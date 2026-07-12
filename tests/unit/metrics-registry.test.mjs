@@ -3,7 +3,7 @@
 // route normalization (bounded cardinality).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from '../../apps/control-plane/src/runtime/metrics-registry.mjs';
+import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from '../../apps/control-plane-executor/src/runtime/metrics-registry.mjs';
 
 test('normalizeRoute collapses id-like segments so the label is bounded', () => {
   assert.equal(normalizeRoute('/v1/tenants/3f9c2b1a-0000-4a5b-8c7d-aaaaaaaaaaaa/workspaces'), '/v1/tenants/{id}/workspaces');

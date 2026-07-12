@@ -19,9 +19,9 @@ import { preflight, createWorker, makeClient, NAMESPACE } from '../workflow-work
 import {
   createFlowTriggerRegistry,
   scheduleIdFor,
-} from '../../../apps/control-plane/src/runtime/flow-trigger-registry.mjs';
-import { createFlowExecutor } from '../../../apps/control-plane/src/runtime/flow-executor.mjs';
-import { computeSignature } from '../../../services/webhook-engine/src/webhook-signing.mjs';
+} from '../../../apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs';
+import { createFlowExecutor } from '../../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
+import { computeSignature } from '../../../packages/webhook-engine/src/webhook-signing.mjs';
 
 const pf = await preflight();
 const SKIP = pf.ok ? false : { skip: pf.reason };

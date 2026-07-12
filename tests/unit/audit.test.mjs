@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as audit from '../../services/scheduling-engine/src/audit.mjs';
+import * as audit from '../../packages/scheduling-engine/src/audit.mjs';
 
 const builders = [
   audit.jobCreatedEvent,

@@ -7,7 +7,7 @@ import {
   readObservabilityAuditExportSurface,
   readObservabilityAuditPipeline,
   readObservabilityAuditQuerySurface
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 export const AUDIT_TRACEABILITY_MATRIX_PATH = 'tests/reference/audit-traceability-matrix.yaml';
 export const REQUIRED_TRACEABILITY_CATEGORY_IDS = Object.freeze([

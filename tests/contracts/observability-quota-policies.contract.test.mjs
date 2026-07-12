@@ -17,9 +17,9 @@ import {
   listQuotaThresholdTypes,
   readAuthorizationModel,
   readObservabilityQuotaPolicies
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
-import { listQuotaPolicyRoutes, summarizeObservabilityQuotaPolicies } from '../../apps/control-plane/src/observability-admin.mjs';
+import { listQuotaPolicyRoutes, summarizeObservabilityQuotaPolicies } from '../../apps/control-plane-executor/src/observability-admin.mjs';
 
 test('observability quota policies contract is exposed through shared readers', () => {
   const contract = readObservabilityQuotaPolicies();

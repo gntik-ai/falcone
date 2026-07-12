@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import {
   createFlowTriggerRegistry,
   resolveTriggerSecretKey,
-} from '../../apps/control-plane/src/runtime/flow-trigger-registry.mjs';
+} from '../../apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs';
 
 // Run `fn` with process.env temporarily set, then restore (node --test shares one process).
 function withEnv(env, fn) {

@@ -24,14 +24,14 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { createSeaweedFSClient } from '../../../services/provisioning-orchestrator/src/reconcilers/s3-rest-client.mjs';
-import { provisionWorkspaceStorageBoundary } from '../../../services/adapters/src/storage-tenant-context.mjs';
-import { createWeedShellTransport } from '../../../services/adapters/src/seaweedfs-iam-client.mjs';
+import { createSeaweedFSClient } from '../../../packages/provisioning-orchestrator/src/reconcilers/s3-rest-client.mjs';
+import { provisionWorkspaceStorageBoundary } from '../../../packages/adapters/src/storage-tenant-context.mjs';
+import { createWeedShellTransport } from '../../../packages/adapters/src/seaweedfs-iam-client.mjs';
 import {
   rotateStorageCredentialIdentity,
   cleanupRotatedCredentialIdentity,
   revokeStorageCredentialIdentity,
-} from '../../../services/provisioning-orchestrator/src/actions/storage-identity-runtime.mjs';
+} from '../../../packages/provisioning-orchestrator/src/actions/storage-identity-runtime.mjs';
 
 const pexec = promisify(execFile);
 const ENDPOINT = process.env.SEAWEEDFS_S3_ENDPOINT;

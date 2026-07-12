@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as backupScopeGet } from '../../../services/provisioning-orchestrator/src/actions/backup-scope-get.mjs';
+import { main as backupScopeGet } from '../../../packages/provisioning-orchestrator/src/actions/backup-scope-get.mjs';
 import { createFakeDb, createFakeProducer } from './fixtures/seed-backup-scope.mjs';
 
 const superadmin = { callerContext: { actor: { id: 'admin-1', type: 'superadmin' } } };

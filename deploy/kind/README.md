@@ -19,10 +19,10 @@ curl -s -X POST http://192.168.1.132:31808/realms/in-falcone-platform/protocol/o
 
 ## Control-plane runtime — domain (A) operational (governance/limits/RBAC)
 
-`control-plane` is no longer a stub: `deploy/kind/control-plane/server.mjs`
+`control-plane` is no longer a stub: `apps/control-plane/server.mjs`
 validates the Keycloak JWT (JWKS), builds a trusted `callerContext` from the
 verified claims, and dispatches `/v1/*` to the repo's REAL action modules
-(`/repo/services/...`) with a pg Pool injected — **54 routes** loaded
+(`/repo/apps/...` and `/repo/packages/...`) with a pg Pool injected — **54 routes** loaded
 (`routes.mjs` seed + `route-map.runtime.json`). Backed by the `in_falcone`
 Postgres DB (migrations 073,074,075,076,078,080,093,097,098,100,103,104,105,114,115,117,118
 applied). Proven end-to-end through the gateway: create plan → set resource
@@ -57,7 +57,7 @@ treated identically to a nonexistent or cross-tenant id —
 
 ## Domain (B) — tenant lifecycle, users, console login (BUILT)
 
-The repo only stubs these (`apps/control-plane/src/workflows/wf-con-002.mjs`:
+The repo only stubs these (`apps/control-plane-executor/src/workflows/wf-con-002.mjs`:
 `createKeycloakRealm` just returns a snapshot), so they were written fresh as
 control-plane modules: `kc-admin.mjs` (real Keycloak admin client),
 `tenant-store.mjs` (the `tenants` registry table — no in-repo migration creates
@@ -196,7 +196,7 @@ this control-plane serves. To make the shell usable end-to-end:
   - **IAM Access** (`/console/iam-access`, superadmin) — pick a user in the active
     tenant realm; assign/remove roles and add/remove group membership.
 - The repo's **Plans** pages (`/console/plans`, `/plans/new`, `/plans/:id`,
-  `/console/my-plan`) are wired: `services/planManagementApi.ts` used a bare `fetch`
+  `/console/my-plan`) are wired: `apps/web-console/src/services/planManagementApi.ts` used a bare `fetch`
   with NO bearer token (every call 401'd) — it now routes through
   `requestConsoleSessionJson` (auth + 401-refresh), and `listPlans` normalizes the
   control-plane's `{plans}` envelope to the SPA's `{items}`. These hit the REAL
@@ -385,8 +385,8 @@ this control-plane serves. To make the shell usable end-to-end:
   the repo's intended data-plane API and are NOT backed by this control-plane.
 
   Build path: `npx vite build` in `apps/web-console` (esbuild transpile — the repo's
-  `tsc -b` baseline is already red on unrelated files), then copy `dist/` into
-  `deploy/kind/web-console/dist` and build the image.
+  `tsc -b` baseline is already red on unrelated files), then build the release image
+  from `apps/web-console/Dockerfile` after `apps/web-console/dist` exists.
 
 ### Honest gaps (domain B — still to build)
 - **Function execution** runs on the Knative data plane (each function is a ksvc;

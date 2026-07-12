@@ -19,8 +19,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import * as shared from '../../services/internal-contracts/src/transport-security.mjs';
-import * as kindLocal from '../../deploy/kind/control-plane/transport-security.mjs';
+import * as shared from '../../packages/internal-contracts/src/transport-security.mjs';
+import * as kindLocal from '../../apps/control-plane/transport-security.mjs';
 
 // A real, readable CA file for the verify-* paths (content is irrelevant to the resolver shape).
 const TMP = mkdtempSync(join(tmpdir(), 'falcone-tls-'));

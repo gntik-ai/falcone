@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { main as managementMain, revealSecretRecords } from '../../services/webhook-engine/actions/webhook-management.mjs';
-import { verifyIncomingWebhook } from '../../services/webhook-engine/src/webhook-signing.mjs';
+import { main as managementMain, revealSecretRecords } from '../../packages/webhook-engine/actions/webhook-management.mjs';
+import { verifyIncomingWebhook } from '../../packages/webhook-engine/src/webhook-signing.mjs';
 
 function makeDb() {
   const state = { subscriptions: new Map(), secrets: new Map(), deliveries: new Map(), attempts: new Map(), events: new Map() };

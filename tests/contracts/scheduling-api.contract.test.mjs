@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import management from '../../services/scheduling-engine/actions/scheduling-management.mjs';
+import management from '../../packages/scheduling-engine/actions/scheduling-management.mjs';
 
 function pgStub() {
   const config = { tenant_id: 't1', workspace_id: 'w1', scheduling_enabled: true, max_active_jobs: 10, min_interval_seconds: 60, max_consecutive_failures: 5 };

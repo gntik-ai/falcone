@@ -1,6 +1,6 @@
 # Domain Model
 
-The platform's core entities and their relationships are defined in `services/internal-contracts/src/domain-model.json` (validated by `npm run validate:domain-model`). This page summarizes that model.
+The platform's core entities and their relationships are defined in `packages/internal-contracts/src/domain-model.json` (validated by `npm run validate:domain-model`). This page summarizes that model.
 
 ## Entities
 

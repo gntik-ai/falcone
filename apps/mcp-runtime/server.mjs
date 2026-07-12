@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
-import { handleMcpMessage } from '../control-plane/src/mcp-official-server.mjs';
+import { handleMcpMessage } from '../control-plane-executor/src/mcp-official-server.mjs';
 
 const PORT = Number(process.env.PORT || 8080);
 const FALCONE_API_BASE_URL = process.env.FALCONE_API_BASE_URL || 'http://falcone-control-plane:8080';

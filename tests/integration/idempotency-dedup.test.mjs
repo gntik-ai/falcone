@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { main as createOperationAction } from '../../services/provisioning-orchestrator/src/actions/async-operation-create.mjs';
-import { createOperation } from '../../services/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
+import { main as createOperationAction } from '../../packages/provisioning-orchestrator/src/actions/async-operation-create.mjs';
+import { createOperation } from '../../packages/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
 
 function createIdempotencyStore() {
   const state = {

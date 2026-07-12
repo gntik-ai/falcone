@@ -6,8 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { main as preflightAction } from '../../../../services/provisioning-orchestrator/src/actions/tenant-config-preflight.mjs';
-import { main as reprovisionAction } from '../../../../services/provisioning-orchestrator/src/actions/tenant-config-reprovision.mjs';
+import { main as preflightAction } from '../../../../packages/provisioning-orchestrator/src/actions/tenant-config-preflight.mjs';
+import { main as reprovisionAction } from '../../../../packages/provisioning-orchestrator/src/actions/tenant-config-reprovision.mjs';
 import { generateExecutionId } from '../../helpers/correlation.mjs';
 import { seedIam } from '../../fixtures/restore/seed-iam.mjs';
 import { seedPostgres } from '../../fixtures/restore/seed-postgres.mjs';

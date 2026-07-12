@@ -3,7 +3,7 @@
  *
  * The control-plane authenticates every request with a Keycloak-signed Bearer JWT and
  * derives the tenant identity from the token's `tenant_id` / `workspace_id` claims (see
- * deploy/kind/control-plane/server.mjs `authenticate`). These specs therefore mint a
+ * apps/control-plane/server.mjs `authenticate`). These specs therefore mint a
  * tenant-scoped token per fixture tenant via the OIDC `client_credentials` grant against
  * a Keycloak client whose hardcoded-claim mappers carry that tenant's UUIDs.
  *

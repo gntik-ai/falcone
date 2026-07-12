@@ -8,7 +8,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { recordQuotaEnforcement, recordRouteDenial } from '../../deploy/kind/control-plane/audit-writer.mjs';
+import { recordQuotaEnforcement, recordRouteDenial } from '../../apps/control-plane/audit-writer.mjs';
 
 const { Pool } = pg;
 const ADMIN_URL =

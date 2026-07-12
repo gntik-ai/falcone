@@ -5,7 +5,7 @@ import {
   MongoDataApiError,
   buildMongoDataApiPlan,
   normalizeMongoDataFilter
-} from '../../services/adapters/src/mongodb-data-api.mjs';
+} from '../../packages/adapters/src/mongodb-data-api.mjs';
 
 test('mongodb data API always injects tenant scope into reads and denies mismatched tenant predicates', () => {
   const plan = buildMongoDataApiPlan({

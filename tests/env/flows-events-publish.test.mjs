@@ -8,8 +8,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Kafka, logLevel } from 'kafkajs';
-import { createEventsExecutor } from '../../apps/control-plane/src/runtime/events-executor.mjs';
-import { eventsPublish } from '../../services/workflow-worker/src/activities/events-publish.mjs';
+import { createEventsExecutor } from '../../apps/control-plane-executor/src/runtime/events-executor.mjs';
+import { eventsPublish } from '../../apps/workflow-worker/src/activities/events-publish.mjs';
 
 const BROKERS = process.env.KAFKA_BROKERS ?? 'localhost:19092';
 const WS_A = 'wsactevta';

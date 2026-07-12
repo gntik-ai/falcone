@@ -1,19 +1,19 @@
 # Flow schedule management API
 
 A flow that declares a `cron` trigger gets a **Temporal Schedule** when a version is published
-(`apps/control-plane/src/runtime/flow-trigger-registry.mjs`). The schedule fires the flow on its cron
+(`apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs`). The schedule fires the flow on its cron
 cadence. The schedule-management API lets a tenant owner **operate that schedule in place** —
 list/inspect it, pause and resume it, and request an ad-hoc run — **without deleting the flow
 definition**. It complements the existing flow lifecycle, where the only schedule controls were
 register-on-publish, swap-on-republish, and delete-on-flow-delete.
 
 These routes are served by the **flow executor runtime**
-(`apps/control-plane/src/runtime/server.mjs`), registered only when a flow executor is wired
+(`apps/control-plane-executor/src/runtime/server.mjs`), registered only when a flow executor is wired
 (`TEMPORAL_ADDRESS` set). They are addressed under the same workspace-scoped flows prefix as the rest
-of the Flows API. The kind control-plane (`deploy/kind/control-plane`) does **not** serve flows routes
+of the Flows API. The kind control-plane (`apps/control-plane`) does **not** serve flows routes
 — flows are executor-only — and the APISIX gateway wildcard-routes `/v1/flows/*` to the executor. The
 five schedule paths are added to the gateway allow-list
-(`services/gateway-config/public-route-catalog.json`, `structural_admin`) alongside the other flows
+(`deploy/gateway-config/public-route-catalog.json`, `structural_admin`) alongside the other flows
 routes so the gateway admits them rather than rejecting them 404-before-route.
 
 ## Schedule identity and tenant isolation

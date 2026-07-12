@@ -19,7 +19,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { KAFKA_HANDLERS } from '../../deploy/kind/control-plane/kafka-handlers.mjs';
+import { KAFKA_HANDLERS } from '../../apps/control-plane/kafka-handlers.mjs';
 
 const TOPIC_A = {
   id: 'res_topic_aaaa',

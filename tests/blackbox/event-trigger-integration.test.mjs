@@ -33,8 +33,8 @@ import { spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createFlowExecutor, createFlowStore } from '../../apps/control-plane/src/runtime/flow-executor.mjs';
-import { createFlowTriggerRegistry, wireFlowTriggers } from '../../apps/control-plane/src/runtime/flow-trigger-registry.mjs';
+import { createFlowExecutor, createFlowStore } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
+import { createFlowTriggerRegistry, wireFlowTriggers } from '../../apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');

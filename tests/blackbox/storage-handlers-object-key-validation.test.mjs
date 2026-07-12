@@ -1,14 +1,14 @@
 // fix-storage-object-key-validation (#638)
 //
 // Distinct from storage-object-key-traversal.test.mjs, which covers the pure ADAPTER builder
-// (services/adapters/.../assertObjectKey). This covers the LIVE kind REST path — the
-// deploy/kind/control-plane storage handlers that talk to the real S3 backend over SigV4. That
+// (packages/adapters/.../assertObjectKey). This covers the LIVE kind REST path — the
+// apps/control-plane storage handlers that talk to the real S3 backend over SigV4. That
 // path did NOT validate the key, so a traversal probe reached the backend and surfaced as a 502.
 // The handlers now validate/normalize the key BEFORE any backend/DB call and return 400. Pure: the
 // pool/backend is never reached for a malformed key.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STORAGE_HANDLERS } from '../../deploy/kind/control-plane/storage-handlers.mjs';
+import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
 
 // A pool whose query() throws — proves key validation runs BEFORE any DB/backend call.
 const explodingPool = { query: async () => { throw new Error('pool must not be reached for a malformed key'); } };

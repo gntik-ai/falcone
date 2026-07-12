@@ -112,6 +112,13 @@ Existing clusters can have disabled-service overrides, manually created Kubernet
 Vault/OpenBao state, an external ESO owner, and PVCs owned by older revisions. Upgrade them through a
 controlled rollout:
 
+> **Execution-token key-derivation upgrades:** releases that change the execution-token key
+> derivation require a coordinated Flows maintenance window. Pause new flow starts and schedules,
+> wait the maximum token lifetime (currently 24 hours) after the last token was minted, then roll
+> out `control-plane-executor` and `workflow-worker` from the same release together. Resume flows
+> only after both rollouts are Ready. Older token formats fail closed by design, so do not perform
+> an independent rolling update of either component for this upgrade.
+
 1. Set `KUBECONFIG`, `NAMESPACE`, `RELEASE`, and `OPENBAO_NAMESPACE` for the intended cluster.
    Set `SOURCE_BAO_ADDR`/`SOURCE_BAO_TOKEN` only when the old deployment used an external
    Vault/OpenBao source. Set target `BAO_ADDR`/`BAO_TOKEN` only if target OpenBao already exists

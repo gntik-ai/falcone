@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import schema from '../../services/internal-contracts/src/retry-override-event.json' with { type: 'json' };
-import { buildRetryOverrideEvent } from '../../services/provisioning-orchestrator/src/events/async-operation-events.mjs';
+import schema from '../../packages/internal-contracts/src/retry-override-event.json' with { type: 'json' };
+import { buildRetryOverrideEvent } from '../../packages/provisioning-orchestrator/src/events/async-operation-events.mjs';
 
 function validate(event) { for (const key of schema.required) assert.notEqual(event[key], undefined); }
 

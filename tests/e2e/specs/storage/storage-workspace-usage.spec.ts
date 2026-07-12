@@ -8,7 +8,7 @@
  *   - GET /v1/storage/workspaces/{workspaceId}/usage returns HTTP 200.
  *   - The response body contains a `dimensions` object with `totalBytes`, `bucketCount`,
  *     `objectCount`, and `objectSizeBytes` dimension entries (handler shape verified against
- *     deploy/kind/control-plane/storage-handlers.mjs storageWorkspaceUsage).
+ *     apps/control-plane/storage-handlers.mjs storageWorkspaceUsage).
  *   - Each dimension entry has a numeric `used` field.
  *
  * fn coverage: fn-storage-workspace-usage

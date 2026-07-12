@@ -13,9 +13,9 @@
 // Writer (audit-writer.mjs):      auditEventForRoute (records failures + outcome), secret handlers
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { auditCanonical, computeRowHash, verifyAuditChain } from '../../deploy/kind/control-plane/audit-hash.mjs';
-import { recordAuditEvent, auditRowToRecord } from '../../deploy/kind/control-plane/audit-store.mjs';
-import { auditEventForRoute, AUDITABLE_LOCAL_HANDLERS } from '../../deploy/kind/control-plane/audit-writer.mjs';
+import { auditCanonical, computeRowHash, verifyAuditChain } from '../../apps/control-plane/audit-hash.mjs';
+import { recordAuditEvent, auditRowToRecord } from '../../apps/control-plane/audit-store.mjs';
+import { auditEventForRoute, AUDITABLE_LOCAL_HANDLERS } from '../../apps/control-plane/audit-writer.mjs';
 
 // ---- pure hash helpers -----------------------------------------------------
 

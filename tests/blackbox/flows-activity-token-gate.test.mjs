@@ -15,8 +15,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dispatchTask } from '../../services/workflow-worker/src/activities/index.mjs';
-import { mintExecutionToken } from '../../apps/control-plane/src/runtime/execution-token.mjs';
+import { dispatchTask } from '../../apps/workflow-worker/src/activities/index.mjs';
+import { mintExecutionToken } from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
 
 function dbQueryInput(token, { tenantId = 'tenant_A', workspaceId = 'ws_A' } = {}) {
   return {
@@ -29,7 +29,7 @@ function dbQueryInput(token, { tenantId = 'tenant_A', workspaceId = 'ws_A' } = {
 
 test('bbx-flows-ten-actgate-01: valid token → activity proceeds, downstream executor called', async () => {
   let called = false;
-  const token = mintExecutionToken('tenant_A', 'ws_A');
+  const token = await mintExecutionToken('tenant_A', 'ws_A');
   await dispatchTask(dbQueryInput(token), {
     executePostgresData: async () => { called = true; return { items: [] }; },
     pgRegistry: {},
@@ -39,7 +39,7 @@ test('bbx-flows-ten-actgate-01: valid token → activity proceeds, downstream ex
 
 test('bbx-flows-ten-actgate-02: expired token → EXECUTION_TOKEN_EXPIRED, no downstream call', async () => {
   let called = false;
-  const expired = mintExecutionToken('tenant_A', 'ws_A', 1, { now: 0 });
+  const expired = await mintExecutionToken('tenant_A', 'ws_A', 1, { now: 0 });
   await assert.rejects(
     () => dispatchTask(dbQueryInput(expired), { executePostgresData: async () => { called = true; return {}; }, pgRegistry: {} }),
     (err) => err.type === 'EXECUTION_TOKEN_EXPIRED' && err.nonRetryable === true,
@@ -50,7 +50,7 @@ test('bbx-flows-ten-actgate-02: expired token → EXECUTION_TOKEN_EXPIRED, no do
 test('bbx-flows-ten-actgate-03: cross-tenant token → EXECUTION_TOKEN_TENANT_MISMATCH, no downstream call', async () => {
   let called = false;
   // Token minted for tenant_B but the execution envelope claims tenant_A.
-  const foreign = mintExecutionToken('tenant_B', 'ws_A');
+  const foreign = await mintExecutionToken('tenant_B', 'ws_A');
   await assert.rejects(
     () => dispatchTask(dbQueryInput(foreign, { tenantId: 'tenant_A', workspaceId: 'ws_A' }), { executePostgresData: async () => { called = true; return {}; }, pgRegistry: {} }),
     (err) => err.type === 'EXECUTION_TOKEN_TENANT_MISMATCH' && err.nonRetryable === true,

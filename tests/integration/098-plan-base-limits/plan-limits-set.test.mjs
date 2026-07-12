@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as setLimit } from '../../../services/provisioning-orchestrator/src/actions/plan-limits-set.mjs';
-import { main as profileGet } from '../../../services/provisioning-orchestrator/src/actions/plan-limits-profile-get.mjs';
+import { main as setLimit } from '../../../packages/provisioning-orchestrator/src/actions/plan-limits-set.mjs';
+import { main as profileGet } from '../../../packages/provisioning-orchestrator/src/actions/plan-limits-profile-get.mjs';
 import { ensureCatalogSeeded } from './fixtures/seed-catalog.mjs';
 import { createFakeDb, createFakeProducer, seedPlans } from './fixtures/seed-plans.mjs';
 

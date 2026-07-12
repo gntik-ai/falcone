@@ -11,12 +11,12 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
-import { buildFlowAuditEvent, FLOW_AUDIT_EVENT_TYPES } from '../../services/audit/src/flow-lifecycle-events.mjs';
-import { teardown as workflowsTeardown } from '../../services/provisioning-orchestrator/src/appliers/workflows-applier.mjs';
+import { buildFlowAuditEvent, FLOW_AUDIT_EVENT_TYPES } from '../../packages/audit/src/flow-lifecycle-events.mjs';
+import { teardown as workflowsTeardown } from '../../packages/provisioning-orchestrator/src/appliers/workflows-applier.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../..');
-const catalog = JSON.parse(readFileSync(resolve(REPO, 'services/gateway-config/public-route-catalog.json'), 'utf8'));
+const catalog = JSON.parse(readFileSync(resolve(REPO, 'deploy/gateway-config/public-route-catalog.json'), 'utf8'));
 
 const WEBHOOK_ROUTE = '/v1/flows/workspaces/{workspaceId}/triggers/webhooks/{triggerId}';
 

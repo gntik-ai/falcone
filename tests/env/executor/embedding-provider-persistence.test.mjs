@@ -19,7 +19,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { createEmbeddingProviderStore } from '../../../apps/control-plane/src/runtime/embedding-executor.mjs';
+import { createEmbeddingProviderStore } from '../../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
 
 const { Pool } = pg;
 

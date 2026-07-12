@@ -8,18 +8,18 @@
 // "postgres executor not wired into db.query activity" at runtime.
 //
 // The fix:
-//   1. services/workflow-worker/src/worker-deps.mjs — new ESM module that exports
+//   1. apps/workflow-worker/src/worker-deps.mjs — new ESM module that exports
 //      wireActivityDeps({ registry? }) → { deps, close } and buildDataDsn(env) → DSN string.
-//   2. services/workflow-worker/src/worker.ts — calls wireActivityDeps() on startup and
+//   2. apps/workflow-worker/src/worker.ts — calls wireActivityDeps() on startup and
 //      feeds the returned deps into activities.setActivityDeps().
 //   3. ../falcone-charts/deploy/kind/values-kind-advanced.yaml — adds PGHOST/PGUSER/PGPASSWORD/PGDATABASE
 //      to workflowWorker.config.inline so the worker can build its DSN.
-//   4. services/workflow-worker/Dockerfile — copies the control-plane runtime .mjs files.
-//   5. services/workflow-worker/package.json — adds pg as a production dependency.
+//   4. apps/workflow-worker/Dockerfile — copies the control-plane runtime .mjs files.
+//   5. apps/workflow-worker/package.json — adds pg as a production dependency.
 //
 // This test suite drives ONLY public surfaces:
-//   - services/workflow-worker/src/activities/index.mjs  (dispatchTask)
-//   - services/workflow-worker/src/worker-deps.mjs       (wireActivityDeps, buildDataDsn)
+//   - apps/workflow-worker/src/activities/index.mjs  (dispatchTask)
+//   - apps/workflow-worker/src/worker-deps.mjs       (wireActivityDeps, buildDataDsn)
 //   No live Temporal connection or Postgres connection required (stubs used).
 //
 // Limitation: bbx-flows-wdb-06 verifies that wireActivityDeps passes the real
@@ -36,8 +36,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dispatchTask } from '../../services/workflow-worker/src/activities/index.mjs';
-import { wireActivityDeps, buildDataDsn } from '../../services/workflow-worker/src/worker-deps.mjs';
+import { dispatchTask } from '../../apps/workflow-worker/src/activities/index.mjs';
+import { wireActivityDeps, buildDataDsn } from '../../apps/workflow-worker/src/worker-deps.mjs';
 
 // Minimal valid db.query dispatch envelope.
 function makeInput(overrides = {}) {
@@ -169,7 +169,7 @@ test('bbx-flows-wdb-06: deps from wireActivityDeps wired into activityDeps stops
   // Import setActivityDeps from the CJS compiled build (the same module executeTask reads from).
   const dynamicImport = new Function('spec', 'return import(spec)');
   const activitiesMod = await dynamicImport(
-    new URL('../../services/workflow-worker/dist/activities/index.js', import.meta.url).pathname,
+    new URL('../../apps/workflow-worker/dist/activities/index.js', import.meta.url).pathname,
   );
   activitiesMod.setActivityDeps(deps);
 

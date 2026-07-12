@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyStatusTransition, buildSubscriptionRecord, canTransition, softDelete, validateSubscriptionInput } from '../../services/webhook-engine/src/webhook-subscription.mjs';
-import { checkSubscriptionQuota } from '../../services/webhook-engine/src/webhook-quota.mjs';
+import { applyStatusTransition, buildSubscriptionRecord, canTransition, softDelete, validateSubscriptionInput } from '../../packages/webhook-engine/src/webhook-subscription.mjs';
+import { checkSubscriptionQuota } from '../../packages/webhook-engine/src/webhook-quota.mjs';
 
 test('valid subscription construction', async () => {
   const resolver = async () => ['93.184.216.34'];

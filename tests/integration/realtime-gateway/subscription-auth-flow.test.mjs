@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AuthError } from '../../../services/realtime-gateway/src/auth/token-validator.mjs';
-import { createScopeChecker } from '../../../services/realtime-gateway/src/auth/scope-checker.mjs';
-import { createAuditPublisher } from '../../../services/realtime-gateway/src/audit/audit-publisher.mjs';
-import { createSessionManager } from '../../../services/realtime-gateway/src/auth/session-manager.mjs';
-import { createValidateSubscriptionAuthAction } from '../../../services/realtime-gateway/src/actions/validate-subscription-auth.mjs';
-import { createHandleScopeRevocationAction } from '../../../services/realtime-gateway/src/actions/handle-scope-revocation.mjs';
-import { guardEvent } from '../../../services/realtime-gateway/src/isolation/tenant-workspace-guard.mjs';
+import { AuthError } from '../../../packages/realtime-gateway/src/auth/token-validator.mjs';
+import { createScopeChecker } from '../../../packages/realtime-gateway/src/auth/scope-checker.mjs';
+import { createAuditPublisher } from '../../../packages/realtime-gateway/src/audit/audit-publisher.mjs';
+import { createSessionManager } from '../../../packages/realtime-gateway/src/auth/session-manager.mjs';
+import { createValidateSubscriptionAuthAction } from '../../../packages/realtime-gateway/src/actions/validate-subscription-auth.mjs';
+import { createHandleScopeRevocationAction } from '../../../packages/realtime-gateway/src/actions/handle-scope-revocation.mjs';
+import { guardEvent } from '../../../packages/realtime-gateway/src/isolation/tenant-workspace-guard.mjs';
 
 function createState() {
   return {

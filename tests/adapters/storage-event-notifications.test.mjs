@@ -14,8 +14,8 @@ import {
   storageEventNotificationErrorCodes,
   storageEventNotificationEventTypes,
   validateStorageEventNotificationRule
-} from '../../services/adapters/src/provider-catalog.mjs';
-import { buildStorageProviderProfile } from '../../services/adapters/src/storage-provider-profile.mjs';
+} from '../../packages/adapters/src/provider-catalog.mjs';
+import { buildStorageProviderProfile } from '../../packages/adapters/src/storage-provider-profile.mjs';
 
 function makeSupportedProfile() {
   const profile = buildStorageProviderProfile({ providerType: 'seaweedfs' });

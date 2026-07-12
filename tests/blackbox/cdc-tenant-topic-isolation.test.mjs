@@ -21,7 +21,7 @@ import {
   deriveTopic as pgDeriveTopic,
   assertValidTopicNamespace as pgAssertValidTopicNamespace,
   KafkaChangePublisher as PgKafkaChangePublisher,
-} from '../../services/pg-cdc-bridge/src/KafkaChangePublisher.mjs';
+} from '../../packages/pg-cdc-bridge/src/KafkaChangePublisher.mjs';
 
 // ---------------------------------------------------------------------------
 // Mongo CDC bridge imports
@@ -30,13 +30,13 @@ import {
   deriveTopic as mongoDeriveTopic,
   assertValidTopicNamespace as mongoAssertValidTopicNamespace,
   KafkaChangePublisher as MongoKafkaChangePublisher,
-} from '../../services/mongo-cdc-bridge/src/KafkaChangePublisher.mjs';
+} from '../../packages/mongo-cdc-bridge/src/KafkaChangePublisher.mjs';
 
 // ---------------------------------------------------------------------------
 // Cache imports
 // ---------------------------------------------------------------------------
-import { CaptureConfigCache } from '../../services/pg-cdc-bridge/src/CaptureConfigCache.mjs';
-import { MongoCaptureConfigCache } from '../../services/mongo-cdc-bridge/src/MongoCaptureConfigCache.mjs';
+import { CaptureConfigCache } from '../../packages/pg-cdc-bridge/src/CaptureConfigCache.mjs';
+import { MongoCaptureConfigCache } from '../../packages/mongo-cdc-bridge/src/MongoCaptureConfigCache.mjs';
 
 // ===========================================================================
 // bbx-cdc-topic-isolation-01: deriveTopic — no override embeds tenant+workspace

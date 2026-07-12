@@ -10,10 +10,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const openapi = JSON.parse(
-  readFileSync(fileURLToPath(new URL('../../apps/control-plane/openapi/control-plane.openapi.json', import.meta.url)), 'utf8'),
+  readFileSync(fileURLToPath(new URL('../../apps/control-plane-executor/openapi/control-plane.openapi.json', import.meta.url)), 'utf8'),
 );
 const bHandlersSrc = readFileSync(
-  fileURLToPath(new URL('../../deploy/kind/control-plane/b-handlers.mjs', import.meta.url)), 'utf8',
+  fileURLToPath(new URL('../../apps/control-plane/b-handlers.mjs', import.meta.url)), 'utf8',
 );
 
 // Extract the live catalog literal so the test catches future drift in EITHER direction.

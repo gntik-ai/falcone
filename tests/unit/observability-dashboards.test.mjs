@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildObservabilityDashboardScope,
   summarizeObservabilityDashboards
-} from '../../apps/control-plane/src/observability-admin.mjs';
+} from '../../apps/control-plane-executor/src/observability-admin.mjs';
 import {
   listObservabilityDashboardScopes,
   listObservabilityDashboardDimensions,
@@ -13,7 +13,7 @@ import {
   getObservabilityDashboardDimension,
   getObservabilityDashboardWidget,
   readObservabilityDashboards
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 test('shared readers expose dashboard scopes, dimensions, and widgets', () => {
   const scopes = listObservabilityDashboardScopes();

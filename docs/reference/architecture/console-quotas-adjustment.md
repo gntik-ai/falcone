@@ -10,7 +10,7 @@ cuota" action. This page documents what that action actually edits, and why (iss
 
 `/console/quotas` does not have its own quota-override write endpoint. There is no
 per-tenant/per-dimension quota-override route in the public route catalog
-(`services/internal-contracts/src/public-route-catalog.json`): the only quota-policy
+(`packages/internal-contracts/src/public-route-catalog.json`): the only quota-policy
 `POST` is scoped to a *plan* (`createQuotaPolicy`,
 `/v1/platform/plans/{planId}/quota-policies`) with no update route, and the real
 per-workspace override action (`workspace-sub-quota-set.mjs`, routed as `POST
@@ -19,7 +19,7 @@ public route catalog the console/OpenAPI contract is generated from.
 
 The dimension values the page renders are, in the real deployed control plane,
 synthesized directly from the tenant's **plan limits**: `dimensionsFromLimits()`
-(`deploy/kind/control-plane/metrics-handlers.mjs`) maps `dimensionId: dimensionKey` and
+(`apps/control-plane/metrics-handlers.mjs`) maps `dimensionId: dimensionKey` and
 `hardLimit: effectiveValue` straight off the tenant's effective entitlements (see
 [console-effective-entitlements-mapping.md](./console-effective-entitlements-mapping.md)),
 whose `effectiveValue` resolves from the tenant's assigned plan's

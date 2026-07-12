@@ -21,7 +21,7 @@ under the platform's [not-production-ready](/) posture and requires Temporal to 
 ## Where flows live
 
 Everything is scoped to a **workspace** inside your tenant. The API family is rooted at
-`/v1/flows/workspaces/{workspaceId}/…` (`services/gateway-config/public-route-catalog.json`).
+`/v1/flows/workspaces/{workspaceId}/…` (`deploy/gateway-config/public-route-catalog.json`).
 Authoring/management routes are `structural_admin`; running and observing executions are
 `data_access`. As with every other capability, the tenant is derived from your verified
 credential — never from a client-supplied header.
@@ -70,7 +70,7 @@ disabled while the document is invalid.
 
 ## The flow document
 
-A flow document has a fixed shape (schema: `services/internal-contracts/src/flow-definition.json`,
+A flow document has a fixed shape (schema: `packages/internal-contracts/src/flow-definition.json`,
 `apiVersion: v1.0`):
 
 | Field | Required | Purpose |
@@ -101,7 +101,7 @@ monitoring). A `branch` needs **at least two arms, or one arm plus a `default`**
 ## Task-type reference
 
 Task nodes invoke first-party **activities**. The catalog is fixed
-(`services/workflow-worker/src/activities/`); each task's input/output schema below is the
+(`apps/workflow-worker/src/activities/`); each task's input/output schema below is the
 authoritative contract the palette and validator use.
 
 ### `db.query` — relational / document query
@@ -233,8 +233,8 @@ Inbound deliveries hit `POST .../triggers/webhooks/{triggerId}` and must carry a
 
 A missing or invalid signature is rejected with **`401`** and **no run is started** — the
 signature is checked before anything else happens. (Implementation:
-`services/webhook-engine/src/webhook-signing.mjs`,
-`apps/control-plane/src/runtime/flow-trigger-registry.mjs`.)
+`packages/webhook-engine/src/webhook-signing.mjs`,
+`apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs`.)
 
 ### Platform event
 
@@ -306,7 +306,7 @@ If a `timeout` is set and elapses first, the run resumes anyway with the timeout
 ## Quotas and limits
 
 Flows are metered on **five per-tenant / per-workspace dimensions**
-(`services/provisioning-orchestrator/src/migrations/121-flow-quota-dimensions.sql`):
+(`packages/provisioning-orchestrator/src/migrations/121-flow-quota-dimensions.sql`):
 
 | Dimension | Scope | Default |
 | --- | --- | --- |

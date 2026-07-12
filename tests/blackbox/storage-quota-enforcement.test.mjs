@@ -31,7 +31,7 @@ import {
   dimensionStatus,
   DEFAULT_MAX_BUCKETS,
   STORAGE_QUOTA_EXCEEDED,
-} from '../../deploy/kind/control-plane/storage-quota.mjs';
+} from '../../apps/control-plane/storage-quota.mjs';
 
 // An injectable loader returning fixed effective limits (mirrors what the env loader yields).
 const limits = ({ maxBuckets = null, maxBytes = null } = {}) => () => ({ maxBuckets, maxBytes });

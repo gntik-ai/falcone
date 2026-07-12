@@ -6,14 +6,14 @@
  * as mcp-api-client / flows-api-client). No real JWT/Keycloak is needed: the control-plane
  * reads `x-tenant-id`, `x-workspace-id`, `x-auth-subject`, `x-pg-role` as trust headers.
  *
- * Wired routes asserted (deploy/kind/control-plane/routes.mjs:118-123):
+ * Wired routes asserted (apps/control-plane/routes.mjs:118-123):
  *   GET  /v1/storage/buckets
  *   POST /v1/storage/workspaces/{workspaceId}/buckets
  *   GET  /v1/storage/workspaces/{workspaceId}/usage
  *   GET  /v1/storage/buckets/{bucketId}/objects
  *   GET  /v1/storage/buckets/{bucketId}/objects/{objectKey}/metadata
  *
- * Response shapes verified against deploy/kind/control-plane/storage-handlers.mjs:
+ * Response shapes verified against apps/control-plane/storage-handlers.mjs:
  *   listBuckets       -> { items: BucketDescriptor[], page: { size: number } }
  *   provisionBucket   -> 201, { bucket: { resourceId, bucketName, workspaceId, tenantId, region, status }, record }
  *   workspaceUsage    -> 200, { dimensions: { totalBytes, bucketCount, objectCount, objectSizeBytes }, buckets }

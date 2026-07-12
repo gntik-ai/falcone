@@ -11,7 +11,7 @@ cd "$(dirname "$0")"
 ROOT="$(cd ../.. && pwd)"
 # shellcheck disable=SC1091
 source ./env.sh
-cd "$ROOT/services/backup-status"
+cd "$ROOT/packages/backup-status"
 if [ $# -eq 0 ]; then
   set -- test/integration/tenant-name-resolver.keycloak.test.ts
 fi

@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import {
   createEmbeddingMappingStore,
   REMAPPING_WARNING,
-} from '../../apps/control-plane/src/runtime/embedding-executor.mjs';
+} from '../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
 
 const WS = 'ws_unit';
 const TEN = 'ten_unit';

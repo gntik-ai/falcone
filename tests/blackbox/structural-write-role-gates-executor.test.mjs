@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 
 const TENANT = 'ten-a';
 const WS = 'ws-a';

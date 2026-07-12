@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 
 import { readJson } from './quality-gates.mjs';
 
-export const INTERNAL_SERVICE_MAP_PATH = 'services/internal-contracts/src/internal-service-map.json';
+export const INTERNAL_SERVICE_MAP_PATH = 'packages/internal-contracts/src/internal-service-map.json';
 export const REQUIRED_SERVICE_IDS = ['control_api', 'provisioning_orchestrator', 'audit_module'];
 export const REQUIRED_ADAPTER_IDS = ['keycloak', 'postgresql', 'mongodb', 'kafka', 'openwhisk', 'storage'];
 export const REQUIRED_CONTRACT_IDS = [
@@ -196,7 +196,7 @@ export function collectServiceMapViolations(serviceMap = readServiceMap()) {
       continue;
     }
 
-    if (!contract.owner || !serviceIndex.has(contract.owner) && contract.owner !== 'services/adapters') {
+    if (!contract.owner || !serviceIndex.has(contract.owner) && contract.owner !== 'packages/adapters') {
       violations.push(`Contract ${contractId} must define a known owner.`);
     }
 

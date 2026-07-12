@@ -29,7 +29,7 @@
  * @module scripts/backfill-seaweedfs-identities
  */
 
-import { provisionWorkspaceStorageBoundary } from '../services/adapters/src/storage-tenant-context.mjs';
+import { provisionWorkspaceStorageBoundary } from '../packages/adapters/src/storage-tenant-context.mjs';
 
 export function parseBackfillArgs(argv = []) {
   const flags = { dryRun: true, forceRotate: false };

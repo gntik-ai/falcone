@@ -15,17 +15,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { provisionWorkspaceStorageBoundary } from '../../services/adapters/src/storage-tenant-context.mjs';
-import { buildStorageProgrammaticCredentialRecord } from '../../services/adapters/src/storage-programmatic-credentials.mjs';
+import { provisionWorkspaceStorageBoundary } from '../../packages/adapters/src/storage-tenant-context.mjs';
+import { buildStorageProgrammaticCredentialRecord } from '../../packages/adapters/src/storage-programmatic-credentials.mjs';
 import {
   writeIdentity,
   deleteIdentity
-} from '../../services/adapters/src/seaweedfs-iam-client.mjs';
+} from '../../packages/adapters/src/seaweedfs-iam-client.mjs';
 import {
   rotateStorageCredentialIdentity,
   cleanupRotatedCredentialIdentity,
   revokeStorageCredentialIdentity
-} from '../../services/provisioning-orchestrator/src/actions/storage-identity-runtime.mjs';
+} from '../../packages/provisioning-orchestrator/src/actions/storage-identity-runtime.mjs';
 
 const noSleep = async () => {};
 

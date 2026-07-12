@@ -123,14 +123,14 @@ two tiers on top:
 
 2. **Per-workspace identities** — provisioned **live** at workspace storage activation, one
    identity per workspace, named `falcone-ws-<workspaceId>`
-   (`services/adapters/src/storage-tenant-context.mjs::provisionWorkspaceStorageBoundary`).
+   (`packages/adapters/src/storage-tenant-context.mjs::provisionWorkspaceStorageBoundary`).
    The bucket scope is the workspace's row in the `workspace_buckets` table, and `actions` are
-   translated from the in-process policy engine (`services/adapters/src/storage-access-policy.mjs`):
+   translated from the in-process policy engine (`packages/adapters/src/storage-access-policy.mjs`):
    `read→Read`, `write→Write`, `list→List`, `admin→Admin`.
 
 Provisioning path and isolation guarantees:
 
-- Identity writes go through `services/adapters/src/seaweedfs-iam-client.mjs`, which applies
+- Identity writes go through `packages/adapters/src/seaweedfs-iam-client.mjs`, which applies
   changes via **`weed shell s3.configure -apply`** (run through `kubectl exec` / `docker exec`).
   SeaweedFS 4.33 exposes no signed-HTTP identity API; `weed shell` is the validated admin path.
 - **Fail-closed scoping.** If `workspace_buckets` returns no bucket for the workspace,

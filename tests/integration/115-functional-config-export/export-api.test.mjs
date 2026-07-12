@@ -7,7 +7,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildMockRegistry, stubCollector, timeoutCollector } from './helpers/mock-collectors.mjs';
 
-const { main } = await import('../../../services/provisioning-orchestrator/src/actions/tenant-config-export.mjs');
+const { main } = await import('../../../packages/provisioning-orchestrator/src/actions/tenant-config-export.mjs');
 
 const AUTH_SUPERADMIN = { actor_id: 'admin@test.com', actor_type: 'superadmin', scopes: ['platform:admin:config:export'] };
 // tenant_owner: identity present but no admin scope → actor_type null → 403

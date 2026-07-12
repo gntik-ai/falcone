@@ -6,7 +6,7 @@ import { dirname, resolve } from 'node:path';
 import Ajv from 'ajv';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = resolve(__dirname, '../../services/internal-contracts/src');
+const SRC = resolve(__dirname, '../../packages/internal-contracts/src');
 const SCHEMA_PATH = resolve(SRC, 'flow-definition.json');
 const FIXTURE_DIR = resolve(SRC, 'fixtures/flows');
 

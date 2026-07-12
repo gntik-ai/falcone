@@ -12,7 +12,7 @@ import {
   resolveActivity,
   taskTypeNames,
   llmComplete,
-} from '../../services/workflow-worker/src/activities/index.mjs';
+} from '../../apps/workflow-worker/src/activities/index.mjs';
 
 const TENANT = { tenantId: 'ten_a', workspaceId: 'ws_llm' };
 const base = { nodeId: 'n1', taskType: 'llm.complete', tenant: TENANT };

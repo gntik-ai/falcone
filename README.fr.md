@@ -276,14 +276,15 @@ cd tests/env
 ## Structure du dépôt
 
 ```text
-apps/            control-plane (surface API REST) · web-console (UI React) ·
-                 cli (CLI falcone : mcp init/dev/deploy) · mcp-server-sdk (SDK d'outils MCP par tenant)
-services/        gateway-config, realtime-gateway, webhook-engine, cdc-bridges,
-                 scheduling-engine, provisioning-orchestrator, backup-status,
-                 workflow-worker (interpréteur du DSL Flows), audit, adapters,
-                 internal-contracts, …
-charts/ helm/    Déploiement Kubernetes / Helm (incl. composants temporal, workflowWorker, mcp)
-deploy/          Routes APISIX, bootstrap kind/OpenShift
+apps/            services publiés : control-plane · control-plane-executor · web-console ·
+                 fn-runtime · workflow-worker · mcp-runtime
+packages/        code partagé/actions : adapters · audit · realtime-gateway · webhook-engine ·
+                 cdc bridges · scheduling-engine · provisioning-orchestrator · backup-status ·
+                 mcp-server-sdk · internal-contracts · …
+tools/           falcone-cli (mcp init/dev/deploy)
+deploy/          Configuration APISIX/Keycloak, bootstrap kind/OpenShift et infrastructure de test
+service-catalog.json  Catalogue canonique des services publiés et non publiés
+../falcone-charts/  Dépôt compagnon pour le déploiement Kubernetes / Helm
 tests/           blackbox (contrat) · e2e (Playwright, incl. specs mcp) · env (stack Compose)
 ```
 
@@ -310,7 +311,6 @@ au sens de l'OSI) — voir la note de compatibilité qui suit.
 | Knative Serving + Kourier | Runtime de fonctions serverless | `Apache-2.0` | [serving](https://github.com/knative/serving) · [net-kourier](https://github.com/knative-extensions/net-kourier) |
 | Kubernetes + Helm | Déploiement et orchestration | `Apache-2.0` | [kubernetes](https://github.com/kubernetes/kubernetes) · [helm](https://github.com/helm/helm) |
 | Node.js 22 | Runtime des services | `MIT` | [nodejs](https://github.com/nodejs/node) |
-| nginx | Service statique de l'image de la console web | `BSD-2-Clause` | [nginx.org](https://nginx.org/LICENSE) |
 
 ### Principaux frameworks et bibliothèques applicatifs (npm)
 

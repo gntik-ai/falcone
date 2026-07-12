@@ -9,7 +9,7 @@ import {
   isKeycloakVersionSupported,
   listIamAdminRoutes,
   summarizeIamAdminSurface
-} from '../../apps/control-plane/src/iam-admin.mjs';
+} from '../../apps/control-plane-executor/src/iam-admin.mjs';
 
 test('iam control-plane helpers expose the new family metadata and compatibility summary', () => {
   const summary = getIamCompatibilitySummary();

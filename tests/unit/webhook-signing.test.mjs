@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeSignature, decryptSecret, encryptSecret, verifyAgainstSecretSet, verifyIncomingWebhook } from '../../services/webhook-engine/src/webhook-signing.mjs';
+import { computeSignature, decryptSecret, encryptSecret, verifyAgainstSecretSet, verifyIncomingWebhook } from '../../packages/webhook-engine/src/webhook-signing.mjs';
 
 test('signatures are deterministic and tamper sensitive', () => {
   const key = 'secret';

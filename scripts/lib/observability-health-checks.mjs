@@ -1,8 +1,8 @@
 import { readJson } from './quality-gates.mjs';
 
-export const OBSERVABILITY_HEALTH_CHECKS_PATH = 'services/internal-contracts/src/observability-health-checks.json';
-export const OBSERVABILITY_METRICS_STACK_PATH = 'services/internal-contracts/src/observability-metrics-stack.json';
-export const OBSERVABILITY_DASHBOARDS_PATH = 'services/internal-contracts/src/observability-dashboards.json';
+export const OBSERVABILITY_HEALTH_CHECKS_PATH = 'packages/internal-contracts/src/observability-health-checks.json';
+export const OBSERVABILITY_METRICS_STACK_PATH = 'packages/internal-contracts/src/observability-metrics-stack.json';
+export const OBSERVABILITY_DASHBOARDS_PATH = 'packages/internal-contracts/src/observability-dashboards.json';
 export const ARCHITECTURE_HEALTH_DOC_PATH = 'docs/reference/architecture/observability-health-checks.md';
 export const ARCHITECTURE_README_PATH = 'docs/reference/architecture/README.md';
 export const OBS_TASK_DOC_PATH = 'docs/tasks/us-obs-01.md';

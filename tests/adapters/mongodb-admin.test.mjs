@@ -15,7 +15,7 @@ import {
   normalizeMongoAdminResource,
   resolveMongoAdminProfile,
   validateMongoAdminRequest
-} from '../../services/adapters/src/mongodb-admin.mjs';
+} from '../../packages/adapters/src/mongodb-admin.mjs';
 
 test('mongodb admin adapter exports supported versions, structural resource coverage, and segregation-aware profile guardrails', () => {
   const sharedProfile = resolveMongoAdminProfile({

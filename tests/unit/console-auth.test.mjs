@@ -7,7 +7,7 @@ import {
   getConsoleAuthRoute,
   listConsoleAuthRoutes,
   summarizeConsoleAuthSurface
-} from '../../apps/control-plane/src/console-auth.mjs';
+} from '../../apps/control-plane-executor/src/console-auth.mjs';
 
 test('console auth helper exposes the expanded auth family surface', () => {
   const routes = listConsoleAuthRoutes();

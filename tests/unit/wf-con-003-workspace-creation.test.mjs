@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { _resetForTest as resetIdempotencyStore } from '../../apps/control-plane/src/workflows/idempotency-store.mjs';
-import { _resetForTest as resetJobStatus } from '../../apps/control-plane/src/workflows/job-status.mjs';
+import { _resetForTest as resetIdempotencyStore } from '../../apps/control-plane-executor/src/workflows/idempotency-store.mjs';
+import { _resetForTest as resetJobStatus } from '../../apps/control-plane-executor/src/workflows/job-status.mjs';
 import handleWorkspaceCreation, {
   __resetWorkflowDependenciesForTest,
   __setWorkflowDependenciesForTest,
   runWorkspaceCreationAction
-} from '../../apps/control-plane/src/workflows/wf-con-003-workspace-creation.mjs';
+} from '../../apps/control-plane-executor/src/workflows/wf-con-003-workspace-creation.mjs';
 
 function request(overrides = {}) {
   return {

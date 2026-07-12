@@ -29,17 +29,17 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { METRICS_HANDLERS } from '../../deploy/kind/control-plane/metrics-handlers.mjs';
-import { auditActionCategoryForType, recordAuditEvent } from '../../deploy/kind/control-plane/audit-store.mjs';
-import { recordScopeDenial, auditEventForRoute } from '../../deploy/kind/control-plane/audit-writer.mjs';
-import { main as scopeAuditQuery } from '../../services/provisioning-orchestrator/src/actions/scope-enforcement-audit-query.mjs';
+import { METRICS_HANDLERS } from '../../apps/control-plane/metrics-handlers.mjs';
+import { auditActionCategoryForType, recordAuditEvent } from '../../apps/control-plane/audit-store.mjs';
+import { recordScopeDenial, auditEventForRoute } from '../../apps/control-plane/audit-writer.mjs';
+import { main as scopeAuditQuery } from '../../packages/provisioning-orchestrator/src/actions/scope-enforcement-audit-query.mjs';
 
 const TENANT_A = '11111111-1111-1111-1111-111111111111';
 const TENANT_B = '22222222-2222-2222-2222-222222222222';
 const WS_A = '33333333-3333-3333-3333-333333333333';
 
 const WS_A_ROW = { id: WS_A, tenant_id: TENANT_A, slug: 'app-staging', display_name: 'App Staging', status: 'active', environment: 'staging' };
-const AUDIT_EVENT_SCHEMA = JSON.parse(readFileSync(new URL('../../services/internal-contracts/src/observability-audit-event-schema.json', import.meta.url), 'utf8'));
+const AUDIT_EVENT_SCHEMA = JSON.parse(readFileSync(new URL('../../packages/internal-contracts/src/observability-audit-event-schema.json', import.meta.url), 'utf8'));
 const AUDIT_ACTION_CATEGORIES = new Set(AUDIT_EVENT_SCHEMA.action.categories);
 
 // In-memory pool that emulates the plan_audit_events + scope_enforcement_denials

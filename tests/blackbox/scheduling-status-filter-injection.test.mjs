@@ -4,7 +4,7 @@
 // Tests: bbx-sched-status-injection-01, -02, valid-status, absent-status, unknown-status
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import main from '../../services/scheduling-engine/actions/scheduling-management.mjs';
+import main from '../../packages/scheduling-engine/actions/scheduling-management.mjs';
 
 const TENANT_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const WS_A = 'wsaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';

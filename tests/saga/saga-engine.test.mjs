@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { executeSaga, recoverInFlightSagas } from '../../apps/control-plane/src/saga/saga-engine.mjs';
-import { __setWorkflowAuditHooksForTesting } from '../../apps/control-plane/src/workflows/workflow-audit.mjs';
+import { executeSaga, recoverInFlightSagas } from '../../apps/control-plane-executor/src/saga/saga-engine.mjs';
+import { __setWorkflowAuditHooksForTesting } from '../../apps/control-plane-executor/src/workflows/workflow-audit.mjs';
 
 function captureAuditAndEvents({ throwOnEmit = false, eventSink } = {}) {
   const auditCalls = [];

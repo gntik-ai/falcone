@@ -171,7 +171,7 @@ histories (the `WorkflowReplayer` test) before rolling it out.
 Starts return `429 { code: QUOTA_EXCEEDED, dimension }`. The five dimensions
 (`max_flows`, `max_flow_versions`, `max_concurrent_executions`, `flow_starts_per_minute`,
 `flow_signal_rate_per_minute`) are seeded by
-`services/provisioning-orchestrator/src/migrations/121-flow-quota-dimensions.sql`; raise a tenant's
+`packages/provisioning-orchestrator/src/migrations/121-flow-quota-dimensions.sql`; raise a tenant's
 limit through the plan/quota administration. The gate **fails closed** — if the quota evaluator is
 unreachable, starts are denied rather than allowed unbounded.
 
@@ -180,7 +180,7 @@ unreachable, starts are denied rather than allowed unbounded.
 The worker image is `node:22-slim` (Debian, glibc) — **deliberately not Alpine**. The Temporal
 TypeScript SDK ships a **native Rust core** (`@temporalio/core-bridge`) as a glibc binary; on
 Alpine/musl the worker crash-loops at startup with a missing-shared-object / symbol error. This
-was hit in the real kind deployment and is why `services/workflow-worker/Dockerfile` pins
+was hit in the real kind deployment and is why `apps/workflow-worker/Dockerfile` pins
 `node:22-slim` while the rest of the platform uses `node:22-alpine`. If you change the base image,
 keep it glibc and rebuild (don't copy `node_modules` across glibc↔musl bases). The package is
 also **TypeScript→CommonJS** (not ESM) by a hard SDK constraint — the Temporal workflow bundler

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as audit from '../../services/webhook-engine/src/webhook-audit.mjs';
+import * as audit from '../../packages/webhook-engine/src/webhook-audit.mjs';
 
 const ctx = { tenantId: 't1', workspaceId: 'w1', actorId: 'u1' };
 

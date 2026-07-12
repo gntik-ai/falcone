@@ -3,7 +3,7 @@
 //
 // The console session principal already carries the effective role bag
 // (`ConsoleSessionPrincipal.platformRoles` — @/lib/console-auth.ts) and the authoritative role
-// intents live server-side in `services/internal-contracts/src/authorization-model.json`
+// intents live server-side in `packages/internal-contracts/src/authorization-model.json`
 // (`permission_matrix.tenant`). Before this change, permission logic was scattered and
 // incomplete across the console: `useWizardPermissionCheck` (console-wizards.ts) only modeled
 // `superadmin`/`platform_operator`/`tenant_owner`/`workspace_admin`; `ConsoleQuotasPage` hand-rolled
@@ -76,7 +76,7 @@ const ROLE_CATALOG_BY_ID = new Map(ROLE_CATALOG.map((entry) => [entry.id, entry]
 // truth. `superadmin`/`platform_admin`/`platform_operator` mirror
 // console-principal.ts::hasPlatformInventoryAccess exactly. `platform_team` is NOT part of that
 // function (nor does it appear anywhere in
-// services/internal-contracts/src/authorization-model.json) — its only precedent in this codebase is
+// packages/internal-contracts/src/authorization-model.json) — its only precedent in this codebase is
 // workspace-secrets-access.ts::SECRETS_PRIVILEGED_ROLES, which already treats it as a
 // tenant-admin-equivalent platform role for the Workspace Secrets gate. Included here for consistency
 // with that precedent; behavior for the other three roles is unchanged.
@@ -99,7 +99,7 @@ export const WORKSPACE_WRITE_CAPABLE_ROLES = new Set([
 // must match the backend's role set EXACTLY, not the broader `WORKSPACE_WRITE_CAPABLE_ROLES` above.
 // `WORKSPACE_WRITE_CAPABLE_ROLES` includes `platform_operator`/`platform_team` (platform-tier roles
 // treated as a console-wide bypass everywhere else — see `PLATFORM_BYPASS_ROLES`), but the backend's
-// `WRITE_CAPABLE_ADMIN_ROLES` (`apps/control-plane/src/runtime/auth-roles.mjs`) does NOT: a
+// `WRITE_CAPABLE_ADMIN_ROLES` (`apps/control-plane-executor/src/runtime/auth-roles.mjs`) does NOT: a
 // `platform_operator`/`platform_team` caller gets a real `403` from a structural write there. Round-2
 // review (#761): reusing `WORKSPACE_WRITE_CAPABLE_ROLES` for this gate caused the console to enable
 // controls the backend then 403s for those two roles — the exact "enabled-then-403" anti-pattern this

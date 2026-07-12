@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveProfile, RetrySemanticProfile, DEFAULT_OPERATION_TYPE } from '../../services/provisioning-orchestrator/src/models/retry-semantics-profile.mjs';
+import { resolveProfile, RetrySemanticProfile, DEFAULT_OPERATION_TYPE } from '../../packages/provisioning-orchestrator/src/models/retry-semantics-profile.mjs';
 
 const fallback = { operation_type: '__default__', max_retries: 5, backoff_strategy: 'exponential', backoff_base_seconds: 30, intervention_conditions: [], failure_categories: {}, is_default: true };
 

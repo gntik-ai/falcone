@@ -23,14 +23,14 @@ import assert from 'node:assert/strict';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// The handler lazily imports the action from ${REPO_ROOT}/services/webhook-engine/...
+// The handler lazily imports the action from ${REPO_ROOT}/packages/webhook-engine/...
 // Point REPO_ROOT at this checkout so the import resolves outside the image.
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 process.env.REPO_ROOT = REPO_ROOT;
 
-const { webhookManage } = await import('../../deploy/kind/control-plane/webhook-handlers.mjs');
-const { routes } = await import('../../deploy/kind/control-plane/routes.mjs');
-const { LOCAL_HANDLERS } = await import('../../deploy/kind/control-plane/b-handlers.mjs');
+const { webhookManage } = await import('../../apps/control-plane/webhook-handlers.mjs');
+const { routes } = await import('../../apps/control-plane/routes.mjs');
+const { LOCAL_HANDLERS } = await import('../../apps/control-plane/b-handlers.mjs');
 
 // In-memory, multi-tenant db implementing the adapter interface the action calls.
 function memDb() {

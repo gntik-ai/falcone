@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import pg from 'pg';
 const { Client } = pg;
 import fs from 'node:fs/promises';
-import { main as createPlan } from '../../../services/provisioning-orchestrator/src/actions/plan-create.mjs';
-import { main as updatePlan } from '../../../services/provisioning-orchestrator/src/actions/plan-update.mjs';
-import { main as lifecyclePlan } from '../../../services/provisioning-orchestrator/src/actions/plan-lifecycle.mjs';
+import { main as createPlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-create.mjs';
+import { main as updatePlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-update.mjs';
+import { main as lifecyclePlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-lifecycle.mjs';
 
-const migration = await fs.readFile(new URL('../../../services/provisioning-orchestrator/src/migrations/097-plan-entity-tenant-assignment.sql', import.meta.url), 'utf8');
+const migration = await fs.readFile(new URL('../../../packages/provisioning-orchestrator/src/migrations/097-plan-entity-tenant-assignment.sql', import.meta.url), 'utf8');
 const superadmin = { callerContext: { actor: { id: 'superadmin-1', type: 'superadmin' } } };
 const sent = [];
 const producer = { send: async (payload) => sent.push(payload) };

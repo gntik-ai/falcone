@@ -21,7 +21,7 @@ payload remains:
 ```
 
 The control-plane route `POST /v1/tenants` is the source of truth for tenant creation. In the kind
-control-plane implementation, `deploy/kind/control-plane/b-handlers.mjs` passes `body.planId` into
+control-plane implementation, `apps/control-plane/b-handlers.mjs` passes `body.planId` into
 `assignPlanBestEffort` after the tenant record is inserted. That path resolves and assigns the plan
 using the existing plan-management assignment action; the assignment is observable through
 `GET /v1/tenants/{tenantId}/plan`.

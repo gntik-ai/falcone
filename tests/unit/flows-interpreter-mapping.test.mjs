@@ -1,6 +1,6 @@
 // Unit tests for the workflow-worker PURE helpers (no live Temporal required):
 //   - DSL retryPolicy → Temporal RetryPolicy mapping (verbatim, per
-//     services/internal-contracts/src/flow-definition-mapping.json)
+//     packages/internal-contracts/src/flow-definition-mapping.json)
 //   - DSL retryPolicy.timeouts → Temporal ActivityOptions timeout fields
 //   - node-ID activity naming convention (activityId === node.id [#loop])
 //   - WorkflowInput discriminated-union dispatch (inline vs load-by-reference)

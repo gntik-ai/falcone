@@ -11,7 +11,7 @@ administration:
 - `GET /v1/tenants/{tenantId}/workspaces/{workspaceId}/consumption`
 
 Both routes are implemented by
-`services/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs`.
+`packages/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs`.
 The gateway configuration already declares the self route as
 `workspace-consumption-self`; the kind runtime route map and the real-stack test
 action-runner must declare the same route so local and deployed verification do

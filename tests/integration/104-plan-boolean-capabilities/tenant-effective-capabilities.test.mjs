@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as tenantCaps } from '../../../services/provisioning-orchestrator/src/actions/tenant-effective-capabilities-get.mjs';
+import { main as tenantCaps } from '../../../packages/provisioning-orchestrator/src/actions/tenant-effective-capabilities-get.mjs';
 import { createFakeDb } from './fixtures/seed-capability-catalog.mjs';
 import { seedPlans, seedAssignments } from './fixtures/seed-plans-with-capabilities.mjs';
 

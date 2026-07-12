@@ -3,7 +3,7 @@
 Time-bounded, tested rollback from the FerretDB v2 + DocumentDB backend back to MongoDB. This
 is the full procedure referenced by the cutover runbook (`RUNBOOK.md` → *Rollback*). It is
 **infrastructure/ops-only** — no application source changes: the data backend is selected by
-the `MONGO_URI` environment variable (`apps/control-plane/src/runtime/main.mjs::mongoUri`,
+the `MONGO_URI` environment variable (`apps/control-plane-executor/src/runtime/main.mjs::mongoUri`,
 lines 33-34) and chart values; realtime/CDC is selected by which control-plane build is
 deployed.
 
@@ -27,10 +27,10 @@ deployed.
 | FerretDB Postgres engine PVC | retained separately | A distinct decommission item from the MongoDB PVC — do not confuse them. |
 
 Verify before relying on this runbook:
-- `apps/control-plane/src/runtime/main.mjs::mongoUri` (lines 33-34) is the sole `MONGO_URI`
+- `apps/control-plane-executor/src/runtime/main.mjs::mongoUri` (lines 33-34) is the sole `MONGO_URI`
   resolution point for the data-API path.
-- `apps/control-plane/src/runtime/realtime-executor.mjs` and
-  `services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs` are **pgoutput-only** in the current
+- `apps/control-plane-executor/src/runtime/realtime-executor.mjs` and
+  `packages/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs` are **pgoutput-only** in the current
   build (no `collection.watch()`); restoring realtime requires the **pre-#460 image** redeploy.
 - The chart `mongodb:` stanza (`../falcone-charts/charts/in-falcone/values.yaml`, line 1792, `enabled: true`)
   keeps MongoDB deployable and its PVC retained during the window.

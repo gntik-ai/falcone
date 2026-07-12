@@ -1,5 +1,5 @@
 // DEFAULT_STORAGE_PROVIDER_TYPE is config-driven and evaluated at module import
-// (services/adapters/src/storage-provider-profile.mjs). Because ESM caches modules,
+// (packages/adapters/src/storage-provider-profile.mjs). Because ESM caches modules,
 // a same-process import cannot re-evaluate with a different env, so each assertion is
 // verified by spawning a fresh child Node process that imports the real module and
 // prints the resolved value.
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const moduleUrl = new URL('../../services/adapters/src/storage-provider-profile.mjs', import.meta.url).href;
+const moduleUrl = new URL('../../packages/adapters/src/storage-provider-profile.mjs', import.meta.url).href;
 const probe = `import { DEFAULT_STORAGE_PROVIDER_TYPE } from ${JSON.stringify(moduleUrl)}; process.stdout.write(DEFAULT_STORAGE_PROVIDER_TYPE);`;
 
 function resolveDefaultProviderType(env) {

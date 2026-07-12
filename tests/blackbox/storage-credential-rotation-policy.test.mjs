@@ -1,14 +1,14 @@
 // Black-box test suite for change add-storage-cred-rotation-policy.
 //
 // Public interfaces exercised:
-//   - Pure builders in services/adapters/src/storage-programmatic-credentials.mjs
+//   - Pure builders in packages/adapters/src/storage-programmatic-credentials.mjs
 //       buildStorageProgrammaticCredentialRecord (policyMaxAgeDays -> policyExpiresAt)
 //       rotateStorageProgrammaticCredential (rotationReason)
 //   - The provisioning-orchestrator sweep action
-//       services/provisioning-orchestrator/src/actions/storage-credential-expiry-sweep.mjs::main
+//       packages/provisioning-orchestrator/src/actions/storage-credential-expiry-sweep.mjs::main
 //     driven with injected fake { db, repo, rotateFn, publishEvent } deps.
 //   - The control-plane storage-admin policy routes + route catalog entries
-//       apps/control-plane/src/storage-admin.mjs
+//       apps/control-plane-executor/src/storage-admin.mjs
 //       (getStorageCredentialRotationPolicy GET, setStorageCredentialRotationPolicy PUT)
 //
 // Covers tasks.md 2.2 - 2.9. No internal knowledge: only the public exports are used.
@@ -29,13 +29,13 @@ import {
   buildStorageProgrammaticCredentialRecord,
   rotateStorageProgrammaticCredential,
   buildStorageProgrammaticCredentialSecretEnvelope
-} from '../../services/adapters/src/storage-programmatic-credentials.mjs';
-import { main as storageCredentialExpirySweep } from '../../services/provisioning-orchestrator/src/actions/storage-credential-expiry-sweep.mjs';
+} from '../../packages/adapters/src/storage-programmatic-credentials.mjs';
+import { main as storageCredentialExpirySweep } from '../../packages/provisioning-orchestrator/src/actions/storage-credential-expiry-sweep.mjs';
 import {
   getStorageAdminRoute,
   getStorageCredentialRotationPolicyPreview,
   setStorageCredentialRotationPolicyPreview
-} from '../../apps/control-plane/src/storage-admin.mjs';
+} from '../../apps/control-plane-executor/src/storage-admin.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

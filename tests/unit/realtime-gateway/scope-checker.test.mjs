@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createScopeChecker } from '../../../services/realtime-gateway/src/auth/scope-checker.mjs';
-import { getScopeMappings, upsertScopeMapping } from '../../../services/realtime-gateway/src/repositories/scope-mapping-repository.mjs';
+import { createScopeChecker } from '../../../packages/realtime-gateway/src/auth/scope-checker.mjs';
+import { getScopeMappings, upsertScopeMapping } from '../../../packages/realtime-gateway/src/repositories/scope-mapping-repository.mjs';
 
 const env = () => ({
   KEYCLOAK_JWKS_URL: 'https://keycloak.example/certs',

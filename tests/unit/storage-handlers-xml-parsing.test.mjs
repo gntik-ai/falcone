@@ -1,4 +1,4 @@
-// XML parsing hardening for the live storage runtime (deploy/kind/control-plane/storage-handlers.mjs).
+// XML parsing hardening for the live storage runtime (apps/control-plane/storage-handlers.mjs).
 //
 // listBuckets() / listObjects() parse the S3 ListAllMyBucketsResult / ListBucketResult
 // envelopes with an entity-aware, CDATA-tolerant regex parser. These tests stub the
@@ -16,7 +16,7 @@ const realListBuckets = readFileSync(new URL('03-listbuckets.xml', SPIKE), 'utf8
 const realListObjects = readFileSync(new URL('04-listobjectsv2.xml', SPIKE), 'utf8');
 
 // Import once; the module reads the global fetch lazily inside each call.
-const handlers = await import('../../deploy/kind/control-plane/storage-handlers.mjs');
+const handlers = await import('../../apps/control-plane/storage-handlers.mjs');
 
 function withStubbedFetch(textByKind, fn) {
   const original = globalThis.fetch;

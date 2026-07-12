@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildQuotaImpactSet, buildCapabilityImpactSet } from '../../../services/provisioning-orchestrator/src/models/effective-entitlement-snapshot.mjs';
+import { buildQuotaImpactSet, buildCapabilityImpactSet } from '../../../packages/provisioning-orchestrator/src/models/effective-entitlement-snapshot.mjs';
 
 test('upgrade/downgrade snapshots include quota and capability lines', () => {
   const quotas = buildQuotaImpactSet([{ dimensionKey: 'max_workspaces', effectiveValue: 5, effectiveValueKind: 'bounded' }], [{ dimensionKey: 'max_workspaces', effectiveValue: 10, effectiveValueKind: 'bounded' }], [{ dimensionKey: 'max_workspaces', observedUsage: 8 }]);

@@ -5,7 +5,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildMockRegistry } from './helpers/mock-collectors.mjs';
 
-const { main } = await import('../../../services/provisioning-orchestrator/src/actions/tenant-config-export-domains.mjs');
+const { main } = await import('../../../packages/provisioning-orchestrator/src/actions/tenant-config-export-domains.mjs');
 
 const AUTH = { actor_id: 'admin@test.com', actor_type: 'superadmin', scopes: ['platform:admin:config:export'] };
 

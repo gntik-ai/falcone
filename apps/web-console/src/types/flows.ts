@@ -1,6 +1,6 @@
 // Flow DSL TypeScript model for the console designer (change: add-console-flow-designer).
 //
-// Mirrors services/internal-contracts/src/flow-definition.json (apiVersion v1.0). This is the
+// Mirrors packages/internal-contracts/src/flow-definition.json (apiVersion v1.0). This is the
 // console-side view of the shared contract; the AUTHORITATIVE structural + semantic rules stay
 // in the contract package (flow-definition.json + flow-definition-validator.mjs), which the
 // designer imports directly for client-side validation. Kept intentionally thin: only the fields

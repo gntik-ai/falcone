@@ -24,7 +24,7 @@ import {
   buildWorkflowId,
   parseWorkflowId,
   createFlowExecutor,
-} from '../../apps/control-plane/src/runtime/flow-executor.mjs';
+} from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
 
 // Realistic UUIDs (UUIDs never contain ':' nor the substring "workflow").
 const TENANT = '11111111-1111-4111-8111-111111111111';

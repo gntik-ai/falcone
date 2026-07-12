@@ -29,7 +29,7 @@ fi
 export TEMPORAL_NAMESPACE="${TEMPORAL_NAMESPACE:-default}"
 
 echo "==> building the workflow-worker (tsc → dist/)"
-( cd "$ROOT/services/workflow-worker" && (pnpm build || npm run build) )
+( cd "$ROOT/apps/workflow-worker" && (pnpm build || npm run build) )
 
 echo "==> running workflow-worker real-stack suite against Temporal at $TEMPORAL_ADDRESS"
 node --test \

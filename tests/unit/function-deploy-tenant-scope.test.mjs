@@ -26,7 +26,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { FN_HANDLERS } from '../../deploy/kind/control-plane/fn-handlers.mjs';
+import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
 
 // ---------------------------------------------------------------------------
 // Fixtures

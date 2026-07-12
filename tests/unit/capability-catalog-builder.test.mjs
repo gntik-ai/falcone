@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCatalog, buildExamples } from '../../services/workspace-docs-service/src/capability-catalog-builder.mjs';
+import { buildCatalog, buildExamples } from '../../packages/workspace-docs-service/src/capability-catalog-builder.mjs';
 
 const workspaceContext = {
   workspaceId: 'ws-123',

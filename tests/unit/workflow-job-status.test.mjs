@@ -8,7 +8,7 @@ import {
   queryJobStatus,
   registerJob,
   updateJobStatus
-} from '../../apps/control-plane/src/workflows/job-status.mjs';
+} from '../../apps/control-plane-executor/src/workflows/job-status.mjs';
 
 test.afterEach(() => {
   _resetForTest();

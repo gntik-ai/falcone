@@ -49,7 +49,7 @@ echo "==> waiting for the S3 gateway to accept signed requests"
 ready=""
 for _ in $(seq 1 60); do
   if node --input-type=module -e '
-    import { createSeaweedFSClient } from "'"$HERE"'/../../../services/provisioning-orchestrator/src/reconcilers/s3-rest-client.mjs";
+    import { createSeaweedFSClient } from "'"$HERE"'/../../../packages/provisioning-orchestrator/src/reconcilers/s3-rest-client.mjs";
     await createSeaweedFSClient({ endpoint: process.env.SEAWEEDFS_S3_ENDPOINT, accessKeyId: process.env.SEAWEEDFS_S3_ACCESS_KEY_ID, secretAccessKey: process.env.SEAWEEDFS_S3_SECRET_ACCESS_KEY }).listBuckets();
   ' >/dev/null 2>&1; then ready=1; break; fi
   sleep 1

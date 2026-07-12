@@ -19,10 +19,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
-import { createFlowExecutor } from '../../apps/control-plane/src/runtime/flow-executor.mjs';
-import { createFlowQuotaGate, FLOW_QUOTA_DIMENSIONS } from '../../apps/control-plane/src/runtime/flow-quota-gate.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
+import { createFlowExecutor } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
+import { createFlowQuotaGate, FLOW_QUOTA_DIMENSIONS } from '../../apps/control-plane-executor/src/runtime/flow-quota-gate.mjs';
 
 const DEF = { apiVersion: 'v1.0', name: 'f', nodes: [{ id: 'a', type: 'task', taskType: 't' }] };
 const headersFor = (t, w) => ({ 'content-type': 'application/json', 'x-tenant-id': t, 'x-workspace-id': w, 'x-auth-subject': `admin-${t}` });

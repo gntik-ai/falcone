@@ -19,8 +19,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deriveBucketName } from '../../deploy/kind/control-plane/storage-handlers.mjs';
-import { insertBucket } from '../../deploy/kind/control-plane/tenant-store.mjs';
+import { deriveBucketName } from '../../apps/control-plane/storage-handlers.mjs';
+import { insertBucket } from '../../apps/control-plane/tenant-store.mjs';
 
 const TENANT_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const TENANT_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';

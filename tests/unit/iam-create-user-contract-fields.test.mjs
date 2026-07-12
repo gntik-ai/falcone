@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LOCAL_HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
-import { normalizeKeycloakAttributes } from '../../deploy/kind/control-plane/kc-admin.mjs';
+import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
+import { normalizeKeycloakAttributes } from '../../apps/control-plane/kc-admin.mjs';
 
 function fakeKc() {
   const calls = [];

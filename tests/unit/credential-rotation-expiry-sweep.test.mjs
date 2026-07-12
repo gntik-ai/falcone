@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../../services/provisioning-orchestrator/src/actions/credential-rotation-expiry-sweep.mjs';
+import { main } from '../../packages/provisioning-orchestrator/src/actions/credential-rotation-expiry-sweep.mjs';
 
 test('expiry sweep processes expired rotations and tolerates partial failures', async () => {
   const events = [];

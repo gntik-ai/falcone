@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCancelledEvent } from '../../services/provisioning-orchestrator/src/events/async-operation-events.mjs';
-import { operationCancelEventSchema } from '../../services/internal-contracts/src/index.mjs';
+import { buildCancelledEvent } from '../../packages/provisioning-orchestrator/src/events/async-operation-events.mjs';
+import { operationCancelEventSchema } from '../../packages/internal-contracts/src/index.mjs';
 
 function validateAgainstRequiredSchema(event, schema) {
   for (const field of schema.required ?? []) {

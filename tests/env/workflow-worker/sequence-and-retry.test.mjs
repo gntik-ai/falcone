@@ -1,6 +1,6 @@
 // Real-stack proof: the PRODUCTION DslInterpreterWorkflow executes a sequence of task
 // nodes in declaration order against a live Temporal server, using the minimal-3-node
-// contract fixture as input (services/internal-contracts/src/fixtures/flows).
+// contract fixture as input (packages/internal-contracts/src/fixtures/flows).
 //
 //   bash tests/env/workflow-worker/run.sh
 //

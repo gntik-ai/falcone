@@ -14,8 +14,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runReconcileBuckets } from '../../../services/provisioning-orchestrator/src/commands/reconcile-buckets.mjs';
-import { createSeaweedFSClient } from '../../../services/provisioning-orchestrator/src/reconcilers/s3-rest-client.mjs';
+import { runReconcileBuckets } from '../../../packages/provisioning-orchestrator/src/commands/reconcile-buckets.mjs';
+import { createSeaweedFSClient } from '../../../packages/provisioning-orchestrator/src/reconcilers/s3-rest-client.mjs';
 
 const config = {
   endpoint: process.env.SEAWEEDFS_S3_ENDPOINT,

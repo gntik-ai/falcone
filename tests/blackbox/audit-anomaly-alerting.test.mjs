@@ -24,9 +24,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getRulesConfig } from '../../services/audit-anomaly-handler/src/rules.mjs';
-import { createAnomalyDetector } from '../../services/audit-anomaly-handler/src/anomaly-detector.mjs';
-import { createAlertPublisher } from '../../services/audit-anomaly-handler/src/alert-publisher.mjs';
+import { getRulesConfig } from '../../packages/audit-anomaly-handler/src/rules.mjs';
+import { createAnomalyDetector } from '../../packages/audit-anomaly-handler/src/anomaly-detector.mjs';
+import { createAlertPublisher } from '../../packages/audit-anomaly-handler/src/alert-publisher.mjs';
 
 // ---------------------------------------------------------------------------
 // Helpers

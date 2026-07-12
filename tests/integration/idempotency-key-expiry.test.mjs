@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { main as createOperationAction } from '../../services/provisioning-orchestrator/src/actions/async-operation-create.mjs';
+import { main as createOperationAction } from '../../packages/provisioning-orchestrator/src/actions/async-operation-create.mjs';
 
 function createExpiryStore() {
   const state = {

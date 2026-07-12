@@ -5,8 +5,8 @@
 // For tenants A and B it drives the live document-store surface and the FerretDB v2
 // compatibility areas, asserting the post-migration backend behaves correctly:
 //   - CRUD (insert / list / query[filter+page] / search) THROUGH the data-API executor
-//     (apps/control-plane/src/runtime/mongo-data-executor.mjs) — tenant scoping via the
-//     `tenantId` field in services/adapters/src/mongodb-data-api.mjs is the SOLE boundary;
+//     (apps/control-plane-executor/src/runtime/mongo-data-executor.mjs) — tenant scoping via the
+//     `tenantId` field in packages/adapters/src/mongodb-data-api.mjs is the SOLE boundary;
 //   - cross-tenant NEGATIVE probe (Tenant A denied on Tenant B data -> 403/404);
 //   - aggregation: $group / same-namespace $lookup(<=1) / $facet(<=4) MUST return 200
 //     (SUPPORTED — adapter-capped, NOT waivable); cross-database $lookup MUST be rejected
@@ -18,7 +18,7 @@
 //     -> UnknownBsonField 40415 (remediation tracked in add-ferretdb-realtime-cdc-remediation);
 //   - isolation-gap: a raw tenant_a backend credential reads tenant_b data directly and
 //     SUCCEEDS — confirming DocumentDB has NO per-database role scoping (ADR-14 finding;
-//     apps/control-plane/src/postgres-applier.mjs provisions no per-tenant DocumentDB identity).
+//     apps/control-plane-executor/src/postgres-applier.mjs provisions no per-tenant DocumentDB identity).
 //
 // `runSmoke` is PURE: it takes an injected `api` (one async method per probe class) so the
 // pass/fail/waiver logic is deterministically testable in tests/blackbox without a live
@@ -198,7 +198,7 @@ const wireCode = (e) => e?.codeName ?? e?.code ?? e?.errmsg ?? e?.message;
 
 async function main() {
   const { MongoClient } = await import('mongodb');
-  const { createMongoExecutor } = await import('../../../apps/control-plane/src/runtime/mongo-data-executor.mjs');
+  const { createMongoExecutor } = await import('../../../apps/control-plane-executor/src/runtime/mongo-data-executor.mjs');
 
   const URI = process.env.FERRETDB_URI ?? process.env.MONGO_URI ?? 'mongodb://falcone:falcone@localhost:57017/';
   const DB = process.env.FERRETDB_VALIDATION_DB ?? 'ferretdb_validation';

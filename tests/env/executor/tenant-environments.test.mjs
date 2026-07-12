@@ -4,7 +4,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { ensureSchema, insertWorkspace, insertWorkspaceDatabase, listTenantEnvironments, getWorkspace } from '../../../deploy/kind/control-plane/tenant-store.mjs';
+import { ensureSchema, insertWorkspace, insertWorkspaceDatabase, listTenantEnvironments, getWorkspace } from '../../../apps/control-plane/tenant-store.mjs';
 import { randomUUID } from 'node:crypto';
 
 const { Pool } = pg;

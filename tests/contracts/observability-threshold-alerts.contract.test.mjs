@@ -12,7 +12,7 @@ import {
   listAlertEventTypes,
   listAlertSuppressionCauses,
   readObservabilityThresholdAlerts
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 test('observability threshold alerts contract is exposed through shared readers', () => {
   const contract = readObservabilityThresholdAlerts();

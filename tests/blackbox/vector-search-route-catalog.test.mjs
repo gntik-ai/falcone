@@ -1,5 +1,5 @@
 // Black-box test suite for change add-vector-search — public route catalog gate.
-// The catalog at services/gateway-config/public-route-catalog.json is the AUTHORITATIVE
+// The catalog at deploy/gateway-config/public-route-catalog.json is the AUTHORITATIVE
 // allow-list: a path not present there is rejected (404-before-route) at the gateway.
 // These tests assert the five new vector routes are present with the correct
 // privilege_domain, and that no vector path is silently mis-domained.
@@ -13,7 +13,7 @@ import { dirname, resolve } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../..');
-const catalog = JSON.parse(readFileSync(resolve(REPO, 'services/gateway-config/public-route-catalog.json'), 'utf8'));
+const catalog = JSON.parse(readFileSync(resolve(REPO, 'deploy/gateway-config/public-route-catalog.json'), 'utf8'));
 
 function has(method, path, domain) {
   return catalog.some((r) => r.method === method && r.path === path && r.privilege_domain === domain);

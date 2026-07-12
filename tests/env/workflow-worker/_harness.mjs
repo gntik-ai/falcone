@@ -1,6 +1,6 @@
 // Shared real-stack harness for the workflow-worker proof.
 //
-// Drives the PRODUCTION interpreter (services/workflow-worker/dist) against a live
+// Drives the PRODUCTION interpreter (apps/workflow-worker/dist) against a live
 // Temporal server (tests/env docker-compose `temporal` service). Self-skips when
 // Temporal/Docker is unavailable (repo precedent: pgvector real-stack tests).
 import { spawn } from 'node:child_process';

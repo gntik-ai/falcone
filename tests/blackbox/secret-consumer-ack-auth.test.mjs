@@ -6,7 +6,7 @@
 //        bbx-sec-ack-tenant-mismatch-01, bbx-sec-ack-success-01
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../../services/provisioning-orchestrator/src/actions/secret-consumer-ack.mjs';
+import { main } from '../../packages/provisioning-orchestrator/src/actions/secret-consumer-ack.mjs';
 
 const TENANT_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const TENANT_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';

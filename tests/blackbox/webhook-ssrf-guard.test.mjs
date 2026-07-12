@@ -14,9 +14,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as managementMain } from '../../services/webhook-engine/actions/webhook-management.mjs';
-import { main as deliveryMain } from '../../services/webhook-engine/actions/webhook-delivery-worker.mjs';
-import { encryptSecret } from '../../services/webhook-engine/src/webhook-signing.mjs';
+import { main as managementMain } from '../../packages/webhook-engine/actions/webhook-management.mjs';
+import { main as deliveryMain } from '../../packages/webhook-engine/actions/webhook-delivery-worker.mjs';
+import { encryptSecret } from '../../packages/webhook-engine/src/webhook-signing.mjs';
 
 // Minimal in-memory db stub for the POST subscription path
 function makeManagementDb() {

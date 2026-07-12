@@ -7,7 +7,7 @@
 //   bbx-cron-floor-03: POST with cron at/above floor → NOT 422 CRON_BELOW_FLOOR (floor check passes)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import main from '../../services/scheduling-engine/actions/scheduling-management.mjs';
+import main from '../../packages/scheduling-engine/actions/scheduling-management.mjs';
 
 const TENANT_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const WS_A = 'wsaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';

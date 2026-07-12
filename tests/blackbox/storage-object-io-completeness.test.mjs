@@ -13,8 +13,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
-import { STORAGE_HANDLERS } from '../../deploy/kind/control-plane/storage-handlers.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
+import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
 
 const {
   storageGetObject, storageDeleteBucket, storagePresignObject,
@@ -132,7 +132,7 @@ test('bbx-stor-io-wiring: each new object-I/O route is registered with a handler
 });
 
 test('bbx-stor-io-catalog: the gateway-config catalog advertises every new object-I/O route', () => {
-  const catalog = JSON.parse(readFileSync(fileURLToPath(new URL('../../services/gateway-config/public-route-catalog.json', import.meta.url)), 'utf8'));
+  const catalog = JSON.parse(readFileSync(fileURLToPath(new URL('../../deploy/gateway-config/public-route-catalog.json', import.meta.url)), 'utf8'));
   const advertised = new Set(catalog.map((r) => `${r.method} ${r.path}`));
   for (const [method, path] of NEW_ROUTES) {
     assert.ok(advertised.has(`${method} ${path}`), `catalog advertises ${method} ${path}`);

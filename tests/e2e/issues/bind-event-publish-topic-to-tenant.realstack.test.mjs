@@ -33,7 +33,7 @@ import { Kafka, logLevel } from 'kafkajs';
 import {
   buildEventGatewayPublishRequest,
   normalizeEventGatewayError
-} from '../../../services/event-gateway/src/runtime.mjs';
+} from '../../../packages/event-gateway/src/runtime.mjs';
 
 const KC = process.env.KEYCLOAK_BASE_URL;
 const ADMIN_CLIENT = process.env.KEYCLOAK_ADMIN_CLIENT_ID || 'falcone-admin';

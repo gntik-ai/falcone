@@ -2,7 +2,7 @@
  * Black-box tests for add-tenant-custom-rbac (management surface + validation half).
  *
  * Drives the public handler exports of the tenant custom-role catalog module
- * (apps/control-plane/src/iam-tenant-roles.mjs) through their injected `db`
+ * (apps/control-plane-executor/src/iam-tenant-roles.mjs) through their injected `db`
  * dependency and gateway-trusted identity headers — no internal knowledge
  * beyond the public function signatures.
  *
@@ -28,7 +28,7 @@ import {
   createTenantCustomRole,
   listTenantCustomRoles,
   getTenantCustomRole,
-} from '../../apps/control-plane/src/iam-tenant-roles.mjs';
+} from '../../apps/control-plane-executor/src/iam-tenant-roles.mjs';
 
 // ---------------------------------------------------------------------------
 // Fakes

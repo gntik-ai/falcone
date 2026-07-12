@@ -19,7 +19,7 @@ import {
   normalizePostgresAdminResource,
   resolvePostgresAdminProfile,
   validatePostgresAdminRequest
-} from '../../services/adapters/src/postgresql-admin.mjs';
+} from '../../packages/adapters/src/postgresql-admin.mjs';
 
 test('postgres admin adapter exports the expanded capability matrix and profile baseline', () => {
   const growthProfile = resolvePostgresAdminProfile({ planId: 'pln_01growth' });

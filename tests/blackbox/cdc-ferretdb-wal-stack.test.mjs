@@ -14,9 +14,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ChangeStreamWatcher } from '../../services/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs';
-import { KafkaChangePublisher as MongoKafkaChangePublisher } from '../../services/mongo-cdc-bridge/src/KafkaChangePublisher.mjs';
-import { decodeWalMessage } from '../../services/mongo-cdc-bridge/src/WalBsonDecoder.mjs';
+import { ChangeStreamWatcher } from '../../packages/mongo-cdc-bridge/src/ChangeStreamWatcher.mjs';
+import { KafkaChangePublisher as MongoKafkaChangePublisher } from '../../packages/mongo-cdc-bridge/src/KafkaChangePublisher.mjs';
+import { decodeWalMessage } from '../../packages/mongo-cdc-bridge/src/WalBsonDecoder.mjs';
 
 const captureConfig = {
   id: 'cfg-wal-1',

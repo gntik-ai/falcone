@@ -1,6 +1,6 @@
 # API Reference — Control Plane
 
-All public HTTP routes are listed in `services/gateway-config/public-route-catalog.json` and tagged with a **privilege domain**. This page is the index; the data-plane families have their own pages ([PostgreSQL](/api/postgresql), [MongoDB](/api/mongodb), [Realtime](/api/realtime), [Gateway](/api/gateway)).
+All public HTTP routes are listed in `deploy/gateway-config/public-route-catalog.json` and tagged with a **privilege domain**. This page is the index; the data-plane families have their own pages ([PostgreSQL](/api/postgresql), [MongoDB](/api/mongodb), [Realtime](/api/realtime), [Gateway](/api/gateway)).
 
 ## Base URL & versioning
 

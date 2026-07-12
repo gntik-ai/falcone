@@ -1,6 +1,6 @@
 // Real-Postgres proof for change add-pgvector-provisioning-preflight.
 //
-// The provisioning applier (services/provisioning-orchestrator/src/appliers/
+// The provisioning applier (packages/provisioning-orchestrator/src/appliers/
 // postgres-applier.mjs) must query pg_available_extensions BEFORE issuing
 // CREATE EXTENSION. pg_available_extensions reflects which extension control
 // files the *image* actually ships, so this is a real-DB behaviour that only a
@@ -12,7 +12,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { apply } from '../../../services/provisioning-orchestrator/src/appliers/postgres-applier.mjs';
+import { apply } from '../../../packages/provisioning-orchestrator/src/appliers/postgres-applier.mjs';
 
 const { Pool } = pg;
 

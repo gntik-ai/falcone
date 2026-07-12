@@ -2,7 +2,7 @@ import {
   filterPublicRoutes,
   listApiFamilies,
   listPublicRoutes
-} from '../../../../services/internal-contracts/src/index.mjs';
+} from '../../../../packages/internal-contracts/src/index.mjs';
 
 export const consoleVisibleApiFamilies = listApiFamilies();
 export const consoleVisibleApiRoutes = listPublicRoutes();

@@ -4,11 +4,11 @@ import assert from 'node:assert/strict';
 import {
   _resetForTest as resetIdempotencyStore,
   markPending
-} from '../../apps/control-plane/src/workflows/idempotency-store.mjs';
+} from '../../apps/control-plane-executor/src/workflows/idempotency-store.mjs';
 import handleUserApproval, {
   __resetWorkflowDependenciesForTest,
   __setWorkflowDependenciesForTest
-} from '../../apps/control-plane/src/workflows/wf-con-001-user-approval.mjs';
+} from '../../apps/control-plane-executor/src/workflows/wf-con-001-user-approval.mjs';
 
 function request(overrides = {}) {
   return {

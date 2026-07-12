@@ -7,7 +7,7 @@ import {
   getAlertLifecycleStateMachine,
   getAlertSuppressionDefaults,
   summarizeConsoleAlertsContract
-} from '../../apps/control-plane/src/observability-admin.mjs';
+} from '../../apps/control-plane-executor/src/observability-admin.mjs';
 
 test('buildHealthSummaryContext returns the platform summary projection', () => {
   const summary = buildHealthSummaryContext('platform');

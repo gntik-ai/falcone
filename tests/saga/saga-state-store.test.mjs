@@ -7,7 +7,7 @@ import {
   getInFlightSagas,
   updateSagaStatus,
   updateStepStatus
-} from '../../apps/control-plane/src/saga/saga-state-store.mjs';
+} from '../../apps/control-plane-executor/src/saga/saga-state-store.mjs';
 
 test('createSagaInstance and createSagaStep build required records', async () => {
   const saga = await createSagaInstance('WF-CON-001', { foo: 'bar' }, { tenantId: 't1', actorType: 'svc', actorId: 'a1' }, 'corr', 'idem');

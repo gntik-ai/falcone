@@ -20,8 +20,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { sanitize } from '../../services/secret-audit-handler/src/sanitizer.mjs';
-import { hasForbiddenField, validateAuditEvent } from '../../services/secret-audit-handler/src/event-schema.mjs';
+import { sanitize } from '../../packages/secret-audit-handler/src/sanitizer.mjs';
+import { hasForbiddenField, validateAuditEvent } from '../../packages/secret-audit-handler/src/event-schema.mjs';
 
 // ---------------------------------------------------------------------------
 // Helpers

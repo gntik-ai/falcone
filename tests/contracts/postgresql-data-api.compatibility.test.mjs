@@ -6,8 +6,8 @@ import {
   getContract,
   getPublicRoute,
   getService
-} from '../../services/internal-contracts/src/index.mjs';
-import { postgresqlAdminAdapterPort } from '../../services/adapters/src/postgresql-admin.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
+import { postgresqlAdminAdapterPort } from '../../packages/adapters/src/postgresql-admin.mjs';
 
 test('postgres data API service contracts and adapter capability baseline are published', () => {
   const postgresDataRequest = getContract('postgres_data_request');

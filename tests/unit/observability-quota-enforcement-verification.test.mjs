@@ -4,15 +4,15 @@ import assert from 'node:assert/strict';
 import {
   buildWorkspaceQuotaUsageOverview,
   buildWorkspaceUsageSnapshot
-} from '../../apps/control-plane/src/observability-admin.mjs';
-import { validateKafkaAdminRequest } from '../../services/adapters/src/kafka-admin.mjs';
-import { validateMongoAdminRequest } from '../../services/adapters/src/mongodb-admin.mjs';
-import { validateOpenWhiskAdminRequest } from '../../services/adapters/src/openwhisk-admin.mjs';
-import { validatePostgresAdminRequest } from '../../services/adapters/src/postgresql-admin.mjs';
+} from '../../apps/control-plane-executor/src/observability-admin.mjs';
+import { validateKafkaAdminRequest } from '../../packages/adapters/src/kafka-admin.mjs';
+import { validateMongoAdminRequest } from '../../packages/adapters/src/mongodb-admin.mjs';
+import { validateOpenWhiskAdminRequest } from '../../packages/adapters/src/openwhisk-admin.mjs';
+import { validatePostgresAdminRequest } from '../../packages/adapters/src/postgresql-admin.mjs';
 import {
   buildStorageQuotaProfile,
   previewStorageBucketQuotaAdmission
-} from '../../services/adapters/src/storage-capacity-quotas.mjs';
+} from '../../packages/adapters/src/storage-capacity-quotas.mjs';
 
 function buildFunctionsAllowedResult() {
   return validateOpenWhiskAdminRequest({

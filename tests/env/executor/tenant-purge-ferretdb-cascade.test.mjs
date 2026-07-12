@@ -1,7 +1,7 @@
 // Real-stack proof for fix-tenant-purge-ferretdb-cascade (#682): tenant purge /
 // workspace delete cascade to the FerretDB document store, isolation-safe.
 //
-// Drives the REAL deploy/kind/control-plane store helpers + mongoTeardown against a
+// Drives the REAL apps/control-plane store helpers + mongoTeardown against a
 // LIVE Postgres (registry) AND a LIVE FerretDB (the shared document cluster), so the
 // cardinal isolation constraint is proven against the actual backend, not a fake:
 //   - a tenant's provisioned mongo db is recorded (workspace_mongo_databases) and
@@ -16,8 +16,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import { MongoClient } from 'mongodb';
-import * as store from '../../../deploy/kind/control-plane/tenant-store.mjs';
-import { mongoTeardown } from '../../../deploy/kind/control-plane/mongo-handlers.mjs';
+import * as store from '../../../apps/control-plane/tenant-store.mjs';
+import { mongoTeardown } from '../../../apps/control-plane/mongo-handlers.mjs';
 
 const { Pool } = pg;
 const ADMIN_URL =

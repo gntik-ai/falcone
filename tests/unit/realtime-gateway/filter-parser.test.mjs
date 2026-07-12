@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFilter, FilterValidationError } from '../../../services/realtime-gateway/src/filters/filter-parser.mjs';
-import { checkComplexity } from '../../../services/realtime-gateway/src/filters/complexity-checker.mjs';
+import { parseFilter, FilterValidationError } from '../../../packages/realtime-gateway/src/filters/filter-parser.mjs';
+import { checkComplexity } from '../../../packages/realtime-gateway/src/filters/complexity-checker.mjs';
 
 test('parseFilter accepts a valid filter payload', () => {
   const parsed = parseFilter({

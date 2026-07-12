@@ -93,7 +93,7 @@ moment the routes are wired.
 
 ## Runtime state and verification
 
-The control-plane runtime (`apps/control-plane/src/runtime/server.mjs`) serves `/v1/mcp/...`
+The control-plane runtime (`apps/control-plane-executor/src/runtime/server.mjs`) serves `/v1/mcp/...`
 management routes when the core chart sets `MCP_ENABLED=true`. Registry, version, audit, and
 rate-limit state is durable in PostgreSQL through the control-plane metadata pool; the memory
 store is retained only for unit tests. Operational verification should create, curate, publish, call,

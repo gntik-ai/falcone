@@ -33,8 +33,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LOCAL_HANDLERS as HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
-import { kcAdmin, TENANT_REALM_SCOPES } from '../../deploy/kind/control-plane/kc-admin.mjs';
+import { LOCAL_HANDLERS as HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
+import { kcAdmin, TENANT_REALM_SCOPES } from '../../apps/control-plane/kc-admin.mjs';
 
 const ACME = 'acme-11111111';
 const GLOBEX = 'globex-22222222';

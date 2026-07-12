@@ -7,8 +7,8 @@ function makeJwtLikeToken(payload) {
 
 test('simulation status response is additive over the base operation contract', async () => {
   process.env.TEST_MODE = 'true'
-  const { setClient } = await import('../../services/backup-status/src/operations/operations.repository.js')
-  const { main } = await import('../../services/backup-status/src/operations/get-operation.action.js')
+  const { setClient } = await import('../../packages/backup-status/src/operations/operations.repository.js')
+  const { main } = await import('../../packages/backup-status/src/operations/get-operation.action.js')
 
   setClient({
     async query() {
@@ -70,7 +70,7 @@ test('simulation status response is additive over the base operation contract', 
 })
 
 test('unsafe simulation profiles surface a clear rejection contract', async () => {
-  const { runRestoreSimulation } = await import('../../services/backup-status/src/operations/restore-simulation.service.js')
+  const { runRestoreSimulation } = await import('../../packages/backup-status/src/operations/restore-simulation.service.js')
 
   await assert.rejects(
     () => runRestoreSimulation({

@@ -92,7 +92,7 @@ function docName(doc) {
 // ---------------------------------------------------------------------------
 test('bbx-flows-interp-001: package.json declares Temporal SDK deps and is NOT type:module', () => {
   const pkgPath = resolve(SVC, 'package.json');
-  assert.ok(existsSync(pkgPath), 'services/workflow-worker/package.json must exist');
+  assert.ok(existsSync(pkgPath), 'apps/workflow-worker/package.json must exist');
   const pkg = JSON.parse(read(pkgPath));
   for (const dep of ['@temporalio/worker', '@temporalio/workflow', '@temporalio/activity', '@temporalio/client']) {
     assert.ok(pkg.dependencies?.[dep], `package.json must depend on ${dep}`);
@@ -187,12 +187,12 @@ test('bbx-flows-interp-006: activity-interface contract envelope is exported and
 // ---------------------------------------------------------------------------
 test('bbx-flows-interp-007: Dockerfile uses node:22-slim, USER node, builds from repo root', () => {
   const df = resolve(SVC, 'Dockerfile');
-  assert.ok(existsSync(df), 'services/workflow-worker/Dockerfile must exist');
+  assert.ok(existsSync(df), 'apps/workflow-worker/Dockerfile must exist');
   const src = read(df);
   assert.match(src, /FROM\s+node:22-slim/, 'Dockerfile must base on node:22-slim (glibc required by @temporalio/core-bridge native binary; Alpine/musl cannot load it)');
   assert.match(src, /USER\s+node/, 'Dockerfile must run as USER node (non-root)');
-  // Build from repo root: copies services/workflow-worker paths (not bare src/).
-  assert.match(src, /services\/workflow-worker/, 'Dockerfile must copy from the repo-root services/workflow-worker path');
+  // Build from repo root: copies apps/workflow-worker paths (not bare src/).
+  assert.match(src, /services\/workflow-worker/, 'Dockerfile must copy from the repo-root apps/workflow-worker path');
   assert.match(src, /CMD\s+\[?["']?node["']?/, 'Dockerfile CMD must launch the node worker process');
 });
 

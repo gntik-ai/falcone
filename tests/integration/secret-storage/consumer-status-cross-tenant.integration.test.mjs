@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import pg from 'pg';
 const { Client } = pg;
-import { main as consumerStatus } from '../../../services/provisioning-orchestrator/src/actions/secret-rotation-consumer-status.mjs';
+import { main as consumerStatus } from '../../../packages/provisioning-orchestrator/src/actions/secret-rotation-consumer-status.mjs';
 
 const TENANT_A = process.env.TESTENV_TENANT_A || '11111111-1111-1111-1111-111111111111';
 const TENANT_B = process.env.TESTENV_TENANT_B || '22222222-2222-2222-2222-222222222222';
@@ -29,7 +29,7 @@ const ownerB = { sub: 'user:b', roles: ['tenant-owner'], tenantId: TENANT_B };
 const platform = { sub: 'ops', roles: ['platform-operator'] };
 
 const migration = await fs.readFile(
-  new URL('../../../services/provisioning-orchestrator/src/migrations/092-secret-rotation.sql', import.meta.url),
+  new URL('../../../packages/provisioning-orchestrator/src/migrations/092-secret-rotation.sql', import.meta.url),
   'utf8'
 );
 

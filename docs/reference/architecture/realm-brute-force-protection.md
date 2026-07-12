@@ -34,7 +34,7 @@ verifiable: an operator can confirm lockout with a small number of attempts.
 
 ### Per-tenant realms (control-plane)
 
-The control-plane runtime (`deploy/kind/control-plane/kc-admin.mjs`) reads the thresholds from
+The control-plane runtime (`apps/control-plane/kc-admin.mjs`) reads the thresholds from
 environment variables at startup and stamps them onto each realm it creates. All variables are
 optional; an unset, empty, or malformed value falls back to the safe default above, and a malformed
 `REALM_BRUTE_FORCE_PROTECTED` keeps protection **on** — detection is disabled only by an explicit,
@@ -98,7 +98,7 @@ environment variables and chart values above.
 
 ## Implementation
 
-- `deploy/kind/control-plane/kc-admin.mjs` — `bruteForceRealmConfig(env)` (pure, exported) resolves
+- `apps/control-plane/kc-admin.mjs` — `bruteForceRealmConfig(env)` (pure, exported) resolves
   the fields from env; `createRealm` spreads the resolved `DEFAULT_BRUTE_FORCE` into the realm
   representation.
 - `../falcone-charts/charts/in-falcone/values.yaml` — the `bootstrap.oneShot.keycloak.realm.bruteForce` defaults.

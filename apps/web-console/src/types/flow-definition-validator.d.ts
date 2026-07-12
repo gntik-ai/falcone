@@ -1,6 +1,6 @@
 // Type surface for the SHARED flow semantic validator (change: add-console-flow-designer).
 //
-// The implementation lives in services/internal-contracts/src/flow-definition-validator.mjs
+// The implementation lives in packages/internal-contracts/src/flow-definition-validator.mjs
 // (plain ESM + cel-js) and is the single rule set used by both the control-plane validate
 // endpoint and this console. Only the exports the designer consumes are typed here.
 declare module '@in-falcone/internal-contracts/src/flow-definition-validator.mjs' {

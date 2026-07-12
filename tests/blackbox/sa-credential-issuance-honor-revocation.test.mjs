@@ -23,7 +23,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LOCAL_HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
+import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
 
 // ---- handler harness: inject store + kcAdmin via ctx, parameterized by SA status -----------------
 function handlerCtx({ status = 'active' } = {}) {

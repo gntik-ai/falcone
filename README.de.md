@@ -275,14 +275,15 @@ cd tests/env
 ## Repository-Aufbau
 
 ```text
-apps/            control-plane (REST-API-Oberfläche) · web-console (React-UI) ·
-                 cli (falcone-CLI: mcp init/dev/deploy) · mcp-server-sdk (mandanten-eingegrenztes MCP-Tool-SDK)
-services/        gateway-config, realtime-gateway, webhook-engine, cdc-bridges,
-                 scheduling-engine, provisioning-orchestrator, backup-status,
-                 workflow-worker (Flows-DSL-Interpreter), audit, adapters,
-                 internal-contracts, …
-charts/ helm/    Kubernetes- / Helm-Deployment (inkl. Komponenten temporal, workflowWorker, mcp)
-deploy/          APISIX-Routen, kind/OpenShift-Bootstrap
+apps/            veröffentlichte Services: control-plane · control-plane-executor · web-console ·
+                 fn-runtime · workflow-worker · mcp-runtime
+packages/        gemeinsamer Code/Aktionen: adapters · audit · realtime-gateway · webhook-engine ·
+                 cdc bridges · scheduling-engine · provisioning-orchestrator · backup-status ·
+                 mcp-server-sdk · internal-contracts · …
+tools/           falcone-cli (mcp init/dev/deploy)
+deploy/          APISIX/Keycloak-Konfiguration, kind/OpenShift-Bootstrap und Testinfrastruktur
+service-catalog.json  Kanonischer Katalog für veröffentlichte und nicht veröffentlichte Services
+../falcone-charts/  Begleit-Repository für Kubernetes-/Helm-Deployment
 tests/           blackbox (Contract) · e2e (Playwright, inkl. mcp-Specs) · env (Compose-Stack)
 ```
 
@@ -309,7 +310,6 @@ source-available** (kein OSI-Open-Source) — siehe den folgenden Kompatibilitä
 | Knative Serving + Kourier | Serverless-Funktions-Runtime | `Apache-2.0` | [serving](https://github.com/knative/serving) · [net-kourier](https://github.com/knative-extensions/net-kourier) |
 | Kubernetes + Helm | Deployment & Orchestrierung | `Apache-2.0` | [kubernetes](https://github.com/kubernetes/kubernetes) · [helm](https://github.com/helm/helm) |
 | Node.js 22 | Service-Runtime | `MIT` | [nodejs](https://github.com/nodejs/node) |
-| nginx | Statisches Ausliefern des Web-Konsolen-Images | `BSD-2-Clause` | [nginx.org](https://nginx.org/LICENSE) |
 
 ### Wichtigste Anwendungs-Frameworks & -Bibliotheken (npm)
 

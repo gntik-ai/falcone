@@ -23,7 +23,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { METRICS_HANDLERS } from '../../deploy/kind/control-plane/metrics-handlers.mjs';
+import { METRICS_HANDLERS } from '../../apps/control-plane/metrics-handlers.mjs';
 
 const WS_A = { id: 'ws-a', tenant_id: 'tenant-a', slug: 'app-staging', display_name: 'App Staging', status: 'active', environment: 'staging' };
 

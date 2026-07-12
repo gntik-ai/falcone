@@ -2,6 +2,8 @@
 
 This page describes **every architecture component** of In Falcone — what it does, where it lives in the repository / chart, and how it participates in tenant isolation. Core components are packaged as unconditional dependencies of the umbrella Helm chart (`../falcone-charts/charts/in-falcone`); legacy `<component>.enabled=false` service disables and zero-replica core overrides are rejected by chart validation.
 
+The canonical release/source map is [`service-catalog.json`](../../service-catalog.json). It lists the six release-published Falcone images (`in-falcone-control-plane`, `in-falcone-control-plane-executor`, `in-falcone-web-console`, `in-falcone-fn-runtime`, `in-falcone-workflow-worker`, `in-falcone-mcp-runtime`) with their chart alias/value key, co-located Dockerfile, direct dependencies and inter-service calls. Packages such as `realtime-gateway`, `mongo-cdc-bridge`, `pg-cdc-bridge` and `workspace-docs-service` are documented there as non-release evidence when they are not published images.
+
 ```
 EDGE          CONTROL & DATA PLANE        DATA BACKENDS           PLATFORM
 ─────         ────────────────────        ─────────────           ────────
@@ -16,12 +18,12 @@ Web Console    Realtime Engine            SeaweedFS (storage)     Bootstrap & Pr
 
 ## API Gateway (APISIX)
 
-**Chart alias:** `apisix` · **Config:** `services/gateway-config/`, `scripts/lib/gateway-policy.mjs` · **Route catalog:** `services/gateway-config/public-route-catalog.json`
+**Chart alias:** `apisix` · **Config:** `deploy/gateway-config/`, `scripts/lib/gateway-policy.mjs` · **Route catalog:** `deploy/gateway-config/public-route-catalog.json`
 
 APISIX is the single ingress for the public API. It is responsible for:
 
 - **Credential classification & routing.** It splits traffic by credential: an `apikey: flc_…` header (anon/service keys) is matched by a route-variable rule (`vars` on `^flc_`) and sent to the executor; a Bearer JWT path is validated and routed with verified identity headers injected. The split means the data plane and admin plane are reachable through one host.
-- **Scope enforcement.** A custom plugin maps each route to its `privilege_domain` (`structural_admin` vs `data_access`) and rejects callers whose verified scope doesn't match (`services/gateway-config/tests/plugins/scope-enforcement-*`).
+- **Scope enforcement.** A custom plugin maps each route to its `privilege_domain` (`structural_admin` vs `data_access`) and rejects callers whose verified scope doesn't match (`deploy/gateway-config/tests/plugins/scope-enforcement-*`).
 - **Per-key rate limiting.** APISIX `limit-count` uses `key_type: var_combination` with `$http_apikey`, so each API key gets its own bucket (using `var` would key globally). `policy: local` is node-local (≈ N× the limit with N replicas); `policy: redis` is globally exact.
 - **Identity injection.** After validating a token, the gateway injects `x-tenant-id` / `x-workspace-id` / `x-auth-subject` / `x-pg-role` and strips any client-supplied context headers, so downstream services receive only trusted context.
 
@@ -31,19 +33,19 @@ In Kubernetes the routes are reconciled by the **bootstrap job** from `bootstrap
 
 ## Control Plane
 
-**Chart alias:** `controlPlane` · **Code:** `apps/control-plane/`
+**Chart alias:** `controlPlane` · **Code:** `apps/control-plane/` · **Image:** `in-falcone-control-plane`
 
 The control plane owns **platform metadata and lifecycle**: tenants, workspaces, members, schemas, function deployment, API keys, service configuration and quotas — the entire `structural_admin` surface. It mutates the platform's own datastore and reconciles downstream resources (gateway routes, identity realm entries, provisioning of per-workspace databases).
 
-The runnable HTTP service (`apps/control-plane/src/runtime/server.mjs`) also fronts the data plane: it matches requests against a small route table, resolves identity, and dispatches to the executors. Paths it does not serve itself are reverse-proxied to the legacy control-plane upstream — and that proxy is **SSRF-safe by construction**: protocol/host/port are pinned to the operator-configured upstream and only the path+query come from the request.
+The runnable HTTP service (`apps/control-plane/server.mjs`) validates identity, matches `/v1/*` requests against the route map, dispatches to product action modules, and injects the dependencies each action needs. Some helper/action modules are loaded from `apps/control-plane-executor`, but the release control-plane image source and Dockerfile are co-located under `apps/control-plane`.
 
 ---
 
 ## Executor (data-plane runtime)
 
-**Chart alias:** `controlPlaneExecutor` · **Code:** `apps/control-plane/src/runtime/*-executor.mjs`
+**Chart alias:** `controlPlaneExecutor` · **Code:** `apps/control-plane-executor/` · **Image:** `in-falcone-control-plane-executor`
 
-The executor is the **data plane**. It is deliberately dependency-light: it takes an adapter-built plan and executes it against a real driver. One executor module per backend family:
+The executor is the **data plane**. Its HTTP entrypoint is `apps/control-plane-executor/src/runtime/server.mjs`; executor modules are deliberately dependency-light and take adapter-built plans that execute against real drivers. One executor module per backend family:
 
 | Module | Backend | Responsibility |
 | --- | --- | --- |
@@ -63,7 +65,7 @@ Every executor call carries an `identity` and **stamps/filters by `tenantId`** �
 
 ## Data Adapters
 
-**Code:** `services/adapters/src/{postgresql-data-api,mongodb-data-api}.mjs`
+**Code:** `packages/adapters/src/{postgresql-data-api,mongodb-data-api}.mjs`
 
 Adapters are pure **plan builders**: they translate a logical data request (collection, filters, ordering, pagination, mutation) into a concrete plan the executor runs. Examples:
 
@@ -76,17 +78,17 @@ Keeping plan-building separate from execution makes the data layer testable with
 
 ## Web Console
 
-**Chart alias:** `webConsole` · **Code:** `apps/web-console/` (or `services/web-console`)
+**Chart alias:** `webConsole` · **Code:** `apps/web-console/` · **Image:** `in-falcone-web-console`
 
 A browser app for operators and developers. It authenticates against Keycloak (OIDC) and operates within a selected **tenant context**. The console surfaces the whole platform: tenants, workspace context, IAM (members, roles, service accounts & credentials), PostgreSQL and MongoDB browsers, object storage, the event bus, serverless functions, plans, quotas, observability and operations. (See the [tour](/guide/what-is-falcone#a-guided-tour-of-a-real-deployment).)
 
-The console talks to the same public API as any other client, so anything it does is reproducible over HTTP. Anon-key embeds let you render read-only data in an external frontend.
+The console talks to the same public API as any other client, so anything it does is reproducible over HTTP. The release Dockerfile at `apps/web-console/Dockerfile` serves the prebuilt Vite bundle with `apps/web-console/static-server.mjs`, a Node static server that runs as a numeric non-root user without filesystem writes. Anon-key embeds let you render read-only data in an external frontend.
 
 ---
 
 ## Realtime Engine
 
-**Code:** `apps/control-plane/src/runtime/realtime-executor.mjs`, `postgres-realtime-executor.mjs` · **Service:** `services/realtime-gateway`
+**Code:** `apps/control-plane-executor/src/runtime/realtime-executor.mjs`, `postgres-realtime-executor.mjs` · **Package:** `packages/realtime-gateway` (non-release evidence; no published image)
 
 Realtime delivers live data changes over **Server-Sent Events** (no WebSocket dependency). Two sources:
 
@@ -137,7 +139,7 @@ A tenant-scoped publish/subscribe stream (`/v1/events/publish`, `/v1/events/subs
 
 ## Serverless Functions
 
-**Chart alias:** none — functions are provisioned by the control-plane executor, not a datastore component.
+**Release image:** `in-falcone-fn-runtime` via `controlPlane.env.FN_RUNTIME_IMAGE` · **Code:** `apps/fn-runtime/`
 
 Per-tenant serverless functions: deploy (`POST /v1/functions`, `structural_admin`/`function_deployment`) and invoke (`POST /v1/functions/{id}/invoke`, `data_access`). The platform runs functions on a **Knative-based runtime** (migrated off OpenWhisk): the control-plane executor provisions one Knative Service per function from `FN_RUNTIME_IMAGE` and manages function lifecycle via Kubernetes RBAC (`templates/control-plane-rbac.yaml`). The public API keeps the OpenWhisk-compatible action/package/trigger/rule model.
 
@@ -145,7 +147,7 @@ Per-tenant serverless functions: deploy (`POST /v1/functions`, `structural_admin
 
 ## Flows / Workflow Engine (Temporal)
 
-**Chart aliases:** `temporal`, `workflowWorker` (core baseline) · **Code:** `services/workflow-worker/`, `apps/control-plane/src/runtime/flow-*.mjs` · **DSL:** `services/internal-contracts/src/flow-definition.json`
+**Chart aliases:** `temporal`, `workflowWorker` (core baseline) · **Code:** `apps/workflow-worker/`, `apps/control-plane-executor/src/runtime/flow-*.mjs` · **DSL:** `packages/internal-contracts/src/flow-definition.json`
 
 A durable workflow engine. Tenants author **flows** as a YAML DSL; the control plane stores immutable versions and starts each execution as a **Temporal** workflow, run by a single generic interpreter (`DslInterpreterWorkflow`) that maps DSL nodes (`sequence`/`parallel`/`task`/`branch`/`wait`/`approval`/`sub-flow`) to Temporal primitives. Temporal is **internal-only** (no public route; operator-only Web UI) and uses a **shared namespace** (`falcone-flows`) with server-stamped `tenantId`/`workspaceId`/`flowId`/`flowVersion`/`triggerType` search attributes for isolation, plus PostgreSQL SQL visibility (no Elasticsearch). Every workflow id is `{tenantId}:{workspaceId}:{flowId}:{runUuid}`, generated server-side and prefix-checked on every command. See [Flows Architecture](/architecture/flows), the [Flows Runbook](/architecture/flows-runbook), the tenant [Flows guide](/guide/flows), and [ADR-11](/architecture/adrs#adr-11-temporal-for-the-durable-workflow-flows-engine).
 
@@ -153,7 +155,7 @@ A durable workflow engine. Tenants author **flows** as a YAML DSL; the control p
 
 ## MCP Server Hosting (Preview)
 
-**Chart alias:** `mcp` (core baseline) · **Code:** `apps/control-plane/src/runtime/mcp-engine.mjs`, `apps/control-plane/src/mcp-*.mjs` · **API:** `/v1/mcp/workspaces/{ws}/servers/…`
+**Chart alias:** `mcp` (core baseline) · **Code:** `apps/control-plane-executor/src/runtime/mcp-engine.mjs`, `apps/control-plane-executor/src/mcp-*.mjs` · **Runtime image:** `apps/mcp-runtime/` (`in-falcone-mcp-runtime`) · **API:** `/v1/mcp/workspaces/{ws}/servers/…`
 
 Hosts tenant **Model Context Protocol** servers so AI agents can call the backend as **tools**. The control-plane runtime serves the management API (create → curate → publish → call → audit) as part of the core install; `mcp-engine` composes the MCP modules — the **instant generator** (tools from a Postgres schema / function / bucket / topic), the **official catalog** (curated read-first platform tools), mandatory **curation**, the **registry** (digest-pinned versions + rug-pull review), per-tenant **quotas/rate-limits**, and **observability/audit** (the `mcp` audit subsystem). Remote transport is **Streamable HTTP**; access is per-tenant **OAuth 2.1** with per-tool scopes via Keycloak (the MCP-aware Authorization Server). Hosted MCP-server pods are **internal-only** (NetworkPolicy), reachable only via the gateway, and scale to zero on Knative.
 
@@ -187,6 +189,6 @@ Prometheus-based metrics with per-tenant usage and quota signals surfaced in the
 
 ## Bootstrap & Provisioning
 
-**Templates:** `../falcone-charts/charts/in-falcone/templates/bootstrap-payload-configmap.yaml`, `NOTES.txt` · **Service:** `services/provisioning-orchestrator/`
+**Templates:** `../falcone-charts/charts/in-falcone/templates/bootstrap-payload-configmap.yaml`, `NOTES.txt` · **Service:** `packages/provisioning-orchestrator/`
 
 On install/upgrade a **bootstrap hook job** reconciles the gateway routes, the identity realm and the initial platform configuration. It is **idempotent**, guarded by a lock ConfigMap and recorded by a marker ConfigMap, so repeated upgrades are safe. The provisioning orchestrator handles per-workspace database/schema creation and migrations (e.g. the admin/data privilege separation migration).

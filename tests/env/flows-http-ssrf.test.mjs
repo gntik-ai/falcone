@@ -8,7 +8,7 @@
 //   node --test tests/env/flows-http-ssrf.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { httpRequest } from '../../services/workflow-worker/src/activities/http-request.mjs';
+import { httpRequest } from '../../apps/workflow-worker/src/activities/http-request.mjs';
 
 const tenant = { tenantId: 'ten_http', workspaceId: 'ws_http' };
 

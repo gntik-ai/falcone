@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { buildStorageProviderProfile, DEFAULT_STORAGE_PROVIDER_TYPE } from '../../services/adapters/src/storage-provider-profile.mjs';
-import { buildStorageBucketRecord } from '../../services/adapters/src/storage-bucket-object-ops.mjs';
-import { isStorageReservedPrefix } from '../../services/adapters/src/storage-logical-organization.mjs';
-import { STORAGE_NORMALIZED_ERROR_CODES } from '../../services/adapters/src/storage-error-taxonomy.mjs';
+import { buildStorageProviderProfile, DEFAULT_STORAGE_PROVIDER_TYPE } from '../../packages/adapters/src/storage-provider-profile.mjs';
+import { buildStorageBucketRecord } from '../../packages/adapters/src/storage-bucket-object-ops.mjs';
+import { isStorageReservedPrefix } from '../../packages/adapters/src/storage-logical-organization.mjs';
+import { STORAGE_NORMALIZED_ERROR_CODES } from '../../packages/adapters/src/storage-error-taxonomy.mjs';
 import {
   MULTIPART_LIFECYCLE_TRANSITIONS,
   MULTIPART_NORMALIZED_ERROR_CODES,
@@ -26,7 +26,7 @@ import {
   validateMultipartObjectKey,
   validatePartList,
   validatePresignedTtl
-} from '../../services/adapters/src/storage-multipart-presigned.mjs';
+} from '../../packages/adapters/src/storage-multipart-presigned.mjs';
 
 function makeUnsatisfiedProfile(capabilityId) {
   const profile = buildStorageProviderProfile({ providerType: 'seaweedfs' });
@@ -210,7 +210,7 @@ test('buildMultipartCompletionPreview returns expected object record for valid p
 
 test('storage-multipart-presigned module no longer hardcodes a providerType: \'minio\' literal', () => {
   const moduleSource = readFileSync(
-    new URL('../../services/adapters/src/storage-multipart-presigned.mjs', import.meta.url),
+    new URL('../../packages/adapters/src/storage-multipart-presigned.mjs', import.meta.url),
     'utf8'
   );
   assert.equal(/providerType:\s*'minio'/.test(moduleSource), false);

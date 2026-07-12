@@ -25,7 +25,6 @@ Deployed as separate services / container images that In Falcone talks to over t
 | Knative Serving + Kourier | Serverless functions runtime | `Apache-2.0` | [serving](https://github.com/knative/serving) · [net-kourier](https://github.com/knative-extensions/net-kourier) |
 | Kubernetes + Helm | Deployment & orchestration | `Apache-2.0` | [kubernetes](https://github.com/kubernetes/kubernetes) · [helm](https://github.com/helm/helm) |
 | Node.js 22 | Service runtime | `MIT` | [nodejs](https://github.com/nodejs/node) |
-| nginx | Static serving of the web-console image | `BSD-2-Clause` | [nginx.org](https://nginx.org/LICENSE) |
 
 ## Application frameworks & libraries (npm)
 

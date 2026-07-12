@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isTerminal, validateTransition } from '../../services/provisioning-orchestrator/src/models/async-operation-states.mjs';
+import { isTerminal, validateTransition } from '../../packages/provisioning-orchestrator/src/models/async-operation-states.mjs';
 
 test('validateTransition allows valid lifecycle moves', () => {
   assert.doesNotThrow(() => validateTransition('pending', 'running'));

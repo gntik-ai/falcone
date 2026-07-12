@@ -3,7 +3,7 @@
 - [x] 1.1 Confirm issue #763 root cause: `ConsoleIamAccessPage` only assigned/removed role and
   group memberships for existing users.
 - [x] 1.2 Confirm backend routes already exist for user create/delete/status and role/group create
-  in `deploy/kind/control-plane/routes.mjs`.
+  in `apps/control-plane/routes.mjs`.
 - [x] 1.3 Confirm no new backend route surface is required because the console consumes existing IAM
   endpoints, while the public API artifacts must publish the existing group and membership endpoints
   now exposed by the fuller UI.

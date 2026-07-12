@@ -18,7 +18,7 @@ const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=()
 const staticServers = [
   {
     name: 'deploy kind static server',
-    script: 'deploy/kind/web-console/static-server.mjs'
+    script: 'apps/web-console/static-server.mjs'
   },
   {
     name: 'app static server',
@@ -321,7 +321,7 @@ test('deploy kind static server keeps the same-origin /v1 proxy ahead of the SPA
 
   const upstreamAddress = upstream.address();
   const { root } = await createDistRoot(t);
-  const { port } = await startStaticServer(t, 'deploy/kind/web-console/static-server.mjs', root, {
+  const { port } = await startStaticServer(t, 'apps/web-console/static-server.mjs', root, {
     GATEWAY_UPSTREAM: `127.0.0.1:${upstreamAddress.port}`
   });
 
@@ -338,7 +338,7 @@ test('deploy kind static server keeps the same-origin /v1 proxy ahead of the SPA
   });
 });
 
-test('nginx static serving configs declare gzip, cache-control, and security-header parity', async () => {
+test('legacy nginx static-serving configs declare gzip, cache-control, and security-header parity', async () => {
   const configs = [
     {
       name: 'production web-console nginx',

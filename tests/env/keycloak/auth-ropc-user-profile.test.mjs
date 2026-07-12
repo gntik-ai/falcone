@@ -7,7 +7,7 @@
 // realm's user profile so those attributes are optional; the chart bootstrap PUTs the same
 // config (../falcone-charts/charts/in-falcone: bootstrap.oneShot.keycloak.userProfile +
 // templates/bootstrap-script-configmap.yaml::ensure_keycloak_user_profile) and the runtime does
-// the same for tenant realms (deploy/kind/control-plane/kc-admin.mjs::relaxUserProfile). This
+// the same for tenant realms (apps/control-plane/kc-admin.mjs::relaxUserProfile). This
 // proves the mechanism end-to-end against a real KC 26: RED before the relax, GREEN after.
 //
 // Run via tests/env/keycloak/run.sh (brings up the tests/env Keycloak 26 on :8081).

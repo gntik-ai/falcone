@@ -39,7 +39,7 @@ kind handlers. Same-tenant non-admin users can list/read applications, but mutat
 ## Validation
 
 Application writes normalize the console payload into the canonical `ExternalApplication` shape and
-reuse `apps/control-plane/src/external-application-iam.mjs` for OIDC/SAML validation. Invalid
+reuse `apps/control-plane-executor/src/external-application-iam.mjs` for OIDC/SAML validation. Invalid
 configuration returns a structured response:
 
 ```json

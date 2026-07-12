@@ -35,7 +35,7 @@ account is still pending activation.
 
 The kind control-plane runtime serves the route with the public local handler
 `getConsoleAccountStatusView` from
-`deploy/kind/control-plane/auth-handlers.mjs`.
+`apps/control-plane/auth-handlers.mjs`.
 
 The handler is intentionally static and dependency-free. It does not call
 Keycloak, query the database, or require an authenticated identity. This keeps
@@ -44,12 +44,12 @@ missing status-view route from surfacing as `404 NO_ROUTE`.
 
 The runtime route is registered in both:
 
-- `deploy/kind/control-plane/routes.mjs`, the seed route table used by unit
+- `apps/control-plane/routes.mjs`, the seed route table used by unit
   tests and local server startup.
-- `deploy/kind/control-plane/route-map.runtime.json`, the route table copied
+- `apps/control-plane/route-map.runtime.json`, the route table copied
   into the kind image through `ROUTE_MAP_FILE`.
 
-The reference catalog entry in `deploy/kind/control-plane/route-map.json` also
+The reference catalog entry in `apps/control-plane/route-map.json` also
 points to the same local handler so the advertised route no longer appears as a
 gap.
 

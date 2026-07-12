@@ -54,7 +54,7 @@ docker compose exec -T keycloak "$KC" add-roles -r master \
 echo "   granted realm 'admin' role to service-account-falcone-admin"
 
 echo "==> applying backup-status migrations to Postgres"
-for f in "$ROOT"/services/backup-status/src/db/migrations/*.sql; do
+for f in "$ROOT"/packages/backup-status/src/db/migrations/*.sql; do
   [ -f "$f" ] || continue
   docker compose exec -T postgres psql -v ON_ERROR_STOP=0 -U falcone -d falcone_test < "$f" >/dev/null 2>&1 \
     && echo "   applied $(basename "$f")" || echo "   skipped $(basename "$f") (already applied?)"
@@ -97,7 +97,7 @@ echo "==> applying scheduling-engine migrations to Postgres"
 # pgcrypto provides gen_random_uuid() used by the scheduling tables' defaults.
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U falcone -d falcone_test \
   -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;' >/dev/null 2>&1 || true
-for f in "$ROOT"/services/scheduling-engine/migrations/*.sql; do
+for f in "$ROOT"/packages/scheduling-engine/migrations/*.sql; do
   [ -f "$f" ] || continue
   docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U falcone -d falcone_test < "$f" >/dev/null 2>&1 \
     && echo "   applied $(basename "$f")" || echo "   skipped $(basename "$f") (already applied?)"
@@ -112,7 +112,7 @@ echo "==> applying provisioning-orchestrator async-operation migrations to Postg
 #   075 idempotency_key_records + retry_attempts (+ attempt_count/max_retries cols)
 #   076 timeout/cancel/recovery cols + operation_policies (+ status-check widening)
 #   078 failure-classification + intervention cols/tables
-PO_MIGRATIONS="$ROOT/services/provisioning-orchestrator/src/migrations"
+PO_MIGRATIONS="$ROOT/packages/provisioning-orchestrator/src/migrations"
 for m in 073-async-operation-tables 074-async-operation-log-entries \
          075-idempotency-retry-tables 076-timeout-cancel-recovery \
          078-retry-semantics-intervention; do

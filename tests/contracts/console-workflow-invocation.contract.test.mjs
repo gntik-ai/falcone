@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { validateInvocationRequest } from '../../apps/control-plane/src/workflows/workflow-invocation-contract.mjs';
+import { validateInvocationRequest } from '../../apps/control-plane-executor/src/workflows/workflow-invocation-contract.mjs';
 
-const schema = JSON.parse(readFileSync(new URL('../../services/internal-contracts/src/console-workflow-invocation.json', import.meta.url), 'utf8'));
+const schema = JSON.parse(readFileSync(new URL('../../packages/internal-contracts/src/console-workflow-invocation.json', import.meta.url), 'utf8'));
 
 function baseCallerContext(actorType = 'workspace_admin') {
   return {

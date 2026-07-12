@@ -22,9 +22,9 @@ import {
   resolveActivity,
   dispatchTask,
   TASK_TYPE_NAMES,
-} from '../../services/workflow-worker/src/activities/index.mjs';
-import { classifyExecutorError } from '../../services/workflow-worker/src/activities/errors.mjs';
-import { MAX_INPUT_BYTES } from '../../services/workflow-worker/src/activities/limits.mjs';
+} from '../../apps/workflow-worker/src/activities/index.mjs';
+import { classifyExecutorError } from '../../apps/workflow-worker/src/activities/errors.mjs';
+import { MAX_INPUT_BYTES } from '../../apps/workflow-worker/src/activities/limits.mjs';
 
 const EXPECTED = ['db.query', 'storage.put', 'storage.get', 'functions.invoke', 'events.publish', 'http.request', 'email.send', 'llm.complete'];
 

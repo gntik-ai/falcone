@@ -5,7 +5,7 @@
 // STORAGE_GET_FAILED / STORAGE_HEAD_FAILED code, the `s3 GET/HEAD … -> 404:` wrapper, the S3 XML
 // (NoSuchKey, <Resource>, <RequestId>), and the INTERNAL physical bucket path `ws-<hash>-…`.
 //
-// The handlers (deploy/kind/control-plane/storage-handlers.mjs) now map a backend 404 — which,
+// The handlers (apps/control-plane/storage-handlers.mjs) now map a backend 404 — which,
 // after the ownership gate has already passed, is unambiguously a missing object — to a stable,
 // structured `404 OBJECT_NOT_FOUND` with a clean message and NO backend internals; and a non-404
 // backend failure keeps its operation-specific failure code but with a generic message (no raw
@@ -13,7 +13,7 @@
 // no real S3 call is made (saved/restored in try/finally).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STORAGE_HANDLERS } from '../../deploy/kind/control-plane/storage-handlers.mjs';
+import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
 
 const { storageGetObject, storageObjectMetadata } = STORAGE_HANDLERS;
 

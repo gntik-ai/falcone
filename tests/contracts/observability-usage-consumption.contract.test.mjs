@@ -17,9 +17,9 @@ import {
   listUsageMeteredDimensions,
   readAuthorizationModel,
   readObservabilityUsageConsumption
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
-import { listUsageConsumptionRoutes, summarizeObservabilityUsageConsumption } from '../../apps/control-plane/src/observability-admin.mjs';
+import { listUsageConsumptionRoutes, summarizeObservabilityUsageConsumption } from '../../apps/control-plane-executor/src/observability-admin.mjs';
 
 test('observability usage consumption contract is exposed through shared readers', () => {
   const contract = readObservabilityUsageConsumption();

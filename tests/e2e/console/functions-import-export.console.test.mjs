@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getPublicRoute } from '../../../services/internal-contracts/src/index.mjs';
-import { listFunctionImportExportRoutes } from '../../../apps/control-plane/src/functions-import-export.mjs';
+import { getPublicRoute } from '../../../packages/internal-contracts/src/index.mjs';
+import { listFunctionImportExportRoutes } from '../../../apps/control-plane-executor/src/functions-import-export.mjs';
 
 test('console-facing function import-export scaffold stays on public routes and bounded resource types', () => {
   const exportRoute = getPublicRoute('exportFunctionDefinition');

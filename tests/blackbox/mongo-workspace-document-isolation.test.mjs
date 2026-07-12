@@ -6,7 +6,7 @@
  * (cross-workspace leak within a tenant). The SQL plane (per-workspace `wsdb_*` db) and
  * storage plane (per-workspace bucket) both isolate per workspace; the document plane is
  * the outlier. These tests drive the PURE adapter chokepoint that IS the isolation
- * boundary (services/adapters/src/mongodb-data-api.mjs) — `buildMongoDataApiPlan` builds
+ * boundary (packages/adapters/src/mongodb-data-api.mjs) — `buildMongoDataApiPlan` builds
  * the filter/stamp, the executor merely dispatches it — so no live FerretDB is needed.
  *
  * The fix: inject `workspaceId` (in addition to `tenantId`) into every query filter and
@@ -29,7 +29,7 @@ import {
   buildMongoDataApiPlan,
   applyTenantScopeToFilter,
   MongoDataApiError,
-} from '../../services/adapters/src/mongodb-data-api.mjs';
+} from '../../packages/adapters/src/mongodb-data-api.mjs';
 
 const TENANT_ACME = 'ten_acme_0000-0000-0000-0000-000000000001';
 const TENANT_GLOBEX = 'ten_glbx_0000-0000-0000-0000-000000000002';

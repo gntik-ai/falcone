@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { AuditEventFilters } from '../../components/backup/AuditEventFilters.js'
 import { AuditEventTable } from '../../components/backup/AuditEventTable.js'
 import { useAuditEvents } from '../../hooks/useAuditEvents.js'
-import type { AuditQueryFilters } from '../../../../../services/backup-status/src/audit/audit-trail.types.js'
+import type { AuditQueryFilters } from '../../../../../packages/backup-status/src/audit/audit-trail.types.js'
 
 interface Props {
   token: string

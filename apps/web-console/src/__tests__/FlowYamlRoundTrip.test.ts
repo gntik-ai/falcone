@@ -24,7 +24,7 @@ import type { FlowDefinition } from '@/types/flows'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DIR = resolve(
   __dirname,
-  '../../../../services/internal-contracts/src/fixtures/flows'
+  '../../../../packages/internal-contracts/src/fixtures/flows'
 )
 
 const EXPECTED_FIXTURES = [

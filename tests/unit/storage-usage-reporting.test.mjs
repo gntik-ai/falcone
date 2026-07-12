@@ -13,7 +13,7 @@ import {
   buildStorageWorkspaceUsageEntry,
   detectStorageUsageThresholdBreaches,
   rankBucketsByUsage
-} from '../../services/adapters/src/storage-usage-reporting.mjs';
+} from '../../packages/adapters/src/storage-usage-reporting.mjs';
 
 test('storage usage dimension status computes remaining and utilization consistently', () => {
   const status = buildStorageUsageDimensionStatus({ dimension: 'total_bytes', used: 125, limit: 100 });

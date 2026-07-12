@@ -2,7 +2,7 @@
  * Black-box tests for the SHIPPABLE-product workspace teardown handler
  * (add-deploy-completeness-cluster, #562 — deliverable (a), product parity).
  *
- * Mirrors the kind-runtime `deleteWorkspace` cascade in `apps/control-plane`:
+ * Mirrors the kind-runtime `deleteWorkspace` cascade in `apps/control-plane-executor`:
  * the public route `deleteWorkspace` (DELETE /v1/workspaces/{workspaceId}) is in
  * the public route catalog but had no handler. `handleWorkspaceDeleteRequest` is
  * a pure function (no real HTTP) that re-gates the request by TENANT OWNERSHIP —
@@ -21,7 +21,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { handleWorkspaceDeleteRequest, getWorkspaceRoute } from '../../apps/control-plane/src/workspace-management.mjs';
+import { handleWorkspaceDeleteRequest, getWorkspaceRoute } from '../../apps/control-plane-executor/src/workspace-management.mjs';
 
 const WS_A = { workspaceId: 'ws-a', tenantId: 'tenant-a', slug: 'app-staging', state: 'active' };
 

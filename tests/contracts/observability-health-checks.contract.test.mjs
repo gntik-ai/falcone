@@ -14,7 +14,7 @@ import {
   readObservabilityHealthChecks,
   readObservabilityMetricsStack,
   OBSERVABILITY_HEALTH_CHECKS_VERSION
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { collectObservabilityHealthCheckViolations } from '../../scripts/lib/observability-health-checks.mjs';
 
 // ---------------------------------------------------------------------------

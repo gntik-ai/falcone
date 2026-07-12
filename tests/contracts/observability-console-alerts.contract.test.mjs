@@ -22,7 +22,7 @@ import {
   readObservabilityDashboards,
   readObservabilityHealthChecks,
   readObservabilityMetricsStack
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { collectObservabilityConsoleAlertViolations } from '../../scripts/lib/observability-console-alerts.mjs';
 
 test('shared readers expose the observability console alerts contract', () => {

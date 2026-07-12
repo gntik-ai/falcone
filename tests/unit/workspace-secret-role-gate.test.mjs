@@ -23,7 +23,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { FN_HANDLERS } from '../../deploy/kind/control-plane/fn-handlers.mjs';
+import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
 
 // A SIMPLE recording fake vault store: every mutating method PUSHES to `calls` (so a denied write is
 // provable by an empty `calls`) and returns a minimal FunctionWorkspaceSecret-ish meta. `exists` is

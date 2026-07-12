@@ -8,8 +8,8 @@ function makeJwtLikeToken(payload) {
 test('simulation metadata persists through repository update and status query', async () => {
   process.env.TEST_MODE = 'true'
   const store = new Map()
-  const { setClient, create, updateStatus } = await import('../../services/backup-status/src/operations/operations.repository.js')
-  const { main: getOperation } = await import('../../services/backup-status/src/operations/get-operation.action.js')
+  const { setClient, create, updateStatus } = await import('../../packages/backup-status/src/operations/operations.repository.js')
+  const { main: getOperation } = await import('../../packages/backup-status/src/operations/get-operation.action.js')
 
   setClient({
     async query(sql, params) {

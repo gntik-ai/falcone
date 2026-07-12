@@ -22,7 +22,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ksvcNameForWorkspace } from '../../deploy/kind/control-plane/function-executor.mjs';
+import { ksvcNameForWorkspace } from '../../apps/control-plane/function-executor.mjs';
 
 const DNS1035 = /^[a-z]([-a-z0-9]*[a-z0-9])?$/;
 

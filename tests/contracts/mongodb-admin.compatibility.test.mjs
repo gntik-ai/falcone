@@ -6,12 +6,12 @@ import {
   getContract,
   getPublicRoute,
   getService
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import {
   MONGO_ADMIN_CAPABILITY_MATRIX,
   SUPPORTED_MONGO_VERSION_RANGES,
   mongodbAdminAdapterPort
-} from '../../services/adapters/src/mongodb-admin.mjs';
+} from '../../packages/adapters/src/mongodb-admin.mjs';
 
 test('mongo admin service contracts and adapter capability baseline cover the expanded MongoDB structural administration surface', () => {
   const mongoAdminRequest = getContract('mongo_admin_request');

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as retryMain } from '../../services/provisioning-orchestrator/src/actions/async-operation-retry.mjs';
-import { main as overrideMain } from '../../services/provisioning-orchestrator/src/actions/async-operation-retry-override.mjs';
+import { main as retryMain } from '../../packages/provisioning-orchestrator/src/actions/async-operation-retry.mjs';
+import { main as overrideMain } from '../../packages/provisioning-orchestrator/src/actions/async-operation-retry-override.mjs';
 
 test('manual intervention lifecycle blocks normal retry and allows override', async () => {
   const operation = { operation_id: 'op', tenant_id: 't', actor_id: 'actor', status: 'failed', attempt_count: 5, max_retries: 5, manual_intervention_required: true, correlation_id: 'corr' };

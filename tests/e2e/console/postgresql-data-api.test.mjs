@@ -5,7 +5,7 @@ import {
   buildPostgresDataApiPlan,
   buildPostgresDataStableEndpointInvocationPlan,
   buildPostgresSavedQueryExecutionPlan
-} from '../../../services/adapters/src/postgresql-data-api.mjs';
+} from '../../../packages/adapters/src/postgresql-data-api.mjs';
 
 function buildWorkspaceFixture(overrides = {}) {
   return {

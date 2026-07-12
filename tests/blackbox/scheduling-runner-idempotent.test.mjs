@@ -4,7 +4,7 @@
 // Tests: bbx-runner-idempotency-01 through -03
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import main from '../../services/scheduling-engine/actions/scheduling-job-runner.mjs';
+import main from '../../packages/scheduling-engine/actions/scheduling-job-runner.mjs';
 
 const TENANT_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const WS_A = 'wsaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';

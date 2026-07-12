@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { _resetForTest as resetIdempotencyStore } from '../../apps/control-plane/src/workflows/idempotency-store.mjs';
+import { _resetForTest as resetIdempotencyStore } from '../../apps/control-plane-executor/src/workflows/idempotency-store.mjs';
 import handleCredentialGeneration, {
   __resetWorkflowDependenciesForTest,
   __setWorkflowDependenciesForTest
-} from '../../apps/control-plane/src/workflows/wf-con-004-credential-generation.mjs';
+} from '../../apps/control-plane-executor/src/workflows/wf-con-004-credential-generation.mjs';
 
 function request(overrides = {}) {
   return {

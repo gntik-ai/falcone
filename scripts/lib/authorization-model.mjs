@@ -1,6 +1,6 @@
 import { readJson } from './quality-gates.mjs';
 
-export const AUTHORIZATION_MODEL_PATH = 'services/internal-contracts/src/authorization-model.json';
+export const AUTHORIZATION_MODEL_PATH = 'packages/internal-contracts/src/authorization-model.json';
 export const REQUIRED_AUTHORIZATION_CONTRACT_IDS = [
   'security_context',
   'authorization_decision',

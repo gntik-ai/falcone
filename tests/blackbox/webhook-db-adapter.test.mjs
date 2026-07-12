@@ -21,7 +21,7 @@
 //   bbx-643-db-06: getSubscription fetches by id (action layer applies the tenant check)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildWebhookDb } from '../../deploy/kind/control-plane/webhook-db.mjs';
+import { buildWebhookDb } from '../../apps/control-plane/webhook-db.mjs';
 
 // A pool stub that records every query and returns a caller-supplied response.
 function recordingPool(responder) {

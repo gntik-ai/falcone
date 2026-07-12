@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkDeliveryRateLimit, checkSubscriptionQuota, getQuotaConfig, incrementRateCounter } from '../../services/webhook-engine/src/webhook-quota.mjs';
+import { checkDeliveryRateLimit, checkSubscriptionQuota, getQuotaConfig, incrementRateCounter } from '../../packages/webhook-engine/src/webhook-quota.mjs';
 
 test('quota helpers honour limits and defaults', async () => {
   assert.equal(checkSubscriptionQuota('w1', 0, 1).allowed, true);

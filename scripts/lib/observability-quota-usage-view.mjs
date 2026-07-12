@@ -1,12 +1,12 @@
 import { readJson } from './quality-gates.mjs';
 
-export const OBSERVABILITY_QUOTA_USAGE_VIEW_PATH = 'services/internal-contracts/src/observability-quota-usage-view.json';
-export const OBSERVABILITY_USAGE_CONSUMPTION_PATH = 'services/internal-contracts/src/observability-usage-consumption.json';
-export const OBSERVABILITY_QUOTA_POLICIES_PATH = 'services/internal-contracts/src/observability-quota-policies.json';
-export const OBSERVABILITY_HARD_LIMIT_ENFORCEMENT_PATH = 'services/internal-contracts/src/observability-hard-limit-enforcement.json';
-export const AUTHORIZATION_MODEL_PATH = 'services/internal-contracts/src/authorization-model.json';
-export const PUBLIC_ROUTE_CATALOG_PATH = 'services/internal-contracts/src/public-route-catalog.json';
-export const PUBLIC_API_TAXONOMY_PATH = 'services/internal-contracts/src/public-api-taxonomy.json';
+export const OBSERVABILITY_QUOTA_USAGE_VIEW_PATH = 'packages/internal-contracts/src/observability-quota-usage-view.json';
+export const OBSERVABILITY_USAGE_CONSUMPTION_PATH = 'packages/internal-contracts/src/observability-usage-consumption.json';
+export const OBSERVABILITY_QUOTA_POLICIES_PATH = 'packages/internal-contracts/src/observability-quota-policies.json';
+export const OBSERVABILITY_HARD_LIMIT_ENFORCEMENT_PATH = 'packages/internal-contracts/src/observability-hard-limit-enforcement.json';
+export const AUTHORIZATION_MODEL_PATH = 'packages/internal-contracts/src/authorization-model.json';
+export const PUBLIC_ROUTE_CATALOG_PATH = 'packages/internal-contracts/src/public-route-catalog.json';
+export const PUBLIC_API_TAXONOMY_PATH = 'packages/internal-contracts/src/public-api-taxonomy.json';
 
 const REQUIRED_SCOPE_IDS = ['tenant_overview', 'workspace_overview'];
 const REQUIRED_PERMISSION_IDS = ['tenant.overview.read', 'workspace.overview.read'];

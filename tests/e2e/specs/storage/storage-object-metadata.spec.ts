@@ -51,7 +51,7 @@ function awsEnc(s: string): string {
 
 /**
  * Minimal SigV4-signed PUT to the SeaweedFS S3 gateway.
- * Mirrors the s3() signer in deploy/kind/control-plane/storage-handlers.mjs.
+ * Mirrors the s3() signer in apps/control-plane/storage-handlers.mjs.
  */
 async function s3Put(bucket: string, key: string, body: string, contentType = 'text/plain'): Promise<number> {
   const url = new URL(S3_ENDPOINT)

@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { _resetForTest as resetIdempotencyStore } from '../../apps/control-plane/src/workflows/idempotency-store.mjs';
+import { _resetForTest as resetIdempotencyStore } from '../../apps/control-plane-executor/src/workflows/idempotency-store.mjs';
 import handleServiceAccountLifecycle, {
   __resetWorkflowDependenciesForTest,
   __setWorkflowDependenciesForTest
-} from '../../apps/control-plane/src/workflows/wf-con-006-service-account.mjs';
+} from '../../apps/control-plane-executor/src/workflows/wf-con-006-service-account.mjs';
 
 function request(overrides = {}) {
   return {

@@ -9,7 +9,7 @@ import {
   controlPlaneDomainEntities,
   controlPlaneTenantStateMachine,
   controlPlaneWorkspaceStateMachine
-} from '../../apps/control-plane/src/domain-model.mjs';
+} from '../../apps/control-plane-executor/src/domain-model.mjs';
 import { OPENAPI_PATH, readJson } from '../../scripts/lib/quality-gates.mjs';
 import {
   getDomainEntity,
@@ -19,7 +19,7 @@ import {
   listLifecycleEvents,
   listResourceSemantics,
   readDomainModel
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 test('domain model aligns with public OpenAPI schemas and paths', () => {
   const domainModel = readDomainModel();

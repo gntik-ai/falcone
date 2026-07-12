@@ -1,7 +1,7 @@
 # Live verification on test-cluster-b: a flow as a long-running MCP tool (#395)
 # Temporal dev server: temporalio/temporal:latest — Temporal CLI 1.7.2 (Server 1.31.1, UI 2.49.1)
 # Client: @temporalio/client 1.18.1 (grpc-js 1.14.4), from the production workflow-worker image.
-# Mirrors apps/control-plane/src/mcp-workflows-tools.mjs (taskHandleFromExecution / mapExecutionToTaskStatus).
+# Mirrors apps/control-plane-executor/src/mcp-workflows-tools.mjs (taskHandleFromExecution / mapExecutionToTaskStatus).
 
 deploy:   Deployment+Service temporal-dev in ns mcp-temporal-spike (temporal-dev.yaml); frontend on :7233
 client:   spike-client pod from localhost:30500/in-falcone-workflow-worker:0.1.0-flows-e2e (ships @temporalio/client)

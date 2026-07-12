@@ -1,11 +1,11 @@
 import { readJson } from './quality-gates.mjs';
 
-export const OBSERVABILITY_CONSOLE_ALERTS_PATH = 'services/internal-contracts/src/observability-console-alerts.json';
-export const OBSERVABILITY_METRICS_STACK_PATH = 'services/internal-contracts/src/observability-metrics-stack.json';
-export const OBSERVABILITY_DASHBOARDS_PATH = 'services/internal-contracts/src/observability-dashboards.json';
-export const OBSERVABILITY_HEALTH_CHECKS_PATH = 'services/internal-contracts/src/observability-health-checks.json';
-export const OBSERVABILITY_BUSINESS_METRICS_PATH = 'services/internal-contracts/src/observability-business-metrics.json';
-export const AUTHORIZATION_MODEL_PATH = 'services/internal-contracts/src/authorization-model.json';
+export const OBSERVABILITY_CONSOLE_ALERTS_PATH = 'packages/internal-contracts/src/observability-console-alerts.json';
+export const OBSERVABILITY_METRICS_STACK_PATH = 'packages/internal-contracts/src/observability-metrics-stack.json';
+export const OBSERVABILITY_DASHBOARDS_PATH = 'packages/internal-contracts/src/observability-dashboards.json';
+export const OBSERVABILITY_HEALTH_CHECKS_PATH = 'packages/internal-contracts/src/observability-health-checks.json';
+export const OBSERVABILITY_BUSINESS_METRICS_PATH = 'packages/internal-contracts/src/observability-business-metrics.json';
+export const AUTHORIZATION_MODEL_PATH = 'packages/internal-contracts/src/authorization-model.json';
 export const PACKAGE_JSON_PATH = 'package.json';
 
 const REQUIRED_SCOPE_IDS = ['platform', 'tenant', 'workspace'];

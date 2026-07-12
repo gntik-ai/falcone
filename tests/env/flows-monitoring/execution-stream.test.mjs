@@ -19,8 +19,8 @@ import { preflight, createWorker, makeClient, FIXTURES } from '../workflow-worke
 import {
   createFlowMonitoringExecutor,
   createTemporalHistoryProvider,
-} from '../../../apps/control-plane/src/runtime/flow-monitoring-executor.mjs';
-import { buildWorkflowId } from '../../../apps/control-plane/src/runtime/flow-executor.mjs';
+} from '../../../apps/control-plane-executor/src/runtime/flow-monitoring-executor.mjs';
+import { buildWorkflowId } from '../../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
 
 const pf = await preflight();
 const SKIP = pf.ok ? false : { skip: pf.reason };

@@ -3,7 +3,7 @@
 // Typed wrappers over the #361 flow API. Every call goes through `requestConsoleSessionJson`
 // (same pattern as functionsApi.ts) so the bearer token + refresh are handled centrally.
 //
-// Endpoint shapes (verified against apps/control-plane/src/runtime/server.mjs + flow-executor.mjs):
+// Endpoint shapes (verified against apps/control-plane-executor/src/runtime/server.mjs + flow-executor.mjs):
 //   GET    /v1/flows/workspaces/{ws}/flows                       -> { items: FlowSummary[] }
 //   POST   /v1/flows/workspaces/{ws}/flows                       -> FlowDefinitionRecord  (create draft)
 //   GET    /v1/flows/workspaces/{ws}/flows/{flowId}              -> FlowDefinitionRecord
@@ -160,7 +160,7 @@ export async function publishFlow(
 // ---- Flow schedule management (change: add-flow-schedule-management-api / #680) -------------
 //
 // Operate in place on a flow's cron Temporal Schedule (created on publish) WITHOUT deleting the
-// flow. Endpoint shapes (verified against apps/control-plane/src/runtime/server.mjs +
+// flow. Endpoint shapes (verified against apps/control-plane-executor/src/runtime/server.mjs +
 // flow-executor.mjs; tenant isolation is identity-derived, identical to the rest of the Flows API):
 //   GET    /v1/flows/workspaces/{ws}/schedules                       -> { items: FlowScheduleSummary[] }
 //   GET    /v1/flows/workspaces/{ws}/flows/{flowId}/schedule         -> FlowSchedule (404 if none)

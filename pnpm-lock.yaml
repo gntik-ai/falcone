@@ -55,9 +55,25 @@ importers:
         specifier: 2.8.3
         version: 2.8.3
 
-  apps/cli: {}
-
   apps/control-plane:
+    dependencies:
+      ajv:
+        specifier: ^8.18.0
+        version: 8.18.0
+      cel-js:
+        specifier: 0.5.0
+        version: 0.5.0
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      mongodb:
+        specifier: ^6.12.0
+        version: 6.21.0(socks@2.8.7)
+      pg:
+        specifier: ^8.16.3
+        version: 8.16.3
+
+  apps/control-plane-executor:
     dependencies:
       '@temporalio/client':
         specifier: 1.18.1
@@ -90,8 +106,6 @@ importers:
         specifier: 2.8.3
         version: 2.8.3
 
-  apps/mcp-server-sdk: {}
-
   apps/web-console:
     dependencies:
       '@fontsource-variable/inter':
@@ -99,7 +113,7 @@ importers:
         version: 5.2.8
       '@in-falcone/internal-contracts':
         specifier: workspace:*
-        version: link:../../services/internal-contracts
+        version: link:../../packages/internal-contracts
       '@radix-ui/react-slot':
         specifier: ^1.1.0
         version: 1.2.4(@types/react@18.3.28)(react@18.3.1)
@@ -189,174 +203,7 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@types/node@22.19.15)(jsdom@25.0.1)(vite@6.4.3(@types/node@22.19.15)(jiti@1.21.7)(terser@5.48.0)(yaml@2.8.3))
 
-  docs-site:
-    devDependencies:
-      vitepress:
-        specifier: ^1.6.3
-        version: 1.6.4(@algolia/client-search@5.50.1)(@types/node@22.19.15)(@types/react@18.3.28)(axios@1.17.0)(jiti@1.21.7)(postcss@8.5.15)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(terser@5.48.0)(typescript@5.9.3)(yaml@2.8.3)
-
-  services/adapters: {}
-
-  services/audit: {}
-
-  services/audit-anomaly-handler:
-    dependencies:
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-
-  services/backup-status:
-    dependencies:
-      jose:
-        specifier: ^5.9.6
-        version: 5.10.0
-      jwks-rsa:
-        specifier: ^3.1.0
-        version: 3.2.2
-      pg:
-        specifier: ^8.13.0
-        version: 8.16.3
-    devDependencies:
-      '@types/node':
-        specifier: ^20.14.0
-        version: 20.19.37
-      '@types/pg':
-        specifier: ^8.11.0
-        version: 8.20.0
-      typescript:
-        specifier: ^5.5.0
-        version: 5.9.3
-      vitest:
-        specifier: ^4.1.0
-        version: 4.1.0(@types/node@20.19.37)(jsdom@25.0.1)(vite@6.4.3(@types/node@20.19.37)(jiti@1.21.7)(terser@5.48.0)(yaml@2.8.3))
-
-  services/billing-export:
-    dependencies:
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-
-  services/event-gateway: {}
-
-  services/internal-contracts:
-    dependencies:
-      ajv:
-        specifier: ^8.18.0
-        version: 8.18.0
-      cel-js:
-        specifier: 0.5.0
-        version: 0.5.0
-
-  services/mongo-cdc-bridge:
-    dependencies:
-      bson:
-        specifier: ^7.2.0
-        version: 7.2.0
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-      mongodb:
-        specifier: ^6.17.0
-        version: 6.21.0(socks@2.8.7)
-      pg:
-        specifier: ^8.11.0
-        version: 8.16.3
-      pg-logical-replication:
-        specifier: ^2.5.0
-        version: 2.5.0
-
-  services/openapi-sdk-service:
-    dependencies:
-      '@aws-sdk/client-s3':
-        specifier: ^3.888.0
-        version: 3.1019.0
-      '@aws-sdk/s3-request-presigner':
-        specifier: ^3.888.0
-        version: 3.1019.0
-      js-yaml:
-        specifier: ^4.2.0
-        version: 4.2.0
-      kafkajs:
-        specifier: '*'
-        version: 2.2.4
-      pg:
-        specifier: '*'
-        version: 8.16.3
-    devDependencies:
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-
-  services/pg-cdc-bridge:
-    dependencies:
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-      pg:
-        specifier: ^8.11.0
-        version: 8.16.3
-      uuid:
-        specifier: ^14.0.0
-        version: 14.0.0
-
-  services/provisioning-orchestrator:
-    dependencies:
-      kafkajs:
-        specifier: 2.2.4
-        version: 2.2.4
-      pg:
-        specifier: 8.16.3
-        version: 8.16.3
-
-  services/realtime-gateway:
-    dependencies:
-      ajv:
-        specifier: ^8.18.0
-        version: 8.18.0
-      jose:
-        specifier: ^5.9.6
-        version: 5.10.0
-      jwks-rsa:
-        specifier: ^3.1.0
-        version: 3.2.2
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-      pg:
-        specifier: ^8.13.1
-        version: 8.16.3
-
-  services/scheduling-engine:
-    dependencies:
-      cron-parser:
-        specifier: ^5.2.0
-        version: 5.5.0
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-      pg:
-        specifier: ^8.16.3
-        version: 8.16.3
-
-  services/secret-audit-handler:
-    dependencies:
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-
-  services/webhook-engine:
-    dependencies:
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-      pg:
-        specifier: ^8.13.1
-        version: 8.16.3
-      undici:
-        specifier: ^6.27.0
-        version: 6.27.0
-
-  services/workflow-worker:
+  apps/workflow-worker:
     dependencies:
       '@temporalio/activity':
         specifier: 1.18.1
@@ -390,7 +237,176 @@ importers:
         specifier: 5.7.2
         version: 5.7.2
 
-  services/workspace-docs-service:
+  docs-site:
+    devDependencies:
+      vitepress:
+        specifier: ^1.6.3
+        version: 1.6.4(@algolia/client-search@5.50.1)(@types/node@22.19.15)(@types/react@18.3.28)(axios@1.17.0)(jiti@1.21.7)(postcss@8.5.15)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(terser@5.48.0)(typescript@5.9.3)(yaml@2.8.3)
+
+  packages/adapters: {}
+
+  packages/audit: {}
+
+  packages/audit-anomaly-handler:
+    dependencies:
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+
+  packages/backup-status:
+    dependencies:
+      jose:
+        specifier: ^5.9.6
+        version: 5.10.0
+      jwks-rsa:
+        specifier: ^3.1.0
+        version: 3.2.2
+      pg:
+        specifier: ^8.13.0
+        version: 8.16.3
+    devDependencies:
+      '@types/node':
+        specifier: ^20.14.0
+        version: 20.19.37
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.20.0
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@20.19.37)(jsdom@25.0.1)(vite@6.4.3(@types/node@20.19.37)(jiti@1.21.7)(terser@5.48.0)(yaml@2.8.3))
+
+  packages/billing-export:
+    dependencies:
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+
+  packages/event-gateway: {}
+
+  packages/internal-contracts:
+    dependencies:
+      ajv:
+        specifier: ^8.18.0
+        version: 8.18.0
+      cel-js:
+        specifier: 0.5.0
+        version: 0.5.0
+
+  packages/mcp-server-sdk: {}
+
+  packages/mongo-cdc-bridge:
+    dependencies:
+      bson:
+        specifier: ^7.2.0
+        version: 7.2.0
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      mongodb:
+        specifier: ^6.17.0
+        version: 6.21.0(socks@2.8.7)
+      pg:
+        specifier: ^8.11.0
+        version: 8.16.3
+      pg-logical-replication:
+        specifier: ^2.5.0
+        version: 2.5.0
+
+  packages/openapi-sdk-service:
+    dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.888.0
+        version: 3.1019.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: ^3.888.0
+        version: 3.1019.0
+      js-yaml:
+        specifier: ^4.2.0
+        version: 4.2.0
+      kafkajs:
+        specifier: '*'
+        version: 2.2.4
+      pg:
+        specifier: '*'
+        version: 8.16.3
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
+  packages/pg-cdc-bridge:
+    dependencies:
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      pg:
+        specifier: ^8.11.0
+        version: 8.16.3
+      uuid:
+        specifier: ^14.0.0
+        version: 14.0.0
+
+  packages/provisioning-orchestrator:
+    dependencies:
+      kafkajs:
+        specifier: 2.2.4
+        version: 2.2.4
+      pg:
+        specifier: 8.16.3
+        version: 8.16.3
+
+  packages/realtime-gateway:
+    dependencies:
+      ajv:
+        specifier: ^8.18.0
+        version: 8.18.0
+      jose:
+        specifier: ^5.9.6
+        version: 5.10.0
+      jwks-rsa:
+        specifier: ^3.1.0
+        version: 3.2.2
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      pg:
+        specifier: ^8.13.1
+        version: 8.16.3
+
+  packages/scheduling-engine:
+    dependencies:
+      cron-parser:
+        specifier: ^5.2.0
+        version: 5.5.0
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      pg:
+        specifier: ^8.16.3
+        version: 8.16.3
+
+  packages/secret-audit-handler:
+    dependencies:
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+
+  packages/webhook-engine:
+    dependencies:
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      pg:
+        specifier: ^8.13.1
+        version: 8.16.3
+      undici:
+        specifier: ^6.27.0
+        version: 6.27.0
+
+  packages/workspace-docs-service:
     dependencies:
       kafkajs:
         specifier: ^2.2.4
@@ -422,6 +438,8 @@ importers:
       uuid:
         specifier: ^14
         version: 14.0.0
+
+  tools/falcone-cli: {}
 
 packages:
 

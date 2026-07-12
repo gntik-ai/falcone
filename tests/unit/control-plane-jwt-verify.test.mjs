@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { createJwtVerifier } from '../../apps/control-plane/src/runtime/jwt-verify.mjs';
+import { createJwtVerifier } from '../../apps/control-plane-executor/src/runtime/jwt-verify.mjs';
 
 const b64url = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
 

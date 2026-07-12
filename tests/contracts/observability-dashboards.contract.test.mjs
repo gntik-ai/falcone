@@ -10,7 +10,7 @@ import {
   readObservabilityMetricsStack,
   listObservedSubsystems,
   getObservabilityCollectionHealth
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import {
   collectObservabilityDashboardViolations
 } from '../../scripts/lib/observability-dashboards.mjs';

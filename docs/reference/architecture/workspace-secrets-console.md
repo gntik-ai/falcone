@@ -1,7 +1,7 @@
 # Workspace secrets — console screen and runtime convergence
 
 Falcone stores **per-workspace function secrets** in the OpenBao KV v2 backend
-(`deploy/kind/control-plane/vault-secrets.mjs`): a tenant sets a secret for a workspace, and at
+(`apps/control-plane/vault-secrets.mjs`): a tenant sets a secret for a workspace, and at
 function deploy the control-plane reads it server-side and injects it as an environment variable.
 This page documents the **Workspace Secrets** console screen (`/console/workspace-secrets`,
 `apps/web-console/src/pages/ConsoleWorkspaceSecretsPage.tsx`) and the runtime convergence that backs
@@ -30,7 +30,7 @@ Secret **values are write-only** — there is no read path on any layer:
 ## Metadata shape (no value, no version)
 
 Every read/write response returns exactly the `FunctionWorkspaceSecret` metadata
-(`apps/control-plane/openapi/families/functions.openapi.json`, `additionalProperties: false`):
+(`apps/control-plane-executor/openapi/families/functions.openapi.json`, `additionalProperties: false`):
 
 ```json
 {
@@ -99,7 +99,7 @@ Tenant/workspace scoping (above) is **isolation**, not authorization: it proves 
 caller belongs to, not *whether* the caller's role may mutate. Creating, replacing, or deleting a
 secret therefore additionally requires an **administrative tenant role** — `tenant_owner` /
 `tenant_admin`, or a platform/superadmin caller — enforced server-side by `canManageTenant`
-(`deploy/kind/control-plane/tenant-scope.mjs`), the same coarse gate every other privileged
+(`apps/control-plane/tenant-scope.mjs`), the same coarse gate every other privileged
 control-plane write uses. A non-admin tenant member (`tenant_developer`, `tenant_viewer`) that
 belongs to the owning tenant receives **`403 FORBIDDEN`** on `POST` / `PUT` / `DELETE`, on **every**
 workspace and **every** stage (dev / staging / **production** alike), and **nothing is
@@ -177,7 +177,7 @@ indicator); the list refreshes after every successful mutation.
 ## Auditing
 
 Each mutation is auditable **server-side** with the secret **value redacted** (the OpenBao file-audit
-pipeline sanitized by `services/secret-audit-handler/src/sanitizer.mjs`), capturing actor, tenant,
+pipeline sanitized by `packages/secret-audit-handler/src/sanitizer.mjs`), capturing actor, tenant,
 workspace, operation, and secret name. The console surfaces success/failure and makes the
 `X-Correlation-Id` available for support, but emits **no secret value** to any client log or
 telemetry.

@@ -19,7 +19,7 @@
  */
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
-import { apply } from '../../../../services/provisioning-orchestrator/src/appliers/postgres-applier.mjs';
+import { apply } from '../../../../packages/provisioning-orchestrator/src/appliers/postgres-applier.mjs';
 
 const { Client } = pg;
 

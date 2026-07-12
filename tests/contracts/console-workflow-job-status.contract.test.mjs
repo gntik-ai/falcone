@@ -8,9 +8,9 @@ import {
   queryJobStatus,
   registerJob,
   updateJobStatus
-} from '../../apps/control-plane/src/workflows/job-status.mjs';
+} from '../../apps/control-plane-executor/src/workflows/job-status.mjs';
 
-const schema = JSON.parse(readFileSync(new URL('../../services/internal-contracts/src/console-workflow-job-status.json', import.meta.url), 'utf8'));
+const schema = JSON.parse(readFileSync(new URL('../../packages/internal-contracts/src/console-workflow-job-status.json', import.meta.url), 'utf8'));
 
 function callerContext() {
   return {

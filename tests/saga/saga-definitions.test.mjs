@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sagaDefinitions } from '../../apps/control-plane/src/saga/saga-definitions.mjs';
+import { sagaDefinitions } from '../../apps/control-plane-executor/src/saga/saga-definitions.mjs';
 
 const nonProvisional = ['WF-CON-001', 'WF-CON-002', 'WF-CON-003', 'WF-CON-004', 'WF-CON-006'];
 

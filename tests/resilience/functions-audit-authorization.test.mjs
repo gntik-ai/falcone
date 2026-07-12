@@ -7,7 +7,7 @@ import {
   queryAuditRecords,
   queryQuotaEnforcement,
   queryRollbackEvidence
-} from '../../apps/control-plane/src/functions-audit.mjs';
+} from '../../apps/control-plane-executor/src/functions-audit.mjs';
 
 test('audit resilience denies cross-tenant and cross-workspace queries without exposing foreign records', () => {
   assert.throws(

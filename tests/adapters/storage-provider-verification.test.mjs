@@ -12,13 +12,13 @@ import {
   storageVerificationScenarioCategories,
   storageVerificationVerdicts,
   summarizeStorageVerificationReport
-} from '../../services/adapters/src/provider-catalog.mjs';
+} from '../../packages/adapters/src/provider-catalog.mjs';
 import {
   buildCapabilityBaselineVerificationResult,
   buildErrorTaxonomyConsistencyResult,
   getErrorScenarioProviderCodeMap,
   listErrorScenarioCodes
-} from '../../services/adapters/src/storage-provider-verification.mjs';
+} from '../../packages/adapters/src/storage-provider-verification.mjs';
 
 test('SeaweedFS baseline verification is eligible', () => {
   const baseline = getStorageProviderCapabilityBaseline({ providerType: 'seaweedfs' });

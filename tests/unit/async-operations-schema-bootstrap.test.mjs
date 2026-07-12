@@ -14,8 +14,8 @@ import { fileURLToPath } from 'node:url';
 import {
   GOVERNANCE_MIGRATIONS,
   applyGovernanceSchema,
-} from '../../deploy/kind/control-plane/governance-schema.mjs';
-import { main as asyncOperationQueryAction } from '../../services/provisioning-orchestrator/src/actions/async-operation-query.mjs';
+} from '../../apps/control-plane/governance-schema.mjs';
+import { main as asyncOperationQueryAction } from '../../packages/provisioning-orchestrator/src/actions/async-operation-query.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');

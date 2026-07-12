@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildDeduplicationEvent } from '../../services/provisioning-orchestrator/src/events/async-operation-events.mjs';
-import { idempotencyDedupEventSchema } from '../../services/internal-contracts/src/index.mjs';
+import { buildDeduplicationEvent } from '../../packages/provisioning-orchestrator/src/events/async-operation-events.mjs';
+import { idempotencyDedupEventSchema } from '../../packages/internal-contracts/src/index.mjs';
 
 function assertMatchesSchema(schema, payload) {
   for (const field of schema.required ?? []) {

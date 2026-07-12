@@ -52,7 +52,7 @@ export function ConsoleTenantPlanOverviewPage() {
   if (error) return <ConsolePageState kind="error" title="Resumen del plan no disponible" description={error} actionLabel="Reintentar" onAction={() => setReloadNonce((nonce) => nonce + 1)} />
   if (!summary) return <ConsolePageState kind="loading" title="Cargando resumen del plan" description="Consultando los derechos efectivos actuales." />
 
-  // The effective-entitlements API (services/provisioning-orchestrator
+  // The effective-entitlements API (packages/provisioning-orchestrator
   // EffectiveEntitlementProfile, served verbatim by GET /v1/tenant/plan/effective-
   // entitlements) returns per-tenant quota limits under `quantitativeLimits` (per-item
   // `currentUsage`) — there is no `quotaDimensions`/`observedUsage`/`noAssignment` field

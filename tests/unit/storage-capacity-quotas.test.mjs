@@ -11,9 +11,9 @@ import {
   buildStorageQuotaProfile,
   previewStorageBucketQuotaAdmission,
   previewStorageObjectQuotaAdmission
-} from '../../services/adapters/src/storage-capacity-quotas.mjs';
-import { STORAGE_NORMALIZED_ERROR_CODES } from '../../services/adapters/src/storage-error-taxonomy.mjs';
-import { buildTenantStorageContextRecord } from '../../services/adapters/src/storage-tenant-context.mjs';
+} from '../../packages/adapters/src/storage-capacity-quotas.mjs';
+import { STORAGE_NORMALIZED_ERROR_CODES } from '../../packages/adapters/src/storage-error-taxonomy.mjs';
+import { buildTenantStorageContextRecord } from '../../packages/adapters/src/storage-tenant-context.mjs';
 
 function buildTenantContext() {
   return buildTenantStorageContextRecord({

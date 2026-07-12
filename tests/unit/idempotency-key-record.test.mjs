@@ -6,7 +6,7 @@ import {
   hashParams,
   isExpired,
   validateKeyFormat
-} from '../../services/provisioning-orchestrator/src/models/idempotency-key-record.mjs';
+} from '../../packages/provisioning-orchestrator/src/models/idempotency-key-record.mjs';
 
 test('createIdempotencyKeyRecord builds deterministic params hash and expiry', () => {
   const record = createIdempotencyKeyRecord({

@@ -6,7 +6,7 @@ import {
   __setKafkaHandlersTestHooks,
   isStaleKafkaMetadataError,
   KAFKA_HANDLERS
-} from '../../deploy/kind/control-plane/kafka-handlers.mjs';
+} from '../../apps/control-plane/kafka-handlers.mjs';
 
 test.afterEach(async () => {
   await __resetKafkaHandlersTestHooks();

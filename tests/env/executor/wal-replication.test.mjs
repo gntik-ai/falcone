@@ -14,8 +14,8 @@ import assert from 'node:assert/strict'
 import { MongoClient } from 'mongodb'
 import pg from 'pg'
 
-import { WalReplicationClient } from '../../../services/mongo-cdc-bridge/src/WalReplicationClient.mjs'
-import { CollectionCatalog } from '../../../services/mongo-cdc-bridge/src/CollectionCatalog.mjs'
+import { WalReplicationClient } from '../../../packages/mongo-cdc-bridge/src/WalReplicationClient.mjs'
+import { CollectionCatalog } from '../../../packages/mongo-cdc-bridge/src/CollectionCatalog.mjs'
 
 const MONGO_URI = process.env.MONGO_URI ?? 'mongodb://falcone:falcone@localhost:57017/'
 const PG = {

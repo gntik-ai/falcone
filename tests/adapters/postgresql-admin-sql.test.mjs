@@ -5,7 +5,7 @@ import {
   buildPostgresAdminSqlAdapterCall,
   resolvePostgresAdminSqlPolicy,
   validatePostgresAdminSqlRequest
-} from '../../services/adapters/src/postgresql-admin.mjs';
+} from '../../packages/adapters/src/postgresql-admin.mjs';
 
 test('postgres admin SQL preview call binds named parameters and exposes plan flags', () => {
   const call = buildPostgresAdminSqlAdapterCall({

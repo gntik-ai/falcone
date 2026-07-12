@@ -6,12 +6,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { STORAGE_HANDLERS } from '../../deploy/kind/control-plane/storage-handlers.mjs';
+import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
 import {
   KAFKA_HANDLERS,
   __resetKafkaHandlersTestHooks,
   __setKafkaHandlersTestHooks,
-} from '../../deploy/kind/control-plane/kafka-handlers.mjs';
+} from '../../apps/control-plane/kafka-handlers.mjs';
 
 const TENANT = 'tenant-a';
 const WORKSPACE = 'ws-a';

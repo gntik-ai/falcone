@@ -1,16 +1,16 @@
 import {
   __resetWorkflowDependenciesForTest as resetWF002Deps,
   __setWorkflowDependenciesForTest as setWF002Deps
-} from '../../../../apps/control-plane/src/workflows/wf-con-002-tenant-provisioning.mjs';
+} from '../../../../apps/control-plane-executor/src/workflows/wf-con-002-tenant-provisioning.mjs';
 import {
   __resetWorkflowDependenciesForTest as resetWF003Deps,
   __setWorkflowDependenciesForTest as setWF003Deps
-} from '../../../../apps/control-plane/src/workflows/wf-con-003-workspace-creation.mjs';
+} from '../../../../apps/control-plane-executor/src/workflows/wf-con-003-workspace-creation.mjs';
 import {
   __resetWorkflowDependenciesForTest as resetWF004Deps,
   __setWorkflowDependenciesForTest as setWF004Deps
-} from '../../../../apps/control-plane/src/workflows/wf-con-004-credential-generation.mjs';
-import { sagaDefinitions } from '../../../../apps/control-plane/src/saga/saga-definitions.mjs';
+} from '../../../../apps/control-plane-executor/src/workflows/wf-con-004-credential-generation.mjs';
+import { sagaDefinitions } from '../../../../apps/control-plane-executor/src/saga/saga-definitions.mjs';
 
 const workflowDependencyMap = {
   'WF-CON-002': {

@@ -6,11 +6,11 @@ import {
   __resetKafkaHandlersTestHooks,
   __setKafkaHandlersTestHooks,
   KAFKA_HANDLERS
-} from '../../deploy/kind/control-plane/kafka-handlers.mjs';
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
+} from '../../apps/control-plane/kafka-handlers.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
 
-const runtimeRouteMap = JSON.parse(readFileSync(new URL('../../deploy/kind/control-plane/route-map.runtime.json', import.meta.url), 'utf8'));
-const fullRouteMap = JSON.parse(readFileSync(new URL('../../deploy/kind/control-plane/route-map.json', import.meta.url), 'utf8'));
+const runtimeRouteMap = JSON.parse(readFileSync(new URL('../../apps/control-plane/route-map.runtime.json', import.meta.url), 'utf8'));
+const fullRouteMap = JSON.parse(readFileSync(new URL('../../apps/control-plane/route-map.json', import.meta.url), 'utf8'));
 
 test.afterEach(async () => {
   await __resetKafkaHandlersTestHooks();

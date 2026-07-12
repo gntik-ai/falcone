@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { buildTaskTypeCatalog, TASK_TYPE_DESCRIPTORS } from '../../apps/control-plane/src/runtime/flow-task-types.mjs';
-import { TASK_TYPE_NAMES } from '../../services/workflow-worker/src/activities/catalog-names.mjs';
+import { buildTaskTypeCatalog, TASK_TYPE_DESCRIPTORS } from '../../apps/control-plane-executor/src/runtime/flow-task-types.mjs';
+import { TASK_TYPE_NAMES } from '../../apps/workflow-worker/src/activities/catalog-names.mjs';
 
 test('ctr-llm-cat-01: llm.complete is present in both the canonical names and the descriptor catalog', () => {
   assert.ok(TASK_TYPE_NAMES.includes('llm.complete'), 'canonical name list includes llm.complete');

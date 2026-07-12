@@ -27,7 +27,7 @@ import pg from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { main as pgCaptureEnable } from '../../../../services/provisioning-orchestrator/src/actions/realtime/pg-capture-enable.mjs';
+import { main as pgCaptureEnable } from '../../../../packages/provisioning-orchestrator/src/actions/realtime/pg-capture-enable.mjs';
 
 const { Pool } = pg;
 
@@ -57,7 +57,7 @@ test.beforeAll(async () => {
   // Read ONLY the "-- up" section; never execute the "-- down" DROP section.
   const migrationPath = path.resolve(
     fileURLToPath(import.meta.url),
-    '../../../../../services/provisioning-orchestrator/src/migrations/080-pg-capture-config.sql',
+    '../../../../../packages/provisioning-orchestrator/src/migrations/080-pg-capture-config.sql',
   );
   const migrationSrc = fs.readFileSync(migrationPath, 'utf8');
   const downMarkerIdx = migrationSrc.split('\n').findIndex((line) => /^--\s*down\s*$/i.test(line.trim()));

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SubscriptionLifecyclePublisher } from '../../../services/provisioning-orchestrator/src/events/realtime/SubscriptionLifecyclePublisher.mjs';
+import { SubscriptionLifecyclePublisher } from '../../../packages/provisioning-orchestrator/src/events/realtime/SubscriptionLifecyclePublisher.mjs';
 
 test('cloud event envelope matches lifecycle contract', () => {
   const publisher = new SubscriptionLifecyclePublisher();

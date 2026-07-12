@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import pg from 'pg';
 const { Client } = pg;
 import fs from 'node:fs/promises';
-import { main as createPlan } from '../../../services/provisioning-orchestrator/src/actions/plan-create.mjs';
-import { main as lifecyclePlan } from '../../../services/provisioning-orchestrator/src/actions/plan-lifecycle.mjs';
-import { main as assignPlan } from '../../../services/provisioning-orchestrator/src/actions/plan-assign.mjs';
-import { main as assignmentHistory } from '../../../services/provisioning-orchestrator/src/actions/plan-assignment-history.mjs';
+import { main as createPlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-create.mjs';
+import { main as lifecyclePlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-lifecycle.mjs';
+import { main as assignPlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-assign.mjs';
+import { main as assignmentHistory } from '../../../packages/provisioning-orchestrator/src/actions/plan-assignment-history.mjs';
 import { setup as setupTenant } from './fixtures/create-test-tenant.mjs';
 
-const migration = await fs.readFile(new URL('../../../services/provisioning-orchestrator/src/migrations/097-plan-entity-tenant-assignment.sql', import.meta.url), 'utf8');
+const migration = await fs.readFile(new URL('../../../packages/provisioning-orchestrator/src/migrations/097-plan-entity-tenant-assignment.sql', import.meta.url), 'utf8');
 const superadmin = { callerContext: { actor: { id: 'superadmin-1', type: 'superadmin' } } };
 const producer = { send: async () => {} };
 async function db() { const client = new Client({ connectionString: process.env.DATABASE_URL }); await client.connect(); await client.query(migration); await client.query('TRUNCATE tenant_plan_assignments, plan_audit_events, plans RESTART IDENTITY CASCADE'); await client.query('DROP TABLE IF EXISTS tenants'); return client; }

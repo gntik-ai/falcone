@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import pg from 'pg';
 const { Client } = pg;
 import fs from 'node:fs/promises';
-import { main as createPlan } from '../../../services/provisioning-orchestrator/src/actions/plan-create.mjs';
-import { main as deletePlan } from '../../../services/provisioning-orchestrator/src/actions/plan-delete.mjs';
+import { main as createPlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-create.mjs';
+import { main as deletePlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-delete.mjs';
 
-const migration = await fs.readFile(new URL('../../../services/provisioning-orchestrator/src/migrations/097-plan-entity-tenant-assignment.sql', import.meta.url), 'utf8');
+const migration = await fs.readFile(new URL('../../../packages/provisioning-orchestrator/src/migrations/097-plan-entity-tenant-assignment.sql', import.meta.url), 'utf8');
 const superadmin = { callerContext: { actor: { id: 'superadmin-1', type: 'superadmin' } } };
 const tenantOwner = { callerContext: { actor: { id: 'owner-1', type: 'tenant_owner', tenantId: 'tenant-delete' } } };
 const producerMessages = [];

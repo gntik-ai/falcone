@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../../services/provisioning-orchestrator/src/actions/async-operation-retry-override.mjs';
+import { main } from '../../packages/provisioning-orchestrator/src/actions/async-operation-retry-override.mjs';
 
 const baseOverrides = { db: { query: async () => ({ rows: [] }) }, findByIdWithTenant: async () => ({ operation_id: 'op', tenant_id: 't', attempt_count: 1, manual_intervention_required: true }), findFlagByOperationId: async () => ({ flag_id: 'flag', status: 'pending' }), createIfNotInProgress: async () => ({ created: true }), createRetryAttemptModel: () => ({ attempt_id: 'attempt', correlation_id: 'corr' }), createRetryAttempt: async () => {}, resolveFlag: async () => {}, publishRetryOverrideEvent: async () => {} };
 

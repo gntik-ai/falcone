@@ -12,9 +12,9 @@ import {
   previewImportQuotaAdmission,
   validateImportManifest,
   validateImportManifestEntry
-} from '../../services/adapters/src/storage-import-export.mjs';
-import { buildStorageQuotaProfile } from '../../services/adapters/src/storage-capacity-quotas.mjs';
-import { previewStorageImportResult } from '../../apps/control-plane/src/storage-admin.mjs';
+} from '../../packages/adapters/src/storage-import-export.mjs';
+import { buildStorageQuotaProfile } from '../../packages/adapters/src/storage-capacity-quotas.mjs';
+import { previewStorageImportResult } from '../../apps/control-plane-executor/src/storage-admin.mjs';
 
 function makeEntry(objectKey, sizeBytes) {
   return buildStorageExportManifestEntry({

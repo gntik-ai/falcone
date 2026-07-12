@@ -22,14 +22,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkWorkspaceQuota } from '../../deploy/kind/control-plane/workspace-quota.mjs';
+import { checkWorkspaceQuota } from '../../apps/control-plane/workspace-quota.mjs';
 
 // Load the real product governance model via repo-relative paths (the runtime uses
 // /repo; tests run from the repo root).
 const load = async () => {
   const [repo, model] = await Promise.all([
-    import('../../services/provisioning-orchestrator/src/repositories/quota-enforcement-repository.mjs'),
-    import('../../services/provisioning-orchestrator/src/models/quota-enforcement.mjs'),
+    import('../../packages/provisioning-orchestrator/src/repositories/quota-enforcement-repository.mjs'),
+    import('../../packages/provisioning-orchestrator/src/models/quota-enforcement.mjs'),
   ]);
   return { resolveEffectiveLimit: repo.resolveEffectiveLimit, evaluateQuotaDecision: model.evaluateQuotaDecision };
 };

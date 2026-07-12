@@ -4,7 +4,7 @@
 import { Connection, WorkflowClient } from '@temporalio/client';
 
 // Mirror of mapExecutionToTaskStatus / taskHandleFromExecution from
-// apps/control-plane/src/mcp-workflows-tools.mjs (Temporal status -> MCP Task status).
+// apps/control-plane-executor/src/mcp-workflows-tools.mjs (Temporal status -> MCP Task status).
 const DONE = new Set(['COMPLETED']);
 const FAILED = new Set(['FAILED', 'TIMED_OUT']);
 const CANCELLED = new Set(['CANCELED', 'TERMINATED']);

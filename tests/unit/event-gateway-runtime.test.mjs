@@ -13,7 +13,7 @@ import {
   summarizeRelativeOrdering,
   validateEventPublicationRequest,
   validateEventSubscriptionRequest
-} from '../../services/event-gateway/src/runtime.mjs';
+} from '../../packages/event-gateway/src/runtime.mjs';
 
 test('event gateway runtime resolves plan-aware payload, replay, queue, and observability guardrails', () => {
   const growthProfile = resolveEventGatewayProfile(

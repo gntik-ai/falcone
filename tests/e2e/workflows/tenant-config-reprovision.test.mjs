@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../../../services/provisioning-orchestrator/src/actions/tenant-config-reprovision.mjs';
+import { main } from '../../../packages/provisioning-orchestrator/src/actions/tenant-config-reprovision.mjs';
 
 const defaultAuth = { actor_id: 'sre-1', actor_type: 'sre', scopes: ['platform:admin:config:reprovision'] };
 const silentLog = { error: () => {}, warn: () => {}, info: () => {} };

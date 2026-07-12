@@ -5,7 +5,7 @@ import {
   listControlPlaneRoutes,
   publicApiFamilies,
   summarizePublicApiFamilies
-} from '../../apps/control-plane/src/public-api-catalog.mjs';
+} from '../../apps/control-plane-executor/src/public-api-catalog.mjs';
 import {
   buildConsoleRouteSections,
   filterConsoleApiRoutes

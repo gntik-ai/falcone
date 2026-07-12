@@ -22,9 +22,9 @@ import assert from 'node:assert/strict';
 import {
   createRealtimeExecutor,
   nonReplicationConfig,
-} from '../../apps/control-plane/src/runtime/realtime-executor.mjs';
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
+} from '../../apps/control-plane-executor/src/runtime/realtime-executor.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 
 const REPL_URL = 'postgres://falcone_cdc_repl:pw@falcone-documentdb:5432/postgres?sslmode=disable&replication=database';
 

@@ -11,8 +11,8 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { MongoClient } from 'mongodb'
 
-import { createMongoExecutor } from '../../../apps/control-plane/src/runtime/mongo-data-executor.mjs'
-import { createRealtimeExecutor } from '../../../apps/control-plane/src/runtime/realtime-executor.mjs'
+import { createMongoExecutor } from '../../../apps/control-plane-executor/src/runtime/mongo-data-executor.mjs'
+import { createRealtimeExecutor } from '../../../apps/control-plane-executor/src/runtime/realtime-executor.mjs'
 
 const URI = process.env.MONGO_URI ?? 'mongodb://falcone:falcone@localhost:57017/'
 const PG = {

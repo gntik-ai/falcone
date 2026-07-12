@@ -2,7 +2,7 @@
  * HTTP client for GET /v1/backup/audit.
  */
 
-import type { AuditQueryFilters, AuditEventPage } from '../../../../services/backup-status/src/audit/audit-trail.types.js'
+import type { AuditQueryFilters, AuditEventPage } from '../../../../../packages/backup-status/src/audit/audit-trail.types.js'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 

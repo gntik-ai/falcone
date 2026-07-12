@@ -11,7 +11,7 @@ import {
   storageQuotaGuardrailErrorCodes,
   storageQuotaOperationTypes,
   storageQuotaScopeTypes
-} from '../../services/adapters/src/provider-catalog.mjs';
+} from '../../packages/adapters/src/provider-catalog.mjs';
 
 function buildTenantContext() {
   return getTenantStorageContextRecord({

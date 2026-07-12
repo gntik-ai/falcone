@@ -67,7 +67,7 @@ message bus), and **operational core services** (observability, secrets manager,
 | `apisix` | Deployment | API gateway (edge: validates JWT, injects tenant identity headers). |
 | `control-plane` | Deployment | Management/Product API (tenants, IAM, functions admin, storage admin). |
 | `control-plane-executor` | Deployment | Data‑plane executor (runs adapter plans against the real backends). |
-| `web-console` | Deployment | Operator/tenant web UI (nginx static + same‑origin `/v1` proxy). |
+| `web-console` | Deployment | Operator/tenant web UI (Node static server + same‑origin `/v1` proxy). |
 | `observability` (Prometheus) | Deployment | Metrics scraping + storage. |
 | `grafana` | Deployment | Dashboards over Prometheus. |
 | Bootstrap / init Jobs | Job | Keycloak realm + APISIX routes; DocumentDB extension + logical replication; SeaweedFS bucket + admin identity. |
@@ -238,11 +238,11 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 
 | Component | Image:tag (chart) | Dockerfile | Build base image(s) (also mirror) | Notes |
 |---|---|---|---|---|
-| control-plane (API) | `in-falcone-control-plane:0.3.0` | `deploy/kind/control-plane/Dockerfile` | `node:22-alpine` | release workflow build; validates JWT and dispatches `/v1/*` to real action modules |
-| control-plane-executor | `in-falcone-control-plane-executor:0.3.0` | `apps/control-plane/Dockerfile` | `node:22-alpine` | data-plane executor; built from repo root |
-| web-console | `in-falcone-web-console:0.3.0` | `deploy/release/web-console.Dockerfile` | `node:22-alpine` | static Node server with zero filesystem writes; build SPA first |
-| workflow-worker | `in-falcone-workflow-worker:0.3.0` | `services/workflow-worker/Dockerfile` | `node:22-slim` (glibc - Temporal core-bridge) | core worker, built from repo root |
-| fn-runtime | `in-falcone-fn-runtime:0.3.0` | `deploy/kind/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
+| control-plane (API) | `in-falcone-control-plane:0.3.0` | `apps/control-plane/Dockerfile` | `node:22-alpine` | release workflow build; validates JWT and dispatches `/v1/*` to real action modules |
+| control-plane-executor | `in-falcone-control-plane-executor:0.3.0` | `apps/control-plane-executor/Dockerfile` | `node:22-alpine` | data-plane executor; built from repo root |
+| web-console | `in-falcone-web-console:0.3.0` | `apps/web-console/Dockerfile` | `node:22-alpine` | static Node server with zero filesystem writes; build SPA first |
+| workflow-worker | `in-falcone-workflow-worker:0.3.0` | `apps/workflow-worker/Dockerfile` | `node:22-slim` (glibc - Temporal core-bridge) | core worker, built from repo root |
+| fn-runtime | `in-falcone-fn-runtime:0.3.0` | `apps/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
 | mcp-runtime | `in-falcone-mcp-runtime:0.3.0` | `apps/mcp-runtime/Dockerfile` | `node:22-alpine` | first-party MCP JSON-RPC runtime |
 
 Harbor targets for the built images:
@@ -2390,7 +2390,7 @@ spec:
 
 The executor runs adapter plans against the real backends. The chart renders only
 `GATEWAY_SHARED_SECRET`; this guide adds the backend connection env it needs to function
-(same variable names as the control‑plane — both build from `apps/control-plane`).
+(same variable names as the control‑plane — both build from `apps/control-plane-executor`).
 
 ```yaml
 apiVersion: apps/v1
@@ -3067,7 +3067,7 @@ spec:
 > **Storing the unseal keys/root token securely is an operator responsibility** — do not
 > leave them in a Job log. For production prefer auto‑unseal. The
 > `secret-audit-handler` sidecar (node:20‑alpine tailing the file audit log → Kafka) is
-> **omitted** here; to enable it, bundle `services/secret-audit-handler/src` into a
+> **omitted** here; to enable it, bundle `packages/secret-audit-handler/src` into a
 > ConfigMap `secret-audit-handler-bundle` and add the sidecar from the chart render.
 
 ### 8.2 Temporal (flows engine) + workflow‑worker
@@ -3687,7 +3687,7 @@ spec:
   strategy:
     type: Docker
     dockerStrategy:
-      dockerfilePath: apps/control-plane/Dockerfile
+      dockerfilePath: apps/control-plane-executor/Dockerfile
       from:
         kind: DockerImage
         name: ${HARBOR}/${HARBOR_PROJECT}/library/node:22-alpine   # base from Harbor

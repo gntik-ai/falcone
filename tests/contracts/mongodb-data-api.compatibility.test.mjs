@@ -6,8 +6,8 @@ import {
   getContract,
   getPublicRoute,
   getService
-} from '../../services/internal-contracts/src/index.mjs';
-import { mongodbDataAdapterPort } from '../../services/adapters/src/mongodb-data-api.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
+import { mongodbDataAdapterPort } from '../../packages/adapters/src/mongodb-data-api.mjs';
 
 test('mongo data API service contracts and adapter capability baseline are published', () => {
   const mongoDataRequest = getContract('mongo_data_request');

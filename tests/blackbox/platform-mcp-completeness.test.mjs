@@ -15,7 +15,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 
 const TENANT_A = 'ten_acme';
 

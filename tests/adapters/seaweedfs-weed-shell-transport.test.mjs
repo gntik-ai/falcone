@@ -6,7 +6,7 @@ import {
   writeIdentity,
   deleteIdentity,
   updateIdentityActions,
-} from '../../services/adapters/src/seaweedfs-iam-client.mjs';
+} from '../../packages/adapters/src/seaweedfs-iam-client.mjs';
 
 // Faithful in-memory model of `weed shell s3.configure` (verified semantics
 // against the pinned SeaweedFS 4.33 image): view returns the JSON config;

@@ -21,7 +21,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AUTH_HANDLERS } from '../../deploy/kind/control-plane/auth-handlers.mjs';
+import { AUTH_HANDLERS } from '../../apps/control-plane/auth-handlers.mjs';
 
 const { logout, refresh } = AUTH_HANDLERS;
 

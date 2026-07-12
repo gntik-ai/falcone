@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import type { AuditQueryFilters, AuditEventType } from '../../../../../services/backup-status/src/audit/audit-trail.types.js'
+import type { AuditQueryFilters, AuditEventType } from '../../../../../packages/backup-status/src/audit/audit-trail.types.js'
 
 interface Props {
   role: 'admin' | 'tenant_owner'

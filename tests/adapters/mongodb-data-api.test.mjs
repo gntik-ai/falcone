@@ -12,7 +12,7 @@ import {
   normalizeMongoDataError,
   summarizeMongoDataApiCapabilityMatrix,
   validateMongoDocumentAgainstCollectionRules
-} from '../../services/adapters/src/mongodb-data-api.mjs';
+} from '../../packages/adapters/src/mongodb-data-api.mjs';
 
 test('mongodb data adapter publishes CRUD, advanced data, and realtime bridge capabilities for document operations', () => {
   assert.ok(mongodbDataAdapterPort.capabilities.includes('mongo_data_query'));

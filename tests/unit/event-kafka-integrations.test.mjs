@@ -14,12 +14,12 @@ import {
   resolveEventBridgeProfile,
   validateEventBridgeDefinition,
   validateKafkaFunctionTrigger
-} from '../../services/event-gateway/src/kafka-integrations.mjs';
+} from '../../packages/event-gateway/src/kafka-integrations.mjs';
 import {
   summarizeEventBridgeSupport,
   summarizeTopicMetadataSupport,
   summarizeWorkspaceEventDashboard
-} from '../../apps/control-plane/src/events-admin.mjs';
+} from '../../apps/control-plane-executor/src/events-admin.mjs';
 
 test('event-bridge profiles and builders normalize multi-source Kafka bridge definitions', () => {
   const context = {
@@ -108,6 +108,35 @@ test('event-bridge validation rejects cross-workspace sources and unsupported ev
     validation.violations.some((entry) => entry.includes('sourceEventType row_updated is not supported for storage')),
     true
   );
+});
+
+test('event-bridge validation rejects non-string partition key templates', () => {
+  const context = {
+    tenantId: 'ten_01growthalpha',
+    workspaceId: 'wrk_01alphadev',
+    workspaceEnvironment: 'dev',
+    planId: 'pln_01growth'
+  };
+  const topic = { resourceId: 'res_01billing', replayWindowHours: 24 };
+
+  for (const partitionKeyTemplate of [42, {}, [], { length: 0 }]) {
+    const validation = validateEventBridgeDefinition({
+      context,
+      topic,
+      bridge: {
+        sourceType: 'postgresql',
+        sourceRef: 'pg://tenant_alpha/orders',
+        topicRef: 'res_01billing',
+        partitionKeyTemplate
+      }
+    });
+
+    assert.equal(validation.ok, false);
+    assert.equal(
+      validation.violations.includes('partitionKeyTemplate must use stable field placeholders or safe separators only.'),
+      true
+    );
+  }
 });
 
 test('Kafka function-trigger builders normalize OpenWhisk execution policy and dead-letter routing', () => {

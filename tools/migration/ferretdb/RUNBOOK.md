@@ -103,7 +103,7 @@ lift the freeze; the source remains authoritative.
 ### Step 6 — Re-point Falcone to FerretDB
 
 Falcone resolves its document store from `MONGO_URI`
-(`apps/control-plane/src/runtime/main.mjs::mongoUri`). Update it to the FerretDB gateway endpoint:
+(`apps/control-plane-executor/src/runtime/main.mjs::mongoUri`). Update it to the FerretDB gateway endpoint:
 
 ```diff
 - MONGO_URI=mongodb://<user>:<pass>@<mongodb-host>:27017/?replicaSet=rs0

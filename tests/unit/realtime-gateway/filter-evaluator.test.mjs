@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateFilter } from '../../../services/realtime-gateway/src/filters/filter-evaluator.mjs';
+import { evaluateFilter } from '../../../packages/realtime-gateway/src/filters/filter-evaluator.mjs';
 
 const event = {
   operation: 'INSERT',

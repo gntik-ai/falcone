@@ -17,7 +17,7 @@ import {
   buildAuditCorrelationConsoleView,
   normalizeAuditCorrelationRequest,
   traceWorkspaceAuditCorrelation
-} from '../../apps/control-plane/src/observability-audit-correlation.mjs';
+} from '../../apps/control-plane-executor/src/observability-audit-correlation.mjs';
 
 test('observability audit correlation surface contract remains internally consistent', () => {
   const violations = collectAuditCorrelationSurfaceViolations();

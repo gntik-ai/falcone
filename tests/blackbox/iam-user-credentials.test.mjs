@@ -16,7 +16,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { credentialPasswordFromBody } from '../../deploy/kind/control-plane/b-handlers.mjs';
+import { credentialPasswordFromBody } from '../../apps/control-plane/b-handlers.mjs';
 
 test('bbx-iam-cred-00: documented bootstrapCredentials.temporaryPassword is honored', () => {
   assert.deepEqual(

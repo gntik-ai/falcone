@@ -7,7 +7,7 @@
  * routes. Tokens are minted locally (RS256) and JWKS is served via an injected fetch stub keyed by
  * realm certs URL, so no Keycloak / network is needed.
  *
- * Defect: deploy/kind/control-plane/server.mjs verified Bearer JWTs against a SINGLE platform-realm
+ * Defect: apps/control-plane/server.mjs verified Bearer JWTs against a SINGLE platform-realm
  * JWKS, so a per-tenant-realm token (Falcone places each tenant in its own realm) failed with
  * JWKSNoMatchingKey → 401 INVALID_TOKEN — even though the executor accepted the same token. Fix:
  * trust any realm under the Keycloak base, fetch each realm's JWKS on demand, and take the tenant id
@@ -29,7 +29,7 @@ import crypto from 'node:crypto';
 import {
   createMultiRealmVerifier,
   deriveRealmTopology,
-} from '../../deploy/kind/control-plane/jwt-verify.mjs';
+} from '../../apps/control-plane/jwt-verify.mjs';
 
 const b64url = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
 

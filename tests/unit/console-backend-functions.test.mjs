@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildConsoleBackendActivationAnnotation,
   validateConsoleBackendInvocationRequest
-} from '../../services/adapters/src/openwhisk-admin.mjs';
+} from '../../packages/adapters/src/openwhisk-admin.mjs';
 import {
   CONSOLE_BACKEND_ACTOR_TYPE,
   CONSOLE_BACKEND_INITIATING_SURFACE,
@@ -15,7 +15,7 @@ import {
   listConsoleWorkflowRouteClassifications,
   summarizeConsoleBackendFunctionsSurface,
   validateConsoleBackendScope
-} from '../../apps/control-plane/src/console-backend-functions.mjs';
+} from '../../apps/control-plane-executor/src/console-backend-functions.mjs';
 
 test('console backend identity requirements remain stable', () => {
   const identity = getConsoleBackendIdentityRequirements();

@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { handleTenantPurgeRequest, getTenantRoute } from '../../apps/control-plane/src/tenant-management.mjs';
+import { handleTenantPurgeRequest, getTenantRoute } from '../../apps/control-plane-executor/src/tenant-management.mjs';
 import { readDomainSeedFixtures } from '../../scripts/lib/domain-model.mjs';
 
 const NOW = '2026-03-24T00:00:00Z';

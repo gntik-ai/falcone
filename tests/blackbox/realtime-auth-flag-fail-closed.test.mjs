@@ -12,8 +12,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadEnv } from '../../services/realtime-gateway/src/config/env.mjs';
-import { createValidateSubscriptionAuthAction } from '../../services/realtime-gateway/src/actions/validate-subscription-auth.mjs';
+import { loadEnv } from '../../packages/realtime-gateway/src/config/env.mjs';
+import { createValidateSubscriptionAuthAction } from '../../packages/realtime-gateway/src/actions/validate-subscription-auth.mjs';
 
 // Minimal valid env vars required by loadEnv (string keys).
 const REQUIRED_ENV = {
@@ -208,7 +208,7 @@ test('bbx-realtime-auth-D2: invalid token → allowed=false, publishAuthDecision
   let publishCalled = false;
 
   // Import AuthError from the module to throw the right type.
-  const { AuthError } = await import('../../services/realtime-gateway/src/auth/token-validator.mjs');
+  const { AuthError } = await import('../../packages/realtime-gateway/src/auth/token-validator.mjs');
 
   const action = createValidateSubscriptionAuthAction({
     envProvider: makeEnvProvider(),

@@ -12,9 +12,9 @@ shell restoring the active workspace selection for the signed-in user. Until tha
 available, the page must not issue an MCP request; if no active workspace can be selected, it renders a
 clear "select a workspace" state.
 
-The backend MCP hosting routes are workspace-scoped in `apps/control-plane/src/runtime/server.mjs`.
+The backend MCP hosting routes are workspace-scoped in `apps/control-plane-executor/src/runtime/server.mjs`.
 Do not add or call unscoped aliases such as `GET /v1/mcp/servers/{serverId}` or
 `POST /v1/mcp/servers/{serverId}/playground/tool-calls`; those paths are not served and would bypass
 the route shape used for tenant/workspace isolation. The legacy gateway MCP route catalog in
-`services/gateway-config/public-route-catalog.json` should advertise the served workspace-scoped
+`deploy/gateway-config/public-route-catalog.json` should advertise the served workspace-scoped
 detail and `tool-calls` paths.

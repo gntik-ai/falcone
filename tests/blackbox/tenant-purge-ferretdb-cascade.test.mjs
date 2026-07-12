@@ -39,8 +39,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LOCAL_HANDLERS as HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
-import { mongoTeardown } from '../../deploy/kind/control-plane/mongo-handlers.mjs';
+import { LOCAL_HANDLERS as HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
+import { mongoTeardown } from '../../apps/control-plane/mongo-handlers.mjs';
 
 const TENANT_A = 'tenant-a';
 const TENANT_B = 'tenant-b';

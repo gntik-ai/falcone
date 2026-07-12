@@ -16,10 +16,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
-import { createFlowMonitoringExecutor } from '../../apps/control-plane/src/runtime/flow-monitoring-executor.mjs';
-import { buildWorkflowId } from '../../apps/control-plane/src/runtime/flow-executor.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
+import { createFlowMonitoringExecutor } from '../../apps/control-plane-executor/src/runtime/flow-monitoring-executor.mjs';
+import { buildWorkflowId } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../..');
@@ -300,7 +300,7 @@ test('bbx-flows-mon-08: SSE route returns 501 when monitoring is disabled', asyn
 
 // bbx-flows-mon-09: the SSE events route is present in the gateway allow-list as data_access.
 test('bbx-flows-mon-09: events SSE route is registered in the public route catalog (data_access)', () => {
-  const catalog = JSON.parse(readFileSync(resolve(REPO, 'services/gateway-config/public-route-catalog.json'), 'utf8'));
+  const catalog = JSON.parse(readFileSync(resolve(REPO, 'deploy/gateway-config/public-route-catalog.json'), 'utf8'));
   const path = '/v1/flows/workspaces/{workspaceId}/executions/{executionId}/events';
   const e = catalog.find((r) => r.method === 'GET' && r.path === path);
   assert.ok(e, 'GET events route present in the gateway allow-list');

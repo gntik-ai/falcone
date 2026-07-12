@@ -1,6 +1,6 @@
 # Environment Variables
 
-The runnable control-plane / executor service (`apps/control-plane/src/runtime`) is configured by environment variables. In a chart deployment these are populated from the component config + `secretRefs`; for local runs you set them directly.
+The runnable control-plane / executor service (`apps/control-plane-executor/src/runtime`) is configured by environment variables. In a chart deployment these are populated from the component config + `secretRefs`; for local runs you set them directly.
 
 ## HTTP
 

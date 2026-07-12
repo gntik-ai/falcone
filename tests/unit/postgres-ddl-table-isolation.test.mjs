@@ -5,7 +5,7 @@
 // tenant_id column + FORCE RLS policy for a table create, and ONLY for a table create.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { executePostgresDdl } from '../../apps/control-plane/src/runtime/postgres-ddl-executor.mjs';
+import { executePostgresDdl } from '../../apps/control-plane-executor/src/runtime/postgres-ddl-executor.mjs';
 
 const identity = { tenantId: 't1', workspaceId: 'ws1' };
 const preview = (params) => executePostgresDdl(null, { ...params, identity, payload: { ...params.payload, dryRun: true } });

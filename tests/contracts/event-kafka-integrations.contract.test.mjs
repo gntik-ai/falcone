@@ -7,7 +7,7 @@ import {
   getPublicRoute,
   getService,
   readPublicApiTaxonomy
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 
 test('US-EVT-03 internal contracts publish bridge, trigger, and source-event envelopes', () => {
   const controlApi = getService('control_api');

@@ -14,7 +14,7 @@ import {
   buildVerificationScenario,
   classifyVerificationFailure,
   summarizeVerificationReport
-} from '../../services/adapters/src/storage-provider-verification.mjs';
+} from '../../packages/adapters/src/storage-provider-verification.mjs';
 
 const REQUIRED_CATEGORIES = [
   'bucket.create',

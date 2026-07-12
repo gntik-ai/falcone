@@ -9,7 +9,7 @@ import {
   mongoDataRequestContract,
   mongoDataResultContract,
   summarizeMongoDataApiSurface
-} from '../../apps/control-plane/src/mongo-data-api.mjs';
+} from '../../apps/control-plane-executor/src/mongo-data-api.mjs';
 import {
   MONGO_DATA_AGGREGATION_STAGES,
   MONGO_DATA_API_CAPABILITIES,
@@ -28,7 +28,7 @@ import {
   buildMongoDataAuditSummary,
   buildMongoDataScopedCredential,
   summarizeMongoDataApiCapabilityMatrix
-} from '../../services/adapters/src/mongodb-data-api.mjs';
+} from '../../packages/adapters/src/mongodb-data-api.mjs';
 
 test('mongo data API public surface publishes CRUD, advanced operations, and scoped credential governance routes', () => {
   const summary = summarizeMongoDataApiSurface({

@@ -5,7 +5,7 @@
  * at a per-tenant/per-workspace path, and resolved server-side at function deploy to inject env vars.
  * Previously no Falcone component read from or wrote to Vault (the seam was a no-op stub).
  *
- * Driven through the module's public surface (deploy/kind/control-plane/vault-secrets.mjs) against a
+ * Driven through the module's public surface (apps/control-plane/vault-secrets.mjs) against a
  * faithful FAKE Vault KV v2 HTTP server — the write/read/list/delete protocol and the exact stored
  * paths are asserted, so per-tenant/per-workspace isolation is proven, not assumed.
  *
@@ -30,7 +30,7 @@ import http from 'node:http';
 import {
   createVaultKvClient, createWorkspaceSecretStore, vaultStoreFromEnv,
   workspaceSecretPath, secretEnvVarName,
-} from '../../deploy/kind/control-plane/vault-secrets.mjs';
+} from '../../apps/control-plane/vault-secrets.mjs';
 
 // A faithful fake Vault/OpenBao KV v2 server. Stores versioned secrets keyed by the logical path
 // (everything after /v1/{mount}/data|metadata/). Records auth headers + the paths it was asked for.

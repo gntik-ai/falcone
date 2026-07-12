@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateTransition } from '../../services/provisioning-orchestrator/src/models/async-operation-states.mjs';
-import { isCancellable } from '../../services/provisioning-orchestrator/src/models/async-operation.mjs';
+import { validateTransition } from '../../packages/provisioning-orchestrator/src/models/async-operation-states.mjs';
+import { isCancellable } from '../../packages/provisioning-orchestrator/src/models/async-operation.mjs';
 
 test('extended transitions are accepted', () => {
   assert.doesNotThrow(() => validateTransition('running', 'timed_out'));

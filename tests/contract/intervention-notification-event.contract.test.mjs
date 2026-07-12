@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import schema from '../../services/internal-contracts/src/intervention-notification-event.json' with { type: 'json' };
-import { buildInterventionNotificationEvent } from '../../services/provisioning-orchestrator/src/events/async-operation-events.mjs';
+import schema from '../../packages/internal-contracts/src/intervention-notification-event.json' with { type: 'json' };
+import { buildInterventionNotificationEvent } from '../../packages/provisioning-orchestrator/src/events/async-operation-events.mjs';
 
 function validate(event) { for (const key of schema.required) assert.notEqual(event[key], undefined); assert.ok(Array.isArray(event.suggestedActions)); }
 for (const role of ['tenant_owner', 'superadmin']) {

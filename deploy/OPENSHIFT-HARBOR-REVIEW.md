@@ -40,7 +40,7 @@ now chart-managed and the control-plane + a live Knative function are unaffected
 - **Executor RBAC is now a chart template** (`templates/control-plane-rbac.yaml`),
   a namespace-scoped Role/RoleBinding granting `serving.knative.dev/services` + jobs +
   pods/log, bound to the Helm-owned control-plane ServiceAccount. This replaces the
-  standalone `deploy/kind/control-plane/executor-rbac.yaml`.
+  standalone `apps/control-plane/executor-rbac.yaml`.
 - **Function execution is Knative-backed.** No legacy function-runtime controller
   workload or service endpoint renders from the chart. The control-plane/executor path
   owns function deployment and invocation, and OpenShift installs use OpenShift
@@ -136,9 +136,9 @@ I had to FIX one chart blocker to get there (committed to the chart copy):
   `serving-core.yaml`/`kourier.yaml` (that was the kind path). No
   `registries-skipping-tag-resolving` hack is needed — Harbor is reachable by both the
   kubelet and the Knative controller, so digest resolution works.
-- Ship the **`fn-runtime`** image (`deploy/kind/fn-runtime/`) to Harbor and set
+- Ship the **`fn-runtime`** image (`apps/fn-runtime/`) to Harbor and set
   `FN_RUNTIME_IMAGE` to its Harbor path. Add the function-executor **RBAC**
-  (`deploy/kind/control-plane/executor-rbac.yaml`: `serving.knative.dev/services` +
+  (`apps/control-plane/executor-rbac.yaml`: `serving.knative.dev/services` +
   jobs/pods) to the chart as a templated Role/RoleBinding, and set the control-plane
   `serviceAccount.automountToken: true` (the executor calls the k8s API with the SA
   token). On OpenShift the executor-created ksvc pods get a random uid — `fn-runtime`

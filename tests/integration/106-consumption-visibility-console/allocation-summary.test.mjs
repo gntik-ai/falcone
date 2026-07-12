@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main as allocationSummary } from '../../../services/provisioning-orchestrator/src/actions/tenant-workspace-allocation-summary-get.mjs';
+import { main as allocationSummary } from '../../../packages/provisioning-orchestrator/src/actions/tenant-workspace-allocation-summary-get.mjs';
 import { seedWorkspaceWithSubQuotas } from './fixtures/seed-workspace-with-sub-quotas.mjs';
 
 const admin = { callerContext: { actor: { id: 'admin-1', type: 'superadmin' } } };

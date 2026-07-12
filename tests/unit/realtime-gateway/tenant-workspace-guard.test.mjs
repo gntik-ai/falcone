@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { guardEvent } from '../../../services/realtime-gateway/src/isolation/tenant-workspace-guard.mjs';
+import { guardEvent } from '../../../packages/realtime-gateway/src/isolation/tenant-workspace-guard.mjs';
 
 const sessionContext = {
   tenantId: 'tenant-1',

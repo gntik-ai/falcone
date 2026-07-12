@@ -7,7 +7,7 @@ import {
   listMongoAdminRoutes,
   summarizeMongoAdminSurface,
   summarizeMongoAuditCoverage
-} from '../../apps/control-plane/src/mongo-admin.mjs';
+} from '../../apps/control-plane-executor/src/mongo-admin.mjs';
 
 test('mongo admin control-plane helper exposes the expanded structural administrative route surface', () => {
   const routes = listMongoAdminRoutes();

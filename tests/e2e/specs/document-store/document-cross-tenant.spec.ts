@@ -1,6 +1,6 @@
 // Document-store E2E — cross-tenant isolation (change add-ferretdb-document-store-e2e, #464,
 // tasks 6.1-6.4). Isolation is enforced by APP-LAYER tenantId scoping in
-// services/adapters/src/mongodb-data-api.mjs — per-database role scoping is NOT enforced at the
+// packages/adapters/src/mongodb-data-api.mjs — per-database role scoping is NOT enforced at the
 // FerretDB/DocumentDB layer (ADR-14). ALL probes go through the HTTP data API; direct-to-engine
 // reads are not isolated and are not a valid test surface. Falcone uses a SHARED-collection model
 // (collections are not tenant-owned; the tenantId field is the boundary), so a Tenant-B write to

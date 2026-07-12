@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import pg from 'pg';
 const { Client } = pg;
 import fs from 'node:fs/promises';
-import { main as createPlan } from '../../../services/provisioning-orchestrator/src/actions/plan-create.mjs';
-import { main as listPlans } from '../../../services/provisioning-orchestrator/src/actions/plan-list.mjs';
-import { main as updatePlan } from '../../../services/provisioning-orchestrator/src/actions/plan-update.mjs';
-import { main as lifecyclePlan } from '../../../services/provisioning-orchestrator/src/actions/plan-lifecycle.mjs';
+import { main as createPlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-create.mjs';
+import { main as listPlans } from '../../../packages/provisioning-orchestrator/src/actions/plan-list.mjs';
+import { main as updatePlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-update.mjs';
+import { main as lifecyclePlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-lifecycle.mjs';
 
 const superadmin = { callerContext: { actor: { id: 'superadmin-1', type: 'superadmin' } } };
 const messages = [];
 const producer = { send: async (payload) => { messages.push(payload); } };
-const migration = await fs.readFile(new URL('../../../services/provisioning-orchestrator/src/migrations/097-plan-entity-tenant-assignment.sql', import.meta.url), 'utf8');
+const migration = await fs.readFile(new URL('../../../packages/provisioning-orchestrator/src/migrations/097-plan-entity-tenant-assignment.sql', import.meta.url), 'utf8');
 
 async function db() { const client = new Client({ connectionString: process.env.DATABASE_URL }); await client.connect(); await client.query(migration); await client.query('TRUNCATE tenant_plan_assignments, plan_audit_events, plans RESTART IDENTITY CASCADE'); return client; }
 

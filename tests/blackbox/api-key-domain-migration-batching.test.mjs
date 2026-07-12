@@ -16,8 +16,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../../services/provisioning-orchestrator/src/actions/api-key-domain-migration.mjs';
-import { TOPICS } from '../../services/provisioning-orchestrator/src/events/privilege-domain-events.mjs';
+import { main } from '../../packages/provisioning-orchestrator/src/actions/api-key-domain-migration.mjs';
+import { TOPICS } from '../../packages/provisioning-orchestrator/src/events/privilege-domain-events.mjs';
 
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 

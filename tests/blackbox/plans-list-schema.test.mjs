@@ -2,8 +2,8 @@
  * Black-box regression suite for spec change fix-plans-list-500
  * (live E2E campaign 2026-06-17, finding F3).
  *
- * Drives the control-plane runtime schema setup (deploy/kind/control-plane/tenant-store.mjs) and the
- * REAL plan-list action (services/provisioning-orchestrator) through their public interface.
+ * Drives the control-plane runtime schema setup (apps/control-plane/tenant-store.mjs) and the
+ * REAL plan-list action (packages/provisioning-orchestrator) through their public interface.
  * Deterministic: a recording fake pool captures the DDL; no live database is required.
  *
  * Defect: the plan/quota actions are the real provisioning-orchestrator modules, but no in-repo
@@ -24,8 +24,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ensureSchema } from '../../deploy/kind/control-plane/tenant-store.mjs';
-import * as planList from '../../services/provisioning-orchestrator/src/actions/plan-list.mjs';
+import { ensureSchema } from '../../apps/control-plane/tenant-store.mjs';
+import * as planList from '../../packages/provisioning-orchestrator/src/actions/plan-list.mjs';
 
 /** Fake pool that records every SQL string. ensureSchema issues only DDL/UPDATE (reads no rows). */
 function recordingPool() {

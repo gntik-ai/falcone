@@ -5,7 +5,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import pg from 'pg'
-import { createPostgresRealtimeExecutor } from '../../../apps/control-plane/src/runtime/postgres-realtime-executor.mjs'
+import { createPostgresRealtimeExecutor } from '../../../apps/control-plane-executor/src/runtime/postgres-realtime-executor.mjs'
 
 const { Pool } = pg
 

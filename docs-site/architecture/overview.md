@@ -39,7 +39,7 @@ In Falcone is a **multi-tenant BaaS** assembled from a small set of cooperating 
 
 ## The two privilege domains
 
-The public route catalog (`services/gateway-config/public-route-catalog.json`) tags every route with a `privilege_domain`. The gateway's scope-enforcement plugin checks the caller's domain before forwarding:
+The public route catalog (`deploy/gateway-config/public-route-catalog.json`) tags every route with a `privilege_domain`. The gateway's scope-enforcement plugin checks the caller's domain before forwarding:
 
 | Domain | Examples | Typical caller |
 | --- | --- | --- |
@@ -48,7 +48,7 @@ The public route catalog (`services/gateway-config/public-route-catalog.json`) t
 
 ## Identity resolution (precedence)
 
-The executor's `resolveIdentity()` (`apps/control-plane/src/runtime/server.mjs`) applies a strict order. Each authoritative credential derives the tenant from itself:
+The executor's `resolveIdentity()` (`apps/control-plane-executor/src/runtime/server.mjs`) applies a strict order. Each authoritative credential derives the tenant from itself:
 
 ```
 1. API key (apikey: flc_… | Authorization: ApiKey/Bearer flc_… | x-api-key)

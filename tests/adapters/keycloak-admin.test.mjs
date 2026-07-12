@@ -12,7 +12,7 @@ import {
   normalizeKeycloakAdminError,
   normalizeKeycloakAdminResource,
   validateIamAdminRequest
-} from '../../services/adapters/src/keycloak-admin.mjs';
+} from '../../packages/adapters/src/keycloak-admin.mjs';
 
 test('keycloak admin adapter exports the supported compatibility matrix and resource coverage', () => {
   assert.deepEqual(Object.keys(IAM_ADMIN_CAPABILITY_MATRIX), ['realm', 'client', 'role', 'scope', 'user']);

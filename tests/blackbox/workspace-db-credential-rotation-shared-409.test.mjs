@@ -19,7 +19,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LOCAL_HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
+import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
 
 // ---- handler harness: inject store + rotate fn via ctx (parity with the SA-delete suite) ------
 function handlerCtx(overrides = {}) {

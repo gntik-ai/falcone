@@ -4,7 +4,7 @@
  *
  * FerretDB topology: ONE shared cluster; db/collection names are caller-supplied
  * and SHARED across tenants — the only isolation boundary is a `tenantId` field on
- * each document (matching services/adapters mongodb-data-api applyTenantScopeToFilter).
+ * each document (matching packages/adapters mongodb-data-api applyTenantScopeToFilter).
  * The control-plane browse/document handlers omitted that filter, so any tenant
  * could read another tenant's documents by db/collection name and enumerate names.
  *
@@ -31,7 +31,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { MONGO_HANDLERS } from '../../deploy/kind/control-plane/mongo-handlers.mjs';
+import { MONGO_HANDLERS } from '../../apps/control-plane/mongo-handlers.mjs';
 
 // Two workspaces of the SAME tenant (tenant-a) — e.g. the dev and staging stages of one
 // project. `id` is the canonical workspace UUID the documents are stamped with; `slug` is the

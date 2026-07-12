@@ -14,7 +14,7 @@ import {
   getStorageAdminRoute,
   listStorageAdminRoutes,
   listStorageAuditRoutes
-} from '../../apps/control-plane/src/storage-admin.mjs';
+} from '../../apps/control-plane-executor/src/storage-admin.mjs';
 
 test('storage admin re-exports the storage audit catalogs without mutation', () => {
   assert.equal(STORAGE_AUDIT_TOPIC_CATALOG, STORAGE_AUDIT_TOPIC);

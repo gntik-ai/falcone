@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { AuditEventTypeBadge } from './AuditEventTypeBadge.js'
 import { AuditEventDetail } from './AuditEventDetail.js'
-import type { AuditEventAdmin, AuditEventPublic } from '../../../../../services/backup-status/src/audit/audit-trail.types.js'
+import type { AuditEventAdmin, AuditEventPublic } from '../../../../../packages/backup-status/src/audit/audit-trail.types.js'
 
 interface Props {
   events: (AuditEventAdmin | AuditEventPublic)[]

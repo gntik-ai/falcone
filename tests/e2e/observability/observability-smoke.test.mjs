@@ -19,7 +19,7 @@ import {
   readObservabilityDashboards,
   readObservabilityHealthChecks,
   readObservabilityMetricsStack
-} from '../../../services/internal-contracts/src/index.mjs';
+} from '../../../packages/internal-contracts/src/index.mjs';
 
 const SMOKE_MATRIX_PATH = 'tests/reference/observability-smoke-matrix.yaml';
 

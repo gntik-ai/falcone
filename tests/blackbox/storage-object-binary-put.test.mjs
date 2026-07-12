@@ -15,7 +15,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveObjectBody } from '../../deploy/kind/control-plane/storage-handlers.mjs';
+import { resolveObjectBody } from '../../apps/control-plane/storage-handlers.mjs';
 
 // Non-UTF-8 bytes (PNG magic + control/high bytes) — a faithful binary payload.
 const BIN = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01, 0xff, 0xfe, 0x7f, 0x80]);

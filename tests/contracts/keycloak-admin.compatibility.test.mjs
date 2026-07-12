@@ -6,12 +6,12 @@ import {
   getContract,
   getPublicRoute,
   getService
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import {
   IAM_ADMIN_CAPABILITY_MATRIX,
   SUPPORTED_KEYCLOAK_VERSION_RANGES,
   keycloakAdminAdapterPort
-} from '../../services/adapters/src/keycloak-admin.mjs';
+} from '../../packages/adapters/src/keycloak-admin.mjs';
 
 test('iam service contracts and adapter capability baseline cover the Keycloak admin surface', () => {
   const iamAdminRequest = getContract('iam_admin_request');

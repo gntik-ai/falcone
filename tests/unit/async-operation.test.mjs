@@ -4,7 +4,7 @@ import {
   applyTransition,
   createOperation,
   isValidCorrelationId
-} from '../../services/provisioning-orchestrator/src/models/async-operation.mjs';
+} from '../../packages/provisioning-orchestrator/src/models/async-operation.mjs';
 
 test('createOperation returns a pending async operation with required metadata', () => {
   const operation = createOperation({

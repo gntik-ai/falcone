@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRetryPolicy, computeNextDelay, hasRetriesRemaining } from '../../services/webhook-engine/src/webhook-retry-policy.mjs';
+import { buildRetryPolicy, computeNextDelay, hasRetriesRemaining } from '../../packages/webhook-engine/src/webhook-retry-policy.mjs';
 
 test('retry delays increase and stay under max', () => {
   const random = () => 0;

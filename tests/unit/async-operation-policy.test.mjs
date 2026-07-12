@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createOperation } from '../../services/provisioning-orchestrator/src/models/async-operation.mjs';
-import { findPolicyForType } from '../../services/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
+import { createOperation } from '../../packages/provisioning-orchestrator/src/models/async-operation.mjs';
+import { findPolicyForType } from '../../packages/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
 
 test('findPolicyForType prefers specific policy and falls back to default', async () => {
   const db = {

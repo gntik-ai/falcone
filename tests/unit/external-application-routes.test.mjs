@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
-import { APPLICATION_HANDLERS } from '../../deploy/kind/control-plane/application-handlers.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
+import { APPLICATION_HANDLERS } from '../../apps/control-plane/application-handlers.mjs';
 
-const runtimeRouteMap = JSON.parse(readFileSync(new URL('../../deploy/kind/control-plane/route-map.runtime.json', import.meta.url), 'utf8'));
-const bHandlersSource = readFileSync(new URL('../../deploy/kind/control-plane/b-handlers.mjs', import.meta.url), 'utf8');
+const runtimeRouteMap = JSON.parse(readFileSync(new URL('../../apps/control-plane/route-map.runtime.json', import.meta.url), 'utf8'));
+const bHandlersSource = readFileSync(new URL('../../apps/control-plane/b-handlers.mjs', import.meta.url), 'utf8');
 
 function compilePath(tmpl) {
   const rx = tmpl

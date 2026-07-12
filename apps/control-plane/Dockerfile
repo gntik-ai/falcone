@@ -1,45 +1,68 @@
-# Control-plane executor service (change: add-control-plane-executor).
-# Build from the REPO ROOT so the executor's relative import of the adapter plan
-# builders (apps/control-plane/src/runtime -> ../../../../services/adapters/src) resolves:
-#   docker build -f apps/control-plane/Dockerfile -t in-falcone-control-plane:0.7.0 .
+# Control-plane runtime image for the kind deploy.
+# BUILD CONTEXT = repo root (so it can COPY the backend action modules):
+#   docker build -f apps/control-plane/Dockerfile -t <ref> .
+#
+# The server (server.mjs) validates the Keycloak JWT and dispatches /v1/* to the
+# repo's real action modules under /repo. Bare imports inside those modules
+# (e.g. `pg`) resolve via the /node_modules symlink -> /app/node_modules
+# (Node's ESM resolver walks up to the filesystem root from /repo).
 FROM node:22-alpine
-
 WORKDIR /app
 
-# Install runtime deps at /app/node_modules so they are accessible from ALL paths
-# under /app (including services/internal-contracts, services/webhook-engine, etc.
-# which are copied as sibling directories and may import shared packages).
-# Node ESM resolution walks UP from the importing file's directory; placing
-# node_modules at /app ensures it is reached regardless of which sub-tree the
-# import originates from.
-COPY apps/control-plane/package.json /app/package.json
-RUN npm install --omit=dev --no-package-lock
+# Server deps (pg for the DI Pool; JWT/JWKS verification is dependency-free via node:crypto).
+COPY apps/control-plane/package.json ./
+RUN npm install --omit=dev --no-audit --no-fund \
+  && ln -sfn /app/node_modules /node_modules
 
-# App sources + the adapter plan-builder layer the executor imports. The Mongo data
-# adapter loads internal-contracts (JSON read at runtime), so ship that src too.
-# The flows-related modules import from:
-#   - services/workflow-worker/src/activities/catalog-names.mjs (task-type names)
-#   - services/audit/src/flow-lifecycle-events.mjs (lifecycle event builder)
-#   - services/webhook-engine/src/ (webhook signing)
-#   - services/workspace-docs-service/ (console workspace docs route)
-COPY apps/control-plane/src /app/apps/control-plane/src
-COPY services/adapters/src /app/services/adapters/src
-COPY services/internal-contracts/src /app/services/internal-contracts/src
-# Realtime executor (add-ferretdb-realtime-cdc-remediation #460) imports the shared logical-
-# replication modules (WalReplicationClient/CollectionCatalog/provisionLogicalReplication) from the
-# CDC bridge. Node resolves their deps (pg-logical-replication, bson — declared in this image's
-# package.json) from /app/node_modules via the upward walk.
-COPY services/mongo-cdc-bridge/src /app/services/mongo-cdc-bridge/src
-COPY services/workflow-worker/src/activities/catalog-names.mjs /app/services/workflow-worker/src/activities/catalog-names.mjs
-COPY services/audit/src /app/services/audit/src
-COPY services/webhook-engine/src /app/services/webhook-engine/src
-COPY services/workspace-docs-service/actions /app/services/workspace-docs-service/actions
-COPY services/workspace-docs-service/src /app/services/workspace-docs-service/src
+# Server source + domain-B modules + the verified runtime route table.
+COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
+     apps/control-plane/jwt-verify.mjs apps/control-plane/sa-revocation.mjs \
+     apps/control-plane/kc-admin.mjs apps/control-plane/tenant-store.mjs \
+     apps/control-plane/b-handlers.mjs apps/control-plane/auth-handlers.mjs \
+     apps/control-plane/saga.mjs apps/control-plane/dataplane.mjs \
+     apps/control-plane/schema-retry.mjs apps/control-plane/tenant-scope.mjs \
+     apps/control-plane/governance-schema.mjs apps/control-plane/workspace-quota.mjs \
+     apps/control-plane/metrics-handlers.mjs apps/control-plane/metrics-registry.mjs \
+     apps/control-plane/storage-handlers.mjs apps/control-plane/seaweedfs-identity.mjs \
+     apps/control-plane/storage-quota.mjs \
+     apps/control-plane/mongo-handlers.mjs apps/control-plane/pg-handlers.mjs \
+     apps/control-plane/kafka-handlers.mjs \
+     apps/control-plane/fn-handlers.mjs apps/control-plane/function-executor.mjs \
+     apps/control-plane/application-handlers.mjs \
+     apps/control-plane/vault-secrets.mjs \
+     apps/control-plane/realtime-handlers.mjs \
+     apps/control-plane/webhook-handlers.mjs apps/control-plane/webhook-db.mjs \
+     apps/control-plane/webhook-schema.mjs \
+     apps/control-plane/audit-store.mjs apps/control-plane/audit-writer.mjs \
+     apps/control-plane/audit-hash.mjs \
+     apps/control-plane/transport-security.mjs \
+     apps/control-plane/request-body.mjs \
+     apps/control-plane/tenant-config-export.mjs \
+     apps/control-plane/route-map.runtime.json ./
 
-ENV NODE_ENV=production \
-    PORT=8080
+# Backend action modules consumed at runtime (resolved under /repo). Copy the
+# services whose actions the route table dispatches to, plus internal-contracts
+# (shared) and apps/control-plane-executor (IAM/console modules). Add more dirs as
+# families are wired.
+COPY packages/provisioning-orchestrator /repo/packages/provisioning-orchestrator
+COPY packages/internal-contracts        /repo/packages/internal-contracts
+COPY packages/scheduling-engine         /repo/packages/scheduling-engine
+COPY packages/webhook-engine            /repo/packages/webhook-engine
+# workspace-docs-service supplies migration 087 in the boot schema/recovery set
+# (governance-schema.mjs GOVERNANCE_MIGRATIONS). Without this dir the CP boot
+# ENOENTs on 087-workspace-doc-notes.sql, permanently fails schema/recovery and
+# exits (server.mjs) -> CrashLoopBackOff on any build after v0.6.3.
+COPY packages/workspace-docs-service    /repo/packages/workspace-docs-service
+COPY apps/control-plane-executor                 /repo/apps/control-plane-executor
 
+# Fail the BUILD if the route map references a handler module the image did not COPY
+# (fix-scheduling-handler-dockerfile): `/v1/scheduling/*` dispatched to
+# /repo/packages/scheduling-engine/... which was never COPY'd, so every scheduling
+# request 500'd with ERR_MODULE_NOT_FOUND at runtime. This static check turns a
+# missing COPY into a build failure instead of a runtime 500.
+RUN node -e "const fs=require('fs');const list=JSON.parse(fs.readFileSync('./route-map.runtime.json','utf8'));const mods=[...new Set(list.filter(r=>typeof r.module==='string').map(r=>r.module))];const miss=mods.filter(p=>!fs.existsSync(p));if(miss.length){console.error('[build] route map references missing handler modules:\n  '+miss.join('\n  '));process.exit(1)}console.log('[build] all '+mods.length+' route handler modules resolve')"
+
+ENV NODE_ENV=production
+USER 1000
 EXPOSE 8080
-USER node
-WORKDIR /app/apps/control-plane
-CMD ["node", "src/runtime/main.mjs"]
+CMD ["node", "server.mjs"]

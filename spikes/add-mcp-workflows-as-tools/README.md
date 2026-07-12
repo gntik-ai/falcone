@@ -1,7 +1,7 @@
 # add-mcp-workflows-as-tools — throwaway verification (issue #395)
 
 EPHEMERAL. Not production code. Evidence that the flow→MCP-Tasks mapping
-(`apps/control-plane/src/mcp-workflows-tools.mjs`) reflects the real Temporal workflow lifecycle:
+(`apps/control-plane-executor/src/mcp-workflows-tools.mjs`) reflects the real Temporal workflow lifecycle:
 a tool invocation **starts a durable workflow** and the returned **Task handle is keyed by the
 workflow id**, and the workflow's status maps to an **MCP Task status**.
 

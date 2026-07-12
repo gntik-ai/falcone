@@ -25,7 +25,7 @@ describe('ConsoleTenantPlanOverviewPage', () => {
   })
 
   // getEffectiveEntitlements returns the REAL effective-entitlements API shape
-  // (services/provisioning-orchestrator EffectiveEntitlementProfile): quota limits
+  // (packages/provisioning-orchestrator EffectiveEntitlementProfile): quota limits
   // live under `quantitativeLimits` with a per-item `currentUsage` — there is NO
   // `quotaDimensions`/`observedUsage` field on this response. On main the component
   // reads `summary.quotaDimensions` (undefined here) and `.filter`/`.map` throws, so

@@ -9,7 +9,7 @@ import {
   queryTenantQuotaPosture,
   queryWorkspaceQuotaPosture,
   summarizeObservabilityQuotaPolicies
-} from '../../apps/control-plane/src/observability-admin.mjs';
+} from '../../apps/control-plane-executor/src/observability-admin.mjs';
 import {
   collectObservabilityQuotaPolicyViolations,
   readObservabilityQuotaPolicies

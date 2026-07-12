@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { getPublicRoute } from '../../services/internal-contracts/src/index.mjs';
+import { getPublicRoute } from '../../packages/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH, resolveParameters } from '../../scripts/lib/quality-gates.mjs';
 
 test('workspace secret OpenAPI contract exposes governed secret routes and write-only secret values', async () => {

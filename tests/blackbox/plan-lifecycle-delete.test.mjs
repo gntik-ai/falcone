@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../..');

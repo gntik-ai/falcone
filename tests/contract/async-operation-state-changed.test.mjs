@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Ajv from 'ajv';
-import { asyncOperationStateChangedSchema } from '../../services/internal-contracts/src/index.mjs';
-import { buildStateChangedEvent } from '../../services/provisioning-orchestrator/src/events/async-operation-events.mjs';
+import { asyncOperationStateChangedSchema } from '../../packages/internal-contracts/src/index.mjs';
+import { buildStateChangedEvent } from '../../packages/provisioning-orchestrator/src/events/async-operation-events.mjs';
 
 const ajv = new Ajv({ allErrors: true, strict: false, validateFormats: false });
 const validate = ajv.compile(asyncOperationStateChangedSchema);

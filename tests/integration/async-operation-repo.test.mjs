@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createOperation as buildOperation } from '../../services/provisioning-orchestrator/src/models/async-operation.mjs';
+import { createOperation as buildOperation } from '../../packages/provisioning-orchestrator/src/models/async-operation.mjs';
 import {
   createOperation,
   findAll,
   findById,
   findByTenant,
   transitionOperation
-} from '../../services/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
+} from '../../packages/provisioning-orchestrator/src/repositories/async-operation-repo.mjs';
 
 function createInMemoryDb() {
   const operations = [];

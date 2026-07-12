@@ -1,7 +1,7 @@
 // Delegates to the single console permission source (#761) instead of hand-rolling a second role
 // set — but to a DEDICATED set, `STRUCTURAL_WRITE_ADMIN_ROLES`, not the broader
 // `WORKSPACE_WRITE_CAPABLE_ROLES`. This gate mirrors a real BACKEND role gate
-// (`apps/control-plane/src/runtime/auth-roles.mjs::WRITE_CAPABLE_ADMIN_ROLES` — Events/Kafka
+// (`apps/control-plane-executor/src/runtime/auth-roles.mjs::WRITE_CAPABLE_ADMIN_ROLES` — Events/Kafka
 // create-topic and publish, per `docs/reference/architecture/structural-write-role-gates.md`), so it
 // must match that backend set EXACTLY: {tenant_owner, tenant_admin, workspace_owner, workspace_admin,
 // platform_admin, superadmin}. `WORKSPACE_WRITE_CAPABLE_ROLES` also includes

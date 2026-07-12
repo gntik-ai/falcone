@@ -6,7 +6,7 @@ function makeJwtLikeToken(payload) {
 }
 
 test('restore simulation service produces safe evidence for sandbox profiles', async () => {
-  const { runRestoreSimulation } = await import('../../services/backup-status/src/operations/restore-simulation.service.js')
+  const { runRestoreSimulation } = await import('../../packages/backup-status/src/operations/restore-simulation.service.js')
 
   const operation = {
     id: 'op-sim-001',
@@ -44,7 +44,7 @@ test('restore simulation service produces safe evidence for sandbox profiles', a
 })
 
 test('restore simulation service rejects unsafe deployment profiles', async () => {
-  const { runRestoreSimulation, RestoreSimulationError } = await import('../../services/backup-status/src/operations/restore-simulation.service.js')
+  const { runRestoreSimulation, RestoreSimulationError } = await import('../../packages/backup-status/src/operations/restore-simulation.service.js')
 
   const operation = {
     id: 'op-sim-002',
@@ -71,8 +71,8 @@ test('restore simulation service rejects unsafe deployment profiles', async () =
 
 test('operation status serializes simulation metadata and evidence', async () => {
   process.env.TEST_MODE = 'true'
-  const { setClient } = await import('../../services/backup-status/src/operations/operations.repository.js')
-  const { main } = await import('../../services/backup-status/src/operations/get-operation.action.js')
+  const { setClient } = await import('../../packages/backup-status/src/operations/operations.repository.js')
+  const { main } = await import('../../packages/backup-status/src/operations/get-operation.action.js')
 
   setClient({
     async query(sql, params) {
@@ -139,10 +139,10 @@ test('operation status serializes simulation metadata and evidence', async () =>
 
 // Safety regression: the simulation branch must never enter the destructive adapter path.
 test('simulation dispatcher bypasses the destructive restore adapter path', async () => {
-  const { setClient } = await import('../../services/backup-status/src/operations/operations.repository.js')
-  const { dispatch } = await import('../../services/backup-status/src/operations/operation-dispatcher.js')
-  const { adapterRegistry } = await import('../../services/backup-status/src/adapters/registry.js')
-  const { setPool } = await import('../../services/backup-status/src/audit/audit-trail.repository.js')
+  const { setClient } = await import('../../packages/backup-status/src/operations/operations.repository.js')
+  const { dispatch } = await import('../../packages/backup-status/src/operations/operation-dispatcher.js')
+  const { adapterRegistry } = await import('../../packages/backup-status/src/adapters/registry.js')
+  const { setPool } = await import('../../packages/backup-status/src/audit/audit-trail.repository.js')
 
   setPool({
     async query() {

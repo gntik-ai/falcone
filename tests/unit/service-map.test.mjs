@@ -16,7 +16,7 @@ test('collectServiceMapViolations flags missing services and broken audit semant
     services: [
       {
         id: 'control_api',
-        package: 'apps/control-plane',
+        package: 'apps/control-plane-executor',
         responsibilities: ['public API'],
         owned_resources: ['routes'],
         service_dependencies: [],
@@ -26,7 +26,7 @@ test('collectServiceMapViolations flags missing services and broken audit semant
       },
       {
         id: 'audit_module',
-        package: 'services/audit',
+        package: 'packages/audit',
         responsibilities: ['audit'],
         owned_resources: ['audit log'],
         service_dependencies: ['control_api'],
@@ -38,7 +38,7 @@ test('collectServiceMapViolations flags missing services and broken audit semant
     adapter_ports: [
       {
         id: 'keycloak',
-        package: 'services/adapters',
+        package: 'packages/adapters',
         consumers: ['control_api'],
         capabilities: ['ensure_realm'],
         request_contract: 'adapter_call',

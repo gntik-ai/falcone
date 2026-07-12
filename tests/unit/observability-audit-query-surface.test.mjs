@@ -14,7 +14,7 @@ import {
   AUDIT_QUERY_ERROR_CODES,
   normalizeAuditRecordQuery,
   queryWorkspaceAuditRecords
-} from '../../apps/control-plane/src/observability-audit-query.mjs';
+} from '../../apps/control-plane-executor/src/observability-audit-query.mjs';
 
 test('observability audit query surface contract remains internally consistent', () => {
   const violations = collectAuditQuerySurfaceViolations();

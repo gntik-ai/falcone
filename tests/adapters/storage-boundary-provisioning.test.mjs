@@ -5,7 +5,7 @@ import {
   STORAGE_BOUNDARY_ERROR_CODES,
   deriveWorkspaceStorageIdentityName,
   provisionWorkspaceStorageBoundary
-} from '../../services/adapters/src/storage-tenant-context.mjs';
+} from '../../packages/adapters/src/storage-tenant-context.mjs';
 
 function fakeIamClient() {
   const writes = [];

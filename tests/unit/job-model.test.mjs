@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildJobRecord, applyTransition, incrementFailureCount, resetFailureCount, applyNextRunAt } from '../../services/scheduling-engine/src/job-model.mjs';
+import { buildJobRecord, applyTransition, incrementFailureCount, resetFailureCount, applyNextRunAt } from '../../packages/scheduling-engine/src/job-model.mjs';
 
 const base = buildJobRecord({ name: 'job', cronExpression: '0 * * * *', targetAction: 'ws/cleanup' }, { tenantId: 't1', workspaceId: 'w1', actorId: 'u1', now: '2026-03-30T10:00:00.000Z' });
 

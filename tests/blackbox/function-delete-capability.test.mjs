@@ -9,8 +9,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { routes } from '../../deploy/kind/control-plane/routes.mjs';
-import { FN_HANDLERS } from '../../deploy/kind/control-plane/fn-handlers.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
+import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
 
 const TENANT_ID = 'ten_alpha';
 const FOREIGN_TENANT_ID = 'ten_beta';

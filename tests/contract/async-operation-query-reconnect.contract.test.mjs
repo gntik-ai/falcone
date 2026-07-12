@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-const actionPath = '../../services/provisioning-orchestrator/src/actions/async-operation-query.mjs'
+const actionPath = '../../packages/provisioning-orchestrator/src/actions/async-operation-query.mjs'
 let actionModule
 try {
   actionModule = await import(actionPath)

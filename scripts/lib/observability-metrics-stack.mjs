@@ -1,6 +1,6 @@
 import { readJson, readYaml } from './quality-gates.mjs';
 
-export const OBSERVABILITY_METRICS_STACK_PATH = 'services/internal-contracts/src/observability-metrics-stack.json';
+export const OBSERVABILITY_METRICS_STACK_PATH = 'packages/internal-contracts/src/observability-metrics-stack.json';
 export const BASE_VALUES_PATH = '../falcone-charts/charts/in-falcone/values.yaml';
 
 const REQUIRED_SUBSYSTEM_IDS = [

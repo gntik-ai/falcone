@@ -10,7 +10,7 @@ import {
   deleteIdentity,
   reloadIdentities,
   updateIdentityActions
-} from '../../services/adapters/src/seaweedfs-iam-client.mjs';
+} from '../../packages/adapters/src/seaweedfs-iam-client.mjs';
 
 // Spin up a real local mock of the SeaweedFS admin transport so the client's
 // SigV4 signing + read-merge-write + reload + retry paths are exercised end to

@@ -7,7 +7,7 @@
  * `redirect_uri` (a classic auth-code interception vector: a victim's auth code can be
  * delivered to an attacker callback).
  *
- * These tests drive the REAL `kcAdmin.createPublicAppClient` (deploy/kind/control-plane/kc-admin.mjs)
+ * These tests drive the REAL `kcAdmin.createPublicAppClient` (apps/control-plane/kc-admin.mjs)
  * against a FAKE Keycloak injected through `globalThis.fetch` (mirrors the fetch-seam harness used by
  * console-logout-revoke-session / sa-revocation unit tests). No live Keycloak / no network.
  *
@@ -29,7 +29,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { kcAdmin, parseAllowList } from '../../deploy/kind/control-plane/kc-admin.mjs';
+import { kcAdmin, parseAllowList } from '../../apps/control-plane/kc-admin.mjs';
 
 const REALM = 'ten-acme';
 

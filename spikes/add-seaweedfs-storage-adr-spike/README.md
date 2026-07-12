@@ -8,7 +8,7 @@ Spec change: `add-seaweedfs-storage-adr-spike` (GitHub #431).
 
 ## What it proves
 - S3 gateway port **8333**; path-style + SigV4 presigned GET work; region scope ignored.
-- The live runtime's regex XML parser (`deploy/kind/control-plane/storage-handlers.mjs:76-97`) is
+- The live runtime's regex XML parser (`apps/control-plane/storage-handlers.mjs:76-97`) is
   byte-compatible with SeaweedFS `ListBuckets` / `ListObjectsV2`.
 - Bucket management (versioning, lifecycle, CORS, object-lock, object versioning) is SUPPORTED;
   only `putBucketPolicy` is PARTIAL (Principal-shape shim — gap G1).

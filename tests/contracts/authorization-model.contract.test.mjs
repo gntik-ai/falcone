@@ -6,7 +6,7 @@ import {
   getContract,
   listResourceSemantics,
   readAuthorizationModel
-} from '../../services/internal-contracts/src/index.mjs';
+} from '../../packages/internal-contracts/src/index.mjs';
 import { OPENAPI_PATH, readJson } from '../../scripts/lib/quality-gates.mjs';
 
 test('authorization model aligns with public access-check resource types', () => {

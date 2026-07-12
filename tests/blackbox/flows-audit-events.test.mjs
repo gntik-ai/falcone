@@ -15,11 +15,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createControlPlaneServer } from '../../apps/control-plane/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane/src/runtime/connection-registry.mjs';
-import { createFlowExecutor } from '../../apps/control-plane/src/runtime/flow-executor.mjs';
-import { FLOW_AUDIT_EVENT_TYPES, buildFlowAuditEvent } from '../../services/audit/src/flow-lifecycle-events.mjs';
-import { flowLifecycleEvent } from '../../services/audit/src/contract-boundary.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
+import { createFlowExecutor } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
+import { FLOW_AUDIT_EVENT_TYPES, buildFlowAuditEvent } from '../../packages/audit/src/flow-lifecycle-events.mjs';
+import { flowLifecycleEvent } from '../../packages/audit/src/contract-boundary.mjs';
 
 const DEF = { apiVersion: 'v1.0', name: 'f', nodes: [{ id: 'a', type: 'approval', next: 'b' }, { id: 'b', type: 'task', taskType: 't' }] };
 const headersFor = (t, w) => ({ 'content-type': 'application/json', 'x-tenant-id': t, 'x-workspace-id': w, 'x-auth-subject': `admin-${t}` });

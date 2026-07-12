@@ -28,7 +28,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PG_HANDLERS } from '../../deploy/kind/control-plane/pg-handlers.mjs';
+import { PG_HANDLERS } from '../../apps/control-plane/pg-handlers.mjs';
 
 const ACME = 'acme-78848e21';
 const GLOBEX = 'globex-fe63fa39';

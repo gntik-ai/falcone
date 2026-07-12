@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { backoffDelay, compensateSaga } from '../../apps/control-plane/src/saga/saga-compensation.mjs';
+import { backoffDelay, compensateSaga } from '../../apps/control-plane-executor/src/saga/saga-compensation.mjs';
 
 test('compensateSaga runs successful steps in reverse order', async () => {
   const order = [];

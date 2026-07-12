@@ -10,7 +10,7 @@
 // Pure: drives LOCAL_HANDLERS.promoteWorkspace with a stubbed pool (no real DB).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LOCAL_HANDLERS } from '../../deploy/kind/control-plane/b-handlers.mjs';
+import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
 
 const TEN = 'acme-12345678';
 const OTHER = 'rival-87654321';
