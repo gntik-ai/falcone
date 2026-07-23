@@ -766,6 +766,61 @@ test('all-core-006e: OpenShift Harbor documentation mirrors stay synchronized', 
   const installation = readFileSync(resolve(REPO_ROOT, 'docs', 'installation', 'openshift-airgapped-harbor.md'), 'utf8');
   const site = readFileSync(resolve(REPO_ROOT, 'docs-site', 'operations', 'openshift-airgapped-harbor.md'), 'utf8');
   assert.equal(site, installation, 'docs-site OpenShift Harbor guide must mirror docs/installation');
+  assert.match(site, /^# Legacy 0\.3\.0 OpenShift\/Harbor Plain-Manifest Reference/m);
+  assert.match(site, /Unsupported for new C-25\/chart 0\.3\.1 installs and upgrades/);
+  assert.match(site, /omit the mandatory chart-managed webhook signing-key Secret reference,\s+> credential\/lifecycle Jobs, and lifecycle RBAC/);
+  assert.match(site, /Copying only a newer\s+> control-plane or other image into these manifests is unsafe and unsupported/);
+  assert.match(site, /\[matched Helm chart\]\(\/operations\/helm-configuration\)/);
+  assert.match(site, /\[OpenShift Install guide\]\(\/operations\/openshift-install\)/);
+  assert.match(site, /\[Webhook Signing-Key Lifecycle runbook\]\(\/operations\/webhook-signing-key-lifecycle\)/);
+  assert.match(site, /Existing\s+> `0\.3\.0` manual installations must remain pinned to `0\.3\.0` and continue their existing manual\s+> process until a separate manual-to-Helm migration is approved and safely rehearsed/);
+  assert.match(site, /No supported\s+> resource-import path moves these plain-manifest resources into Helm/);
+  assert.match(site, /webhook key adoption does not\s+> import or transfer ownership of them/);
+});
+
+test('all-core-006f: docs do not advertise the legacy no-Helm reference as a C-25 install choice', () => {
+  const advertisements = [
+    'docs-site/guide/installation.md',
+    'docs-site/personas/operator.md',
+    'docs-site/operations/helm-configuration.md',
+    'docs-site/operations/openshift-install.md',
+    'docs-site/operations/webhook-signing-key-lifecycle.md',
+  ];
+  for (const rel of advertisements) {
+    const text = readFileSync(resolve(REPO_ROOT, rel), 'utf8');
+    assert.match(
+      text,
+      /legacy\s+`?0\.3\.0`?|frozen\s+`0\.3\.0`/i,
+      `${rel} must label the manual guide as legacy 0.3.0`,
+    );
+    assert.match(
+      text,
+      /not\s+a\s+supported|unsupported\s+for/i,
+      `${rel} must reject the manual guide as a C-25 install/upgrade choice`,
+    );
+    assert.match(
+      text,
+      /unsafe and unsupported/,
+      `${rel} must warn against copying only a newer image into the legacy manifests`,
+    );
+    assert.match(
+      text,
+      /manual (?:`0\.3\.0` (?:OpenShift )?installations?|OpenShift installation on legacy\s+`0\.3\.0`)[\s\S]{0,300}?must\s+remain pinned to\s+`0\.3\.0`/i,
+      `${rel} must keep existing manual installations pinned`,
+    );
+    assert.match(
+      text,
+      /manual-to-Helm migration\s+is\s+approved\s+and\s+(?:safely\s+)?rehearsed/i,
+      `${rel} must require an approved and rehearsed manual-to-Helm migration`,
+    );
+  }
+
+  const sidebar = readFileSync(resolve(REPO_ROOT, 'docs-site', '.vitepress', 'config.mts'), 'utf8');
+  assert.match(
+    sidebar,
+    /Legacy 0\.3\.0 Manual \(Unsupported\).*\/operations\/openshift-airgapped-harbor/,
+    'the operations sidebar must label the no-Helm page as a legacy unsupported reference',
+  );
 });
 
 test('all-core-006i: E2E Helm overlays render without obsolete service lifecycle toggles', SKIP, () => {

@@ -3,6 +3,7 @@ import { subscriptionCreatedEvent, subscriptionDeletedEvent, subscriptionPausedE
 import { buildSubscriptionRecord, applyStatusTransition, softDelete, validateSubscriptionInput } from '../src/webhook-subscription.mjs';
 import { checkSubscriptionQuota, getQuotaConfig } from '../src/webhook-quota.mjs';
 import { decryptSecret, encryptSecret, generateSigningSecret } from '../src/webhook-signing.mjs';
+import { assertLifecycleVerifiedWebhookKeyContext } from '../src/webhook-master-key.mjs';
 
 function ok(statusCode, body) { return { statusCode, body }; }
 function noContent() { return { statusCode: 204, body: null }; }
@@ -80,11 +81,11 @@ async function requireSubscription(db, ctx, id) {
 }
 
 export async function main(params) {
-  const { db, kafka, env = process.env, method = 'GET', path = '/', body = {}, query = {}, auth = {}, resolver } = params;
+  const { db, kafka, keyContext, env = process.env, method = 'GET', path = '/', body = {}, query = {}, auth = {}, resolver } = params;
+  assertLifecycleVerifiedWebhookKeyContext(keyContext);
   const ctx = { tenantId: auth.tenantId, workspaceId: auth.workspaceId, actorId: auth.actorId, resolver };
   const parts = pathParts(path);
   const quotaConfig = getQuotaConfig(env);
-  const signingKey = env.WEBHOOK_SIGNING_KEY ?? 'development-signing-key';
 
   if (method === 'GET' && parts[0] === 'event-types') return ok(200, { eventTypes: EVENT_CATALOGUE });
 
@@ -104,11 +105,11 @@ export async function main(params) {
       // reachable cross-tenant). Fail closed before any secret is written.
       assertTenantScoped(record);
       const signingSecret = generateSigningSecret();
-      const encrypted = encryptSecret(signingSecret, signingKey);
+      const encrypted = encryptSecret(signingSecret, keyContext);
       await db.insertSubscription(record);
       // Thread tenant_id/workspace_id so the db layer can scope the INSERT and
       // every subsequent read by (tenant_id, workspace_id), not subscription_id alone.
-      await db.insertSecret(record.id, encrypted, record.tenant_id, record.workspace_id);
+      await db.insertSecret(record.id, encrypted, record.tenant_id, record.workspace_id, keyContext.keyId);
       await publish(kafka, 'console.webhook.subscription.created', subscriptionCreatedEvent(ctx, record.id));
       return ok(201, { ...responseSubscription(record), signingSecret });
     } catch (caught) {
@@ -168,11 +169,11 @@ export async function main(params) {
   if (method === 'POST' && parts[2] === 'rotate-secret') {
     const gracePeriodSeconds = Number(body.gracePeriodSeconds ?? env.WEBHOOK_SECRET_GRACE_PERIOD_SECONDS ?? 86400);
     const newSigningSecret = generateSigningSecret();
-    const encrypted = encryptSecret(newSigningSecret, signingKey);
+    const encrypted = encryptSecret(newSigningSecret, keyContext);
     const graceExpiresAt = new Date(Date.now() + (gracePeriodSeconds * 1000)).toISOString();
     // Scope rotation to the owning tenant so only rows where tenant_id matches
     // the subscription are rotated/invalidated by the db layer's predicate.
-    await db.rotateSecret(subscription.id, encrypted, graceExpiresAt, subscription.tenant_id, subscription.workspace_id);
+    await db.rotateSecret(subscription.id, encrypted, graceExpiresAt, subscription.tenant_id, subscription.workspace_id, keyContext.keyId);
     await publish(kafka, 'console.webhook.secret.rotated', secretRotatedEvent(ctx, subscription.id));
     return ok(200, { newSigningSecret, gracePeriodSeconds, graceExpiresAt });
   }
@@ -195,7 +196,14 @@ export async function main(params) {
   return error(404, 'NOT_FOUND', 'Route not found');
 }
 
-export function revealSecretRecords(secretRows, env = process.env) {
-  const signingKey = env.WEBHOOK_SIGNING_KEY ?? 'development-signing-key';
-  return secretRows.map((row) => ({ ...row, secret: decryptSecret(row.secret_cipher, row.secret_iv, signingKey) }));
+export function revealSecretRecords(secretRows, keyContext) {
+  assertLifecycleVerifiedWebhookKeyContext(keyContext);
+  return secretRows.map((row) => {
+    if (row.encryption_key_id !== keyContext?.keyId) {
+      const error = new Error('Webhook signing-secret key identity does not match the serving context');
+      error.code = 'WEBHOOK_ROW_KEY_MISMATCH';
+      throw error;
+    }
+    return { ...row, secret: decryptSecret(row.secret_cipher, row.secret_iv, keyContext) };
+  });
 }

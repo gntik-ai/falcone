@@ -28,6 +28,10 @@
 import { buildWebhookDb } from './webhook-db.mjs';
 import { getWorkspace } from './tenant-store.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
+import {
+  configureWebhookRuntimeKeyContext,
+  requireWebhookRuntimeKeyContext,
+} from './webhook-runtime.mjs';
 
 // The action module resolves under /repo in the image; REPO_ROOT lets a local
 // checkout (tests) point at the source tree. Same convention as the route loader.
@@ -35,6 +39,9 @@ const REPO_ROOT = process.env.REPO_ROOT || '/repo';
 const ACTION_PATH = `${REPO_ROOT}/packages/webhook-engine/actions/webhook-management.mjs`;
 
 let _mainPromise = null;
+export function setWebhookKeyContext(keyContext) {
+  return configureWebhookRuntimeKeyContext(keyContext);
+}
 function loadMain() {
   if (!_mainPromise) _mainPromise = import(ACTION_PATH).then((m) => m.main);
   return _mainPromise;
@@ -55,6 +62,12 @@ export async function webhookManage(ctx, deps = {}) {
   const main = await loadMain();
   const buildDb = deps.buildDb ?? buildWebhookDb;
   const resolveWorkspace = deps.getWorkspace ?? getWorkspace;
+  let keyContext = deps.keyContext;
+  try {
+    keyContext ??= requireWebhookRuntimeKeyContext();
+  } catch {
+    return { statusCode: 503, body: { code: 'WEBHOOK_KEY_UNAVAILABLE', message: 'Webhook key lifecycle is not ready' } };
+  }
   const identity = ctx.identity ?? {};
   let path = pathnameOf(ctx.req?.url);
   let workspaceId = identity.workspaceId ?? null;
@@ -77,6 +90,7 @@ export async function webhookManage(ctx, deps = {}) {
   const result = await main({
     db: buildDb(ctx.pool),
     kafka: null, // audit events are best-effort; the action no-ops when kafka is absent
+    keyContext,
     env: process.env,
     method: (ctx.req?.method ?? 'GET').toUpperCase(),
     path,

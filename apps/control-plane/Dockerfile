@@ -32,11 +32,16 @@ COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
      apps/control-plane/vault-secrets.mjs \
      apps/control-plane/realtime-handlers.mjs \
      apps/control-plane/webhook-handlers.mjs apps/control-plane/webhook-db.mjs \
-     apps/control-plane/webhook-schema.mjs \
+     apps/control-plane/webhook-schema.mjs apps/control-plane/webhook-key-runtime.mjs \
+     apps/control-plane/webhook-runtime.mjs \
+     apps/control-plane/webhook-key-lifecycle-cli.mjs \
+     apps/control-plane/webhook-key-credential-cli.mjs \
+     apps/control-plane/kubernetes-api.mjs \
      apps/control-plane/audit-store.mjs apps/control-plane/audit-writer.mjs \
      apps/control-plane/audit-hash.mjs \
      apps/control-plane/transport-security.mjs \
      apps/control-plane/request-body.mjs \
+     apps/control-plane/control-plane-startup.mjs \
      apps/control-plane/tenant-config-export.mjs \
      apps/control-plane/route-map.runtime.json ./
 
@@ -54,6 +59,11 @@ COPY packages/webhook-engine            /repo/packages/webhook-engine
 # exits (server.mjs) -> CrashLoopBackOff on any build after v0.6.3.
 COPY packages/workspace-docs-service    /repo/packages/workspace-docs-service
 COPY apps/control-plane-executor                 /repo/apps/control-plane-executor
+
+# Source modules under apps/control-plane use repository-relative ../../packages imports.
+# The image flattens control-plane files into /app, so preserve that resolved absolute seam
+# without duplicating package contents.
+RUN ln -sfn /repo/packages /packages
 
 # Fail the BUILD if the route map references a handler module the image did not COPY
 # (fix-scheduling-handler-dockerfile): `/v1/scheduling/*` dispatched to

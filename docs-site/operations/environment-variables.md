@@ -101,3 +101,11 @@ plus ESO reconcile the same keys after the secret backend is ready:
 | `gatewayTls` | `tls.crt`, `tls.key` | Gateway TLS |
 
 See [Secret Management](/operations/secret-management).
+
+`WEBHOOK_SIGNING_KEY` is a reserved exception: never name it in `controlPlane.env`,
+`global.transportSecurity.env`, or `controlPlane.config.inline`, and never set it directly. Chart
+`0.3.1` injects one required Secret reference from `global.webhookSigningKey` and rejects every
+chart-inspectable direct override. External `envFromSecrets` and `envFromConfigMaps` references
+remain valid because Helm cannot inspect their keys; the dedicated explicit environment entry is
+authoritative. Its non-secret identity/mode and lifecycle are documented in the
+[Webhook Signing Master-Key Lifecycle Runbook](/operations/webhook-signing-key-lifecycle).

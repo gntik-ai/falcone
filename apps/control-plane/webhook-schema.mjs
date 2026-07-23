@@ -7,6 +7,7 @@
 // like applyGovernanceSchema, this module applies the migration set at boot.
 //
 // We apply 001 (tables) + 002 (tenant_id/workspace_id columns on the secrets table)
+// + 004 (platform master-key lifecycle metadata)
 // ONLY. Migration 003 (FORCE ROW LEVEL SECURITY) is intentionally NOT applied here:
 // its policies key on current_setting('app.tenant_id') and FORCE RLS makes even the
 // table owner subject to them, so without a `SET LOCAL app.tenant_id` connection
@@ -26,12 +27,13 @@ import { resolve } from 'node:path';
 export const WEBHOOK_MIGRATIONS = [
   'packages/webhook-engine/migrations/001-webhook-subscriptions.sql',
   'packages/webhook-engine/migrations/002-signing-secret-tenant-scope.sql',
+  'packages/webhook-engine/migrations/004-webhook-master-key-lifecycle.sql',
 ];
 
 const DEFAULT_REPO_ROOT = process.env.REPO_ROOT || '/repo';
 
 /**
- * Apply the webhook schema (migrations 001 + 002) to the in_falcone database.
+ * Apply the webhook schema (migrations 001 + 002 + 004) to the in_falcone database.
  * Idempotent. Injectable I/O for tests.
  *
  * @param {{query:(sql:string)=>Promise<any>}} pool  control-plane Postgres pool

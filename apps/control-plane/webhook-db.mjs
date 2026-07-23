@@ -48,12 +48,12 @@ export function buildWebhookDb(pool) {
       return record;
     },
 
-    async insertSecret(subscriptionId, encrypted, tenantId, workspaceId) {
+    async insertSecret(subscriptionId, encrypted, tenantId, workspaceId, encryptionKeyId) {
       await pool.query(
         `INSERT INTO webhook_signing_secrets
-           (subscription_id, secret_cipher, secret_iv, status, tenant_id, workspace_id)
-         VALUES ($1, $2, $3, 'active', $4, $5)`,
-        [subscriptionId, encrypted.cipher, encrypted.iv, tenantId, workspaceId],
+           (subscription_id, secret_cipher, secret_iv, status, tenant_id, workspace_id, encryption_key_id)
+         VALUES ($1, $2, $3, 'active', $4, $5, $6)`,
+        [subscriptionId, encrypted.cipher, encrypted.iv, tenantId, workspaceId, encryptionKeyId],
       );
     },
 
@@ -114,7 +114,7 @@ export function buildWebhookDb(pool) {
       );
     },
 
-    async rotateSecret(subscriptionId, encrypted, graceExpiresAt, tenantId, workspaceId) {
+    async rotateSecret(subscriptionId, encrypted, graceExpiresAt, tenantId, workspaceId, encryptionKeyId) {
       // Move the current active secret to a time-boxed grace window (tenant-scoped),
       // then issue the new active secret. Verification accepts both during grace.
       await pool.query(
@@ -126,9 +126,9 @@ export function buildWebhookDb(pool) {
       );
       await pool.query(
         `INSERT INTO webhook_signing_secrets
-           (subscription_id, secret_cipher, secret_iv, status, tenant_id, workspace_id)
-         VALUES ($1, $2, $3, 'active', $4, $5)`,
-        [subscriptionId, encrypted.cipher, encrypted.iv, tenantId, workspaceId],
+           (subscription_id, secret_cipher, secret_iv, status, tenant_id, workspace_id, encryption_key_id)
+         VALUES ($1, $2, $3, 'active', $4, $5, $6)`,
+        [subscriptionId, encrypted.cipher, encrypted.iv, tenantId, workspaceId, encryptionKeyId],
       );
     },
 

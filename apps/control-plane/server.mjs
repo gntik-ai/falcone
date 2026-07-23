@@ -27,12 +27,15 @@ import { ensureSagaSchema, recoverSagas } from './saga.mjs';
 import { runWithRetry, migrationRetryConfig } from './schema-retry.mjs';
 import { applyGovernanceSchema } from './governance-schema.mjs';
 import { applyWebhookSchema } from './webhook-schema.mjs';
+import { resolveWebhookKeyBeforeServing, sanitizedWebhookBootstrapError } from './webhook-key-runtime.mjs';
+import { setWebhookKeyContext } from './webhook-handlers.mjs';
 import { tenantIdentitiesEnabled } from './storage-handlers.mjs';
 import { cleanupLegacyWorkspaceIdentities } from './seaweedfs-identity.mjs';
 import { recordHttp, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { recordRouteAudit, recordRouteDenial } from './audit-writer.mjs';
 import { withPostgresSsl } from './transport-security.mjs';
 import { normalizeJsonBody } from './request-body.mjs';
+import { listenAfterRequiredGates } from './control-plane-startup.mjs';
 
 const { Pool } = pg;
 
@@ -423,59 +426,51 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-loadRoutes();
-// Domain B needs the `tenants` registry + saga tables (no in-repo migration
-// creates them). After the schema is ready, sweep any saga left 'running' by a
-// prior crash and run its durable compensations (rollback survives a restart).
-// Postgres may not be ready when we start (fresh install / rolling restart). Retry the
-// schema/recovery with exponential backoff (D5); without it an ECONNREFUSED left the
-// `tenants` table uncreated and every tenant op 500'd until a manual pod restart. If the DB
-// is still unreachable after the timeout, exit non-zero so Kubernetes restarts the pod and
-// retries — never serve indefinitely against a missing schema.
-runWithRetry(async (attempt) => {
-  await ensureSchema(pool);
-  await ensureSagaSchema(pool);
-  // Apply the provisioning-orchestrator migration set required by served real actions
-  // (async operations, plans / quota dimensions / change-history / quota overrides /
-  // boolean capabilities / scope-enforcement) so the wireable routes resolve instead
-  // of 500'ing on 42P01 (#555, #736).
-  await applyGovernanceSchema(pool);
-  // Webhook management plane (#643): create webhook_subscriptions/_signing_secrets/
-  // _deliveries/_delivery_attempts (migrations 001+002) so /v1/webhooks/* has durable
-  // tenant-scoped storage. Idempotent; RLS (003) deferred — see webhook-schema.mjs.
-  await applyWebhookSchema(pool);
-  const n = await recoverSagas(pool);
-  console.log(`[control-plane] schema ready; recovered ${n} orphaned saga(s) (attempt ${attempt})`);
-  return n;
-}, migrationRetryConfig()).catch((e) => {
-  console.error('[control-plane] schema/recovery permanently failed; exiting for restart:', e?.message ?? e);
-  process.exit(1);
-});
-// One-shot forward migration for #673: invalidate ALL legacy per-WORKSPACE SeaweedFS
-// identities (`falcone-ws-*`). Pre-fix, one identity per workspace accumulated a grant +
-// a fresh key for every bucket, so any of its keys reached every (current or RE-CREATED)
-// bucket in the workspace — and orphaned legacy identities (workspace/buckets deleted)
-// still authenticated against a re-created, deterministically-named bucket. Switching the
-// issuer to per-bucket identities is forward-only and does NOT remove those live legacy
-// keys; this cleanup does. It is BEST-EFFORT and NON-FATAL: it never blocks or crashes
-// boot (independent of the DB schema retry above), is idempotent (a no-op once the legacy
-// identities are gone, so running at every boot is harmless), and skips cleanly when not
-// in-cluster (local/test runs have no SA token to post the Job). Gated on the same flag
-// as per-bucket issuance — if identities are disabled there is nothing to migrate.
-if (tenantIdentitiesEnabled()) {
-  cleanupLegacyWorkspaceIdentities()
-    .then((r) => {
-      if (r.posted) console.log(`[control-plane] #673 legacy per-workspace identity cleanup Job posted: ${r.jobName}`);
-      else if (r.skipped) console.log(`[control-plane] #673 legacy identity cleanup skipped (${r.skipped})`);
-      else if (r.error) console.warn(`[control-plane] #673 legacy identity cleanup could not post a Job (non-fatal): ${r.error}`);
-    })
-    .catch((e) => console.warn('[control-plane] #673 legacy identity cleanup unexpected error (non-fatal):', e?.message ?? e));
+export async function bootstrapControlPlane() {
+  loadRoutes();
+  if (ROUTE_MAP_FILE) {
+    try {
+      const extra = JSON.parse(await readFile(ROUTE_MAP_FILE, 'utf8'));
+      loadRoutes(Array.isArray(extra) ? extra : []);
+      console.log(`[control-plane] loaded ${ROUTES.length} routes (seed + route map)`);
+    } catch {
+      console.error('[control-plane] route map load failed');
+      process.exit(1);
+    }
+  }
+
+  try {
+    await listenAfterRequiredGates({
+      applySchema: () => runWithRetry(async (attempt) => {
+        await ensureSchema(pool);
+        await ensureSagaSchema(pool);
+        await applyGovernanceSchema(pool);
+        await applyWebhookSchema(pool);
+        const n = await recoverSagas(pool);
+        console.log(`[control-plane] schema ready; recovered ${n} orphaned saga(s) (attempt ${attempt})`);
+        return n;
+      }, migrationRetryConfig()),
+      resolveWebhookKey: () => resolveWebhookKeyBeforeServing(pool, process.env),
+      configureWebhookKey: setWebhookKeyContext,
+      listen: () => server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}; routes=${ROUTES.length}; jwks=${JWKS_URL}`)),
+    });
+  } catch (caught) {
+    console.error(`[control-plane] webhook key bootstrap failed: ${sanitizedWebhookBootstrapError(caught)}`);
+    process.exit(1);
+  }
+
+  // One-shot forward migration for #673 remains best-effort, but it starts only
+  // after the mandatory webhook lifecycle gate has succeeded.
+  if (tenantIdentitiesEnabled()) {
+    cleanupLegacyWorkspaceIdentities()
+      .then((r) => {
+        if (r.posted) console.log(`[control-plane] #673 legacy identity cleanup Job posted: ${r.jobName}`);
+        else if (r.skipped) console.log(`[control-plane] #673 legacy identity cleanup skipped (${r.skipped})`);
+        else if (r.error) console.warn('[control-plane] #673 legacy identity cleanup could not post a Job (non-fatal)');
+      })
+      .catch(() => console.warn('[control-plane] #673 legacy identity cleanup failed (non-fatal)'));
+  }
 }
-if (ROUTE_MAP_FILE) {
-  readFile(ROUTE_MAP_FILE, 'utf8').then((txt) => {
-    try { const extra = JSON.parse(txt); loadRoutes(Array.isArray(extra) ? extra : []); console.log(`[control-plane] loaded ${ROUTES.length} routes (seed + ${ROUTE_MAP_FILE})`); }
-    catch (e) { console.error('[control-plane] route map parse failed:', e.message); }
-  }).catch(() => {});
-}
-server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}; routes=${ROUTES.length}; jwks=${JWKS_URL}`));
+
+await bootstrapControlPlane();
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(() => pool.end().finally(() => process.exit(0))));
