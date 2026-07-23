@@ -62,10 +62,10 @@ test('bbx-643-db-02: listSubscriptions scopes by tenant + workspace and excludes
 test('bbx-643-db-03: insertSecret binds the subscription tenant dimension + cipher/iv', async () => {
   const pool = recordingPool();
   const db = buildWebhookDb(pool);
-  await db.insertSecret('sub-1', { cipher: 'CIPHER', iv: 'IV' }, 'tenant-a', 'ws-a');
+  await db.insertSecret('sub-1', { cipher: 'CIPHER', iv: 'IV' }, 'tenant-a', 'ws-a', 'wk1:test-id');
   const q = pool.calls[0];
   assert.ok(has(q.text, 'insert\\s+into\\s+webhook_signing_secrets'));
-  for (const v of ['sub-1', 'CIPHER', 'IV', 'tenant-a', 'ws-a']) {
+  for (const v of ['sub-1', 'CIPHER', 'IV', 'tenant-a', 'ws-a', 'wk1:test-id']) {
     assert.ok(q.params.includes(v), `binds ${v}`);
   }
 });
@@ -73,7 +73,7 @@ test('bbx-643-db-03: insertSecret binds the subscription tenant dimension + ciph
 test('bbx-643-db-04: rotateSecret graces the active secret (tenant-scoped) then inserts a new active secret', async () => {
   const pool = recordingPool();
   const db = buildWebhookDb(pool);
-  await db.rotateSecret('sub-1', { cipher: 'NEWC', iv: 'NEWIV' }, '2026-07-01T00:00:00.000Z', 'tenant-a', 'ws-a');
+  await db.rotateSecret('sub-1', { cipher: 'NEWC', iv: 'NEWIV' }, '2026-07-01T00:00:00.000Z', 'tenant-a', 'ws-a', 'wk1:test-id');
   assert.ok(pool.calls.length >= 2, 'rotate issues at least an update + an insert');
   const grace = pool.calls.find((c) => /update\s+webhook_signing_secrets/i.test(c.text));
   const insert = pool.calls.find((c) => /insert\s+into\s+webhook_signing_secrets/i.test(c.text));
@@ -82,7 +82,7 @@ test('bbx-643-db-04: rotateSecret graces the active secret (tenant-scoped) then 
     'grace update is tenant-scoped');
   assert.ok(grace.params.includes('sub-1') && grace.params.includes('tenant-a') && grace.params.includes('ws-a'));
   assert.ok(insert, 'inserts the new active secret');
-  for (const v of ['sub-1', 'NEWC', 'NEWIV', 'tenant-a', 'ws-a']) assert.ok(insert.params.includes(v), `insert binds ${v}`);
+  for (const v of ['sub-1', 'NEWC', 'NEWIV', 'tenant-a', 'ws-a', 'wk1:test-id']) assert.ok(insert.params.includes(v), `insert binds ${v}`);
 });
 
 test('bbx-643-db-05: cancelPendingDeliveries only affects this subscription pending deliveries', async () => {
