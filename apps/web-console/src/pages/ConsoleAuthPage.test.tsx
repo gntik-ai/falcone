@@ -115,6 +115,92 @@ describe('ConsoleAuthPage', () => {
     expect(screen.queryByText(/Users y roles/i)).not.toBeInTheDocument()
   })
 
+  it('mantiene las secciones sanas cuando los alcances no están disponibles', async () => {
+    requestConsoleSessionJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('/users')) return { items: [{ id: 'usr_1' }, { id: 'usr_2' }] }
+      if (url.includes('/roles')) return { items: [{ roleName: 'admin' }] }
+      if (url.includes('/scopes')) throw { status: 404 }
+      if (url.includes('/clients')) return { items: [{ clientId: 'console-web', protocol: 'openid-connect', accessType: 'public', enabled: true, state: 'active' }] }
+      if (url.includes('/applications?limit=100')) return { items: [] }
+      return { status: 'accepted' }
+    })
+
+    renderPage()
+
+    expect(await screen.findByTestId('auth-section-error-scopes')).toHaveTextContent(/alcances: no se encontró el recurso solicitado/i)
+    expect(screen.getByTestId('auth-summary-users')).toHaveTextContent('2')
+    expect(screen.getByTestId('auth-summary-roles')).toHaveTextContent('1')
+    expect(screen.getByTestId('auth-summary-clients')).toHaveTextContent('1')
+    expect(screen.getByText('console-web')).toBeInTheDocument()
+    expect(screen.queryByTestId('auth-section-error-scopes')?.querySelector('button')).not.toBeInTheDocument()
+    expect(screen.queryByText(/no hay alcances gestionados/i)).not.toBeInTheDocument()
+  })
+
+  it('reintenta solamente los clientes cuando su lectura es recuperable', async () => {
+    let clientsAvailable = false
+    requestConsoleSessionJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('/users')) return { items: [{ id: 'usr_1' }] }
+      if (url.includes('/roles')) return { items: [{ roleName: 'admin' }] }
+      if (url.includes('/scopes')) return { items: [{ scopeName: 'openid', protocol: 'openid-connect', isDefault: true, isOptional: false, includeInTokenScope: true }] }
+      if (url.includes('/clients')) {
+        if (!clientsAvailable) throw { status: 503 }
+        return { items: [{ clientId: 'console-web', protocol: 'openid-connect', accessType: 'public', enabled: true, state: 'active' }] }
+      }
+      if (url.includes('/applications?limit=100')) return { items: [] }
+      return { status: 'accepted' }
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    const clientsError = await screen.findByTestId('auth-section-error-clients')
+    expect(clientsError).toHaveTextContent(/clientes: el servicio no está disponible/i)
+    expect(screen.getByText('openid')).toBeInTheDocument()
+    clientsAvailable = true
+    await user.click(screen.getByRole('button', { name: /^reintentar$/i }))
+
+    expect(await screen.findByText('console-web')).toBeInTheDocument()
+    const realmClientRequests = requestConsoleSessionJsonMock.mock.calls.filter(([url]) => String(url).includes('/v1/iam/realms/realm-alpha/clients'))
+    expect(realmClientRequests).toHaveLength(2)
+    expect(requestConsoleSessionJsonMock.mock.calls.filter(([url]) => String(url).includes('/v1/iam/realms/realm-alpha/users'))).toHaveLength(1)
+    expect(requestConsoleSessionJsonMock.mock.calls.filter(([url]) => String(url).includes('/v1/iam/realms/realm-alpha/roles'))).toHaveLength(1)
+    expect(requestConsoleSessionJsonMock.mock.calls.filter(([url]) => String(url).includes('/v1/iam/realms/realm-alpha/scopes'))).toHaveLength(1)
+  })
+
+  it('usa el fallback localizado y permite reintentar un error de red de usuarios', async () => {
+    requestConsoleSessionJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('/users')) throw new Error('network detail that must not be displayed')
+      if (url.includes('/roles')) return { items: [] }
+      if (url.includes('/scopes')) return { items: [] }
+      if (url.includes('/clients')) return { items: [] }
+      if (url.includes('/applications?limit=100')) return { items: [] }
+      return { status: 'accepted' }
+    })
+
+    renderPage()
+
+    expect(await screen.findByTestId('auth-section-error-users')).toHaveTextContent(/usuarios: no se pudieron cargar los usuarios del realm/i)
+    expect(screen.getByRole('button', { name: /^reintentar$/i })).toBeInTheDocument()
+    expect(screen.queryByText(/network detail that must not be displayed/i)).not.toBeInTheDocument()
+  })
+
+  it('atribuye cada error cuando todas las lecturas del realm fallan', async () => {
+    requestConsoleSessionJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('/v1/iam/realms/')) throw { status: 503 }
+      if (url.includes('/applications?limit=100')) return { items: [] }
+      return { status: 'accepted' }
+    })
+
+    renderPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-section-error-users')).toHaveTextContent(/^usuarios:/i)
+      expect(screen.getByTestId('auth-section-error-roles')).toHaveTextContent(/^roles:/i)
+      expect(screen.getByTestId('auth-section-error-scopes')).toHaveTextContent(/^alcances:/i)
+      expect(screen.getByTestId('auth-section-error-clients')).toHaveTextContent(/^clientes:/i)
+    })
+    expect(screen.queryByText(/no se pudo cargar el inventario auth\/iam del realm/i)).not.toBeInTheDocument()
+  })
+
   it('crea una aplicación y refresca el inventario', async () => {
     mockSuccessfulLoads([])
     const user = userEvent.setup()
