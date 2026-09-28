@@ -1,7 +1,9 @@
 name: release-images
 
-# Build and publish the Falcone application container images to GHCR on every published
-# GitHub Release. The release tag (e.g. v0.6.2) becomes the image version tag (0.6.2).
+# Build and publish the Falcone application container images to GHCR on strict vX.Y.Z tag pushes,
+# published GitHub Releases, and explicit manual runs. Every build publishes both the version tag
+# (for example 0.6.2) and an immutable sha-<commit> tag from github.sha; stable tag-triggered
+# builds also publish :latest. A release following an already-built tag verifies and skips it.
 #
 # Images are pushed to ghcr.io/<owner>/<image> using the workflow's GITHUB_TOKEN — no PAT
 # required. After a release, deploy by pinning each component image tag to the release version.
@@ -17,6 +19,9 @@ name: release-images
 #   in-falcone-workflow-worker         apps/workflow-worker/Dockerfile   (Temporal DSL worker)
 #   in-falcone-mcp-runtime             apps/mcp-runtime/Dockerfile           (first-party MCP JSON-RPC runtime)
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   release:
     types: [published]
   workflow_dispatch:
@@ -40,6 +45,11 @@ permissions:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
+
+concurrency:
+  # Push and release events use the same tag value, preventing concurrent publication of it.
+  group: release-images-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   build-push:
@@ -65,28 +75,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Resolve the version tag from the release (or the manual input) and the lowercase
-      # owner (GHCR requires a lowercase namespace).
+      # Resolve and validate the release, pushed tag, or manual input without interpolating
+      # untrusted tag values into this shell script. GHCR requires a lowercase namespace.
       - name: Resolve version and registry namespace
         id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_PUSH_LATEST: ${{ inputs.push_latest }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          SHA: ${{ github.sha }}
+          IMAGE: ${{ matrix.image }}
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            raw="${{ github.event.release.tag_name }}"
+          if [ "$EVENT_NAME" = "release" ]; then
+            raw="$RELEASE_TAG"
+            latest="true"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            raw="$REF_NAME"
             latest="true"
           else
-            raw="${{ github.event.inputs.tag }}"
-            latest="${{ github.event.inputs.push_latest }}"
+            raw="$INPUT_TAG"
+            latest="$INPUT_PUSH_LATEST"
+          fi
+          if ! [[ "$raw" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag must be strict vX.Y.Z or X.Y.Z, got invalid value"
+            exit 1
           fi
           version="${raw#v}"
-          if [ -z "$version" ]; then echo "::error::empty version"; exit 1; fi
-          owner="${{ github.repository_owner }}"
+          short_sha="${SHA:0:7}"
+          if ! [[ "$short_sha" =~ ^[0-9a-f]{7}$ ]]; then
+            echo "::error::github.sha did not provide a valid short commit SHA"
+            exit 1
+          fi
+          owner="$REPOSITORY_OWNER"
           owner_lc="$(echo "$owner" | tr '[:upper:]' '[:lower:]')"
           {
             echo "version=$version"
+            echo "short_sha=$short_sha"
             echo "namespace=ghcr.io/${owner_lc}"
             echo "push_latest=$latest"
           } >> "$GITHUB_OUTPUT"
-          echo "Publishing ${{ matrix.image }}:$version to ghcr.io/${owner_lc}"
+          echo "Publishing $IMAGE:$version and sha-$short_sha to ghcr.io/${owner_lc}"
 
       # The web-console SPA is built here (vite) so the thin Node static-server release image
       # just copies the dist. Other images build straight from their Dockerfile (repo-root context).
@@ -123,19 +154,76 @@ jobs:
 
       - name: Compute image tags
         id: tags
+        env:
+          IMAGE: ${{ matrix.image }}
+          NAMESPACE: ${{ steps.meta.outputs.namespace }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+          PUSH_LATEST: ${{ steps.meta.outputs.push_latest }}
         run: |
-          base="${{ steps.meta.outputs.namespace }}/${{ matrix.image }}"
+          base="${NAMESPACE}/${IMAGE}"
           {
+            echo "version_ref=${base}:${VERSION}"
+            echo "sha_ref=${base}:sha-${SHORT_SHA}"
             echo 'value<<EOF'
-            echo "${base}:${{ steps.meta.outputs.version }}"
-            if [ "${{ steps.meta.outputs.push_latest }}" = "true" ]; then
+            echo "${base}:${VERSION}"
+            echo "${base}:sha-${SHORT_SHA}"
+            if [ "$PUSH_LATEST" = "true" ]; then
               echo "${base}:latest"
             fi
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
+      # Tag pushes and releases are idempotent only when both immutable references already point
+      # at the same manifest. Fail closed on partial, conflicting, or uninspectable references.
+      - name: Skip already-published image
+        id: existing
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          VERSION_REF: ${{ steps.tags.outputs.version_ref }}
+          SHA_REF: ${{ steps.tags.outputs.sha_ref }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          inspect_digest() {
+            local result
+            if result="$(docker buildx imagetools inspect --format '{{.Digest}}' "$1" 2>&1)"; then
+              printf '%s\n' "$result"
+              return 0
+            fi
+            if printf '%s' "$result" | grep -Eqi '(not found|manifest unknown|name unknown)'; then
+              return 1
+            fi
+            echo "::error::could not inspect $1: $result" >&2
+            return 2
+          }
+
+          version_digest="$(inspect_digest "$VERSION_REF")"
+          version_status=$?
+          sha_digest="$(inspect_digest "$SHA_REF")"
+          sha_status=$?
+          if [ "$version_status" -eq 2 ] || [ "$sha_status" -eq 2 ]; then exit 1; fi
+          if [ "$version_status" -eq 1 ] && [ "$sha_status" -eq 1 ]; then
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$version_status" -ne 0 ] || [ "$sha_status" -ne 0 ]; then
+            echo "::error::$IMAGE has only one existing immutable release tag; refusing to overwrite it"
+            exit 1
+          fi
+          if [ "$version_digest" != "$sha_digest" ]; then
+            echo "::error::$IMAGE version and sha tags resolve to different digests"
+            exit 1
+          fi
+          echo 'skip=true' >> "$GITHUB_OUTPUT"
+          {
+            echo "### $IMAGE already published"
+            echo
+            echo "${VERSION_REF} and ${SHA_REF} both resolve to \`${version_digest}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build and push ${{ matrix.image }}
-        if: github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime
+        id: build
+        if: steps.existing.outputs.skip != 'true' && (github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime)
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context || '.' }}
@@ -148,3 +236,22 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+
+      - name: Verify published image digests
+        if: steps.existing.outputs.skip != 'true' && steps.build.outcome == 'success'
+        env:
+          VERSION_REF: ${{ steps.tags.outputs.version_ref }}
+          SHA_REF: ${{ steps.tags.outputs.sha_ref }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          version_digest="$(docker buildx imagetools inspect --format '{{.Digest}}' "$VERSION_REF")"
+          sha_digest="$(docker buildx imagetools inspect --format '{{.Digest}}' "$SHA_REF")"
+          if [ "$version_digest" != "$sha_digest" ]; then
+            echo "::error::$IMAGE version and sha tags resolve to different digests"
+            exit 1
+          fi
+          {
+            echo "### $IMAGE published"
+            echo
+            echo "${VERSION_REF} and ${SHA_REF} both resolve to \`${version_digest}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
