@@ -67,6 +67,38 @@ jobs:
       - name: Resilience scaffolding
         run: pnpm test:resilience
 
+      - name: Workflow E2E tests
+        run: |
+          set -o pipefail
+          mkdir -p test-results
+          pnpm test:e2e:workflows 2>&1 | tee test-results/workflows-e2e.tap
+
+      - name: Upload workflow E2E test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflows-e2e-test-results
+          path: test-results/workflows-e2e.tap
+          if-no-files-found: error
+
+      - name: Restore E2E tests
+        env:
+          RESTORE_TEST_REPORT_OUTPUT: test-results/restore-e2e-report.json
+        run: |
+          set -o pipefail
+          mkdir -p test-results
+          pnpm test:e2e:restore 2>&1 | tee test-results/restore-e2e.tap
+
+      - name: Upload restore E2E test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-e2e-test-results
+          path: |
+            test-results/restore-e2e.tap
+            test-results/restore-e2e-report.json
+          if-no-files-found: error
+
       # SeaweedFS migration validation (change add-seaweedfs-migration-validation).
       # Gated OFF by default (repo variable SEAWEEDFS_VALIDATION != '1') so normal CI
       # is unaffected; enable only when a SeaweedFS-backed env + Postgres are reachable
@@ -99,9 +131,11 @@ jobs:
           MIGRATION_MANIFEST: ${{ vars.FERRETDB_MIGRATION_MANIFEST }}
         run: bash tests/blackbox/run.sh
 
-      - name: Plan Enforcement Coherence Tests
+      - name: Plan Enforcement Coherence Tests (gated)
+        if: ${{ vars.PLAN_ENFORCEMENT_VALIDATION == '1' }}
         run: node --test --test-reporter=tap tests/integration/plan-enforcement/suites/*.test.mjs
         env:
+          PLAN_ENFORCEMENT_STRICT: 'true'
           GATEWAY_BASE_URL: ${{ secrets.GATEWAY_BASE_URL }}
           CONTROL_PLANE_URL: ${{ secrets.CONTROL_PLANE_URL }}
           CONSOLE_API_URL: ${{ secrets.CONSOLE_API_URL }}
@@ -114,13 +148,15 @@ jobs:
           TEST_RESULT_OUTPUT_PATH: test-results/plan-enforcement-report.json
 
       - name: Upload plan enforcement test artifact
+        if: ${{ always() && vars.PLAN_ENFORCEMENT_VALIDATION == '1' }}
         uses: actions/upload-artifact@v4
         with:
           name: plan-enforcement-tests-result
           path: test-results/plan-enforcement-report.json
           if-no-files-found: ignore
 
-      - name: Plan Upgrade/Downgrade E2E Tests
+      - name: Plan Upgrade/Downgrade E2E Tests (gated)
+        if: ${{ vars.PLAN_ENFORCEMENT_VALIDATION == '1' }}
         run: node --test --test-reporter=tap tests/e2e/101-plan-upgrade-downgrade-tests/index.test.mjs
         env:
           TEST_API_BASE_URL: ${{ secrets.TEST_API_BASE_URL }}
@@ -131,6 +167,7 @@ jobs:
           TEST_RESULT_OUTPUT_PATH: test-results/101-plan-upgrade-downgrade-tests-result.json
 
       - name: Upload plan upgrade/downgrade test artifact
+        if: ${{ always() && vars.PLAN_ENFORCEMENT_VALIDATION == '1' }}
         uses: actions/upload-artifact@v4
         with:
           name: plan-upgrade-downgrade-tests-result

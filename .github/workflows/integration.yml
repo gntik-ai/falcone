@@ -1,0 +1,102 @@
+name: scheduled-integration
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '10.0.0'
+  FALCONE_CHARTS_REF: '62c3975b4964fedfc821db5d8787e697e2f7af94'
+
+jobs:
+  plan-enforcement:
+    name: Plan-enforcement integration
+    runs-on: ubuntu-latest
+    # tests/e2e/stack.sh provisions tests/env dependencies before the Helm install.
+    # It therefore shares the fixed compose project and host ports with real-stack.
+    concurrency:
+      group: real-stack-shared-host
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout deployment charts
+        uses: actions/checkout@v4
+        with:
+          repository: gntik-ai/falcone-charts
+          ref: ${{ env.FALCONE_CHARTS_REF }}
+          path: falcone-charts
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create isolated kind cluster
+        uses: helm/kind-action@v1.12.0
+        with:
+          cluster_name: falcone-plan-enforcement
+          version: v0.26.0
+          kubectl_version: v1.31.0
+          helm_version: v3.16.3
+
+      - name: Provision plan-enforcement services with the deterministic Helm adapter
+        env:
+          E2E_NAMESPACE: falcone-plan-enforcement
+          E2E_HELM_RELEASE: falcone
+          E2E_HELM_CHART: ${{ github.workspace }}/falcone-charts/charts/in-falcone
+          E2E_HELM_VALUES: ${{ github.workspace }}/falcone-charts/deploy/kind/values-kind.yaml
+          E2E_FWD: svc/falcone-apisix:9080:9080 svc/falcone-control-plane:3233:8080 svc/falcone-keycloak:8080:8080
+        run: bash tests/e2e/stack.sh up
+
+      - name: Plan-enforcement coherence tests
+        env:
+          PLAN_ENFORCEMENT_STRICT: 'true'
+          GATEWAY_BASE_URL: http://localhost:9080
+          CONTROL_PLANE_URL: http://localhost:3233
+          CONSOLE_API_URL: http://localhost:3000/api
+          KEYCLOAK_URL: http://localhost:8080
+          KEYCLOAK_REALM: in-falcone-platform
+          SUPERADMIN_CLIENT_ID: ${{ secrets.SUPERADMIN_CLIENT_ID }}
+          SUPERADMIN_CLIENT_SECRET: ${{ secrets.SUPERADMIN_CLIENT_SECRET }}
+          KAFKA_BROKERS: localhost:9092
+          KAFKA_AUDIT_TOPIC: platform.audit.events
+          TEST_RESULT_OUTPUT_PATH: test-results/plan-enforcement-report.json
+        run: |
+          set -o pipefail
+          mkdir -p test-results
+          node --test --test-reporter=tap tests/integration/plan-enforcement/suites/*.test.mjs 2>&1 | tee test-results/plan-enforcement.tap
+          non_skipped=$(awk '/^ok [0-9]+/ && !/# SKIP/ { count += 1 } END { print count + 0 }' test-results/plan-enforcement.tap)
+          test "$non_skipped" -gt 0
+
+      - name: Upload plan-enforcement test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-enforcement-integration-test-results
+          path: |
+            test-results/plan-enforcement.tap
+            test-results/plan-enforcement-report.json
+          if-no-files-found: error
+
+      - name: Tear down plan-enforcement stack
+        if: always()
+        env:
+          E2E_NAMESPACE: falcone-plan-enforcement
+          E2E_HELM_RELEASE: falcone
+        run: bash tests/e2e/stack.sh down
