@@ -73,10 +73,16 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
+          keycloak_admin_password="$(openssl rand -hex 24)"
+          superadmin_password="$(openssl rand -hex 24)"
+          plan_enforcement_client_secret="$(openssl rand -hex 24)"
+          printf '::add-mask::%s\n' "$keycloak_admin_password"
+          printf '::add-mask::%s\n' "$superadmin_password"
+          printf '::add-mask::%s\n' "$plan_enforcement_client_secret"
           {
-            echo "E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -hex 24)"
-            echo "E2E_BOOTSTRAP_SUPERADMIN_PASSWORD=$(openssl rand -hex 24)"
-            echo "E2E_PLAN_ENFORCEMENT_CLIENT_SECRET=$(openssl rand -hex 24)"
+            echo "E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD=$keycloak_admin_password"
+            echo "E2E_BOOTSTRAP_SUPERADMIN_PASSWORD=$superadmin_password"
+            echo "E2E_PLAN_ENFORCEMENT_CLIENT_SECRET=$plan_enforcement_client_secret"
           } >> "$GITHUB_ENV"
 
       - name: Provision plan-enforcement services with the deterministic Helm adapter

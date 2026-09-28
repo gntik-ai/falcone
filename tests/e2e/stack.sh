@@ -805,7 +805,8 @@ case "${1:-up}" in
       # finishes).  Strategy:
       #   1. Deploy ALL non-hook resources via --no-hooks --wait=false (Helm adopts them).
       #   2. Wait for PostgreSQL then run the schema Job out-of-band.
-      #   3. Wait for Temporal frontend then run the bootstrap Job out-of-band.
+      #   3. Wait for Temporal frontend then run the Temporal and platform
+      #      Keycloak bootstrap Jobs out-of-band.
       #   4. Wait for all Deployments + StatefulSets to stabilise (retries self-heal).
       TEMPORAL_ENABLED=0
       helm template "$REL" "$CHART" $VALUES_FLAG --skip-schema-validation 2>/dev/null \
@@ -828,7 +829,9 @@ case "${1:-up}" in
           || kubectl wait job/"$REL"-temporal-schema -n "$NS" --for=condition=failed --timeout=30s || true
         kubectl logs -n "$NS" job/"$REL"-temporal-schema 2>/dev/null | tail -5 || true
 
-        # Phase 3 — wait for Temporal frontend then run bootstrap job.
+        # Phase 3 — wait for Temporal frontend, then initialise Temporal and
+        # the platform Keycloak realm.  --no-hooks deliberately omits both
+        # post-install hooks, so render and apply them explicitly.
         echo ">> Waiting for Temporal frontend ..."
         kubectl rollout status deployment/"$REL"-temporal-frontend -n "$NS" --timeout=5m
         echo ">> Running Temporal namespace bootstrap ..."
@@ -838,6 +841,12 @@ case "${1:-up}" in
         kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=complete --timeout=5m \
           || kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=failed --timeout=30s || true
         kubectl logs -n "$NS" job/"$REL"-temporal-bootstrap 2>/dev/null | tail -5 || true
+        echo ">> Running platform Keycloak bootstrap ..."
+        helm template "$REL" "$CHART" $VALUES_FLAG --skip-schema-validation \
+          -s templates/bootstrap-job.yaml 2>/dev/null \
+          | kubectl apply -n "$NS" -f -
+        kubectl wait job/"$REL"-in-falcone-bootstrap -n "$NS" --for=condition=complete --timeout=5m
+        kubectl logs -n "$NS" job/"$REL"-in-falcone-bootstrap 2>/dev/null | tail -5 || true
       else
         # No Temporal: standard helm install with hooks.
         # --skip-schema-validation: in-falcone chart has strict JSON-schema constraints that
