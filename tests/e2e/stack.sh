@@ -710,9 +710,11 @@ case "${1:-up}" in
       --from-literal=client-secret=e2e-placeholder-secret \
       -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
 
-    # CI can seed these disposable values so a test-only Keycloak client can be
-    # created after the chart bootstrap.  They are optional for local E2E use,
-    # and all-or-nothing so a partial configuration never weakens bootstrap.
+    # CI can seed these disposable values so the non-hook Temporal lifecycle
+    # can also run the chart's platform bootstrap. They are optional for local
+    # E2E use, and all-or-nothing so a partial configuration never weakens
+    # bootstrap or changes the default local lifecycle.
+    PLATFORM_BOOTSTRAP_ENABLED=0
     bootstrap_credentials="${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME:-}${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD:-}${E2E_BOOTSTRAP_SUPERADMIN_PASSWORD:-}"
     if [ -n "$bootstrap_credentials" ]; then
       [ -n "${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME:-}" ] \
@@ -728,6 +730,14 @@ case "${1:-up}" in
       kubectl create secret generic in-falcone-superadmin \
         --from-literal=password="$E2E_BOOTSTRAP_SUPERADMIN_PASSWORD" \
         -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+      # The pre-install credentials hook normally creates this Secret. The
+      # Temporal lifecycle deliberately uses --no-hooks, so generate an
+      # isolated replacement only for this explicit CI bootstrap path.
+      require openssl
+      kubectl create secret generic in-falcone-apisix-admin \
+        --from-literal=admin-key="$(openssl rand -hex 24)" \
+        -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+      PLATFORM_BOOTSTRAP_ENABLED=1
     fi
 
     # ---- DocumentDB / FerretDB secrets (add-ferretdb-realtime-cdc-remediation #460) ----
@@ -829,9 +839,9 @@ case "${1:-up}" in
           || kubectl wait job/"$REL"-temporal-schema -n "$NS" --for=condition=failed --timeout=30s || true
         kubectl logs -n "$NS" job/"$REL"-temporal-schema 2>/dev/null | tail -5 || true
 
-        # Phase 3 — wait for Temporal frontend, then initialise Temporal and
-        # the platform Keycloak realm.  --no-hooks deliberately omits both
-        # post-install hooks, so render and apply them explicitly.
+        # Phase 3 — wait for Temporal frontend, then initialise Temporal.
+        # --no-hooks deliberately omits its post-install hook, so render and
+        # apply it explicitly.
         echo ">> Waiting for Temporal frontend ..."
         kubectl rollout status deployment/"$REL"-temporal-frontend -n "$NS" --timeout=5m
         echo ">> Running Temporal namespace bootstrap ..."
@@ -841,12 +851,18 @@ case "${1:-up}" in
         kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=complete --timeout=5m \
           || kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=failed --timeout=30s || true
         kubectl logs -n "$NS" job/"$REL"-temporal-bootstrap 2>/dev/null | tail -5 || true
-        echo ">> Running platform Keycloak bootstrap ..."
-        helm template "$REL" "$CHART" $VALUES_FLAG --skip-schema-validation \
-          -s templates/bootstrap-job.yaml 2>/dev/null \
-          | kubectl apply -n "$NS" -f -
-        kubectl wait job/"$REL"-in-falcone-bootstrap -n "$NS" --for=condition=complete --timeout=5m
-        kubectl logs -n "$NS" job/"$REL"-in-falcone-bootstrap 2>/dev/null | tail -5 || true
+        # The platform bootstrap needs Secrets normally made by the skipped
+        # pre-install hook. Keep it opt-in for the scheduled CI environment,
+        # which supplies all three disposable credentials above; ordinary
+        # local stack runs retain their previous lifecycle.
+        if [ "$PLATFORM_BOOTSTRAP_ENABLED" -eq 1 ]; then
+          echo ">> Running platform Keycloak bootstrap ..."
+          helm template "$REL" "$CHART" -n "$NS" $VALUES_FLAG --skip-schema-validation \
+            -s templates/bootstrap-job.yaml 2>/dev/null \
+            | kubectl apply -n "$NS" -f -
+          kubectl wait job/"$REL"-in-falcone-bootstrap -n "$NS" --for=condition=complete --timeout=5m
+          kubectl logs -n "$NS" job/"$REL"-in-falcone-bootstrap 2>/dev/null | tail -5 || true
+        fi
       else
         # No Temporal: standard helm install with hooks.
         # --skip-schema-validation: in-falcone chart has strict JSON-schema constraints that

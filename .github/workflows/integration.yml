@@ -17,11 +17,6 @@ jobs:
   plan-enforcement:
     name: Plan-enforcement integration
     runs-on: ubuntu-latest
-    # The kind/Helm workflow and real-stack both reserve host ports while their
-    # disposable stacks are running.
-    concurrency:
-      group: real-stack-shared-host
-      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
