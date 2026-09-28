@@ -3,7 +3,8 @@ name: release-images
 # Build and publish the Falcone application container images to GHCR on strict vX.Y.Z tag pushes,
 # published GitHub Releases, and explicit manual runs. Every build publishes both the version tag
 # (for example 0.6.2) and an immutable sha-<commit> tag from github.sha; stable tag-triggered
-# builds also publish :latest. A release following an already-built tag verifies and skips it.
+# builds also publish :latest. Existing matching immutable references are verified and skipped to
+# prevent a release or manual run from rebuilding or overwriting a previously published version.
 #
 # Images are pushed to ghcr.io/<owner>/<image> using the workflow's GITHUB_TOKEN — no PAT
 # required. After a release, deploy by pinning each component image tag to the release version.
@@ -178,6 +179,7 @@ jobs:
       # manifest. Fail closed on partial, conflicting, or uninspectable references.
       - name: Check existing immutable image tags
         id: existing
+        if: github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime
         env:
           VERSION_REF: ${{ steps.tags.outputs.version_ref }}
           SHA_REF: ${{ steps.tags.outputs.sha_ref }}
@@ -185,10 +187,15 @@ jobs:
         run: |
           inspect_digest() {
             local result
-            if result="$(docker buildx imagetools inspect --format '{{.Digest}}' "$1" 2>&1)"; then
+            local stderr_file
+            stderr_file="$(mktemp)"
+            if result="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$1" 2>"$stderr_file")"; then
+              rm -f "$stderr_file"
               printf '%s\n' "$result"
               return 0
             fi
+            result="$(<"$stderr_file")"
+            rm -f "$stderr_file"
             if printf '%s' "$result" | grep -Eqi '(not found|manifest unknown|name unknown)'; then
               return 1
             fi
@@ -249,8 +256,8 @@ jobs:
           SHA_REF: ${{ steps.tags.outputs.sha_ref }}
           IMAGE: ${{ matrix.image }}
         run: |
-          version_digest="$(docker buildx imagetools inspect --format '{{.Digest}}' "$VERSION_REF")"
-          sha_digest="$(docker buildx imagetools inspect --format '{{.Digest}}' "$SHA_REF")"
+          version_digest="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$VERSION_REF")"
+          sha_digest="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$SHA_REF")"
           if [ "$version_digest" != "$sha_digest" ]; then
             echo "::error::$IMAGE version and sha tags resolve to different digests"
             exit 1

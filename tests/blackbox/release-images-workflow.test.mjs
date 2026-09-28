@@ -53,11 +53,22 @@ test('bbx-1026-003: existing image checks and post-push digest verification fail
   const existing = stepNamed('Check existing immutable image tags');
   const verify = stepNamed('Verify published image digests');
   assert.match(existing?.run ?? '', /docker buildx imagetools inspect/);
+  assert.match(existing?.run ?? '', /--format '\{\{\.Manifest\.Digest\}\}'/);
+  assert.doesNotMatch(existing?.run ?? '', /2>&1/);
   assert.match(existing?.run ?? '', /skip=true/);
   assert.match(existing?.run ?? '', /different digests/);
   assert.match(verify?.run ?? '', /docker buildx imagetools inspect/);
+  assert.match(verify?.run ?? '', /--format '\{\{\.Manifest\.Digest\}\}'/);
   assert.match(verify?.run ?? '', /different digests/);
   assert.match(verify?.run ?? '', /GITHUB_STEP_SUMMARY/);
+});
+
+test('bbx-1026-006: disabled manual function runtime does not probe or build its image', () => {
+  const existing = stepNamed('Check existing immutable image tags');
+  assert.equal(
+    existing?.if,
+    "github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime",
+  );
 });
 
 test('bbx-1026-004: existing image check handles docker results under bash -e', () => {
