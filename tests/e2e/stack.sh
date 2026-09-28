@@ -908,7 +908,9 @@ case "${1:-up}" in
           kubectl logs -n "$NS" job/"$REL"-in-falcone-bootstrap 2>/dev/null | tail -5 || true
           # This post-install authority hook grants the generated webhook
           # principals before the control plane begins serving requests.
-          apply_ci_hook templates/webhook-database-authority-bootstrap.yaml "$NS" "${REL}-in-falcone-webhook-db-authority"
+          # This hook incorporates Helm's rendered release revision. helm
+          # template renders revision 1, so wait for the resulting Job name.
+          apply_ci_hook templates/webhook-database-authority-bootstrap.yaml "$NS" "${REL}-in-falcone-webhook-db-authority-r1"
         fi
       else
         # No Temporal: standard helm install with hooks.
