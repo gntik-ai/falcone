@@ -47,8 +47,8 @@ env:
   PNPM_VERSION: '10.0.0'
 
 concurrency:
-  # Push and release events use the same tag value, preventing concurrent publication of it.
-  group: release-images-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name || github.ref_name }}
+  # Canonicalize manual X.Y.Z inputs to vX.Y.Z so they serialize with tag and release events.
+  group: release-images-${{ github.event_name == 'workflow_dispatch' && (startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag)) || github.event.release.tag_name || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -174,11 +174,10 @@ jobs:
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
-      # Tag pushes and releases are idempotent only when both immutable references already point
-      # at the same manifest. Fail closed on partial, conflicting, or uninspectable references.
-      - name: Skip already-published image
+      # Builds are idempotent only when both immutable references already point at the same
+      # manifest. Fail closed on partial, conflicting, or uninspectable references.
+      - name: Check existing immutable image tags
         id: existing
-        if: github.event_name != 'workflow_dispatch'
         env:
           VERSION_REF: ${{ steps.tags.outputs.version_ref }}
           SHA_REF: ${{ steps.tags.outputs.sha_ref }}
@@ -197,10 +196,16 @@ jobs:
             return 2
           }
 
-          version_digest="$(inspect_digest "$VERSION_REF")"
-          version_status=$?
-          sha_digest="$(inspect_digest "$SHA_REF")"
-          sha_status=$?
+          if version_digest="$(inspect_digest "$VERSION_REF")"; then
+            version_status=0
+          else
+            version_status=$?
+          fi
+          if sha_digest="$(inspect_digest "$SHA_REF")"; then
+            sha_status=0
+          else
+            sha_status=$?
+          fi
           if [ "$version_status" -eq 2 ] || [ "$sha_status" -eq 2 ]; then exit 1; fi
           if [ "$version_status" -eq 1 ] && [ "$sha_status" -eq 1 ]; then
             echo 'skip=false' >> "$GITHUB_OUTPUT"
