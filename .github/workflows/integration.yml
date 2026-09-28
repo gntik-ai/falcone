@@ -17,6 +17,11 @@ jobs:
   plan-enforcement:
     name: Plan-enforcement integration
     runs-on: ubuntu-latest
+    # The kind cluster name is fixed, so scheduled and manually dispatched runs
+    # must not overlap on a shared runner.
+    concurrency:
+      group: real-stack-shared-host
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -86,6 +91,9 @@ jobs:
           E2E_HELM_RELEASE: falcone
           E2E_HELM_CHART: ${{ github.workspace }}/falcone-charts/charts/in-falcone
           E2E_HELM_VALUES: ${{ github.workspace }}/falcone-charts/deploy/kind/values-kind.yaml
+          # The pinned chart uses a release digest that is not present in kind.
+          # This isolated run instead consumes the local tag loaded above.
+          E2E_USE_LOCAL_CONTROL_PLANE_IMAGE: 'true'
           E2E_APISIX_STANDALONE_CONFIG_FILE: deploy/kind/apisix/apisix.yaml
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: ci-plan-enforcement-admin
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD }}

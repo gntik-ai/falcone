@@ -11,6 +11,9 @@
   workflow using the pinned charts revision and deterministic E2E Helm adapter.
 - [x] 2.2 Run all plan-enforcement suites in strict mode, fail if no
   non-skipped TAP test executes, upload reports, and tear down on every exit.
+- [x] 2.3 Render the chart-owned CI credential, TLS, OpenBao-init, and webhook
+  authority hooks in the isolated no-hooks Temporal lifecycle; use the
+  locally-loaded control-plane image tag and serialize the fixed kind cluster.
 
 ## 3. Verify
 

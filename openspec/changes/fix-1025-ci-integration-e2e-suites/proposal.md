@@ -27,5 +27,10 @@ configuration and report a successful job after skipping every scenario.
 ## Risks and Rollback
 
 This is an R1 CI-only change. The scheduled integration stack is isolated and
-serialized with the existing real-stack shared-host workflow. Reverting these
-workflow files restores the earlier CI schedule without changing runtime code.
+serialized with the existing real-stack shared-host workflow. Its Temporal
+no-hooks lifecycle explicitly renders the chart-owned credential and TLS hooks
+inside the disposable kind cluster, including a CI-only exception that creates
+random ephemeral Kubernetes Secrets rather than sourcing them through
+External Secrets/OpenBao. No values file contains credentials, and the normal
+local lifecycle is unchanged. Reverting these workflow files restores the
+earlier CI schedule without changing runtime code.
