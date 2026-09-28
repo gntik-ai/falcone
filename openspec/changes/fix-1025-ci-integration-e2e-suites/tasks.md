@@ -14,7 +14,8 @@
 
 ## 3. Verify
 
-- [ ] 3.1 Run the workflow and restore suites locally without service
-  credentials and record TAP pass/skip counts.
+- [x] 3.1 Run the workflow and restore suites locally without service
+  credentials and record TAP pass/skip counts (workflows: 39 pass; restore:
+  10 pass, 2 explicit skips).
 - [ ] 3.2 Run workflow YAML validation and trigger the scheduled workflow in
   GitHub to confirm provision, execution, artifact upload, and teardown.

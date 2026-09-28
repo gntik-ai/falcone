@@ -633,6 +633,26 @@ case "${1:-up}" in
     kubectl delete namespace "$NS" --ignore-not-found --wait=true
     kubectl create namespace "$NS"
 
+    # The kind chart profile uses a standalone APISIX route table mounted from a
+    # ConfigMap.  Let isolated CI provide that route table before Helm renders
+    # the APISIX Deployment; otherwise its required volume cannot be mounted.
+    if [ -n "${E2E_APISIX_STANDALONE_CONFIG_FILE:-}" ]; then
+      [ -f "$E2E_APISIX_STANDALONE_CONFIG_FILE" ] || {
+        echo "E2E_APISIX_STANDALONE_CONFIG_FILE does not exist: $E2E_APISIX_STANDALONE_CONFIG_FILE" >&2
+        exit 2
+      }
+      route_file="$(mktemp)"
+      # The checked-in kind route table targets the developer namespace.  The
+      # chart test lifecycle is deliberately namespace-isolated, so substitute
+      # only the Kubernetes DNS namespace segment before creating the ConfigMap.
+      sed "s/\.falcone\.svc\.cluster\.local/.${NS}.svc.cluster.local/g" \
+        "$E2E_APISIX_STANDALONE_CONFIG_FILE" >"$route_file"
+      kubectl create configmap falcone-apisix-standalone \
+        --from-file=apisix.yaml="$route_file" \
+        -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+      rm -f "$route_file"
+    fi
+
     # ---- SeaweedFS image pre-pull (add-seaweedfs-storage-e2e, task 5.1) ----
     # When E2E_STORAGE_BACKEND=seaweedfs, pre-pull the SeaweedFS and its filer
     # init-container images so the kind nodes do not hit ImagePullBackOff on first
@@ -689,6 +709,26 @@ case "${1:-up}" in
       --from-literal=client-id=in-falcone-console \
       --from-literal=client-secret=e2e-placeholder-secret \
       -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+
+    # CI can seed these disposable values so a test-only Keycloak client can be
+    # created after the chart bootstrap.  They are optional for local E2E use,
+    # and all-or-nothing so a partial configuration never weakens bootstrap.
+    bootstrap_credentials="${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME:-}${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD:-}${E2E_BOOTSTRAP_SUPERADMIN_PASSWORD:-}"
+    if [ -n "$bootstrap_credentials" ]; then
+      [ -n "${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME:-}" ] \
+        && [ -n "${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD:-}" ] \
+        && [ -n "${E2E_BOOTSTRAP_SUPERADMIN_PASSWORD:-}" ] || {
+          echo "E2E bootstrap Keycloak credentials must be supplied together." >&2
+          exit 2
+        }
+      kubectl create secret generic in-falcone-keycloak-admin \
+        --from-literal=username="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME" \
+        --from-literal=password="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD" \
+        -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+      kubectl create secret generic in-falcone-superadmin \
+        --from-literal=password="$E2E_BOOTSTRAP_SUPERADMIN_PASSWORD" \
+        -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+    fi
 
     # ---- DocumentDB / FerretDB secrets (add-ferretdb-realtime-cdc-remediation #460) ----
     # The documentdb sub-chart (postgres-documentdb engine) requires in-falcone-documentdb

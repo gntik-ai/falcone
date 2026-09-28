@@ -17,8 +17,8 @@ jobs:
   plan-enforcement:
     name: Plan-enforcement integration
     runs-on: ubuntu-latest
-    # tests/e2e/stack.sh provisions tests/env dependencies before the Helm install.
-    # It therefore shares the fixed compose project and host ports with real-stack.
+    # The kind/Helm workflow and real-stack both reserve host ports while their
+    # disposable stacks are running.
     concurrency:
       group: real-stack-shared-host
       cancel-in-progress: false
@@ -55,25 +55,83 @@ jobs:
           kubectl_version: v1.31.0
           helm_version: v3.16.3
 
+      - name: Build and load Falcone images for kind
+        run: |
+          set -euo pipefail
+          while IFS='|' read -r image dockerfile; do
+            docker build --tag "$image" --file "$dockerfile" .
+            kind load docker-image --name falcone-plan-enforcement "$image"
+          done <<'IMAGES'
+          localhost:30500/in-falcone-mcp-runtime:latest|apps/mcp-runtime/Dockerfile
+          localhost:30500/in-falcone-control-plane:0.3.1|apps/control-plane/Dockerfile
+          localhost:30500/in-falcone-control-plane-executor:0.9.3|apps/control-plane-executor/Dockerfile
+          localhost:30500/in-falcone-workflow-worker:0.1.0|apps/workflow-worker/Dockerfile
+          localhost:30500/in-falcone-web-console:0.2.11|apps/web-console/Dockerfile
+          IMAGES
+
+      - name: Generate ephemeral integration credentials
+        run: |
+          set -euo pipefail
+          umask 077
+          {
+            echo "E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -hex 24)"
+            echo "E2E_BOOTSTRAP_SUPERADMIN_PASSWORD=$(openssl rand -hex 24)"
+            echo "E2E_PLAN_ENFORCEMENT_CLIENT_SECRET=$(openssl rand -hex 24)"
+          } >> "$GITHUB_ENV"
+
       - name: Provision plan-enforcement services with the deterministic Helm adapter
         env:
           E2E_NAMESPACE: falcone-plan-enforcement
           E2E_HELM_RELEASE: falcone
           E2E_HELM_CHART: ${{ github.workspace }}/falcone-charts/charts/in-falcone
           E2E_HELM_VALUES: ${{ github.workspace }}/falcone-charts/deploy/kind/values-kind.yaml
-          E2E_FWD: svc/falcone-apisix:9080:9080 svc/falcone-control-plane:3233:8080 svc/falcone-keycloak:8080:8080
+          E2E_APISIX_STANDALONE_CONFIG_FILE: deploy/kind/apisix/apisix.yaml
+          E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: ci-plan-enforcement-admin
+          E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD }}
+          E2E_BOOTSTRAP_SUPERADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_SUPERADMIN_PASSWORD }}
+          E2E_FWD: svc/falcone-apisix:9080:9080 svc/falcone-control-plane:3233:8080 svc/falcone-web-console:3000:3000 svc/falcone-keycloak:8080:8080 svc/falcone-kafka:9092:9092
         run: bash tests/e2e/stack.sh up
+
+      - name: Provision ephemeral plan-enforcement client
+        env:
+          E2E_NAMESPACE: falcone-plan-enforcement
+          E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: ci-plan-enforcement-admin
+          E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD }}
+          E2E_PLAN_ENFORCEMENT_CLIENT_SECRET: ${{ env.E2E_PLAN_ENFORCEMENT_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          kubectl exec -n "$E2E_NAMESPACE" deployment/falcone-keycloak -- \
+            env KEYCLOAK_ADMIN_USERNAME="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME" \
+                KEYCLOAK_ADMIN_PASSWORD="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD" \
+                PLAN_ENFORCEMENT_CLIENT_SECRET="$E2E_PLAN_ENFORCEMENT_CLIENT_SECRET" \
+            bash -ec '
+              KC=/opt/keycloak/bin/kcadm.sh
+              "$KC" config credentials --server http://localhost:8080 --realm master \
+                --user "$KEYCLOAK_ADMIN_USERNAME" --password "$KEYCLOAK_ADMIN_PASSWORD"
+              "$KC" create clients -r in-falcone-platform \
+                -s clientId=plan-enforcement-ci -s enabled=true -s publicClient=false \
+                -s standardFlowEnabled=false -s directAccessGrantsEnabled=false \
+                -s serviceAccountsEnabled=true -s clientAuthenticatorType=client-secret \
+                -s secret="$PLAN_ENFORCEMENT_CLIENT_SECRET"
+              "$KC" add-roles -r in-falcone-platform \
+                --uusername service-account-plan-enforcement-ci --rolename superadmin
+              "$KC" add-roles -r in-falcone-platform --cclientid realm-management \
+                --uusername service-account-plan-enforcement-ci --rolename impersonation
+            '
+
+      - name: Route Kafka metadata to the local port-forward
+        run: echo '127.0.0.1 falcone-kafka' | sudo tee -a /etc/hosts >/dev/null
 
       - name: Plan-enforcement coherence tests
         env:
           PLAN_ENFORCEMENT_STRICT: 'true'
           GATEWAY_BASE_URL: http://localhost:9080
           CONTROL_PLANE_URL: http://localhost:3233
-          CONSOLE_API_URL: http://localhost:3000/api
+          CONSOLE_API_URL: http://localhost:3233/api/v1
           KEYCLOAK_URL: http://localhost:8080
           KEYCLOAK_REALM: in-falcone-platform
-          SUPERADMIN_CLIENT_ID: ${{ secrets.SUPERADMIN_CLIENT_ID }}
-          SUPERADMIN_CLIENT_SECRET: ${{ secrets.SUPERADMIN_CLIENT_SECRET }}
+          SUPERADMIN_CLIENT_ID: plan-enforcement-ci
+          SUPERADMIN_CLIENT_SECRET: ${{ env.E2E_PLAN_ENFORCEMENT_CLIENT_SECRET }}
           KAFKA_BROKERS: localhost:9092
           KAFKA_AUDIT_TOPIC: platform.audit.events
           TEST_RESULT_OUTPUT_PATH: test-results/plan-enforcement-report.json
@@ -81,8 +139,8 @@ jobs:
           set -o pipefail
           mkdir -p test-results
           node --test --test-reporter=tap tests/integration/plan-enforcement/suites/*.test.mjs 2>&1 | tee test-results/plan-enforcement.tap
-          non_skipped=$(awk '/^ok [0-9]+/ && !/# SKIP/ { count += 1 } END { print count + 0 }' test-results/plan-enforcement.tap)
-          test "$non_skipped" -gt 0
+          passed=$(awk '/^# pass [0-9]+$/ { count = $3 } END { print count + 0 }' test-results/plan-enforcement.tap)
+          test "$passed" -gt 0
 
       - name: Upload plan-enforcement test artifacts
         if: always()
