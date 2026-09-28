@@ -1,9 +1,9 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ConsoleAuthPage } from './ConsoleAuthPage'
+import { ConsoleAuthPage, isRetryableRealmSectionError } from './ConsoleAuthPage'
 
 import { useConsoleContext } from '@/lib/console-context'
 import { requestConsoleSessionJson } from '@/lib/console-session'
@@ -113,6 +113,127 @@ describe('ConsoleAuthPage', () => {
     expect(screen.getByTestId('auth-summary-clients')).toHaveTextContent(/clientes/i)
     expect(screen.queryByRole('link', { name: /abrir members/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/Users y roles/i)).not.toBeInTheDocument()
+  })
+
+  it('mantiene los datos disponibles y atribuye al apartado de alcances un 404', async () => {
+    requestConsoleSessionJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('/users')) return { items: [{ id: 'usr_1' }, { id: 'usr_2' }] }
+      if (url.includes('/roles')) return { items: [{ roleName: 'admin' }] }
+      if (url.includes('/scopes')) throw { status: 404, message: 'raw scopes failure' }
+      if (url.includes('/clients')) return { items: [{ clientId: 'console-web', protocol: 'openid-connect', accessType: 'public', enabled: true, state: 'active' }] }
+      if (url.includes('/applications?limit=100')) return { items: [] }
+      return { status: 'accepted' }
+    })
+
+    renderPage()
+
+    await waitFor(() => expect(screen.getByTestId('auth-summary-users')).toHaveTextContent('2'))
+    expect(screen.getByTestId('auth-summary-roles')).toHaveTextContent('1')
+    expect(screen.getByTestId('auth-summary-clients')).toHaveTextContent('1')
+    expect(screen.getByText('console-web')).toBeInTheDocument()
+    const error = await screen.findByTestId('auth-section-scopes-error')
+    expect(error).toHaveTextContent(/alcances/i)
+    expect(error).toHaveTextContent(/no se encontró el recurso solicitado/i)
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(within(error).queryByRole('button', { name: /reintentar/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('raw scopes failure')).not.toBeInTheDocument()
+  })
+
+  it('reintenta solamente clientes IAM cuando el fallo es transitorio', async () => {
+    let clientsAvailable = false
+    requestConsoleSessionJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('/users')) return { items: [{ id: 'usr_1' }] }
+      if (url.includes('/roles')) return { items: [{ roleName: 'admin' }] }
+      if (url.includes('/scopes')) return { items: [] }
+      if (url.includes('/clients')) {
+        if (!clientsAvailable) throw { status: 503, message: 'raw clients failure' }
+        return { items: [{ clientId: 'console-web', protocol: 'openid-connect', accessType: 'public', enabled: true, state: 'active' }] }
+      }
+      if (url.includes('/applications?limit=100')) return { items: [] }
+      return { status: 'accepted' }
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    const error = await screen.findByTestId('auth-section-clients-error')
+    clientsAvailable = true
+    await user.click(within(error).getByRole('button', { name: /reintentar/i }))
+
+    expect(await screen.findByText('console-web')).toBeInTheDocument()
+    expect(requestConsoleSessionJsonMock.mock.calls.filter(([url]) => String(url).includes('/users'))).toHaveLength(1)
+    expect(requestConsoleSessionJsonMock.mock.calls.filter(([url]) => String(url).includes('/roles'))).toHaveLength(1)
+    expect(requestConsoleSessionJsonMock.mock.calls.filter(([url]) => String(url).includes('/scopes'))).toHaveLength(1)
+    expect(requestConsoleSessionJsonMock.mock.calls.filter(([url]) => String(url).includes('/clients'))).toHaveLength(2)
+  })
+
+  it('muestra cada fallo IAM sin bloquear las aplicaciones externas', async () => {
+    requestConsoleSessionJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('/users') || url.includes('/roles') || url.includes('/scopes') || url.includes('/clients')) {
+        throw new Error('raw network failure')
+      }
+      if (url.includes('/applications?limit=100')) return { items: [applicationFixture()] }
+      return { status: 'accepted' }
+    })
+
+    renderPage()
+
+    await waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(4))
+    expect(screen.getByTestId('auth-section-users-error')).toHaveTextContent(/usuarios/i)
+    expect(screen.getByTestId('auth-section-roles-error')).toHaveTextContent(/roles/i)
+    expect(screen.getByTestId('auth-section-scopes-error')).toHaveTextContent(/alcances/i)
+    expect(screen.getByTestId('auth-section-clients-error')).toHaveTextContent(/clientes iam/i)
+    expect(screen.queryByText('raw network failure')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /aplicaciones externas y proveedores/i })).toBeInTheDocument()
+  })
+
+  it('descarta respuestas IAM obsoletas al cambiar de realm', async () => {
+    let resolveOldUsers: ((value: { items: Array<{ id: string }> }) => void) | undefined
+    requestConsoleSessionJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('/v1/iam/realms/realm-alpha/users')) {
+        return new Promise<{ items: Array<{ id: string }> }>((resolve) => {
+          resolveOldUsers = resolve
+        })
+      }
+      if (url.includes('/v1/iam/realms/realm-beta/users')) return { items: [{ id: 'usr_beta' }] }
+      if (url.includes('/iam/realms/')) return { items: [] }
+      if (url.includes('/applications?limit=100')) return { items: [] }
+      return { status: 'accepted' }
+    })
+    const { rerender } = renderPage()
+
+    await waitFor(() => expect(resolveOldUsers).toBeDefined())
+    useConsoleContextMock.mockReturnValue({
+      activeTenant: { tenantId: 'ten_beta', label: 'Tenant Beta', consoleUserRealm: 'realm-beta' },
+      activeWorkspace: { workspaceId: 'wrk_beta', label: 'Workspace Beta' }
+    } as never)
+    rerender(
+      <MemoryRouter>
+        <ConsoleAuthPage />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => expect(screen.getByTestId('auth-summary-users')).toHaveTextContent('1'))
+    resolveOldUsers?.({ items: Array.from({ length: 9 }, (_, index) => ({ id: `usr_old_${index}` })) })
+    await waitFor(() => expect(screen.getByTestId('auth-summary-users')).toHaveTextContent('1'))
+  })
+
+  it('no ofrece reintento para un fallo de permisos de usuarios', async () => {
+    requestConsoleSessionJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('/users')) throw { status: 403, message: 'raw permission failure' }
+      if (url.includes('/roles')) return { items: [{ roleName: 'admin' }] }
+      if (url.includes('/scopes')) return { items: [] }
+      if (url.includes('/clients')) return { items: [] }
+      if (url.includes('/applications?limit=100')) return { items: [] }
+      return { status: 'accepted' }
+    })
+
+    renderPage()
+
+    const error = await screen.findByTestId('auth-section-users-error')
+    expect(error).toHaveTextContent(/usuarios/i)
+    expect(error).toHaveTextContent(/no tienes permiso/i)
+    expect(within(error).queryByRole('button', { name: /reintentar/i })).not.toBeInTheDocument()
+    expect(screen.getByTestId('auth-summary-roles')).toHaveTextContent('1')
   })
 
   it('crea una aplicación y refresca el inventario', async () => {
@@ -331,6 +452,20 @@ describe('ConsoleAuthPage', () => {
     expect(await screen.findByRole('heading', { name: 'Fragmentos de conexión' })).toBeInTheDocument()
     expect(screen.getByText(/client_secret=<CLIENT_SECRET>/)).toBeInTheDocument()
     expect(screen.queryByText(/super-secret/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('isRetryableRealmSectionError', () => {
+  it('clasifica únicamente los fallos transitorios como reintentables', () => {
+    expect(isRetryableRealmSectionError(new Error('network'))).toBe(true)
+    expect(isRetryableRealmSectionError({ status: 408 })).toBe(true)
+    expect(isRetryableRealmSectionError({ status: 429 })).toBe(true)
+    expect(isRetryableRealmSectionError({ status: 500 })).toBe(true)
+    expect(isRetryableRealmSectionError({ status: 503 })).toBe(true)
+    expect(isRetryableRealmSectionError({ status: 401 })).toBe(false)
+    expect(isRetryableRealmSectionError({ status: 403 })).toBe(false)
+    expect(isRetryableRealmSectionError({ status: 404 })).toBe(false)
+    expect(isRetryableRealmSectionError({ status: 409 })).toBe(false)
   })
 })
 

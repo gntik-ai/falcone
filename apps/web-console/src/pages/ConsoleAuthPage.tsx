@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { ConnectionSnippets } from '@/components/console/ConnectionSnippets'
@@ -8,7 +8,7 @@ import { CreateIamClientWizard } from '@/components/console/wizards/CreateIamCli
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
-import { describeConsoleError } from '@/lib/console-errors'
+import { describeConsoleError, getConsoleErrorStatus } from '@/lib/console-errors'
 import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
 import { requestConsoleSessionJson } from '@/lib/console-session'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
@@ -127,13 +127,24 @@ type MutationAccepted = {
   status: 'accepted' | 'queued'
 }
 
-type RealmSurfaceState = {
+type RealmSectionName = 'users' | 'roles' | 'scopes' | 'clients'
+
+type RealmSectionError = {
+  message: string
+  retryable: boolean
+}
+
+type RealmSectionState<T> = {
   loading: boolean
-  error: string | null
-  usersCount: number
-  rolesCount: number
-  scopes: IamScope[]
-  clients: IamClient[]
+  error: RealmSectionError | null
+  data: T
+}
+
+type RealmSurfaceState = {
+  users: RealmSectionState<number>
+  roles: RealmSectionState<number>
+  scopes: RealmSectionState<IamScope[]>
+  clients: RealmSectionState<IamClient[]>
   compatibility: IamProviderCompatibility | null
 }
 
@@ -190,13 +201,88 @@ type ProviderFormState = {
 type FormErrors = Record<string, string>
 
 const EMPTY_REALM_STATE: RealmSurfaceState = {
-  loading: false,
-  error: null,
-  usersCount: 0,
-  rolesCount: 0,
-  scopes: [],
-  clients: [],
+  users: { loading: false, error: null, data: 0 },
+  roles: { loading: false, error: null, data: 0 },
+  scopes: { loading: false, error: null, data: [] },
+  clients: { loading: false, error: null, data: [] },
   compatibility: null
+}
+
+function loadingRealmState(): RealmSurfaceState {
+  return {
+    users: { loading: true, error: null, data: 0 },
+    roles: { loading: true, error: null, data: 0 },
+    scopes: { loading: true, error: null, data: [] },
+    clients: { loading: true, error: null, data: [] },
+    compatibility: null
+  }
+}
+
+/** Network failures and transient HTTP responses can reasonably succeed on another request. */
+export function isRetryableRealmSectionError(error: unknown): boolean {
+  const status = getConsoleErrorStatus(error)
+  return status === undefined || status === 408 || status === 429 || status >= 500
+}
+
+function realmSectionError(section: RealmSectionName, error: unknown): RealmSectionError {
+  const labels: Record<RealmSectionName, string> = {
+    users: 'usuarios',
+    roles: 'roles',
+    scopes: 'alcances',
+    clients: 'clientes IAM'
+  }
+  const label = labels[section]
+  return {
+    message: `No se pudieron cargar los ${label} del realm. ${describeConsoleError(error, `No se pudo completar la solicitud de ${label}.`)}`,
+    retryable: isRetryableRealmSectionError(error)
+  }
+}
+
+function realmSectionLoading(state: RealmSurfaceState, section: RealmSectionName): RealmSurfaceState {
+  switch (section) {
+    case 'users':
+      return { ...state, users: { ...state.users, loading: true, error: null } }
+    case 'roles':
+      return { ...state, roles: { ...state.roles, loading: true, error: null } }
+    case 'scopes':
+      return { ...state, scopes: { ...state.scopes, loading: true, error: null } }
+    case 'clients':
+      return { ...state, clients: { ...state.clients, loading: true, error: null } }
+  }
+}
+
+function realmSectionSucceeded(
+  state: RealmSurfaceState,
+  section: RealmSectionName,
+  response: IamCollectionResponse<unknown>
+): RealmSurfaceState {
+  const compatibility = state.compatibility ?? response.compatibility ?? null
+
+  switch (section) {
+    case 'users':
+      return { ...state, users: { loading: false, error: null, data: response.items?.length ?? 0 }, compatibility }
+    case 'roles':
+      return { ...state, roles: { loading: false, error: null, data: response.items?.length ?? 0 }, compatibility }
+    case 'scopes':
+      return { ...state, scopes: { loading: false, error: null, data: (response.items ?? []) as IamScope[] }, compatibility }
+    case 'clients':
+      return { ...state, clients: { loading: false, error: null, data: (response.items ?? []) as IamClient[] }, compatibility }
+  }
+}
+
+function realmSectionFailed(state: RealmSurfaceState, section: RealmSectionName, error: unknown): RealmSurfaceState {
+  const sectionError = realmSectionError(section, error)
+
+  switch (section) {
+    case 'users':
+      return { ...state, users: { loading: false, error: sectionError, data: 0 } }
+    case 'roles':
+      return { ...state, roles: { loading: false, error: sectionError, data: 0 } }
+    case 'scopes':
+      return { ...state, scopes: { loading: false, error: sectionError, data: [] } }
+    case 'clients':
+      return { ...state, clients: { loading: false, error: sectionError, data: [] } }
+  }
 }
 
 const EMPTY_APPLICATIONS_STATE: ApplicationsState = {
@@ -246,7 +332,6 @@ export function ConsoleAuthPage() {
   const { activeTenant, activeWorkspace } = useConsoleContext()
   const [realmState, setRealmState] = useState<RealmSurfaceState>(EMPTY_REALM_STATE)
   const [applicationsState, setApplicationsState] = useState<ApplicationsState>(EMPTY_APPLICATIONS_STATE)
-  const [realmReloadToken, setRealmReloadToken] = useState(0)
   const [applicationsReloadToken, setApplicationsReloadToken] = useState(0)
   const [feedback, setFeedback] = useState<MutationFeedback | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -261,6 +346,7 @@ export function ConsoleAuthPage() {
   const [isSubmittingProvider, setIsSubmittingProvider] = useState(false)
   const [iamWizardOpen, setIamWizardOpen] = useState(false)
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
+  const realmRequestVersion = useRef(0)
   const destructiveOp = useDestructiveOp()
 
   const realmId = activeTenant?.consoleUserRealm ?? null
@@ -271,47 +357,57 @@ export function ConsoleAuthPage() {
       ? 'Selecciona un área de trabajo para operar aplicaciones externas y proveedores.'
       : null
 
+  function loadRealmSection(section: RealmSectionName, requestVersion: number, isIgnored: () => boolean = () => false) {
+    if (!realmId) return
+
+    const request = (() => {
+      switch (section) {
+        case 'users':
+          return requestConsoleSessionJson<IamCollectionResponse<unknown>>(`/v1/iam/realms/${realmId}/users?page[size]=100`)
+        case 'roles':
+          return requestConsoleSessionJson<IamCollectionResponse<unknown>>(`/v1/iam/realms/${realmId}/roles?page[size]=100`)
+        case 'scopes':
+          return requestConsoleSessionJson<IamCollectionResponse<IamScope>>(`/v1/iam/realms/${realmId}/scopes?page[size]=100`)
+        case 'clients':
+          return requestConsoleSessionJson<IamCollectionResponse<IamClient>>(`/v1/iam/realms/${realmId}/clients?page[size]=100`)
+      }
+    })()
+
+    void request
+      .then((response) => {
+        if (isIgnored() || requestVersion !== realmRequestVersion.current) return
+        setRealmState((current) => realmSectionSucceeded(current, section, response))
+      })
+      .catch((error: unknown) => {
+        if (isIgnored() || requestVersion !== realmRequestVersion.current) return
+        setRealmState((current) => realmSectionFailed(current, section, error))
+      })
+  }
+
+  function retryRealmSection(section: RealmSectionName) {
+    const requestVersion = realmRequestVersion.current
+    setRealmState((current) => realmSectionLoading(current, section))
+    loadRealmSection(section, requestVersion)
+  }
+
   useEffect(() => {
     if (!activeTenant || !realmId) {
+      realmRequestVersion.current += 1
       setRealmState(EMPTY_REALM_STATE)
       return
     }
 
     let ignore = false
-    setRealmState((current) => ({ ...current, loading: true, error: null, scopes: [], clients: [] }))
-
-    Promise.all([
-      requestConsoleSessionJson<IamCollectionResponse<unknown>>(`/v1/iam/realms/${realmId}/users?page[size]=100`),
-      requestConsoleSessionJson<IamCollectionResponse<unknown>>(`/v1/iam/realms/${realmId}/roles?page[size]=100`),
-      requestConsoleSessionJson<IamCollectionResponse<IamScope>>(`/v1/iam/realms/${realmId}/scopes?page[size]=100`),
-      requestConsoleSessionJson<IamCollectionResponse<IamClient>>(`/v1/iam/realms/${realmId}/clients?page[size]=100`)
-    ])
-      .then(([usersResponse, rolesResponse, scopesResponse, clientsResponse]) => {
-        if (ignore) return
-        setRealmState({
-          loading: false,
-          error: null,
-          usersCount: usersResponse.items?.length ?? 0,
-          rolesCount: rolesResponse.items?.length ?? 0,
-          scopes: scopesResponse.items ?? [],
-          clients: clientsResponse.items ?? [],
-          compatibility:
-            usersResponse.compatibility ?? rolesResponse.compatibility ?? scopesResponse.compatibility ?? clientsResponse.compatibility ?? null
-        })
-      })
-      .catch((error: unknown) => {
-        if (ignore) return
-        setRealmState({
-          ...EMPTY_REALM_STATE,
-          loading: false,
-          error: describeConsoleError(error, 'No se pudo cargar el inventario Auth/IAM del realm.')
-        })
-      })
+    const requestVersion = realmRequestVersion.current + 1
+    realmRequestVersion.current = requestVersion
+    setRealmState(loadingRealmState())
+    ;(['users', 'roles', 'scopes', 'clients'] as const).forEach((section) => loadRealmSection(section, requestVersion, () => ignore))
 
     return () => {
       ignore = true
+      realmRequestVersion.current += 1
     }
-  }, [activeTenant, realmId, realmReloadToken])
+  }, [activeTenant, realmId])
 
   useEffect(() => {
     if (!workspaceId) {
@@ -355,8 +451,8 @@ export function ConsoleAuthPage() {
   }, [activeTenant?.tenantId, destructiveOp.handleCancel, workspaceId])
 
   const selectedClient = useMemo(
-    () => realmState.clients.find((client) => client.clientId === selectedClientId) ?? realmState.clients[0] ?? null,
-    [realmState.clients, selectedClientId]
+    () => realmState.clients.data.find((client) => client.clientId === selectedClientId) ?? realmState.clients.data[0] ?? null,
+    [realmState.clients.data, selectedClientId]
   )
 
   const iamSnippetContext = useMemo<SnippetContext | null>(() => {
@@ -667,40 +763,31 @@ export function ConsoleAuthPage() {
           {realmState.compatibility ? <Badge variant="outline">{realmState.compatibility.provider} · {realmState.compatibility.contractVersion}</Badge> : null}
         </div>
 
-        {realmState.loading ? <div className="rounded-2xl border border-dashed border-border/70 bg-card p-6 text-sm text-muted-foreground">Cargando inventario del realm…</div> : null}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard label="Usuarios" state={realmState.users} testId="auth-summary-users" onRetry={() => retryRealmSection('users')} />
+          <SummaryCard label="Roles" state={realmState.roles} testId="auth-summary-roles" onRetry={() => retryRealmSection('roles')} />
+          <SummaryCard label="Alcances" state={{ loading: realmState.scopes.loading, error: null, data: realmState.scopes.error ? null : realmState.scopes.data.length }} testId="auth-summary-scopes" />
+          <SummaryCard label="Clientes" state={{ loading: realmState.clients.loading, error: null, data: realmState.clients.error ? null : realmState.clients.data.length }} testId="auth-summary-clients" />
+        </div>
 
-        {realmState.error ? (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4" role="alert">
-            <div className="space-y-3">
-              <p className="text-sm text-foreground">{realmState.error}</p>
-              <Button type="button" variant="outline" onClick={() => setRealmReloadToken((value) => value + 1)}>Reintentar</Button>
+        <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+          <div className="min-w-0 rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
+            <div className="mb-4 space-y-1">
+              <h3 className="text-lg font-semibold text-foreground">Alcances de cliente</h3>
+              <p className="text-sm text-muted-foreground">Alcances gestionados del realm activo con sus opciones operativas.</p>
             </div>
-          </div>
-        ) : null}
-
-        {!realmState.loading && !realmState.error ? (
-          <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <SummaryCard label="Usuarios" value={realmState.usersCount} testId="auth-summary-users" />
-              <SummaryCard label="Roles" value={realmState.rolesCount} testId="auth-summary-roles" />
-              <SummaryCard label="Alcances" value={realmState.scopes.length} testId="auth-summary-scopes" />
-              <SummaryCard label="Clientes" value={realmState.clients.length} testId="auth-summary-clients" />
-            </div>
-
-            <div className="grid min-w-0 gap-6 xl:grid-cols-2">
-              <div className="min-w-0 rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
-                <div className="mb-4 space-y-1">
-                  <h3 className="text-lg font-semibold text-foreground">Alcances de cliente</h3>
-                  <p className="text-sm text-muted-foreground">Alcances gestionados del realm activo con sus opciones operativas.</p>
-                </div>
-                {realmState.scopes.length === 0 ? (
+            {realmState.scopes.loading ? (
+              <p className="text-sm text-muted-foreground">Cargando alcances del realm…</p>
+            ) : realmState.scopes.error ? (
+              <RealmSectionErrorMessage section="scopes" error={realmState.scopes.error} onRetry={() => retryRealmSection('scopes')} />
+            ) : realmState.scopes.data.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No hay alcances gestionados para este realm.</p>
-                ) : (
+            ) : (
                   <TableContainer>
                     <table className="min-w-full text-left text-sm">
                       <thead><tr className="border-b border-border/60 text-muted-foreground"><th scope="col" className="px-3 py-2 font-medium">Alcance</th><th scope="col" className="px-3 py-2 font-medium">Protocolo</th><th scope="col" className="px-3 py-2 font-medium">Opciones</th><th scope="col" className="px-3 py-2 font-medium">Clientes</th></tr></thead>
                       <tbody>
-                        {realmState.scopes.map((scope) => (
+                        {realmState.scopes.data.map((scope) => (
                           <tr key={scope.scopeName} className="border-b border-border/40 align-top last:border-b-0">
                             <td className="px-3 py-3"><div className="font-medium text-foreground">{scope.scopeName}</div></td>
                             <td className="px-3 py-3"><Badge variant="outline">{formatConsoleEnumLabel(scope.protocol)}</Badge></td>
@@ -711,22 +798,26 @@ export function ConsoleAuthPage() {
                       </tbody>
                     </table>
                   </TableContainer>
-                )}
-              </div>
+            )}
+          </div>
 
-              <div className="min-w-0 rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
-                <div className="mb-4 space-y-1">
-                  <h3 className="text-lg font-semibold text-foreground">Clientes IAM</h3>
-                  <p className="text-sm text-muted-foreground">Clientes gestionados del realm con tipo de acceso, estado y alcances asociados.</p>
-                </div>
-                {realmState.clients.length === 0 ? (
+          <div className="min-w-0 rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
+            <div className="mb-4 space-y-1">
+              <h3 className="text-lg font-semibold text-foreground">Clientes IAM</h3>
+              <p className="text-sm text-muted-foreground">Clientes gestionados del realm con tipo de acceso, estado y alcances asociados.</p>
+            </div>
+            {realmState.clients.loading ? (
+              <p className="text-sm text-muted-foreground">Cargando clientes IAM del realm…</p>
+            ) : realmState.clients.error ? (
+              <RealmSectionErrorMessage section="clients" error={realmState.clients.error} onRetry={() => retryRealmSection('clients')} />
+            ) : realmState.clients.data.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No hay clientes gestionados para este realm.</p>
-                ) : (
+            ) : (
                   <TableContainer>
                     <table className="min-w-full text-left text-sm">
                       <thead><tr className="border-b border-border/60 text-muted-foreground"><th scope="col" className="px-3 py-2 font-medium">Cliente</th><th scope="col" className="px-3 py-2 font-medium">Protocolo</th><th scope="col" className="px-3 py-2 font-medium">Acceso</th><th scope="col" className="px-3 py-2 font-medium">Estado</th><th scope="col" className="px-3 py-2 font-medium">Redirecciones</th><th scope="col" className="px-3 py-2 font-medium">Alcances</th></tr></thead>
                       <tbody>
-                        {realmState.clients.map((client) => (
+                        {realmState.clients.data.map((client) => (
                           <tr
                             key={client.clientId}
                             className={`border-b border-border/40 align-top last:border-b-0 ${selectedClient?.clientId === client.clientId ? 'bg-muted/40' : ''}`}
@@ -743,12 +834,10 @@ export function ConsoleAuthPage() {
                       </tbody>
                     </table>
                   </TableContainer>
-                )}
-                {iamSnippetContext ? <ConnectionSnippets resourceType="iam-client" context={iamSnippetContext} /> : null}
-              </div>
-            </div>
-          </>
-        ) : null}
+            )}
+            {!realmState.clients.error && iamSnippetContext ? <ConnectionSnippets resourceType="iam-client" context={iamSnippetContext} /> : null}
+          </div>
+        </div>
       </section>
 
       <section className="space-y-4" aria-labelledby="auth-applications-heading">
@@ -833,12 +922,33 @@ export function ConsoleAuthPage() {
   )
 }
 
-function SummaryCard({ label, value, testId }: { label: string; value: number; testId: string }) {
+function SummaryCard({
+  label,
+  state,
+  testId,
+  onRetry
+}: {
+  label: string
+  state: RealmSectionState<number | null>
+  testId: string
+  onRetry?: () => void
+}) {
   return (
     <article className="rounded-3xl border border-border/60 bg-card p-5 shadow-sm" data-testid={testId}>
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
+      {state.loading ? <p className="mt-2 text-sm text-muted-foreground">Cargando…</p> : null}
+      {!state.loading && state.error ? <RealmSectionErrorMessage section={label === 'Usuarios' ? 'users' : 'roles'} error={state.error} onRetry={onRetry} /> : null}
+      {!state.loading && !state.error ? <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{state.data ?? '—'}</p> : null}
     </article>
+  )
+}
+
+function RealmSectionErrorMessage({ section, error, onRetry }: { section: RealmSectionName; error: RealmSectionError; onRetry?: () => void }) {
+  return (
+    <div className="mt-3 space-y-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4" data-testid={`auth-section-${section}-error`} role="alert">
+      <p className="text-sm text-foreground">{error.message}</p>
+      {error.retryable && onRetry ? <Button type="button" variant="outline" onClick={onRetry}>Reintentar</Button> : <p className="text-sm text-muted-foreground">Recargar la página no resolverá este error.</p>}
+    </div>
   )
 }
 
