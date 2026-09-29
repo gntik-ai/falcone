@@ -25,6 +25,8 @@ import { readFileSync } from 'node:fs';
 
 const ENC = (s) => encodeURIComponent(String(s));
 const SECRET_ROOT = 'falcone/workspace-secrets';
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+const AUTH_REQUEST_TIMEOUT_MS = 10_000;
 
 /** The Vault KV path for one workspace secret (raw; segments are encoded by the client). */
 export function workspaceSecretPath(tenantId, workspaceId, name) {
@@ -84,8 +86,38 @@ export function createKubernetesAuthTokenProvider({
   }
   function schedule(delay, action) {
     clearTimer();
-    timer = setTimeoutImpl(() => { timer = null; void action().catch(() => {}); }, Math.max(0, delay));
-    timer?.unref?.();
+    const deadline = now() + Math.max(0, delay);
+    const arm = () => {
+      timer = setTimeoutImpl(() => {
+        timer = null;
+        if (now() < deadline) arm();
+        else void action().catch(() => {});
+      }, Math.min(MAX_TIMER_DELAY_MS, Math.max(0, deadline - now())));
+      timer?.unref?.();
+    };
+    arm();
+  }
+  async function authJson(url, options, op, path) {
+    const controller = new AbortController();
+    let timeout;
+    try {
+      return await Promise.race([
+        (async () => {
+          const res = await fetchImpl(url, { ...options, signal: controller.signal });
+          if (!res.ok) throw vaultError(op, path, res.status);
+          return res.json();
+        })(),
+        new Promise((_, reject) => {
+          timeout = setTimeoutImpl(() => {
+            controller.abort();
+            reject(vaultError('auth', 'request', 502));
+          }, AUTH_REQUEST_TIMEOUT_MS);
+          timeout?.unref?.();
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeoutImpl(timeout);
+    }
   }
   function failure(status) {
     const transition = health.state !== 'degraded';
@@ -126,11 +158,9 @@ export function createKubernetesAuthTokenProvider({
   async function performLogin() {
     try {
       const jwt = readFileSync(serviceAccountJwtPath, 'utf8').trim();
-      const res = await fetchImpl(`${base}/v1/auth/${mount}/login`, {
+      const auth = (await authJson(`${base}/v1/auth/${mount}/login`, {
         method: 'POST', headers, body: JSON.stringify({ role, jwt }),
-      });
-      if (!res.ok) throw vaultError('kubernetes-login', `auth/${authMount}/login`, res.status);
-      const auth = (await res.json())?.auth;
+      }, 'kubernetes-login', `auth/${authMount}/login`))?.auth;
       if (!auth?.client_token) throw vaultError('kubernetes-login', `auth/${authMount}/login`, 502);
       success(auth.client_token, auth.lease_duration, auth.renewable === true);
       return cachedToken;
@@ -148,25 +178,23 @@ export function createKubernetesAuthTokenProvider({
       if (!cachedToken || now() >= expiresAt) return performLogin();
       try {
         const previousExpiry = expiresAt;
-        const res = await fetchImpl(`${base}/v1/auth/token/renew-self`, {
+        const auth = (await authJson(`${base}/v1/auth/token/renew-self`, {
           method: 'POST', headers: { ...headers, 'x-vault-token': cachedToken }, body: '{}',
-        });
-        if (!res.ok) throw vaultError('renew-self', 'auth/token/renew-self', res.status);
-        const auth = (await res.json())?.auth;
+        }, 'renew-self', 'auth/token/renew-self'))?.auth;
         const leaseMs = Number(auth?.lease_duration) * 1000;
         if (!Number.isFinite(leaseMs) || leaseMs <= 0 || now() + leaseMs <= previousExpiry)
           throw vaultError('renew-self', 'auth/token/renew-self', 502);
         success(auth?.client_token || cachedToken, auth.lease_duration, auth.renewable === true);
         return cachedToken;
-      } catch (error) {
-        failure(Number(error?.vaultStatus) || 0);
+      } catch {
+        // A failed renewal is recovered by re-login; report degradation only if that fails too.
         return performLogin();
       }
     });
   }
   const provider = async () => {
-    if (inFlight) await inFlight;
     if (cachedToken && now() < expiresAt) return cachedToken;
+    if (inFlight) return inFlight;
     if (now() < nextRetryAt) throw vaultError('kubernetes-login', `auth/${authMount}/login`, health.lastFailureStatus || 502);
     return login();
   };
@@ -176,7 +204,8 @@ export function createKubernetesAuthTokenProvider({
       cachedToken = null;
       expiresAt = 0;
       health.tokenExpiresAt = null;
-      clearTimer();
+      // A failed login has already armed a backoff retry. Keep it alive after a KV 403.
+      if (now() >= nextRetryAt) clearTimer();
     }
     return provider();
   };
@@ -423,4 +452,12 @@ export function vaultStoreFromEnv(env = process.env, fetchImpl) {
     fetchImpl,
   });
   return createWorkspaceSecretStore(client);
+}
+
+/** Read-only process health for an optional workspace-secret store. */
+export function vaultStoreHealthSnapshot(store) {
+  return store?.getHealthSnapshot() ?? {
+    state: 'disabled', lastSuccessAt: null, lastFailureAt: null,
+    lastFailureStatus: null, consecutiveFailures: 0, tokenExpiresAt: null,
+  };
 }

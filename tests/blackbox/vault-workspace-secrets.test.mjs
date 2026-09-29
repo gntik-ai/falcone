@@ -22,16 +22,14 @@
  * NOTE: the backend is OpenBao (the Vault fork). The KV v2 REST surface, paths, and the X-Vault-Token
  * request header are byte-compatible, so the fake server below (and the asserted protocol) is
  * unchanged by the swap; the client just additionally accepts BAO_* env aliases.
+ * Kubernetes-auth lease tests live in vault-token-lifecycle.test.mjs so their fake clock can run
+ * without a local HTTP listener.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import {
-  createKubernetesAuthTokenProvider, createVaultKvClient, createWorkspaceSecretStore, vaultStoreFromEnv,
+  createVaultKvClient, createWorkspaceSecretStore, vaultStoreFromEnv,
   workspaceSecretPath, secretEnvVarName,
 } from '../../apps/control-plane/vault-secrets.mjs';
 
@@ -262,156 +260,4 @@ test('bbx-612-token-required: the client surfaces a Vault auth failure', async (
     return fetch(u, { ...init, headers: h });
   } });
   await assert.rejects(() => noTok.writeSecret('t/w/k', { value: 'x' }), /vault write .* -> HTTP 403/);
-});
-
-function authHarness(fetchImpl) {
-  let time = 0;
-  const timers = [];
-  const logs = [];
-  const dir = mkdtempSync(join(tmpdir(), 'falcone-bao-auth-'));
-  const jwtPath = join(dir, 'jwt');
-  writeFileSync(jwtPath, 'fake-jwt-sensitive');
-  const provider = createKubernetesAuthTokenProvider({ addr: 'http://bao', role: 'workspace-secrets-role',
-    namespace: 'team-1', serviceAccountJwtPath: jwtPath, fetchImpl,
-    now: () => time, setTimeoutImpl: (fn, delay) => {
-      const handle = { at: time + delay, fn, cleared: false, unref() {} };
-      timers.push(handle);
-      return handle;
-    }, clearTimeoutImpl: (handle) => { handle.cleared = true; },
-    random: () => 0, log: (line) => logs.push(line) });
-  return { provider, logs, timers, advance: async (ms) => {
-    time += ms;
-    for (const t of [...timers]) if (!t.cleared && t.at <= time) {
-      t.cleared = true;
-      t.fn();
-      await new Promise(setImmediate);
-    }
-  }, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
-}
-
-test('bbx-984-renew: eager login renews after half the lease without another login', async () => {
-  let logins = 0; let renewals = 0; let renewHeaders;
-  const h = authHarness(async (url, init) => {
-    if (url.endsWith('/renew-self')) {
-      renewals++; renewHeaders = init.headers;
-      return { ok: true, json: async () => ({ auth: { lease_duration: 100, renewable: true } }) };
-    }
-    logins++;
-    return { ok: true, json: async () => ({ auth: { client_token: 'fake-token-sensitive', lease_duration: 100, renewable: true } }) };
-  });
-  try {
-    assert.equal(await h.provider(), 'fake-token-sensitive');
-    await h.advance(55_100);
-    assert.equal(await h.provider(), 'fake-token-sensitive');
-    assert.equal(logins, 1);
-    assert.equal(renewals, 1);
-    assert.equal(renewHeaders['x-vault-token'], 'fake-token-sensitive');
-    assert.equal(renewHeaders['x-vault-namespace'], 'team-1');
-    assert.equal(h.provider.getHealthSnapshot().state, 'ok');
-  } finally { h.cleanup(); }
-});
-
-test('bbx-984-fallback: failed renewal re-logs in once; concurrent callers share it', async () => {
-  let logins = 0; let release;
-  const h = authHarness(async (url) => {
-    if (url.endsWith('/renew-self')) return { ok: false, status: 403 };
-    logins++;
-    if (logins === 2) await new Promise((resolve) => { release = resolve; });
-    return { ok: true, json: async () => ({ auth: { client_token: `token-${logins}`, lease_duration: 100, renewable: true } }) };
-  });
-  try {
-    await h.provider();
-    const advancing = h.advance(55_100);
-    await new Promise(setImmediate);
-    const callers = [h.provider(), h.provider()];
-    release();
-    await advancing;
-    assert.deepEqual(await Promise.all(callers), ['token-2', 'token-2']);
-    assert.equal(logins, 2);
-    assert.equal(h.provider.getHealthSnapshot().consecutiveFailures, 0);
-  } finally { h.cleanup(); }
-});
-
-test('bbx-984-failure: startup denial degrades, bounded backoff recovers and redacts credentials', async () => {
-  let attempts = 0;
-  const h = authHarness(async () => {
-    attempts++;
-    if (attempts === 1) return { ok: false, status: 403 };
-    return { ok: true, json: async () => ({ auth: { client_token: 'fake-token-sensitive', lease_duration: 100, renewable: true } }) };
-  });
-  try {
-    await assert.rejects(h.provider(), /HTTP 403/);
-    assert.equal(h.provider.getHealthSnapshot().state, 'degraded');
-    assert.equal(h.provider.getHealthSnapshot().lastFailureStatus, 403);
-    assert.equal(h.logs.length, 1);
-    assert.match(h.logs[0], /workspace-secrets-role/);
-    assert.ok(h.timers[0].at >= 500 && h.timers[0].at <= 1000);
-    await Promise.all(Array.from({ length: 5 }, () => assert.rejects(h.provider(), /HTTP 403/)));
-    assert.equal(attempts, 1, 'requests cannot bypass the retry deadline');
-    await h.advance(1000);
-    assert.equal(await h.provider(), 'fake-token-sensitive');
-    assert.equal(h.provider.getHealthSnapshot().state, 'ok');
-    assert.equal(h.provider.getHealthSnapshot().consecutiveFailures, 0);
-    assert.doesNotMatch(JSON.stringify({ logs: h.logs, health: h.provider.getHealthSnapshot() }), /fake-jwt-sensitive|fake-token-sensitive/);
-  } finally { h.cleanup(); }
-});
-
-test('bbx-984-kv-403: provider token is replaced and the KV request retries exactly once', async () => {
-  let logins = 0; let kv = 0;
-  const fakeFetch = async (url, init) => {
-    if (url.endsWith('/login')) return { ok: true, json: async () => ({ auth: {
-      client_token: `token-${++logins}`, lease_duration: 100, renewable: true,
-    } }) };
-    kv++;
-    if (init.headers['x-vault-token'] === 'token-1') return { status: 403, ok: false };
-    return { status: 200, ok: true, json: async () => ({ data: { data: { value: 'secret-value' }, metadata: { version: 1 } } }) };
-  };
-  const h = authHarness(fakeFetch);
-  try {
-    const client = createVaultKvClient({ addr: 'http://bao', tokenProvider: h.provider,
-      fetchImpl: fakeFetch });
-    assert.equal((await client.readSecret('t/w/k')).data.value, 'secret-value');
-    assert.equal(logins, 2);
-    assert.equal(kv, 2);
-  } finally { h.cleanup(); }
-});
-
-test('bbx-984-renew-and-login-fail: degraded state persists and retry is bounded', async () => {
-  let logins = 0;
-  const h = authHarness(async (url) => {
-    if (url.endsWith('/renew-self')) return { ok: false, status: 403 };
-    if (++logins > 1) return { ok: false, status: 503 };
-    return { ok: true, json: async () => ({ auth: {
-      client_token: 'fake-token-sensitive', lease_duration: 100, renewable: true,
-    } }) };
-  });
-  try {
-    await h.provider();
-    await h.advance(55_100);
-    const health = h.provider.getHealthSnapshot();
-    assert.equal(health.state, 'degraded');
-    assert.equal(health.lastFailureStatus, 503);
-    assert.equal(health.consecutiveFailures, 2);
-    assert.equal(h.logs.length, 1, 'only the transition to degraded is logged');
-    assert.ok(h.timers.some((t) => !t.cleared && t.at >= 55_100 + 1000 && t.at <= 55_100 + 2000));
-    assert.doesNotMatch(JSON.stringify({ health, logs: h.logs }), /fake-token-sensitive|fake-jwt-sensitive/);
-  } finally { h.cleanup(); }
-});
-
-test('bbx-984-second-kv-403: one retry still surfaces the original KV error', async () => {
-  let logins = 0; let kv = 0;
-  const fetchImpl = async (url) => {
-    if (url.endsWith('/login')) return { ok: true, json: async () => ({ auth: {
-      client_token: `token-${++logins}`, lease_duration: 100, renewable: true,
-    } }) };
-    kv++;
-    return { status: 403, ok: false };
-  };
-  const h = authHarness(fetchImpl);
-  try {
-    const client = createVaultKvClient({ addr: 'http://bao', tokenProvider: h.provider, fetchImpl });
-    await assert.rejects(client.readSecret('t/w/k'), /vault read t\/w\/k -> HTTP 403/);
-    assert.equal(logins, 2);
-    assert.equal(kv, 2);
-  } finally { h.cleanup(); }
 });

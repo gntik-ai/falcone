@@ -45,6 +45,7 @@ import {
 import { createRuntimeCleanupRepository, recoverFunctionCleanupObligations } from './runtime-cleanup-repository.mjs';
 import { deleteKnativeService } from './function-executor.mjs';
 import { secretBackendHealth } from './fn-handlers.mjs';
+import { respondHealth } from './health-response.mjs';
 
 const { Pool } = pg;
 
@@ -357,9 +358,7 @@ const server = http.createServer(async (req, res) => {
 
     if (method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
     if (path === '/healthz' || path === '/readyz') {
-      const secretBackend = secretBackendHealth();
-      try { await pool.query('SELECT 1'); return sendJson(res, 200, { status: 'ok', secretBackend }); }
-      catch (e) { console.error('[control-plane] healthz db check failed:', e); return sendJson(res, 503, { status: 'db_unavailable', secretBackend }); }
+      return respondHealth(res, { pool, secretBackendHealth, sendJson });
     }
     if (path === '/') return sendJson(res, 200, { service: 'in-falcone-control-plane', routes: ROUTES.length });
 

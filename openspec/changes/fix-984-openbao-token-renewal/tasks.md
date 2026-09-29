@@ -13,4 +13,5 @@
 ## 3. Verification
 
 - [x] 3.1 Add fake-fetch and fake-clock lifecycle coverage.
-- [ ] 3.2 Run the local HTTP blackbox tests and runtime staging check in CI/release environment (sandbox disallows local sockets).
+- [x] 3.2 Cover the server health response, disabled state, and metrics without a socket.
+- [ ] 3.3 Run the socket-based HTTP blackbox tests and staging runtime check in CI/release (sandbox disallows local sockets).

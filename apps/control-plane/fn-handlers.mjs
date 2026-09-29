@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
 import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost } from './function-executor.mjs';
-import { vaultStoreFromEnv } from './vault-secrets.mjs';
+import { vaultStoreFromEnv, vaultStoreHealthSnapshot } from './vault-secrets.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { functionsDisabledResponse, knativeUnavailableResponse } from './knative-runtime.mjs';
 import { createRuntimeCleanupRepository } from './runtime-cleanup-repository.mjs';
@@ -59,10 +59,7 @@ const vaultStore = vaultStoreFromEnv();
 
 // Read-only process health for the same store used by secret routes.
 export function secretBackendHealth() {
-  return vaultStore?.getHealthSnapshot() ?? {
-    state: 'disabled', lastSuccessAt: null, lastFailureAt: null,
-    lastFailureStatus: null, consecutiveFailures: 0, tokenExpiresAt: null,
-  };
+  return vaultStoreHealthSnapshot(vaultStore);
 }
 
 // Resolve the caller's workspace, returning null on cross-tenant access (no existence leak) so a
