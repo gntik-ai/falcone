@@ -22,3 +22,10 @@
   10 pass, 2 explicit skips).
 - [ ] 3.2 Run workflow YAML validation and trigger the scheduled workflow in
   GitHub to confirm provision, execution, artifact upload, and teardown.
+
+## 4. Action supply-chain pins
+
+- [x] 4.1 Pin every `uses:` reference in `ci.yml` and `integration.yml` to a
+  reviewed action commit SHA and retain its release version as a comment.
+- [x] 4.2 Add a static regression test that rejects mutable, abbreviated, or
+  uncommented action references.

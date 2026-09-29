@@ -17,6 +17,8 @@ configuration and report a successful job after skipping every scenario.
   a disposable kind/Helm stack from the pinned charts revision, runs the
   plan-enforcement suite in strict mode, verifies a non-skipped test executed,
   uploads TAP/JSON evidence, and always tears down the stack.
+- Pin every GitHub Action used by `ci.yml` and `integration.yml` to a full
+  commit SHA with its reviewed release version in a trailing comment.
 
 ## Non-Goals
 

@@ -2,6 +2,18 @@
 
 ## ADDED Requirements
 
+### Requirement: CI actions are immutable and reviewable
+
+Every `uses:` reference in `ci.yml` and `integration.yml` SHALL name one of
+the approved actions and pin it to a full lowercase 40-character commit SHA.
+Each pin SHALL retain the corresponding release version in a trailing comment.
+
+#### Scenario: Mutable or incomplete action pin is rejected
+
+- **WHEN** a workflow contains a tag reference, abbreviated SHA, SHA without a
+  release-version comment, or an unapproved action
+- **THEN** the static workflow action-pin test fails.
+
 ### Requirement: CI executes the headless workflow and restore E2E suites
 
 The pull-request and main-push CI workflow SHALL execute the workflow and
