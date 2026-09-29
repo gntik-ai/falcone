@@ -241,8 +241,9 @@ const flowQuotaGate = process.env.FLOW_QUOTA_ENFORCE_URL
 const flowAuditProducer = process.env.TEMPORAL_ADDRESS && process.env.KAFKA_BROKERS
   ? createPlatformFlowAuditProducer({ brokers: process.env.KAFKA_BROKERS,
       topic: process.env.FLOW_AUDIT_TOPIC ?? 'falcone.audit.flow-lifecycle' }) : undefined;
-const flowAuditRelay = process.env.TEMPORAL_ADDRESS && flowAuditProducer
-  ? createFlowAuditRelay({ pool: keyPool, publish: (event) => flowAuditProducer.publish(event) }) : undefined;
+const flowAuditRelay = process.env.TEMPORAL_ADDRESS
+  ? createFlowAuditRelay({ pool: keyPool, publish: flowAuditProducer
+    ? (event) => flowAuditProducer.publish(event) : undefined }) : undefined;
 
 const flowExecutor = process.env.TEMPORAL_ADDRESS
   ? createFlowExecutor({
@@ -408,11 +409,23 @@ async function recoverHostedMcpCleanup() {
 }
 
 // Flow audit persistence is a boot gate: a broken outbox schema must prevent successful
-// authoring responses. Kafka can be unavailable; the relay will retry persisted rows.
-Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(),
+// authoring responses. Other metadata initializers retain their prior best-effort boot behavior.
+// Kafka can be unavailable; the relay will retry persisted rows.
+Promise.allSettled([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(),
   llmExecutor.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve(),
   flowExecutor ? triggerStore.ensureSchema() : Promise.resolve(), mcpEngine?.ensureSchema() ?? Promise.resolve()])
-  .then(async () => {
+  .then(async (results) => {
+    if (results[4].status === 'rejected') {
+      const error = results[4].reason;
+      console.error('[control-plane] flow metadata initialization failed', { errorClass: String(error?.code ?? error?.name ?? 'UNKNOWN') });
+      process.exit(1);
+    }
+    for (const [index, result] of results.entries()) {
+      if (index !== 4 && result.status === 'rejected') {
+        const error = result.reason;
+        console.error('[control-plane] metadata initialization failed', { errorClass: String(error?.code ?? error?.name ?? 'UNKNOWN') });
+      }
+    }
     await bootFlowTriggers().catch((error) => console.error('[control-plane] flow-trigger boot wiring failed:', { errorClass: String(error?.code ?? error?.name ?? 'UNKNOWN') }));
     flowAuditRelay?.start();
     server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
@@ -422,10 +435,7 @@ Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingS
     }, mcpCleanupIntervalMs);
     mcpCleanupTimer.unref?.();
   })
-  .catch((error) => {
-    console.error('[control-plane] metadata initialization failed', { errorClass: String(error?.code ?? error?.name ?? 'UNKNOWN') });
-    process.exit(1);
-  });
+  .catch((error) => console.error('[control-plane] metadata boot failed', { errorClass: String(error?.code ?? error?.name ?? 'UNKNOWN') }));
 
 async function shutdown(signal) {
   console.log(`[control-plane] ${signal} received, shutting down`);

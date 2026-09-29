@@ -11,3 +11,7 @@ Every event MUST include a stable event ID, event type, tenant ID, workspace ID,
 The relay MUST publish through a platform Kafka producer to `falcone.audit.flow-lifecycle`, outside the `evt.<workspaceId>.` namespace. It MUST claim rows safely across replicas, use the event ID as the Kafka key, retry with bounded exponential backoff, and retain rows that exhaust retries as dead letters. Metrics MUST report pending depth and age, dead letters, and relay failures.
 
 Audit payloads and logs MUST exclude credentials, tokens, Flow definitions, and Flow input/output. Delivery failures MUST log only event ID, attempt count, and a redacted error class.
+
+Execution start, cancel, retry and signal audit rows are recorded after Temporal acknowledges the
+operation. If the outbox write then fails, the API returns `AUDIT_UNAVAILABLE`; callers MUST
+inspect execution state before retrying an operation that could be repeated.

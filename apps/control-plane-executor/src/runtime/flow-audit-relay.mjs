@@ -1,19 +1,21 @@
 // Platform flow audit outbox relay. A row lock spans publish and acknowledgement so replicas
 // never claim the same pending event concurrently. A crash after publish can replay eventId.
-import { Kafka, logLevel } from 'kafkajs';
 import { resolveKafkaSecurity } from '../../../../packages/internal-contracts/src/transport-security.mjs';
 import { recordFlowAuditOutbox } from './metrics-registry.mjs';
 
 const MAX_ATTEMPTS = 12;
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 30 * 60 * 1000;
+const MAX_BATCH = 100;
 
 export function createPlatformFlowAuditProducer({ brokers, topic = 'falcone.audit.flow-lifecycle' }) {
-  const kafka = new Kafka({ clientId: 'falcone-flow-audit', brokers: brokers.split(',').map((b) => b.trim()).filter(Boolean),
-    logLevel: logLevel.NOTHING, ...resolveKafkaSecurity() });
+  if (!topic || topic.startsWith('evt.')) throw new TypeError('Flow audit topic must be platform-owned');
   let connected;
   async function producer() {
     if (!connected) {
+      const { Kafka, logLevel } = await import('kafkajs');
+      const kafka = new Kafka({ clientId: 'falcone-flow-audit', brokers: brokers.split(',').map((b) => b.trim()).filter(Boolean),
+        logLevel: logLevel.NOTHING, ...resolveKafkaSecurity() });
       const instance = kafka.producer();
       connected = instance.connect().then(() => instance).catch((err) => { connected = null; throw err; });
     }
@@ -33,15 +35,13 @@ export function createFlowAuditRelay({ pool, publish, logger = console, interval
   let failures = 0;
   async function refreshMetrics() {
     const { rows } = await pool.query(`SELECT
-      count(*) FILTER (WHERE state = 'pending')::integer AS pending,
-      count(*) FILTER (WHERE state = 'dead_letter')::integer AS dead_letter,
-      COALESCE(EXTRACT(EPOCH FROM now() - min(created_at) FILTER (WHERE state = 'pending')), 0)::float AS oldest_seconds
-      FROM flow_audit_outbox`);
+      (SELECT count(*)::integer FROM flow_audit_outbox WHERE state = 'pending') AS pending,
+      (SELECT count(*)::integer FROM flow_audit_outbox WHERE state = 'dead_letter') AS dead_letter,
+      COALESCE((SELECT EXTRACT(EPOCH FROM now() - created_at)::float FROM flow_audit_outbox
+        WHERE state = 'pending' ORDER BY created_at LIMIT 1), 0) AS oldest_seconds`);
     recordFlowAuditOutbox({ ...rows[0], failures });
   }
-  async function runOnce() {
-    if (running) return false;
-    running = true;
+  async function processOne() {
     let client;
     try {
       client = await pool.connect();
@@ -52,7 +52,6 @@ export function createFlowAuditRelay({ pool, publish, logger = console, interval
       const row = rows[0];
       if (!row) {
         await client.query('COMMIT');
-        await refreshMetrics();
         return false;
       }
       try {
@@ -74,14 +73,36 @@ export function createFlowAuditRelay({ pool, publish, logger = console, interval
         [row.event_id, attempts >= MAX_ATTEMPTS ? 'dead_letter' : 'pending', attempts, delayMs]);
       }
       await client.query('COMMIT');
-      await refreshMetrics();
       return true;
     } catch (err) {
       if (client) await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client?.release();
+    }
+  }
+  async function runOnce() {
+    if (running) return false;
+    running = true;
+    try {
+      let processed = false;
+      if (publish) {
+        for (let i = 0; i < MAX_BATCH; i += 1) {
+          if (!await processOne()) break;
+          processed = true;
+        }
+      }
+      // Delivered rows are operational history, not dead letters. Retain them for seven days,
+      // then delete in bounded chunks so healthy relays do not grow the table indefinitely.
+      await pool.query(`DELETE FROM flow_audit_outbox WHERE event_id IN (
+        SELECT event_id FROM flow_audit_outbox WHERE state = 'delivered'
+          AND delivered_at < now() - interval '7 days' ORDER BY delivered_at LIMIT 1000)`);
+      await refreshMetrics();
+      return processed;
+    } catch (err) {
       logger.error?.('[flow-audit-relay] database failure', { errorClass: String(err?.code ?? err?.name ?? 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0, 64) });
       return false;
     } finally {
-      client?.release();
       running = false;
     }
   }

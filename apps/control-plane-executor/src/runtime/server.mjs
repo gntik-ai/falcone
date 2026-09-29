@@ -911,7 +911,10 @@ async function runFlowMonitoringSse(flowMonitoringExecutor, target, c) {
 // a node-scoped `errors` array which is surfaced on the 422 envelope (see the error handler).
 async function runFlows(flowExecutor, params, successStatus) {
   if (!flowExecutor) throw Object.assign(new Error('Flows are not enabled'), { statusCode: 501, code: 'FLOWS_DISABLED' });
-  const result = await flowExecutor.executeFlows(params);
+  const suppliedId = params.correlationId;
+  const correlationId = typeof suppliedId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(suppliedId)
+    ? suppliedId : randomUUID();
+  const result = await flowExecutor.executeFlows({ ...params, correlationId });
   return { status: successStatus, body: result };
 }
 

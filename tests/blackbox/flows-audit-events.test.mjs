@@ -132,9 +132,29 @@ test('bbx-flows-ten-audit-05: a B-emitted event never carries tenant A identifie
 test('bbx-flows-ten-audit-06: the contract entry registers exactly the eight event types', () => {
   const enumTypes = flowLifecycleEvent.fields.eventType.enum;
   assert.deepEqual([...enumTypes].sort(), Object.values(FLOW_AUDIT_EVENT_TYPES).sort());
+  assert.equal(flowLifecycleEvent.fields.eventId.type, 'string');
+  assert.equal(flowLifecycleEvent.fields.outcome.type, 'string');
+  assert.equal(flowLifecycleEvent.fields.correlationId.nullable, undefined);
   // The builder rejects an unknown event type and a missing required field (fail-closed).
   assert.throws(() => buildFlowAuditEvent({ eventType: 'flow.bogus', tenantId: 't', workspaceId: 'w', actorId: 'u', flowId: 'f' }));
   assert.throws(() => buildFlowAuditEvent({ eventType: FLOW_AUDIT_EVENT_TYPES.DEFINITION_CREATED, tenantId: 't', actorId: 'u', flowId: 'f' }));
+});
+
+test('invalid or oversized request correlation IDs are replaced before audit persistence', async () => {
+  await withServer(async (baseUrl, events) => {
+    const response = await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows`, {
+      method: 'POST', headers: { ...A, 'x-correlation-id': 'bad id with spaces' },
+      body: JSON.stringify({ name: 'f', definition: DEF }),
+    });
+    assert.equal(response.status, 201);
+    assert.match(events[0].correlationId, /^[0-9a-f-]{36}$/);
+    const response2 = await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows`, {
+      method: 'POST', headers: { ...A, 'x-correlation-id': 'a'.repeat(129) },
+      body: JSON.stringify({ name: 'f2', definition: DEF }),
+    });
+    assert.equal(response2.status, 201);
+    assert.match(events[1].correlationId, /^[0-9a-f-]{36}$/);
+  });
 });
 
 

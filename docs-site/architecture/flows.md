@@ -225,6 +225,13 @@ anon key is passed as `?apikey=`; the gateway verifies it and enforces tenant sc
   commit together; an outbox failure returns `AUDIT_UNAVAILABLE` with no definition change.
   The relay retries transient Kafka failures and keeps exhausted rows as dead letters.
   `/metrics` exposes pending depth, oldest pending age, dead-letter count, and relay failures.
+  The relay drains pending rows in batches and removes delivered rows after seven days; dead
+  letters remain for operator review. If Kafka is not configured, pending rows remain visible in
+  metrics and delivery resumes when a producer is configured. Execution start, cancel, retry, and
+  signal events are enqueued after Temporal acknowledges the operation. An outbox failure at that
+  point returns `AUDIT_UNAVAILABLE` even though the execution action may already have occurred;
+  callers should check execution state before retrying. Events lost before this change cannot be
+  reconstructed from the outbox, so audit consumers must account for the pre-upgrade gap.
 - **Teardown** (`packages/provisioning-orchestrator/src/appliers/workflows-applier.mjs`): a tenant
   purge cascades to the `workflows` domain with the same partial-failure semantics as the other
   domains — it terminates every running execution whose `tenantId` matches (paginated

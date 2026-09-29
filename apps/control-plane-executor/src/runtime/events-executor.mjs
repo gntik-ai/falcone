@@ -8,8 +8,6 @@
 // API exposes; the physical prefix is never crossable.
 import { randomUUID } from 'node:crypto'
 
-import { Kafka, logLevel } from 'kafkajs'
-
 import { clientError } from './errors.mjs'
 import { resolveKafkaSecurity } from '../../../../packages/internal-contracts/src/transport-security.mjs'
 
@@ -26,27 +24,32 @@ const toLogical = (physical, workspaceId) => physical.slice(workspacePrefix(work
 export function createEventsExecutor(options = {}) {
   const brokers = (options.brokers ?? '').split(',').map((b) => b.trim()).filter(Boolean)
   if (brokers.length === 0) throw new TypeError('createEventsExecutor requires brokers')
-  const kafka = new Kafka({ clientId: 'in-falcone-control-plane', brokers, logLevel: logLevel.NOTHING, ...resolveKafkaSecurity() })
+  let kafkaP
+  async function kafka() {
+    if (!kafkaP) kafkaP = options.kafka ? Promise.resolve(options.kafka) : import('kafkajs').then(({ Kafka, logLevel }) =>
+      new Kafka({ clientId: 'in-falcone-control-plane', brokers, logLevel: logLevel.NOTHING, ...resolveKafkaSecurity() }))
+    return kafkaP
+  }
   let producerP = null
   let adminP = null
 
   async function producer() {
     if (!producerP) {
-      const p = kafka.producer()
+      const p = (await kafka()).producer()
       producerP = p.connect().then(() => p).catch((e) => { producerP = null; throw e })
     }
     return producerP
   }
   async function admin() {
     if (!adminP) {
-      const a = kafka.admin()
+      const a = (await kafka()).admin()
       adminP = a.connect().then(() => a).catch((e) => { adminP = null; throw e })
     }
     return adminP
   }
 
   async function consumeOnce(physical, { maxMessages = 10, timeoutMs = 3000 } = {}) {
-    const consumer = kafka.consumer({ groupId: `cp-exec-${randomUUID()}` })
+    const consumer = (await kafka()).consumer({ groupId: `cp-exec-${randomUUID()}` })
     await consumer.connect()
     await consumer.subscribe({ topic: physical, fromBeginning: true })
     const messages = []

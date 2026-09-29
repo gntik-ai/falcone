@@ -26,9 +26,6 @@ export const capabilityEnforcementDeniedEvent = {
   category: 'security',
   fields: {
     eventType: { type: 'string', enum: ['capability_enforcement_denied'] },
-    eventId: { type: 'string', description: 'Stable idempotency key for publication' },
-    outcome: { type: 'string', description: 'Outcome of the action' },
-    correlationId: { type: 'string', description: 'Request correlation id' },
     tenantId: { type: 'string', description: 'UUID of the tenant' },
     workspaceId: { type: 'string', nullable: true, description: 'UUID of the workspace if applicable' },
     actorId: { type: 'string', description: 'sub from JWT or client_id' },
@@ -58,6 +55,8 @@ export const flowLifecycleEvent = {
   eventType: 'flow_lifecycle_event',
   category: 'flows',
   fields: {
+    eventId: { type: 'string', description: 'Stable idempotency key for publication' },
+    outcome: { type: 'string', description: 'Outcome of the action' },
     eventType: {
       type: 'string',
       enum: [
@@ -77,7 +76,7 @@ export const flowLifecycleEvent = {
     flowId: { type: 'string', description: 'The flow definition id' },
     flowVersion: { type: 'string', nullable: true, description: 'Pinned/published version where applicable' },
     executionId: { type: 'string', nullable: true, description: 'Workflow execution id for execution/signal events' },
-    correlationId: { type: 'string', nullable: true, description: 'End-to-end correlation ID' },
+    correlationId: { type: 'string', description: 'End-to-end correlation ID' },
     occurredAt: { type: 'string', description: 'ISO 8601 UTC timestamp' }
   }
 };

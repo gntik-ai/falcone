@@ -16,6 +16,45 @@ env:
   FALCONE_CHARTS_REF: '62c3975b4964fedfc821db5d8787e697e2f7af94'
 
 jobs:
+  flow-audit-postgres:
+    name: Flow audit PostgreSQL relay
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: docker.io/library/postgres:17.2-alpine@sha256:7e5df973a74872482e320dcbdeb055e178d6f42de0558b083892c50cda833c96
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify concurrent relay claims against PostgreSQL
+        env:
+          TEST_DATABASE_URL: postgres://postgres@localhost:5432/postgres
+          FLOW_AUDIT_PG_REQUIRED: '1'
+        run: node tests/integration/flow-audit-relay-postgres.test.mjs
+
   quality:
     runs-on: ubuntu-latest
     steps:

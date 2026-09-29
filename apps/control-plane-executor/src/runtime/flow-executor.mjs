@@ -451,6 +451,12 @@ function createPostgresFlowStore(pool) {
       )`);
       await pool.query(`CREATE INDEX IF NOT EXISTS flow_audit_outbox_pending_idx
         ON flow_audit_outbox (next_attempt_at, created_at) WHERE state = 'pending'`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS flow_audit_outbox_pending_age_idx
+        ON flow_audit_outbox (created_at) WHERE state = 'pending'`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS flow_audit_outbox_dead_letter_idx
+        ON flow_audit_outbox (event_id) WHERE state = 'dead_letter'`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS flow_audit_outbox_delivered_idx
+        ON flow_audit_outbox (delivered_at) WHERE state = 'delivered'`);
     },
 
     async enqueueAudit(event) { await insertAudit(pool, event); },
