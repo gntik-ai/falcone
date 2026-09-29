@@ -81,6 +81,7 @@ export function SignupPage() {
   const [policyLoading, setPolicyLoading] = useState(true)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [registration, setRegistration] = useState<ConsoleSignupRegistration | null>(null)
+  const [registrationTenantId, setRegistrationTenantId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({})
   const usernameInputRef = useRef<HTMLInputElement>(null)
@@ -236,6 +237,7 @@ export function SignupPage() {
       // Single success surface: the confirmation alert below leads with the service's plain-language
       // guidance, keeps the registration reference, and carries the primary next action. Avoid a
       // second, redundant success banner via `feedback` (which stays reserved for error states).
+      setRegistrationTenantId(tenantId)
       setRegistration(createdRegistration)
     } catch (rawError) {
       const error = rawError as ApiError
@@ -520,7 +522,7 @@ export function SignupPage() {
                   </span>
                   <Link
                     className="mt-3 inline-flex font-medium text-primary underline underline-offset-4"
-                    to={consoleAuthConfig.loginPath}
+                    to={`${consoleAuthConfig.loginPath}?${new URLSearchParams({ tenantId: registrationTenantId ?? '' })}`}
                   >
                     Continuar hacia login
                   </Link>

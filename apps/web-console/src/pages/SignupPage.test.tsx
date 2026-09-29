@@ -121,7 +121,7 @@ describe('SignupPage', () => {
     expect(screen.queryByText(/^Estado:/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Modo de activación:/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Vista de estado:/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /continuar hacia login/i })).toHaveAttribute('href', '/login')
+    expect(screen.getByRole('link', { name: /continuar hacia login/i })).toHaveAttribute('href', '/login?tenantId=ten_acme')
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(

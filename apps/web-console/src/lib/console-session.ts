@@ -15,6 +15,7 @@ let inFlightSessionRefresh: Promise<ConsoleShellSession | null> | null = null
 
 export interface ConsoleShellSession {
   sessionId: string
+  tenantId?: string
   authenticationState: ConsoleLoginSession['authenticationState']
   statusView: ConsoleLoginSession['statusView']
   issuedAt: string
@@ -32,9 +33,10 @@ export interface ConsoleSessionRequestOptions {
   signal?: AbortSignal
 }
 
-export function persistConsoleShellSession(session: ConsoleLoginSession): void {
+export function persistConsoleShellSession(session: ConsoleLoginSession, tenantId?: string): void {
   const snapshot: ConsoleShellSession = {
     sessionId: session.sessionId,
+    ...(tenantId ? { tenantId } : {}),
     authenticationState: session.authenticationState,
     statusView: session.statusView,
     issuedAt: session.issuedAt,
@@ -70,6 +72,7 @@ export function readConsoleShellSession(): ConsoleShellSession | null {
 
   return {
     sessionId: parsed.sessionId,
+    ...(typeof parsed.tenantId === 'string' && parsed.tenantId ? { tenantId: parsed.tenantId } : {}),
     authenticationState: parsed.authenticationState,
     statusView: parsed.statusView,
     issuedAt: parsed.issuedAt,
@@ -204,7 +207,7 @@ export async function refreshConsoleShellSession(session = readConsoleShellSessi
   inFlightSessionRefresh = (async () => {
     try {
       const refreshedSession = await runRefreshWithSingleRetry(session)
-      persistConsoleShellSession(refreshedSession)
+      persistConsoleShellSession(refreshedSession, session.tenantId)
       return readConsoleShellSession()
     } catch {
       clearConsoleShellSession()
@@ -286,14 +289,14 @@ export function getConsolePrincipalInitials(session: ConsoleShellSession | null)
 
 async function runRefreshWithSingleRetry(session: ConsoleShellSession): Promise<ConsoleLoginSession> {
   try {
-    return await refreshConsoleLoginSession(session.sessionId, session.tokenSet!.refreshToken)
+    return await refreshConsoleLoginSession(session.sessionId, session.tokenSet!.refreshToken, session.tenantId)
   } catch (rawError) {
     const error = rawError as ApiError
     if (!isRetryableRefreshError(error)) {
       throw error
     }
 
-    return refreshConsoleLoginSession(session.sessionId, session.tokenSet!.refreshToken)
+    return refreshConsoleLoginSession(session.sessionId, session.tokenSet!.refreshToken, session.tenantId)
   }
 }
 

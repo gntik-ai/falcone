@@ -148,6 +148,25 @@ describe('LoginPage', () => {
     })
   })
 
+  it('envía tenantId del enlace y lo conserva en la sesión', async () => {
+    fetchMock
+      .mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
+      .mockResolvedValueOnce(createJsonResponse(200, activeConsoleSession()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLoginPage('/login?tenantId=ten_acme')
+    await screen.findByRole('link', { name: /solicita acceso o crea tu cuenta/i })
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: 'operaciones' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'example-password' } })
+    fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
+
+    expect(await screen.findByText('Overview target')).toBeInTheDocument()
+    expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string)).toMatchObject({ tenantId: 'ten_acme' })
+    expect(JSON.parse(window.sessionStorage.getItem('in-falcone.console-shell-session') ?? '{}')).toMatchObject({
+      tenantId: 'ten_acme'
+    })
+  })
+
   it('[#761] envía el login y redirige a un destino de solo lectura (Observabilidad) para tenant_viewer, sin intent protegido', async () => {
     fetchMock
       .mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
