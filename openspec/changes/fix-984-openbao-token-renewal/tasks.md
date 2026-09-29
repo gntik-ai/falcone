@@ -2,7 +2,7 @@
 
 - [x] 1.1 Start Kubernetes auth eagerly, track lease expiry and health, and renew after half the lease.
 - [x] 1.2 Fall back to re-login, serialize auth requests, and bound retry backoff with jitter.
-- [x] 1.3 Invalidate a provider token on KV 403 and retry the request once.
+- [x] 1.3 Invalidate a provider token on KV 403, retry once, and rate-limit repeated denials.
 
 ## 2. Observability
 
@@ -13,5 +13,5 @@
 ## 3. Verification
 
 - [x] 3.1 Add fake-fetch and fake-clock lifecycle coverage.
-- [x] 3.2 Cover the server health response, disabled state, and metrics without a socket.
-- [ ] 3.3 Run the socket-based HTTP blackbox tests and staging runtime check in CI/release (sandbox disallows local sockets).
+- [x] 3.2 Cover the health response, disabled state, and metrics over local HTTP where permitted, with a direct fallback.
+- [ ] 3.3 Run the staging runtime check in the release gate.

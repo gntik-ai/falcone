@@ -27,6 +27,7 @@ const ENC = (s) => encodeURIComponent(String(s));
 const SECRET_ROOT = 'falcone/workspace-secrets';
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 const AUTH_REQUEST_TIMEOUT_MS = 10_000;
+const KV_REJECTION_BACKOFF_MS = 60_000;
 
 /** The Vault KV path for one workspace secret (raw; segments are encoded by the client). */
 export function workspaceSecretPath(tenantId, workspaceId, name) {
@@ -73,6 +74,7 @@ export function createKubernetesAuthTokenProvider({
   let cachedToken = null;
   let expiresAt = 0;
   let nextRetryAt = 0;
+  let nextKvInvalidationAt = 0;
   let timer = null;
   let inFlight = null;
   const health = { state: 'starting', lastSuccessAt: null, lastFailureAt: null,
@@ -130,15 +132,19 @@ export function createKubernetesAuthTokenProvider({
       status, consecutiveFailures: health.consecutiveFailures }));
   }
   function success(token, leaseSeconds, renewable) {
+    const recovered = health.state === 'degraded';
     cachedToken = token;
     const parsedLease = Number(leaseSeconds);
     const leaseMs = Math.max(1000, (Number.isFinite(parsedLease) && parsedLease > 0 ? parsedLease : 3600) * 1000);
     expiresAt = now() + leaseMs;
     nextRetryAt = 0;
+    nextKvInvalidationAt = 0;
     health.state = 'ok';
     health.lastSuccessAt = new Date(now()).toISOString();
     health.consecutiveFailures = 0;
     health.tokenExpiresAt = new Date(expiresAt).toISOString();
+    if (recovered) log(JSON.stringify({ event: 'secret_backend_auth_recovered', role, authMount,
+      consecutiveFailures: 0 }));
     // Renew after half the lease, leaving time for a bounded re-login before expiry.
     schedule(leaseMs * 0.55, () => renewable ? renew() : login());
   }
@@ -186,8 +192,10 @@ export function createKubernetesAuthTokenProvider({
           throw vaultError('renew-self', 'auth/token/renew-self', 502);
         success(auth?.client_token || cachedToken, auth.lease_duration, auth.renewable === true);
         return cachedToken;
-      } catch {
+      } catch (error) {
         // A failed renewal is recovered by re-login; report degradation only if that fails too.
+        log(JSON.stringify({ event: 'secret_backend_auth_renewal_failure', role, authMount,
+          status: Number(error?.vaultStatus) || 0 }));
         return performLogin();
       }
     });
@@ -200,6 +208,9 @@ export function createKubernetesAuthTokenProvider({
   };
   provider.invalidate = async (rejectedToken) => {
     if (inFlight) await inFlight.catch(() => {});
+    // A second KV 403 after a fresh login usually means a policy denial. Bound token creation
+    // until the next cooldown, while preserving the first invalidate-and-retry attempt.
+    if (now() < nextKvInvalidationAt) return rejectedToken;
     if (cachedToken === rejectedToken) {
       cachedToken = null;
       expiresAt = 0;
@@ -209,6 +220,7 @@ export function createKubernetesAuthTokenProvider({
     }
     return provider();
   };
+  provider.noteKvRejection = () => { nextKvInvalidationAt = now() + KV_REJECTION_BACKOFF_MS; };
   provider.getHealthSnapshot = () => ({ ...health });
   // Start auth without blocking module import, and consume the rejection until a caller arrives.
   void login().catch(() => {});
@@ -235,8 +247,12 @@ export function createVaultKvClient({ addr, token, tokenProvider, mount = 'secre
     });
     let res = await request();
     if (res.status === 403 && !token && typeof tokenProvider.invalidate === 'function') {
-      activeToken = await tokenProvider.invalidate(activeToken);
-      res = await request();
+      const replacement = await tokenProvider.invalidate(activeToken);
+      if (replacement !== activeToken) {
+        activeToken = replacement;
+        res = await request();
+        if (res.status === 403) tokenProvider.noteKvRejection?.();
+      }
     }
     return res;
   };

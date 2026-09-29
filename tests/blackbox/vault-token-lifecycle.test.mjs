@@ -92,7 +92,8 @@ test('bbx-984-fallback: failed renewal re-logs in once; concurrent callers share
     assert.equal(logins, 2);
     assert.equal(h.provider.getHealthSnapshot().consecutiveFailures, 0);
     assert.equal(h.provider.getHealthSnapshot().state, 'ok');
-    assert.equal(h.logs.length, 0, 'a successful fallback does not raise a transient alert');
+    assert.equal(h.logs.length, 1, 'the recovered renewal failure remains observable');
+    assert.match(h.logs[0], /secret_backend_auth_renewal_failure/);
   } finally { h.cleanup(); }
 });
 
@@ -116,6 +117,7 @@ test('bbx-984-failure: startup denial degrades, bounded backoff recovers and red
     assert.equal(await h.provider(), 'fake-token-sensitive');
     assert.equal(h.provider.getHealthSnapshot().state, 'ok');
     assert.equal(h.provider.getHealthSnapshot().consecutiveFailures, 0);
+    assert.match(h.logs[1], /secret_backend_auth_recovered/);
     assert.doesNotMatch(JSON.stringify({ logs: h.logs, health: h.provider.getHealthSnapshot() }), /fake-jwt-sensitive|fake-token-sensitive/);
   } finally { h.cleanup(); }
 });
@@ -156,7 +158,7 @@ test('bbx-984-renew-and-login-fail: degraded state persists and retry is bounded
     assert.equal(health.state, 'degraded');
     assert.equal(health.lastFailureStatus, 503);
     assert.equal(health.consecutiveFailures, 1);
-    assert.equal(h.logs.length, 1, 'only the transition to degraded is logged');
+    assert.equal(h.logs.length, 2, 'renewal failure and transition to degraded are logged');
     assert.ok(h.timers.some((t) => !t.cleared && t.at >= 55_100 + 500 && t.at <= 55_100 + 1000));
     assert.doesNotMatch(JSON.stringify({ health, logs: h.logs }), /fake-token-sensitive|fake-jwt-sensitive/);
   } finally { h.cleanup(); }
@@ -177,6 +179,28 @@ test('bbx-984-second-kv-403: one retry still surfaces the original KV error', as
     await assert.rejects(client.readSecret('t/w/k'), /vault read t\/w\/k -> HTTP 403/);
     assert.equal(logins, 2);
     assert.equal(kv, 2);
+  } finally { h.cleanup(); }
+});
+
+test('bbx-984-policy-403: repeated policy denials do not mint a new token per request', async () => {
+  let logins = 0; let kv = 0;
+  const fetchImpl = async (url) => {
+    if (url.endsWith('/login')) return { ok: true, json: async () => ({ auth: {
+      client_token: `token-${++logins}`, lease_duration: 3600, renewable: true,
+    } }) };
+    kv++;
+    return { status: 403, ok: false };
+  };
+  const h = authHarness(fetchImpl);
+  try {
+    const client = createVaultKvClient({ addr: 'http://bao', tokenProvider: h.provider, fetchImpl });
+    await assert.rejects(client.readSecret('t/w/k'), /HTTP 403/);
+    for (let i = 0; i < 5; i++) await assert.rejects(client.readSecret('t/w/k'), /HTTP 403/);
+    assert.equal(logins, 2, 'policy denials cannot mint a token for every request');
+    assert.equal(kv, 7, 'later requests surface the first 403 without another retry');
+    await h.advance(60_000);
+    await assert.rejects(client.readSecret('t/w/k'), /HTTP 403/);
+    assert.equal(logins, 3, 'the bounded cooldown eventually allows a fresh login');
   } finally { h.cleanup(); }
 });
 

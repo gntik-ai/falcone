@@ -15,6 +15,7 @@ When renewal fails or does not extend expiry, the provider re-logs in before the
 #### Scenario: KV request rejects a provider token
 
 When a KV request returns 403, the client invalidates the rejected provider token, re-logs in, and retries the KV request once. A second failure retains the existing route error contract.
+Repeated 403 responses after a fresh login SHALL rate-limit further invalidation attempts to bound token creation during a persistent policy denial.
 
 ### Requirement: Secret-backend authentication health
 
