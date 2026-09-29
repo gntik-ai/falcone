@@ -1,0 +1,169 @@
+name: scheduled-integration
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '10.0.0'
+  FALCONE_CHARTS_REF: '62c3975b4964fedfc821db5d8787e697e2f7af94'
+
+jobs:
+  plan-enforcement:
+    name: Plan-enforcement integration
+    runs-on: ubuntu-latest
+    # The kind cluster name is fixed, so scheduled and manually dispatched runs
+    # must not overlap on a shared runner.
+    concurrency:
+      group: real-stack-shared-host
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Checkout deployment charts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: gntik-ai/falcone-charts
+          ref: ${{ env.FALCONE_CHARTS_REF }}
+          path: falcone-charts
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create isolated kind cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          cluster_name: falcone-plan-enforcement
+          version: v0.26.0
+          kubectl_version: v1.31.0
+          helm_version: v3.16.3
+
+      - name: Build and load Falcone images for kind
+        run: |
+          set -euo pipefail
+          while IFS='|' read -r image dockerfile; do
+            docker build --tag "$image" --file "$dockerfile" .
+            kind load docker-image --name falcone-plan-enforcement "$image"
+          done <<'IMAGES'
+          localhost:30500/in-falcone-mcp-runtime:latest|apps/mcp-runtime/Dockerfile
+          localhost:30500/in-falcone-control-plane:0.3.1|apps/control-plane/Dockerfile
+          localhost:30500/in-falcone-control-plane-executor:0.9.3|apps/control-plane-executor/Dockerfile
+          localhost:30500/in-falcone-workflow-worker:0.1.0|apps/workflow-worker/Dockerfile
+          localhost:30500/in-falcone-web-console:0.2.11|apps/web-console/Dockerfile
+          IMAGES
+
+      - name: Generate ephemeral integration credentials
+        run: |
+          set -euo pipefail
+          umask 077
+          keycloak_admin_password="$(openssl rand -hex 24)"
+          superadmin_password="$(openssl rand -hex 24)"
+          plan_enforcement_client_secret="$(openssl rand -hex 24)"
+          printf '::add-mask::%s\n' "$keycloak_admin_password"
+          printf '::add-mask::%s\n' "$superadmin_password"
+          printf '::add-mask::%s\n' "$plan_enforcement_client_secret"
+          {
+            echo "E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD=$keycloak_admin_password"
+            echo "E2E_BOOTSTRAP_SUPERADMIN_PASSWORD=$superadmin_password"
+            echo "E2E_PLAN_ENFORCEMENT_CLIENT_SECRET=$plan_enforcement_client_secret"
+          } >> "$GITHUB_ENV"
+
+      - name: Provision plan-enforcement services with the deterministic Helm adapter
+        env:
+          E2E_NAMESPACE: falcone-plan-enforcement
+          E2E_HELM_RELEASE: falcone
+          E2E_HELM_CHART: ${{ github.workspace }}/falcone-charts/charts/in-falcone
+          E2E_HELM_VALUES: ${{ github.workspace }}/falcone-charts/deploy/kind/values-kind.yaml
+          # The pinned chart uses a release digest that is not present in kind.
+          # This isolated run instead consumes the local tag loaded above.
+          E2E_USE_LOCAL_CONTROL_PLANE_IMAGE: 'true'
+          E2E_APISIX_STANDALONE_CONFIG_FILE: deploy/kind/apisix/apisix.yaml
+          E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: ci-plan-enforcement-admin
+          E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD }}
+          E2E_BOOTSTRAP_SUPERADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_SUPERADMIN_PASSWORD }}
+          E2E_FWD: svc/falcone-apisix:9080:9080 svc/falcone-control-plane:3233:8080 svc/falcone-web-console:3000:3000 svc/falcone-keycloak:8080:8080 svc/falcone-kafka:9092:9092
+        run: bash tests/e2e/stack.sh up
+
+      - name: Provision ephemeral plan-enforcement client
+        env:
+          E2E_NAMESPACE: falcone-plan-enforcement
+          E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: ci-plan-enforcement-admin
+          E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD }}
+          E2E_PLAN_ENFORCEMENT_CLIENT_SECRET: ${{ env.E2E_PLAN_ENFORCEMENT_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          kubectl exec -n "$E2E_NAMESPACE" deployment/falcone-keycloak -- \
+            env KEYCLOAK_ADMIN_USERNAME="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME" \
+                KEYCLOAK_ADMIN_PASSWORD="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD" \
+                PLAN_ENFORCEMENT_CLIENT_SECRET="$E2E_PLAN_ENFORCEMENT_CLIENT_SECRET" \
+            bash -ec '
+              KC=/opt/keycloak/bin/kcadm.sh
+              "$KC" config credentials --server http://localhost:8080 --realm master \
+                --user "$KEYCLOAK_ADMIN_USERNAME" --password "$KEYCLOAK_ADMIN_PASSWORD"
+              "$KC" create clients -r in-falcone-platform \
+                -s clientId=plan-enforcement-ci -s enabled=true -s publicClient=false \
+                -s standardFlowEnabled=false -s directAccessGrantsEnabled=false \
+                -s serviceAccountsEnabled=true -s clientAuthenticatorType=client-secret \
+                -s secret="$PLAN_ENFORCEMENT_CLIENT_SECRET"
+              "$KC" add-roles -r in-falcone-platform \
+                --uusername service-account-plan-enforcement-ci --rolename superadmin
+              "$KC" add-roles -r in-falcone-platform --cclientid realm-management \
+                --uusername service-account-plan-enforcement-ci --rolename impersonation
+            '
+
+      - name: Route Kafka metadata to the local port-forward
+        run: echo '127.0.0.1 falcone-kafka' | sudo tee -a /etc/hosts >/dev/null
+
+      - name: Plan-enforcement coherence tests
+        env:
+          PLAN_ENFORCEMENT_STRICT: 'true'
+          GATEWAY_BASE_URL: http://localhost:9080
+          CONTROL_PLANE_URL: http://localhost:3233
+          CONSOLE_API_URL: http://localhost:3233/api/v1
+          KEYCLOAK_URL: http://localhost:8080
+          KEYCLOAK_REALM: in-falcone-platform
+          SUPERADMIN_CLIENT_ID: plan-enforcement-ci
+          SUPERADMIN_CLIENT_SECRET: ${{ env.E2E_PLAN_ENFORCEMENT_CLIENT_SECRET }}
+          KAFKA_BROKERS: localhost:9092
+          KAFKA_AUDIT_TOPIC: platform.audit.events
+          TEST_RESULT_OUTPUT_PATH: test-results/plan-enforcement-report.json
+        run: |
+          set -o pipefail
+          mkdir -p test-results
+          node --test --test-reporter=tap tests/integration/plan-enforcement/suites/*.test.mjs 2>&1 | tee test-results/plan-enforcement.tap
+          passed=$(awk '/^# pass [0-9]+$/ { count = $3 } END { print count + 0 }' test-results/plan-enforcement.tap)
+          test "$passed" -gt 0
+
+      - name: Upload plan-enforcement test artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: plan-enforcement-integration-test-results
+          path: |
+            test-results/plan-enforcement.tap
+            test-results/plan-enforcement-report.json
+          if-no-files-found: error
+
+      - name: Tear down plan-enforcement stack
+        if: always()
+        env:
+          E2E_NAMESPACE: falcone-plan-enforcement
+          E2E_HELM_RELEASE: falcone
+        run: bash tests/e2e/stack.sh down

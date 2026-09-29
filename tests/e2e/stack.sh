@@ -12,6 +12,7 @@
 #   E2E_FWD ("svc/name:local:remote ...") · E2E_BASE_URL · E2E_HEALTH_PATH (e.g. /api/health) ·
 #   E2E_NAMESPACE_MODE (default ephemeral; or preserve-existing) ·
 #   E2E_EXPECTED_NAMESPACE_UID (mandatory with preserve-existing) ·
+#   E2E_USE_LOCAL_CONTROL_PLANE_IMAGE=true (isolated kind CI only; use loaded tag) ·
 #   DEPLOY_CMD (ephemeral-only full override) · E2E_CONFIRM_CONTEXT=1 (allow non-local context)
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo root
@@ -633,6 +634,26 @@ case "${1:-up}" in
     kubectl delete namespace "$NS" --ignore-not-found --wait=true
     kubectl create namespace "$NS"
 
+    # The kind chart profile uses a standalone APISIX route table mounted from a
+    # ConfigMap.  Let isolated CI provide that route table before Helm renders
+    # the APISIX Deployment; otherwise its required volume cannot be mounted.
+    if [ -n "${E2E_APISIX_STANDALONE_CONFIG_FILE:-}" ]; then
+      [ -f "$E2E_APISIX_STANDALONE_CONFIG_FILE" ] || {
+        echo "E2E_APISIX_STANDALONE_CONFIG_FILE does not exist: $E2E_APISIX_STANDALONE_CONFIG_FILE" >&2
+        exit 2
+      }
+      route_file="$(mktemp)"
+      # The checked-in kind route table targets the developer namespace.  The
+      # chart test lifecycle is deliberately namespace-isolated, so substitute
+      # only the Kubernetes DNS namespace segment before creating the ConfigMap.
+      sed "s/\.falcone\.svc\.cluster\.local/.${NS}.svc.cluster.local/g" \
+        "$E2E_APISIX_STANDALONE_CONFIG_FILE" >"$route_file"
+      kubectl create configmap falcone-apisix-standalone \
+        --from-file=apisix.yaml="$route_file" \
+        -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+      rm -f "$route_file"
+    fi
+
     # ---- SeaweedFS image pre-pull (add-seaweedfs-storage-e2e, task 5.1) ----
     # When E2E_STORAGE_BACKEND=seaweedfs, pre-pull the SeaweedFS and its filer
     # init-container images so the kind nodes do not hit ImagePullBackOff on first
@@ -690,6 +711,36 @@ case "${1:-up}" in
       --from-literal=client-secret=e2e-placeholder-secret \
       -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
 
+    # CI can seed these disposable values so the non-hook Temporal lifecycle
+    # can also run the chart's platform bootstrap. They are optional for local
+    # E2E use, and all-or-nothing so a partial configuration never weakens
+    # bootstrap or changes the default local lifecycle.
+    PLATFORM_BOOTSTRAP_ENABLED=0
+    bootstrap_credentials="${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME:-}${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD:-}${E2E_BOOTSTRAP_SUPERADMIN_PASSWORD:-}"
+    if [ -n "$bootstrap_credentials" ]; then
+      [ -n "${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME:-}" ] \
+        && [ -n "${E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD:-}" ] \
+        && [ -n "${E2E_BOOTSTRAP_SUPERADMIN_PASSWORD:-}" ] || {
+          echo "E2E bootstrap Keycloak credentials must be supplied together." >&2
+          exit 2
+        }
+      kubectl create secret generic in-falcone-keycloak-admin \
+        --from-literal=username="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME" \
+        --from-literal=password="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD" \
+        -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+      kubectl create secret generic in-falcone-superadmin \
+        --from-literal=password="$E2E_BOOTSTRAP_SUPERADMIN_PASSWORD" \
+        -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+      # The pre-install credentials hook normally creates this Secret. The
+      # Temporal lifecycle deliberately uses --no-hooks, so generate an
+      # isolated replacement only for this explicit CI bootstrap path.
+      require openssl
+      kubectl create secret generic in-falcone-apisix-admin \
+        --from-literal=admin-key="$(openssl rand -hex 24)" \
+        -n "$NS" --dry-run=client -o yaml | kubectl apply -f -
+      PLATFORM_BOOTSTRAP_ENABLED=1
+    fi
+
     # ---- DocumentDB / FerretDB secrets (add-ferretdb-realtime-cdc-remediation #460) ----
     # The documentdb sub-chart (postgres-documentdb engine) requires in-falcone-documentdb
     # with the admin credentials it uses for CREATE EXTENSION and the superuser password.
@@ -739,7 +790,41 @@ case "${1:-up}" in
     else
       require helm
       CHART="$(find_chart)" || { echo "No Helm chart found. Set E2E_HELM_CHART=<path-or-ref> (and E2E_HELM_VALUES if needed)." >&2; exit 2; }
-      VALUES_FLAG="${E2E_HELM_VALUES:+-f "$E2E_HELM_VALUES"}"
+      HELM_VALUES_ARGS=()
+      if [ -n "${E2E_HELM_VALUES:-}" ]; then
+        HELM_VALUES_ARGS=(-f "$E2E_HELM_VALUES")
+      fi
+      # The release profile pins the production control-plane image by digest.
+      # An isolated kind run cannot resolve that registry reference after
+      # `kind load docker-image`, so this explicit CI-only opt-in removes the
+      # digest and uses the already loaded local tag instead.
+      HELM_IMAGE_ARGS=()
+      if [ "${E2E_USE_LOCAL_CONTROL_PLANE_IMAGE:-false}" = "true" ]; then
+        HELM_IMAGE_ARGS=(--set-string controlPlane.image.digest=)
+      fi
+      helm_render() {
+        helm template "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" \
+          "${HELM_IMAGE_ARGS[@]}" --skip-schema-validation "$@"
+      }
+      apply_ci_hook() {
+        local template_path="$1" hook_namespace="$2" hook_job="$3"
+        helm_render -s "$template_path" | kubectl apply -f -
+        kubectl wait job/"$hook_job" -n "$hook_namespace" --for=condition=complete --timeout=5m
+        kubectl logs -n "$hook_namespace" job/"$hook_job" 2>/dev/null | tail -5 || true
+      }
+
+      # The phased Temporal install omits all Helm hooks to avoid its bootstrap
+      # cycle. For the explicit CI bootstrap path, render the chart-owned
+      # credential/TLS hooks as ordinary manifests before the no-hooks install.
+      # This creates only random, short-lived values inside the isolated kind
+      # cluster; no credential is placed in a values file or emitted to logs.
+      if [ "$PLATFORM_BOOTSTRAP_ENABLED" -eq 1 ]; then
+        echo ">> Preparing chart-owned CI credentials and OpenBao TLS ..."
+        apply_ci_hook templates/webhook-key-lifecycle.yaml "$NS" "${REL}-in-falcone-webhook-key-credential"
+        apply_ci_hook templates/webhook-database-credentials.yaml "$NS" "${REL}-in-falcone-webhook-db-credential"
+        apply_ci_hook templates/platform-credentials.yaml "$NS" "${REL}-in-falcone-credential-bootstrap"
+        apply_ci_hook charts/openbao/templates/openbao-tls-bootstrap.yaml "$NS" openbao-tls-bootstrap
+      fi
 
       # ---- SeaweedFS Helm wiring (add-seaweedfs-storage-e2e, task 5.2) -----
       # SeaweedFS is core in the all-core chart, so E2E_STORAGE_BACKEND=seaweedfs no
@@ -765,44 +850,73 @@ case "${1:-up}" in
       # finishes).  Strategy:
       #   1. Deploy ALL non-hook resources via --no-hooks --wait=false (Helm adopts them).
       #   2. Wait for PostgreSQL then run the schema Job out-of-band.
-      #   3. Wait for Temporal frontend then run the bootstrap Job out-of-band.
+      #   3. Wait for Temporal frontend then run the Temporal and platform
+      #      Keycloak bootstrap Jobs out-of-band.
       #   4. Wait for all Deployments + StatefulSets to stabilise (retries self-heal).
       TEMPORAL_ENABLED=0
-      helm template "$REL" "$CHART" $VALUES_FLAG --skip-schema-validation 2>/dev/null \
+      helm_render 2>/dev/null \
         | grep -q 'falcone-temporal-schema' && TEMPORAL_ENABLED=1 || true
 
       if [ "$TEMPORAL_ENABLED" -eq 1 ]; then
         echo ">> Temporal schema job rendered: phased deploy to break bootstrap deadlock ..."
         # Phase 1 — deploy everything without hooks; no --wait so CrashLoopBackOffs are OK.
         helm upgrade --install --skip-schema-validation --server-side=false --no-hooks \
-          "$REL" "$CHART" -n "$NS" $VALUES_FLAG
+          "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}"
 
         # Phase 2 — wait for PostgreSQL then run schema job.
         echo ">> Waiting for PostgreSQL ..."
         kubectl rollout status statefulset/"$REL"-postgresql -n "$NS" --timeout=5m
         echo ">> Running Temporal schema migration ..."
-        helm template "$REL" "$CHART" $VALUES_FLAG --skip-schema-validation \
+        helm_render \
           -s templates/temporal/schema-job.yaml 2>/dev/null \
           | kubectl apply -n "$NS" -f -
         kubectl wait job/"$REL"-temporal-schema -n "$NS" --for=condition=complete --timeout=3m \
           || kubectl wait job/"$REL"-temporal-schema -n "$NS" --for=condition=failed --timeout=30s || true
         kubectl logs -n "$NS" job/"$REL"-temporal-schema 2>/dev/null | tail -5 || true
 
-        # Phase 3 — wait for Temporal frontend then run bootstrap job.
+        # Phase 3 — wait for Temporal frontend, then initialise Temporal.
+        # --no-hooks deliberately omits its post-install hook, so render and
+        # apply it explicitly.
+        # OpenBao's post-install init hook is also excluded by --no-hooks.
+        # Run it after its StatefulSet exists so workloads get a live, unsealed
+        # OpenBao rather than only a mounted TLS Secret.
+        if [ "$PLATFORM_BOOTSTRAP_ENABLED" -eq 1 ]; then
+          echo ">> Initialising OpenBao ..."
+          kubectl rollout status statefulset/openbao -n secret-store --timeout=5m
+          apply_ci_hook charts/openbao/templates/openbao-init-job.yaml secret-store openbao-init
+        fi
+
         echo ">> Waiting for Temporal frontend ..."
         kubectl rollout status deployment/"$REL"-temporal-frontend -n "$NS" --timeout=5m
         echo ">> Running Temporal namespace bootstrap ..."
-        helm template "$REL" "$CHART" $VALUES_FLAG --skip-schema-validation \
+        helm_render \
           -s templates/temporal/bootstrap-job.yaml 2>/dev/null \
           | kubectl apply -n "$NS" -f -
         kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=complete --timeout=5m \
           || kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=failed --timeout=30s || true
         kubectl logs -n "$NS" job/"$REL"-temporal-bootstrap 2>/dev/null | tail -5 || true
+        # The platform bootstrap needs Secrets normally made by the skipped
+        # pre-install hook. Keep it opt-in for the scheduled CI environment,
+        # which supplies all three disposable credentials above; ordinary
+        # local stack runs retain their previous lifecycle.
+        if [ "$PLATFORM_BOOTSTRAP_ENABLED" -eq 1 ]; then
+          echo ">> Running platform Keycloak bootstrap ..."
+          helm_render \
+            -s templates/bootstrap-job.yaml 2>/dev/null \
+            | kubectl apply -n "$NS" -f -
+          kubectl wait job/"$REL"-in-falcone-bootstrap -n "$NS" --for=condition=complete --timeout=5m
+          kubectl logs -n "$NS" job/"$REL"-in-falcone-bootstrap 2>/dev/null | tail -5 || true
+          # This post-install authority hook grants the generated webhook
+          # principals before the control plane begins serving requests.
+          # This hook incorporates Helm's rendered release revision. helm
+          # template renders revision 1, so wait for the resulting Job name.
+          apply_ci_hook templates/webhook-database-authority-bootstrap.yaml "$NS" "${REL}-in-falcone-webhook-db-authority-r1"
+        fi
       else
         # No Temporal: standard helm install with hooks.
         # --skip-schema-validation: in-falcone chart has strict JSON-schema constraints that
         # reject unknown/overridden keys even in valid e2e overlay combinations (known quirk).
-        helm upgrade --install --skip-schema-validation --server-side=false "$REL" "$CHART" -n "$NS" $VALUES_FLAG --wait --timeout 15m
+        helm upgrade --install --skip-schema-validation --server-side=false "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}" --wait --timeout 15m
       fi
     fi
     # Clean up SeaweedFS overlay temp file if it was created.
