@@ -169,11 +169,11 @@ test('bbx-643-rt-07: every webhook route (tenant- and workspace-addressed) is wi
 });
 
 // ---- workspace-addressed form: /v1/workspaces/{workspaceId}/webhooks/... -----
-// Workspace from PATH, authorized against the caller's verified tenant. A
-// tenant_owner (no workspace_id in the JWT) CAN manage its workspace's webhooks.
+// Workspace from PATH, authorized against the caller's verified tenant. The
+// resolved workspace record supplies the scope used by the action and db.
 const ownedWs = (tenantId) => async (_pool, wsId) => ({ id: wsId, tenant_id: tenantId });
 
-test('bbx-643-rt-08: workspace-path create -> 201, scoped to the PATH workspace + caller tenant', async () => {
+test('bbx-643-rt-08: workspace-path create -> 201, scoped to the resolved workspace', async () => {
   const db = memDb();
   const res = await webhookManage(ctx({
     method: 'POST', url: '/v1/workspaces/ws-a/webhooks/subscriptions', identity: A, params: { workspaceId: 'ws-a' },
@@ -210,6 +210,111 @@ test('bbx-643-rt-11: workspace-path event-types -> 200 (workspace authorized, pa
   const res = await webhookManage(ctx({ method: 'GET', url: '/v1/workspaces/ws-a/webhooks/event-types', identity: A, params: { workspaceId: 'ws-a' } }), { buildDb: () => db, getWorkspace: ownedWs('tenant-a') });
   assert.equal(res.statusCode, 200);
   assert.ok(Array.isArray(res.body.eventTypes));
+});
+
+test('bbx-957-01: superadmin lists and creates under the resolved workspace tenant', async () => {
+  const db = memDb();
+  const superadmin = { sub: 'platform-admin', tenantId: null, workspaceId: null, actorType: 'superadmin' };
+  const opts = { buildDb: () => db, getWorkspace: ownedWs('tenant-a') };
+  db._subs.set('other-tenant', { id: 'other-tenant', tenant_id: 'tenant-b', workspace_id: 'ws-a' });
+  db._subs.set('other-workspace', { id: 'other-workspace', tenant_id: 'tenant-a', workspace_id: 'ws-b' });
+  const request = (method, body) => ctx({
+    method, url: '/v1/workspaces/ws-a/webhooks/subscriptions', identity: superadmin,
+    params: { workspaceId: 'ws-a' }, body,
+  });
+  const created = await webhookManage(request('POST', { targetUrl: TARGET, eventTypes: ['document.created'] }), opts);
+  assert.equal(created.statusCode, 201);
+  const stored = db._subs.get(created.body.subscriptionId);
+  assert.equal(stored.tenant_id, 'tenant-a');
+  assert.equal(stored.workspace_id, 'ws-a');
+  assert.equal(stored.created_by, 'platform-admin');
+  assert.equal(db._secrets[0].tenant_id, 'tenant-a');
+  assert.equal(db._secrets[0].workspace_id, 'ws-a');
+  const listed = await webhookManage(request('GET'), opts);
+  assert.equal(listed.statusCode, 200);
+  assert.deepEqual(listed.body.items.map((item) => item.subscriptionId), [created.body.subscriptionId]);
+});
+
+test('bbx-957-01b: same-tenant admin keeps workspace-path create and list access', async () => {
+  const db = memDb();
+  const admin = { sub: 'admin-a', tenantId: 'tenant-a', workspaceId: null, actorType: 'tenant_admin' };
+  const opts = { buildDb: () => db, getWorkspace: ownedWs('tenant-a') };
+  const request = (method, body) => ctx({
+    method, url: '/v1/workspaces/ws-a/webhooks/subscriptions', identity: admin,
+    params: { workspaceId: 'ws-a' }, body,
+  });
+  const created = await webhookManage(request('POST', { targetUrl: TARGET, eventTypes: ['document.created'] }), opts);
+  assert.equal(created.statusCode, 201);
+  const listed = await webhookManage(request('GET'), opts);
+  assert.equal(listed.statusCode, 200);
+  assert.deepEqual(listed.body.items.map((item) => item.subscriptionId), [created.body.subscriptionId]);
+});
+
+test('bbx-957-02: same-tenant member sees event catalogue but cannot manage subscriptions', async () => {
+  const member = { sub: 'member-a', tenantId: 'tenant-a', workspaceId: null, actorType: 'tenant_member' };
+  let dbBuilds = 0;
+  const opts = { buildDb: () => { dbBuilds++; return memDb(); }, getWorkspace: ownedWs('tenant-a') };
+  for (const method of ['GET', 'POST']) {
+    const response = await webhookManage(ctx({
+      method, url: '/v1/workspaces/ws-a/webhooks/subscriptions', identity: member,
+      params: { workspaceId: 'ws-a' }, body: { targetUrl: TARGET, eventTypes: ['document.created'] },
+    }), opts);
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.body.code, 'FORBIDDEN');
+  }
+  assert.equal(dbBuilds, 0);
+  const catalogue = await webhookManage(ctx({
+    method: 'GET', url: '/v1/workspaces/ws-a/webhooks/event-types', identity: member,
+    params: { workspaceId: 'ws-a' },
+  }), opts);
+  assert.equal(catalogue.statusCode, 200);
+  assert.ok(catalogue.body.eventTypes.some((event) => event.id === 'document.created'));
+});
+
+test('bbx-957-03: cross-tenant member gets 404 before role or db dispatch', async () => {
+  const member = { sub: 'member-b', tenantId: 'tenant-b', workspaceId: null, actorType: 'tenant_member' };
+  let dbBuilds = 0;
+  const opts = { buildDb: () => { dbBuilds++; return memDb(); }, getWorkspace: ownedWs('tenant-a') };
+  for (const [method, suffix] of [
+    ['GET', 'subscriptions'], ['POST', 'subscriptions'], ['GET', 'event-types'],
+  ]) {
+    const response = await webhookManage(ctx({
+      method, url: `/v1/workspaces/ws-a/webhooks/${suffix}`, identity: member,
+      params: { workspaceId: 'ws-a' }, body: { targetUrl: TARGET, eventTypes: ['document.created'] },
+    }), opts);
+    assert.equal(response.statusCode, 404);
+    assert.equal(response.body.code, 'NOT_FOUND');
+  }
+  assert.equal(dbBuilds, 0);
+});
+
+test('bbx-957-04: tenant-addressed subscriptions require both verified scope dimensions', async () => {
+  for (const [method, missing] of [
+    ['GET', { tenantId: null }], ['POST', { tenantId: '' }],
+    ['GET', { workspaceId: null }], ['POST', { workspaceId: '' }],
+  ]) {
+    let dbBuilds = 0;
+    let poolQueries = 0;
+    const request = ctx({
+      method, url: '/v1/webhooks/subscriptions', identity: { ...A, ...missing },
+      body: { targetUrl: TARGET, eventTypes: ['document.created'] },
+    });
+    request.webhookRuntimePool = { async query() { poolQueries++; } };
+    request.webhookWritePool = { async query() { poolQueries++; } };
+    const response = await webhookManage(request, { buildDb: () => { dbBuilds++; return memDb(); } });
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.body.code, 'WEBHOOK_SCOPE_REQUIRED');
+    assert.equal(dbBuilds, 0);
+    assert.equal(poolQueries, 0);
+  }
+});
+
+test('bbx-957-05: database principal gate precedes missing-scope response', async () => {
+  const request = ctx({ method: 'GET', url: '/v1/webhooks/subscriptions', identity: { ...A, tenantId: null } });
+  request.webhookWritePool = null;
+  const response = await webhookManage(request, { buildDb: () => { throw new Error('db must not be built'); } });
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.code, 'WEBHOOK_DATABASE_PRINCIPALS_REQUIRED');
 });
 
 test('bbx-c25-pools: webhook adapter never receives the global control-plane pool', async () => {
