@@ -170,6 +170,39 @@ test('bbx-flows-audit-unavailable: failed outbox write rolls back an authoring m
   }, { auditSink: async () => { throw new Error('simulated outbox failure'); } });
 });
 
+test('failed audit writes leave update, publish, and delete state unchanged', async () => {
+  let failType;
+  await withServer(async (baseUrl) => {
+    const collection = `${baseUrl}/v1/flows/workspaces/ws_A/flows`;
+    const created = await fetch(collection, { method: 'POST', headers: A,
+      body: JSON.stringify({ name: 'original', definition: DEF }) });
+    assert.equal(created.status, 201);
+    const { flowId } = await created.json();
+    const flowUrl = `${collection}/${flowId}`;
+
+    failType = FLOW_AUDIT_EVENT_TYPES.DEFINITION_UPDATED;
+    const updated = await fetch(flowUrl, { method: 'PATCH', headers: A,
+      body: JSON.stringify({ name: 'changed' }) });
+    assert.equal(updated.status, 503);
+    assert.equal((await updated.json()).code, 'AUDIT_UNAVAILABLE');
+    assert.equal((await (await fetch(flowUrl, { headers: A })).json()).name, 'original');
+
+    failType = FLOW_AUDIT_EVENT_TYPES.VERSION_PUBLISHED;
+    const published = await fetch(`${flowUrl}/versions`, { method: 'POST', headers: A });
+    assert.equal(published.status, 503);
+    assert.equal((await published.json()).code, 'AUDIT_UNAVAILABLE');
+    assert.deepEqual((await (await fetch(`${flowUrl}/versions`, { headers: A })).json()).items, []);
+
+    failType = FLOW_AUDIT_EVENT_TYPES.DEFINITION_DELETED;
+    const deleted = await fetch(flowUrl, { method: 'DELETE', headers: A });
+    assert.equal(deleted.status, 503);
+    assert.equal((await deleted.json()).code, 'AUDIT_UNAVAILABLE');
+    assert.equal((await (await fetch(flowUrl, { headers: A })).json()).flowId, flowId);
+  }, { auditSink: async (event) => {
+    if (event.eventType === failType) throw new Error('simulated outbox failure');
+  } });
+});
+
 test('flow audit envelope has stable id and rejects missing correlation id', () => {
   const event = buildFlowAuditEvent({ eventType: FLOW_AUDIT_EVENT_TYPES.DEFINITION_CREATED,
     tenantId: 't', workspaceId: 'w', actorId: 'a', flowId: 'f' });

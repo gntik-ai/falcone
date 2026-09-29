@@ -26,6 +26,26 @@ test('two PostgreSQL relay replicas never claim the same pending event concurren
       const indexes = await pool.query(`SELECT indexname FROM pg_indexes WHERE schemaname = $1
         AND tablename = 'flow_audit_outbox'`, [schema]);
       assert.ok(indexes.rows.some((row) => row.indexname === 'flow_audit_outbox_pending_idx'));
+      const scope = { tenantId: 'tenant-test', workspaceId: 'workspace-test', flowId: randomUUID() };
+      const invalidAudit = { eventId: 'invalid-uuid', eventType: 'flow.definition_created',
+        tenantId: scope.tenantId, workspaceId: scope.workspaceId };
+      const definition = { apiVersion: 'v1.0', name: 'original', nodes: [] };
+      const create = (auditEvent) => store.createDefinition({ ...scope, name: 'original', definition,
+        createdBy: 'actor-test', auditEvent });
+      await assert.rejects(create(invalidAudit), (err) => err.code === 'AUDIT_UNAVAILABLE');
+      assert.equal(await store.getDefinition(scope), null, 'create rolls back with the outbox insert');
+      await create();
+
+      await assert.rejects(store.updateDefinition({ ...scope, changes: { name: 'changed' },
+        auditEvent: invalidAudit }), (err) => err.code === 'AUDIT_UNAVAILABLE');
+      assert.equal((await store.getDefinition(scope)).name, 'original', 'update rolls back');
+      await assert.rejects(store.insertVersion({ ...scope, definition, createdBy: 'actor-test',
+        auditEvent: () => invalidAudit }), (err) => err.code === 'AUDIT_UNAVAILABLE');
+      assert.deepEqual(await store.listVersions(scope), [], 'publish rolls back');
+      await assert.rejects(store.deleteDefinition({ ...scope, auditEvent: invalidAudit }),
+        (err) => err.code === 'AUDIT_UNAVAILABLE');
+      assert.ok(await store.getDefinition(scope), 'delete rolls back');
+
       const eventIds = [randomUUID(), randomUUID(), randomUUID()];
       for (const eventId of eventIds) {
         await store.enqueueAudit({ eventId, eventType: 'flow.definition_created',

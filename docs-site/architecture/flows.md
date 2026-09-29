@@ -228,8 +228,10 @@ anon key is passed as `?apikey=`; the gateway verifies it and enforces tenant sc
   them after restoring the broker.
   `/metrics` exposes pending depth, oldest pending age, dead-letter count, and relay failures.
   The relay drains pending rows in batches and removes delivered rows after seven days; dead
-  letters remain for operator review. Alert on the maximum gauge value across replicas because
-  each replica reports the same table-wide counts. If Kafka is not configured, pending rows
+  letters remain for operator review. Alert when
+  `max(falcone_flow_audit_outbox_dead_letter) > 0` and on rising pending depth or age; use
+  the maximum gauge value across replicas because each replica reports the same table-wide
+  counts. If Kafka is not configured, pending rows
   remain visible in metrics and delivery resumes when a producer is configured. Execution start,
   cancel, retry, and signal events are enqueued after Temporal acknowledges the operation. An outbox failure at that
   point returns `AUDIT_UNAVAILABLE` even though the execution action may already have occurred;
