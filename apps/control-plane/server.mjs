@@ -44,6 +44,7 @@ import {
 } from './knative-runtime-handlers.mjs';
 import { createRuntimeCleanupRepository, recoverFunctionCleanupObligations } from './runtime-cleanup-repository.mjs';
 import { deleteKnativeService } from './function-executor.mjs';
+import { secretBackendHealth } from './fn-handlers.mjs';
 
 const { Pool } = pg;
 
@@ -344,7 +345,7 @@ const server = http.createServer(async (req, res) => {
   // Prometheus scrape endpoint (no auth) — this process's HTTP metrics (#499).
   if (method === 'GET' && (req.url === '/metrics' || req.url === '/metrics/')) {
     res.writeHead(200, { 'content-type': METRICS_CONTENT_TYPE });
-    return res.end(renderMetrics());
+    return res.end(renderMetrics(secretBackendHealth()));
   }
   const startNs = process.hrtime.bigint();
   const metric = { method, route: 'unmatched', tenantId: '' };
@@ -356,8 +357,9 @@ const server = http.createServer(async (req, res) => {
 
     if (method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
     if (path === '/healthz' || path === '/readyz') {
-      try { await pool.query('SELECT 1'); return sendJson(res, 200, { status: 'ok' }); }
-      catch (e) { console.error('[control-plane] healthz db check failed:', e); return sendJson(res, 503, { status: 'db_unavailable' }); }
+      const secretBackend = secretBackendHealth();
+      try { await pool.query('SELECT 1'); return sendJson(res, 200, { status: 'ok', secretBackend }); }
+      catch (e) { console.error('[control-plane] healthz db check failed:', e); return sendJson(res, 503, { status: 'db_unavailable', secretBackend }); }
     }
     if (path === '/') return sendJson(res, 200, { service: 'in-falcone-control-plane', routes: ROUTES.length });
 

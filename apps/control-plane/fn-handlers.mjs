@@ -57,6 +57,14 @@ const err = (statusCode, code, message) => ({ statusCode, body: { code, message 
 // function deploys ignore secret refs, so default behaviour is unchanged.
 const vaultStore = vaultStoreFromEnv();
 
+// Read-only process health for the same store used by secret routes.
+export function secretBackendHealth() {
+  return vaultStore?.getHealthSnapshot() ?? {
+    state: 'disabled', lastSuccessAt: null, lastFailureAt: null,
+    lastFailureStatus: null, consecutiveFailures: 0, tokenExpiresAt: null,
+  };
+}
+
 // Resolve the caller's workspace, returning null on cross-tenant access (no existence leak) so a
 // secret read/write can never reach another tenant's workspace. Superadmin/internal may operate
 // cross-tenant (callerTenantId → null). The Postgres store is taken from ctx.store ?? store so tests
