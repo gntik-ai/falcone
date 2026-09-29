@@ -18,6 +18,8 @@ import {
 
 const SECRET_WRITE_FAILED_CODE = 'WEBHOOK_SECRET_WRITE_FAILED';
 const SECRET_WRITE_FAILED_MESSAGE = 'Webhook signing secret could not be stored';
+const SCOPE_REQUIRED_CODE = 'WEBHOOK_SCOPE_REQUIRED';
+const SCOPE_REQUIRED_MESSAGE = 'Webhook tenant and workspace scope are required';
 const DATABASE_POOLS_REQUIRED_CODE = 'WEBHOOK_DATABASE_PRINCIPALS_REQUIRED';
 const DATABASE_POOLS_INVALID_CODE = 'WEBHOOK_DATABASE_PRINCIPALS_INVALID';
 const DATABASE_POOLS_REQUIRED_MESSAGE =
@@ -38,6 +40,14 @@ class WebhookSigningSecretWriteError extends Error {
     super(SECRET_WRITE_FAILED_MESSAGE);
     this.name = 'WebhookSigningSecretWriteError';
     this.code = SECRET_WRITE_FAILED_CODE;
+  }
+}
+
+class WebhookScopeRequiredError extends Error {
+  constructor() {
+    super(SCOPE_REQUIRED_MESSAGE);
+    this.name = 'WebhookScopeRequiredError';
+    this.code = SCOPE_REQUIRED_CODE;
   }
 }
 
@@ -109,7 +119,7 @@ async function withSigningSecretWrite(
 
 function requireScope(value) {
   if (typeof value !== 'string' || value.length === 0) {
-    throw new WebhookSigningSecretWriteError();
+    throw new WebhookScopeRequiredError();
   }
   return value;
 }

@@ -70,6 +70,21 @@ test('bbx-643-db-02: listSubscriptions scopes by tenant + workspace and excludes
   assert.ok(q.params.includes('tenant-a') && q.params.includes('ws-a'));
 });
 
+test('bbx-957-db-01: missing runtime scope fails before pool connection with a scope error', async () => {
+  let connections = 0;
+  const runtimePool = { async connect() { connections++; throw new Error('unexpected connection'); } };
+  const db = buildWebhookDb(runtimePool, { writePool: recordingPool() });
+  for (const [tenantId, workspaceId] of [[null, 'ws-a'], ['tenant-a', ''], ['', 'ws-a']]) {
+    await assert.rejects(db.listSubscriptions({ tenantId, workspaceId }), (caught) => {
+      assert.equal(caught.name, 'WebhookScopeRequiredError');
+      assert.equal(caught.code, 'WEBHOOK_SCOPE_REQUIRED');
+      assert.notEqual(caught.name, 'WebhookSigningSecretWriteError');
+      return true;
+    });
+  }
+  assert.equal(connections, 0);
+});
+
 function subscriptionRecord() {
   return {
     id: 'sub-1',

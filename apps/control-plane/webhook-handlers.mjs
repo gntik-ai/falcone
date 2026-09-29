@@ -60,7 +60,7 @@ function pathnameOf(url) {
 /**
  * Serve a webhook management request by delegating to the webhook-management action.
  * @param {object} ctx     the control-plane local-handler context
- * @param {object} [deps]  test seam: { buildDb, getWorkspace } override the adapters
+ * @param {object} [deps]  test seam: { buildDb, getWorkspace, keyContext, resolver }
  * @returns {Promise<{statusCode:number, body:any}>}
  */
 export async function webhookManage(ctx, deps = {}) {
@@ -94,20 +94,33 @@ export async function webhookManage(ctx, deps = {}) {
   const identity = ctx.identity ?? {};
   let path = pathnameOf(ctx.req?.url);
   let workspaceId = identity.workspaceId ?? null;
+  let tenantId = identity.tenantId ?? null;
 
   // Workspace-addressed form: take the workspace from the PATH and authorize it
-  // against the caller's verified tenant. A missing OR cross-tenant workspace is a
-  // 404 (never disclose existence). The tenant always comes from the verified
-  // token, never the path. Rewrite the path to the /v1/webhooks/... shape the
-  // action understands, and scope the action to the path's workspace.
+  // against the caller's verified tenant. A missing OR cross-tenant workspace is
+  // a 404 before any role check (never disclose existence). The resolved record
+  // supplies both scope dimensions, including for platform callers with no tenant
+  // claim. Rewrite the path to the /v1/webhooks/... shape the action understands.
   if (ctx.params?.workspaceId) {
     const ws = await resolveWorkspace(ctx.pool, ctx.params.workspaceId);
-    if (!ws || !canManageTenant(identity, ws.tenant_id)) {
+    const platformCaller = identity.actorType === 'superadmin' || identity.actorType === 'internal';
+    if (!ws || (!platformCaller && (identity.tenantId == null || identity.tenantId !== ws.tenant_id))) {
       return { statusCode: 404, body: { code: 'NOT_FOUND', message: 'workspace not found' } };
     }
-    workspaceId = ws.id;
     const idx = path.indexOf('/webhooks');
+    const webhookPath = idx >= 0 ? path.slice(idx) : '';
+    if (webhookPath !== '/webhooks/event-types' && !canManageTenant(identity, ws.tenant_id)) {
+      return { statusCode: 403, body: { code: 'FORBIDDEN', message: 'requires superadmin or tenant owner/admin' } };
+    }
+    workspaceId = ws.id;
+    tenantId = ws.tenant_id;
     path = '/v1/webhooks' + (idx >= 0 ? path.slice(idx + '/webhooks'.length) : '');
+  }
+
+  if (/^\/v1\/webhooks\/subscriptions(?:\/|$)/.test(path)
+      && (typeof tenantId !== 'string' || tenantId.length === 0
+        || typeof workspaceId !== 'string' || workspaceId.length === 0)) {
+    return { statusCode: 400, body: { code: 'WEBHOOK_SCOPE_REQUIRED', message: 'Webhook tenant and workspace scope are required' } };
   }
 
   const result = await main({
@@ -119,7 +132,7 @@ export async function webhookManage(ctx, deps = {}) {
     path,
     body: ctx.body ?? {},
     query: ctx.query ?? {},
-    auth: { tenantId: identity.tenantId, workspaceId, actorId: identity.sub },
+    auth: { tenantId, workspaceId, actorId: identity.sub },
     resolver: deps.resolver, // undefined in prod -> action uses real DNS for SSRF validation
   });
   return { statusCode: result.statusCode, body: result.body };
