@@ -93,6 +93,20 @@ describe('console-session', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/v1/auth/login-sessions/ses_test123/refresh')
   })
 
+  it('retiene tenantId y lo reenvía durante refresh', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-28T19:59:30.000Z'))
+    persistConsoleShellSession(baseSession, 'ten_acme')
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, baseSession))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await refreshConsoleShellSession()
+    expect(readConsoleShellSession()?.tenantId).toBe('ten_acme')
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({
+      refreshToken: baseSession.tokenSet?.refreshToken, tenantId: 'ten_acme'
+    }))
+  })
+
   it('serializa refresh concurrentes en una sola llamada real', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-03-28T19:59:30.000Z'))

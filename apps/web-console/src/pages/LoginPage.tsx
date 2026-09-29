@@ -147,6 +147,7 @@ export function LoginPage() {
   }, [navigate])
 
   const signupVisible = signupPolicy?.selfServiceEnabled === true
+  const tenantId = (searchParams.get('tenantId') ?? searchParams.get('tenant') ?? '').trim() || undefined
 
   const signupTarget = useMemo(() => {
     const tenantId = (searchParams.get('tenantId') ?? searchParams.get('tenant') ?? '').trim()
@@ -247,10 +248,11 @@ export function LoginPage() {
       const createdSession = await createConsoleLoginSession({
         username: trimmedUsername,
         password: form.password,
-        rememberMe: form.rememberMe
+        rememberMe: form.rememberMe,
+        ...(tenantId ? { tenantId } : {})
       })
 
-      persistConsoleShellSession(createdSession)
+      persistConsoleShellSession(createdSession, tenantId)
       setFeedback({
         variant: 'success',
         kind: 'success',

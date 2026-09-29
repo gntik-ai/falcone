@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { terminateConsoleLoginSession } from './console-auth'
+import { refreshConsoleLoginSession, terminateConsoleLoginSession } from './console-auth'
 
 // Regression for #667: console logout must carry the session's refresh token in
 // the DELETE body so the control plane can revoke it at Keycloak and end the SSO
@@ -55,5 +55,30 @@ describe('terminateConsoleLoginSession', () => {
 
     const [url] = fetchMock.mock.calls[0] ?? []
     expect(url).toBe(`/v1/auth/login-sessions/${encodeURIComponent('ses a/b')}`)
+  })
+
+  it('sends tenantId for tenant logout while preserving the platform body', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, { sessionId: 'ses_abc', status: 'accepted' }))
+    vi.stubGlobal('fetch', fetchMock)
+    await terminateConsoleLoginSession('ses_abc', 'example-access', 'example-refresh', 'ten_acme')
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({
+      refreshToken: 'example-refresh', tenantId: 'ten_acme'
+    }))
+  })
+})
+
+describe('refreshConsoleLoginSession', () => {
+  afterEach(() => {
+    fetchMock.mockReset()
+    vi.unstubAllGlobals()
+  })
+
+  it('sends tenantId with the refresh token', async () => {
+    fetchMock.mockResolvedValueOnce(createJsonResponse(200, {}))
+    vi.stubGlobal('fetch', fetchMock)
+    await refreshConsoleLoginSession('ses_abc', 'example-refresh', 'ten_acme')
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({
+      refreshToken: 'example-refresh', tenantId: 'ten_acme'
+    }))
   })
 })

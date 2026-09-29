@@ -68685,6 +68685,10 @@
           },
           "rememberMe": {
             "type": "boolean"
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Tenant ID for authentication in the tenant's provisioned realm. Omit for platform login."
           }
         }
       },
@@ -68872,6 +68876,10 @@
           "refreshToken": {
             "type": "string",
             "minLength": 16
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Tenant ID used when this session was created. Omit for platform sessions."
           }
         }
       },
@@ -68884,6 +68892,10 @@
             "type": "string",
             "minLength": 16,
             "description": "The refresh token issued for this session. When present, it is revoked and the Keycloak SSO session is ended on logout."
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Tenant ID used when this session was created. Omit for platform sessions."
           }
         }
       },

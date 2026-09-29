@@ -616,7 +616,8 @@ export function ConsoleShellLayout() {
         await terminateConsoleLoginSession(
           session.sessionId,
           session.tokenSet.accessToken,
-          session.tokenSet.refreshToken
+          session.tokenSet.refreshToken,
+          session.tenantId
         )
       }
     } catch {

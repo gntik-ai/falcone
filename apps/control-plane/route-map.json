@@ -40,7 +40,7 @@
     "deps": ["keycloakAdmin"],
     "auth": "public",
     "subroutes": "no",
-    "notes": "console-auth.ts::startConsoleLoginSession (LoginPage). No server impl; must perform Keycloak ROPC/token exchange against realm in-falcone-platform, client in-falcone-console. GAP - needs Keycloak.",
+    "notes": "LoginPage sends optional tenantId; auth-handlers.mjs resolves active tenant iam_realm and slug-app client from the DB for tenant login, or uses the platform realm and console client when omitted.",
     "consoleUsed": true
   },
   {
@@ -54,7 +54,7 @@
     "deps": ["keycloakAdmin"],
     "auth": "public (refresh token)",
     "subroutes": "no",
-    "notes": "console-session.ts auto-refresh + console-auth.ts::refreshConsoleLoginSession. GAP - Keycloak token refresh.",
+    "notes": "console-session.ts persists optional tenantId and sends it for refresh; auth-handlers.mjs resolves the same DB-backed tenant realm and client, or platform defaults when omitted.",
     "consoleUsed": true
   },
   {
@@ -68,7 +68,7 @@
     "deps": ["keycloakAdmin"],
     "auth": "session bearer",
     "subroutes": "no",
-    "notes": "console-auth.ts::terminateConsoleLoginSession (logout). GAP.",
+    "notes": "console-auth.ts sends refreshToken and optional tenantId for logout; auth-handlers.mjs resolves the tenant realm and client from the DB before revocation.",
     "consoleUsed": true
   },
   {

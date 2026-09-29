@@ -1,8 +1,7 @@
 // Domain B — console auth endpoints (login/refresh/logout/signup-policy).
 //
 // The SPA's LoginPage calls these (apps/web-console/src/lib/console-auth.ts);
-// the repo ships no implementation. We back them with Keycloak ROPC against the
-// platform realm + public console client, returning the ConsoleLoginSession
+// We back them with Keycloak ROPC against the selected realm and public client, returning the ConsoleLoginSession
 // shape the SPA expects. Handler contract: async (ctx) => { statusCode, body }.
 import { randomUUID } from 'node:crypto';
 import { kcAdmin } from './kc-admin.mjs';
@@ -120,8 +119,19 @@ function sessionFromTokenResponse(data, sessionId) {
   };
 }
 
-async function kcToken(form, fetchImpl = fetch) {
-  const res = await fetchImpl(`${KC_BASE}/realms/${encodeURIComponent(REALM)}/protocol/openid-connect/token`, {
+// Resolve tenant auth only from a provisioned, active row. A missing or invalid
+// tenant shares the credentials error so this public endpoint reveals no tenant state.
+async function resolveAuthTarget(ctx) {
+  const tenantId = ctx.body?.tenantId;
+  if (tenantId === undefined) return { realm: REALM, client: CLIENT };
+  if (typeof tenantId !== 'string' || !tenantId) return null;
+  const tenant = await store.getTenant(ctx.pool, tenantId);
+  if (!tenant || tenant.id !== tenantId || tenant.status !== 'active' || !tenant.iam_realm || !tenant.slug) return null;
+  return { realm: tenant.iam_realm, client: `${tenant.slug}-app` };
+}
+
+async function kcToken(form, realm, fetchImpl = fetch) {
+  const res = await fetchImpl(`${KC_BASE}/realms/${encodeURIComponent(realm)}/protocol/openid-connect/token`, {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(form)
   });
   const data = await res.json().catch(() => ({}));
@@ -129,14 +139,14 @@ async function kcToken(form, fetchImpl = fetch) {
 }
 
 // Revoke a refresh token AND end the corresponding Keycloak SSO session.
-// `in-falcone-console` is a PUBLIC client, so no client_secret is sent. Keycloak
+// Both console and tenant app clients are public, so no client_secret is sent. Keycloak
 // returns 204 on success; the revoked refresh token then yields invalid_grant on
 // any later refresh. Mirrors kcToken's structure; the fetch impl is injectable so
 // tests can fake Keycloak without a live server.
-async function kcLogout(refreshToken, fetchImpl = fetch) {
-  const res = await fetchImpl(`${KC_BASE}/realms/${encodeURIComponent(REALM)}/protocol/openid-connect/logout`, {
+async function kcLogout(refreshToken, { realm, client }, fetchImpl = fetch) {
+  const res = await fetchImpl(`${KC_BASE}/realms/${encodeURIComponent(realm)}/protocol/openid-connect/logout`, {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: CLIENT, refresh_token: refreshToken })
+    body: new URLSearchParams({ client_id: client, refresh_token: refreshToken })
   });
   return { ok: res.ok, status: res.status };
 }
@@ -145,7 +155,9 @@ async function kcLogout(refreshToken, fetchImpl = fetch) {
 async function login(ctx) {
   const { body } = ctx;
   if (!body.username || !body.password) return errBody(400, 'VALIDATION_ERROR', 'username and password are required');
-  const r = await kcToken({ grant_type: 'password', client_id: CLIENT, scope: 'openid', username: body.username, password: body.password });
+  const target = await resolveAuthTarget(ctx);
+  if (!target) return errBody(401, 'INVALID_CREDENTIALS', 'Invalid user credentials');
+  const r = await kcToken({ grant_type: 'password', client_id: target.client, scope: 'openid', username: body.username, password: body.password }, target.realm, ctx._fetch ?? fetch);
   if (!r.ok) {
     const desc = r.data.error_description || r.data.error || 'authentication failed';
     return errBody(401, 'INVALID_CREDENTIALS', desc);
@@ -157,7 +169,9 @@ async function login(ctx) {
 async function refresh(ctx) {
   const { body, params } = ctx;
   if (!body.refreshToken) return errBody(400, 'VALIDATION_ERROR', 'refreshToken is required');
-  const r = await kcToken({ grant_type: 'refresh_token', client_id: CLIENT, refresh_token: body.refreshToken }, ctx._fetch ?? fetch);
+  const target = await resolveAuthTarget(ctx);
+  if (!target) return errBody(401, 'REFRESH_FAILED', 'refresh failed');
+  const r = await kcToken({ grant_type: 'refresh_token', client_id: target.client, refresh_token: body.refreshToken }, target.realm, ctx._fetch ?? fetch);
   if (!r.ok) return errBody(401, 'REFRESH_FAILED', r.data.error_description || 'refresh failed');
   return ok(200, sessionFromTokenResponse(r.data, params.sessionId || randomId()));
 }
@@ -169,14 +183,16 @@ async function refresh(ctx) {
 async function logout(ctx) {
   const refreshToken = ctx.body?.refreshToken;
   if (refreshToken) {
+    const target = await resolveAuthTarget(ctx);
+    if (!target) return errBody(401, 'INVALID_CREDENTIALS', 'authentication failed');
     // Best-effort for the RESPONSE (always return accepted; never leak Keycloak
     // error detail), but the revoke MUST be attempted when a token is supplied.
     try {
-      await kcLogout(refreshToken, ctx._fetch ?? fetch);
-    } catch (e) {
+      await kcLogout(refreshToken, target, ctx._fetch ?? fetch);
+    } catch {
       // Network/Keycloak failure: log server-side, still accept locally. The token
       // remains valid until expiry in this degraded case, but we do not 500.
-      console.error('[control-plane] logout: Keycloak refresh-token revoke failed:', e?.message ?? e);
+      console.error('[control-plane] logout: Keycloak refresh-token revoke failed');
     }
   }
   // Tolerant of older clients that omit the refresh token (no 500): accept locally.

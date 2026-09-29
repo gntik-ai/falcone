@@ -17,6 +17,7 @@ export interface ConsoleLoginRequest {
   username: string
   password: string
   rememberMe?: boolean
+  tenantId?: string
 }
 
 export interface ConsoleSignupRequest {
@@ -98,6 +99,7 @@ export interface ConsoleLoginSession {
 
 export interface ConsoleTokenRefreshRequest {
   refreshToken: string
+  tenantId?: string
 }
 
 export interface ConsoleSignupRegistration {
@@ -141,6 +143,7 @@ export interface ConsolePasswordRecoveryTicket {
 
 export interface ConsoleSessionTerminationRequest {
   refreshToken: string
+  tenantId?: string
 }
 
 export interface ConsoleSessionTerminationAccepted {
@@ -174,15 +177,18 @@ export async function createConsoleLoginSession(
 export async function refreshConsoleLoginSession(
   sessionId: string,
   refreshToken: string,
+  tenantIdOrSignal?: string | AbortSignal,
   signal?: AbortSignal
 ): Promise<ConsoleLoginSession> {
+  const tenantId = typeof tenantIdOrSignal === 'string' ? tenantIdOrSignal : undefined
   return requestJson<ConsoleLoginSession>(`/v1/auth/login-sessions/${encodeURIComponent(sessionId)}/refresh`, {
     method: 'POST',
     body: {
-      refreshToken
+      refreshToken,
+      ...(tenantId ? { tenantId } : {})
     },
     idempotent: true,
-    signal
+    signal: typeof tenantIdOrSignal === 'string' ? signal : tenantIdOrSignal ?? signal
   })
 }
 
@@ -190,18 +196,20 @@ export async function terminateConsoleLoginSession(
   sessionId: string,
   accessToken: string,
   refreshToken: string,
+  tenantIdOrSignal?: string | AbortSignal,
   signal?: AbortSignal
 ): Promise<ConsoleSessionTerminationAccepted> {
+  const tenantId = typeof tenantIdOrSignal === 'string' ? tenantIdOrSignal : undefined
   return requestJson<ConsoleSessionTerminationAccepted>(`/v1/auth/login-sessions/${encodeURIComponent(sessionId)}`, {
     method: 'DELETE',
     // Carry the refresh token so the control plane can revoke it at Keycloak and
     // end the SSO session; without it logout was a no-op (#667).
-    body: { refreshToken } satisfies ConsoleSessionTerminationRequest,
+    body: { refreshToken, ...(tenantId ? { tenantId } : {}) } satisfies ConsoleSessionTerminationRequest,
     idempotent: true,
     headers: {
       Authorization: `Bearer ${accessToken}`
     },
-    signal
+    signal: typeof tenantIdOrSignal === 'string' ? signal : tenantIdOrSignal ?? signal
   })
 }
 
