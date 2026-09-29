@@ -230,7 +230,9 @@ anon key is passed as `?apikey=`; the gateway verifies it and enforces tenant sc
   metrics and delivery resumes when a producer is configured. Execution start, cancel, retry, and
   signal events are enqueued after Temporal acknowledges the operation. An outbox failure at that
   point returns `AUDIT_UNAVAILABLE` even though the execution action may already have occurred;
-  callers should check execution state before retrying. Events lost before this change cannot be
+  callers should check execution state before retrying. A replay of a triggered start repairs a
+  missing start event using a stable event ID, without adding a second row if it was already
+  recorded. Events lost before this change cannot be
   reconstructed from the outbox, so audit consumers must account for the pre-upgrade gap.
 - **Teardown** (`packages/provisioning-orchestrator/src/appliers/workflows-applier.mjs`): a tenant
   purge cascades to the `workflows` domain with the same partial-failure semantics as the other

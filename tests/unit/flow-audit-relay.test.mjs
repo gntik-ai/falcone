@@ -54,10 +54,12 @@ test('Kafka outage keeps event pending; recovery drains backlog once per eventId
 
   await relay.runOnce();
   assert.equal(pool.rows.filter((r) => r.state === 'pending').length, 3);
-  assert.deepEqual(pool.rows.map((r) => r.attempts), [1, 1, 1]);
-  assert.equal(logs.length, 3);
+  assert.deepEqual(pool.rows.map((r) => r.attempts), [1, 0, 0]);
+  assert.equal(logs.length, 1);
   assert.deepEqual(logs[0][1], { eventId: 'event-0', attempts: 1, errorClass: 'KAFKA_ERROR' });
   assert.equal(JSON.stringify(logs).includes('private broker detail'), false);
+  assert.match(renderMetrics(), /# HELP falcone_flow_audit_outbox_failures_total /);
+  assert.match(renderMetrics(), /# TYPE falcone_flow_audit_outbox_failures_total counter/);
 
   unavailable = false;
   for (const row of pool.rows) row.due = true;

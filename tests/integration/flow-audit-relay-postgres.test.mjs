@@ -19,14 +19,17 @@ test('two PostgreSQL relay replicas never claim the same pending event concurren
     try {
       await admin.query(`CREATE SCHEMA ${schema}`);
       pool = new Pool({ connectionString, max: 4, options: `-c search_path=${schema}` });
-      await pool.query(`CREATE TABLE flow_audit_outbox (
-        event_id uuid PRIMARY KEY, payload jsonb NOT NULL, attempts integer NOT NULL DEFAULT 0,
-        state text NOT NULL DEFAULT 'pending', next_attempt_at timestamptz NOT NULL DEFAULT now(),
-        created_at timestamptz NOT NULL DEFAULT now(), delivered_at timestamptz)`);
+      const { createFlowStore } = await import('../../apps/control-plane-executor/src/runtime/flow-executor.mjs');
+      const store = createFlowStore({ pool });
+      await store.ensureSchema();
+      await store.ensureSchema(); // The real DDL and indexes must be idempotent.
+      const indexes = await pool.query(`SELECT indexname FROM pg_indexes WHERE schemaname = $1
+        AND tablename = 'flow_audit_outbox'`, [schema]);
+      assert.ok(indexes.rows.some((row) => row.indexname === 'flow_audit_outbox_pending_idx'));
       const eventIds = [randomUUID(), randomUUID(), randomUUID()];
       for (const eventId of eventIds) {
-        await pool.query('INSERT INTO flow_audit_outbox (event_id, payload) VALUES ($1, $2)',
-          [eventId, { eventId }]);
+        await store.enqueueAudit({ eventId, eventType: 'flow.definition_created',
+          tenantId: 'tenant-test', workspaceId: 'workspace-test' });
       }
       const published = [];
       const publish = async (event) => { await delay(25); published.push(event.eventId); };
@@ -39,8 +42,8 @@ test('two PostgreSQL relay replicas never claim the same pending event concurren
       assert.ok(result.rows.every((row) => row.state === 'delivered' && row.attempts === 1));
 
       const failedEventId = randomUUID();
-      await pool.query('INSERT INTO flow_audit_outbox (event_id, payload) VALUES ($1, $2)',
-        [failedEventId, { eventId: failedEventId }]);
+      await store.enqueueAudit({ eventId: failedEventId, eventType: 'flow.definition_created',
+        tenantId: 'tenant-test', workspaceId: 'workspace-test' });
       const failingRelay = createFlowAuditRelay({ pool, publish: async () => {
         throw Object.assign(new Error('broker unavailable'), { code: 'KAFKA_ERROR' });
       }, logger: { error() {} } });

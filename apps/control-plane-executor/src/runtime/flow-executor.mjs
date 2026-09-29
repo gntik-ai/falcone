@@ -24,7 +24,7 @@
 // in-memory Map fallback (no pool) for the no-database black-box mode — the same backend
 // split api-keys.mjs / embedding-executor.mjs use.
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { parse as parseYaml } from 'yaml';
 import {
   validateFlowDefinition,
@@ -77,6 +77,13 @@ const DEFINITION_WRITE_OPERATIONS = new Set([
 ]);
 
 const WORKFLOW_ID_SEPARATOR = ':';
+
+// A triggered start may be replayed after Temporal accepted it but the outbox insert failed.
+// Derive a UUID from the immutable workflow ID so that replay repairs the same audit event.
+function executionStartedAuditId(workflowId) {
+  const hex = createHash('sha256').update('flow.execution_started\0').update(workflowId).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
 
 // Recognise Temporal's "a workflow with this id is already running/closed" rejection across SDK
 // shapes (WorkflowExecutionAlreadyStartedError / gRPC ALREADY_EXISTS / a fake's marker) so a
@@ -282,6 +289,7 @@ function createInMemoryFlowStore() {
   let auditWriter;
   async function appendAudit(event) {
     if (!event) return;
+    if (outbox.some((row) => row.eventId === event.eventId)) return;
     try { await auditWriter?.(event); }
     catch { throw clientError('Flow audit record could not be persisted', 503, 'AUDIT_UNAVAILABLE'); }
     outbox.push(event);
@@ -383,7 +391,7 @@ function createPostgresFlowStore(pool) {
     try {
       await client.query(
         `INSERT INTO flow_audit_outbox (event_id, event_type, tenant_id, workspace_id, payload)
-         VALUES ($1,$2,$3,$4,$5)`,
+         VALUES ($1,$2,$3,$4,$5) ON CONFLICT (event_id) DO NOTHING`,
         [event.eventId, event.eventType, event.tenantId, event.workspaceId, event],
       );
     } catch {
@@ -745,11 +753,11 @@ export function createFlowExecutor({
   // Events are validated before a state change and persisted by the store. The optional
   // writer is an in-memory test adapter; production uses the Postgres outbox exclusively.
   store.setAuditWriter?.(auditSink);
-  function auditEvent(eventType, { identity, flowId, flowVersion, executionId, triggerType, correlationId } = {}) {
+  function auditEvent(eventType, { identity, flowId, flowVersion, executionId, triggerType, correlationId, eventId } = {}) {
     return buildFlowAuditEvent({
       eventType, tenantId: identity.tenantId, workspaceId: identity.workspaceId,
       actorId: identity.actorId ?? `apikey:${identity.roleName ?? 'service'}`,
-      flowId, flowVersion, executionId, triggerType, correlationId: correlationId ?? randomUUID(),
+      flowId, flowVersion, executionId, triggerType, correlationId: correlationId ?? randomUUID(), eventId,
     });
   }
   async function emitAudit(eventType, details) {
@@ -838,6 +846,8 @@ export function createFlowExecutor({
     const workflowId = workflowIdOverride
       ? buildWorkflowId(identity.tenantId, identity.workspaceId, flowId, workflowIdOverride)
       : buildWorkflowId(identity.tenantId, identity.workspaceId, flowId);
+    const startAudit = { identity, flowId, flowVersion: pinned.version, executionId: workflowId,
+      triggerType, correlationId, eventId: executionStartedAuditId(workflowId) };
     // Mint the short-lived, tenant+workspace-scoped token; expiry never outlasts the run.
     const executionToken = await mintExecutionToken(identity.tenantId, identity.workspaceId, maxRunDurationMs);
     let handle;
@@ -856,12 +866,13 @@ export function createFlowExecutor({
       // Duplicate workflow id (replayed webhook delivery / redelivered Kafka offset) -> the run
       // already exists; treat as an idempotent no-op (spec: no second execution started).
       if (isWorkflowAlreadyStarted(err)) {
+        await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_STARTED, startAudit);
         return { executionId: workflowId, workflowId, version: pinned.version, status: 'Running', deduplicated: true };
       }
       throw err;
     }
     // Persist the execution event after Temporal acknowledges the run.
-    await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_STARTED, { identity, flowId, flowVersion: pinned.version, executionId: workflowId, triggerType, correlationId });
+    await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_STARTED, startAudit);
     return {
       executionId: workflowId,
       workflowId,

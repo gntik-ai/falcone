@@ -94,7 +94,14 @@ export function renderMetrics() {
     out.push(`falcone_mcp_knative_dependency_events_total{operation="${esc(operation)}",outcome="${esc(outcome)}",mode="${esc(mode)}",state="${esc(state)}",reason="${esc(reason)}"} ${v}`);
   }
   for (const [name, value] of Object.entries(flowAuditOutbox)) {
-    const metric = `falcone_flow_audit_outbox_${name}`;
+    const metric = `falcone_flow_audit_outbox_${name}${name === 'failures' ? '_total' : ''}`;
+    const help = {
+      pending: 'Pending Flow audit events in the shared outbox.',
+      dead_letter: 'Flow audit events retained after retry exhaustion.',
+      oldest_seconds: 'Age in seconds of the oldest pending Flow audit event.',
+      failures: 'Flow audit relay publish failures in this process.',
+    }[name];
+    out.push(`# HELP ${metric} ${help}`);
     out.push(`# TYPE ${metric} ${name === 'failures' ? 'counter' : 'gauge'}`);
     out.push(`${metric} ${Number(value) || 0}`);
   }

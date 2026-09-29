@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
-import { createFlowExecutor } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
+import { createFlowExecutor, createFlowStore } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
 import { createFlowTriggerRegistry } from '../../apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs';
 import { computeSignature } from '../../packages/webhook-engine/src/webhook-signing.mjs';
 
@@ -371,6 +371,36 @@ test('bbx-flows-trig-12: duplicate Kafka offset starts only one execution', asyn
   const second = await start();
   assert.equal(t.started.length, 1, 'redelivered offset → only one execution');
   assert.equal(second.deduplicated, true);
+  await flowExecutor.close();
+});
+
+test('a trigger replay repairs a failed start audit insert without creating a second event', async () => {
+  const temporal = makeFakeTemporal();
+  const store = createFlowStore();
+  let failStartAudit = true;
+  const flowExecutor = createFlowExecutor({ store, temporalClient: temporal, temporalAddress: 'fake:7233',
+    auditSink: async (event) => {
+      if (event.eventType === 'flow.execution_started' && failStartAudit) {
+        throw new Error('outbox unavailable');
+      }
+    } });
+  const identity = { tenantId: TEN, workspaceId: WS, actorId: 'svc', roles: ['tenant_admin'] };
+  await flowExecutor.executeFlows({ operation: 'create_definition', identity, flowId: 'auditflow',
+    body: { name: 'Audit', definition: EVENT_DEF } });
+  await flowExecutor.executeFlows({ operation: 'publish_version', identity, flowId: 'auditflow' });
+  const start = () => flowExecutor.startTriggeredExecution({ identity, flowId: 'auditflow', version: 1,
+    input: {}, triggerType: 'platform_event', workflowIdOverride: 'offset-5' });
+  await assert.rejects(start(), (err) => err.code === 'AUDIT_UNAVAILABLE');
+  assert.equal(temporal.started.length, 1);
+  assert.equal(store.pendingAudit().filter((event) => event.eventType === 'flow.execution_started').length, 0);
+
+  failStartAudit = false;
+  assert.equal((await start()).deduplicated, true);
+  assert.equal((await start()).deduplicated, true);
+  const startEvents = store.pendingAudit().filter((event) => event.eventType === 'flow.execution_started');
+  assert.equal(startEvents.length, 1);
+  assert.match(startEvents[0].eventId, /^[0-9a-f-]{36}$/);
+  assert.equal(temporal.started.length, 1);
   await flowExecutor.close();
 });
 

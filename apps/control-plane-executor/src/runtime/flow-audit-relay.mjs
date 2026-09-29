@@ -54,14 +54,21 @@ export function createFlowAuditRelay({ pool, publish, logger = console, interval
         await client.query('COMMIT');
         return false;
       }
+      let publishFailed = false;
+      let publishError;
       try {
         await publish(row.payload);
+      } catch (err) {
+        publishFailed = true;
+        publishError = err;
+      }
+      if (!publishFailed) {
         await client.query(`UPDATE flow_audit_outbox SET state = 'delivered', delivered_at = now(), attempts = attempts + 1
           WHERE event_id = $1`, [row.event_id]);
-      } catch (err) {
+      } else {
         failures += 1;
         const attempts = row.attempts + 1;
-        const reason = err?.cause ?? err;
+        const reason = publishError?.cause ?? publishError;
         // No error message: Kafka messages may include broker or auth details.
         logger.error?.('[flow-audit-relay] publish failed', {
           eventId: row.event_id, attempts,
@@ -73,7 +80,7 @@ export function createFlowAuditRelay({ pool, publish, logger = console, interval
         [row.event_id, attempts >= MAX_ATTEMPTS ? 'dead_letter' : 'pending', attempts, delayMs]);
       }
       await client.query('COMMIT');
-      return true;
+      return publishFailed ? 'failed' : 'delivered';
     } catch (err) {
       if (client) await client.query('ROLLBACK').catch(() => {});
       throw err;
@@ -88,8 +95,12 @@ export function createFlowAuditRelay({ pool, publish, logger = console, interval
       let processed = false;
       if (publish) {
         for (let i = 0; i < MAX_BATCH; i += 1) {
-          if (!await processOne()) break;
+          const result = await processOne();
+          if (!result) break;
           processed = true;
+          // An unavailable broker would impose a full connect/retry cycle on every row.
+          // Leave the rest of the batch pending for the next interval.
+          if (result === 'failed') break;
         }
       }
       // Delivered rows are operational history, not dead letters. Retain them for seven days,
