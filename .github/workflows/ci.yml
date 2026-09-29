@@ -91,6 +91,9 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit
 
+      - name: Flow audit and webhook blackbox tests
+        run: node --test tests/blackbox/flows-audit-events.test.mjs tests/blackbox/flows-triggers.test.mjs
+
       - name: Adapter integration scaffolding
         run: pnpm test:adapters
 

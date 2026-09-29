@@ -3,7 +3,8 @@
 - [x] Commit definition mutations and outbox records atomically.
 - [x] Add a replica-safe Kafka relay with stable event keys, retry cap, dead letters, and metrics.
 - [x] Propagate request correlation IDs and update Flow audit documentation.
-- [ ] Run black-box and real PostgreSQL integration tests in PR CI after dependency installation.
+- [x] Run Flow audit and webhook black-box and real PostgreSQL integration tests in PR CI after dependency installation.
+- [x] Document operator redrive for retained dead letters after broker recovery.
 
 ## Deployment and release gate
 

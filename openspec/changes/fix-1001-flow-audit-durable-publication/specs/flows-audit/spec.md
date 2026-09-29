@@ -18,7 +18,7 @@ Every event MUST include a stable event ID, event type, tenant ID, workspace ID,
 
 ### Requirement: Platform audit delivery is isolated and retried
 
-The relay MUST publish through a platform Kafka producer to `falcone.audit.flow-lifecycle`, outside the `evt.<workspaceId>.` namespace. It MUST claim rows safely across replicas, use the event ID as the Kafka key, retry with bounded exponential backoff, and retain rows that exhaust retries as dead letters. Metrics MUST report pending depth and age, dead letters, and relay failures.
+The relay MUST publish through a platform Kafka producer to `falcone.audit.flow-lifecycle`, outside the `evt.<workspaceId>.` namespace. It MUST claim rows safely across replicas, use the event ID as the Kafka key, retry with bounded exponential backoff, and retain rows that exhaust retries as dead letters. After broker recovery, operators MUST be able to reset selected dead letters to pending without changing their event IDs; the relay MUST then deliver them. Metrics MUST report pending depth and age, dead letters, and relay failures.
 
 Audit payloads and logs MUST exclude credentials, tokens, Flow definitions, and Flow input/output. Delivery failures MUST log only event ID, attempt count, and a redacted error class.
 
@@ -35,6 +35,11 @@ inspect execution state before retrying an operation that could be repeated.
 
 - **WHEN** an event reaches the configured maximum number of failed delivery attempts
 - **THEN** the relay retains it as a dead letter and reports it in metrics.
+
+#### Scenario: An operator redrives after broker recovery
+
+- **WHEN** an operator resets a selected dead-letter row to pending with attempts zero after restoring Kafka
+- **THEN** the relay delivers it using its original event ID, and retains the row as delivered.
 
 #### Scenario: A tenant accesses the events API
 

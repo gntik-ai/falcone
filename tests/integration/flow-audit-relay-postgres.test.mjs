@@ -54,6 +54,16 @@ test('two PostgreSQL relay replicas never claim the same pending event concurren
       }
       const failed = await pool.query('SELECT state, attempts FROM flow_audit_outbox WHERE event_id = $1', [failedEventId]);
       assert.deepEqual(failed.rows[0], { state: 'dead_letter', attempts: 12 });
+
+      await pool.query(`UPDATE flow_audit_outbox SET state = 'pending', attempts = 0, next_attempt_at = now()
+        WHERE state = 'dead_letter' AND event_id = $1`, [failedEventId]);
+      const redriven = [];
+      const recoveredRelay = createFlowAuditRelay({ pool, publish: async (event) => redriven.push(event.eventId) });
+      await recoveredRelay.runOnce();
+      await recoveredRelay.runOnce();
+      assert.deepEqual(redriven, [failedEventId]);
+      const delivered = await pool.query('SELECT state, attempts FROM flow_audit_outbox WHERE event_id = $1', [failedEventId]);
+      assert.deepEqual(delivered.rows[0], { state: 'delivered', attempts: 1 });
     } finally {
       await pool?.end();
       await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);

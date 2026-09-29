@@ -22,7 +22,7 @@ import { FLOW_AUDIT_EVENT_TYPES, buildFlowAuditEvent } from '../../packages/audi
 import { flowLifecycleEvent } from '../../packages/audit/src/contract-boundary.mjs';
 
 const DEF = { apiVersion: 'v1.0', name: 'f', nodes: [{ id: 'a', type: 'approval', next: 'b' }, { id: 'b', type: 'task', taskType: 't' }] };
-const headersFor = (t, w) => ({ 'content-type': 'application/json', 'x-tenant-id': t, 'x-workspace-id': w, 'x-auth-subject': `admin-${t}` });
+const headersFor = (t, w) => ({ 'content-type': 'application/json', 'x-tenant-id': t, 'x-workspace-id': w, 'x-auth-subject': `admin-${t}`, 'x-actor-roles': 'tenant_admin' });
 const A = headersFor('tenant_A', 'ws_A');
 const B = headersFor('tenant_B', 'ws_B');
 

@@ -26,6 +26,7 @@ const authHeaders = {
   'x-tenant-id': TEN,
   'x-workspace-id': WS,
   'x-auth-subject': 'admin-trig',
+  'x-actor-roles': 'tenant_admin',
 };
 
 const CRON_DEF = {
@@ -237,7 +238,7 @@ test('bbx-flows-trig-05: publishing a webhook trigger returns a per-trigger secr
 
 // bbx-flows-trig-06: a valid HMAC signature starts a run (202).
 test('bbx-flows-trig-06: valid HMAC signature starts a webhook-triggered run (202)', async () => {
-  await withTriggersServer(async ({ baseUrl, temporal }) => {
+  await withTriggersServer(async ({ baseUrl, temporal, auditEvents }) => {
     const { pubBody } = await createAndPublish(baseUrl, WEBHOOK_DEF, 'Webhook Flow');
     const { triggerId, secret } = pubBody.triggers.webhooks[0];
     const rawBody = JSON.stringify({ order: 42 });
@@ -245,14 +246,15 @@ test('bbx-flows-trig-06: valid HMAC signature starts a webhook-triggered run (20
     const before = temporal.started.length;
     const res = await fetch(`${baseUrl}/v1/flows/workspaces/${WS}/triggers/webhooks/${encodeURIComponent(triggerId)}`, {
       method: 'POST',
-      headers: { ...authHeaders, 'x-platform-webhook-signature': sig, 'x-platform-webhook-id': 'd-abc123' },
+      headers: { ...authHeaders, 'x-platform-webhook-signature': sig, 'x-platform-webhook-id': 'd-abc123', 'x-correlation-id': 'webhook-request-1001' },
       body: rawBody,
     });
     assert.equal(res.status, 202);
     assert.equal(temporal.started.length, before + 1, 'exactly one execution started');
     const sa = temporal.started[before].opts.searchAttributes;
     assert.deepEqual(sa.triggerType, ['webhook'], 'triggerType=webhook stamped');
-  });
+    assert.equal(auditEvents.find((event) => event.eventType === 'flow.execution_started')?.correlationId, 'webhook-request-1001');
+  }, { audit: true });
 });
 
 // bbx-flows-trig-07: an invalid HMAC signature is 401 and starts NO run.

@@ -219,21 +219,44 @@ anon key is passed as `?apikey=`; the gateway verifies it and enforces tenant sc
   **fails closed**: an evaluator error denies rather than allowing unbounded use.
 - **Audit** (`packages/audit/src/flow-lifecycle-events.mjs`) emits a tenant-scoped event for each
   of the eight lifecycle actions (`definition_created/updated`, `version_published`,
-  `definition_deleted`, `execution_started/cancelled/retry`, `signal_sent`) into the existing
-  platform-owned audit topic through a PostgreSQL outbox, carrying `eventId`, `outcome`,
+  `definition_deleted`, `execution_started/cancelled/retry`, `signal_sent`) into the
+  platform-owned Flow audit topic through a PostgreSQL outbox, carrying `eventId`, `outcome`,
   `correlationId`, and `triggerType` on starts. Definition mutations and their outbox rows
   commit together; an outbox failure returns `AUDIT_UNAVAILABLE` with no definition change.
-  The relay retries transient Kafka failures and keeps exhausted rows as dead letters.
+  The relay retries Kafka failures with exponential backoff, capped at 12 attempts. A sustained
+  outage can exhaust that budget; exhausted rows stay in `dead_letter` until an operator redrives
+  them after restoring the broker.
   `/metrics` exposes pending depth, oldest pending age, dead-letter count, and relay failures.
   The relay drains pending rows in batches and removes delivered rows after seven days; dead
-  letters remain for operator review. If Kafka is not configured, pending rows remain visible in
-  metrics and delivery resumes when a producer is configured. Execution start, cancel, retry, and
-  signal events are enqueued after Temporal acknowledges the operation. An outbox failure at that
+  letters remain for operator review. Alert on the maximum gauge value across replicas because
+  each replica reports the same table-wide counts. If Kafka is not configured, pending rows
+  remain visible in metrics and delivery resumes when a producer is configured. Execution start,
+  cancel, retry, and signal events are enqueued after Temporal acknowledges the operation. An outbox failure at that
   point returns `AUDIT_UNAVAILABLE` even though the execution action may already have occurred;
   callers should check execution state before retrying. A replay of a triggered start repairs a
   missing start event using a stable event ID, without adding a second row if it was already
   recorded. Events lost before this change cannot be
   reconstructed from the outbox, so audit consumers must account for the pre-upgrade gap.
+
+  To redrive after broker recovery, inspect `event_id`, `attempts`, and `created_at` for
+  `state = 'dead_letter'` in `flow_audit_outbox` (do not export `payload`). Select the event IDs
+  approved for replay, then run the following parameterized statement against the Flow metadata
+  database, binding those UUIDs as `$1`. The relay will pick up each row on its next poll;
+  consumers should deduplicate by the unchanged `eventId` because delivery is at least once.
+  Check the dead-letter and pending gauges after
+  replay and investigate any row that exhausts its retry budget again.
+
+  ```sql
+  SELECT event_id, attempts, created_at
+  FROM flow_audit_outbox
+  WHERE state = 'dead_letter'
+  ORDER BY created_at;
+
+  UPDATE flow_audit_outbox
+  SET state = 'pending', attempts = 0, next_attempt_at = now()
+  WHERE state = 'dead_letter' AND event_id = ANY($1::uuid[]);
+  ```
+
 - **Teardown** (`packages/provisioning-orchestrator/src/appliers/workflows-applier.mjs`): a tenant
   purge cascades to the `workflows` domain with the same partial-failure semantics as the other
   domains — it terminates every running execution whose `tenantId` matches (paginated

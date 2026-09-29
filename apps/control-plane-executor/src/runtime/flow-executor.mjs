@@ -886,15 +886,15 @@ export function createFlowExecutor({
   // triggerType search attribute + audit + execution-token minting are identical to a manual start;
   // the deterministic workflowIdOverride gives idempotent (replay-safe) delivery. Quota gates still
   // apply (a flood of webhook deliveries is metered exactly like manual starts).
-  async function startTriggeredExecution({ identity, flowId, version, input, triggerType, workflowIdOverride }) {
-    return startExecution({ identity, flowId, version, input, triggerType, workflowIdOverride });
+  async function startTriggeredExecution({ identity, flowId, version, input, triggerType, workflowIdOverride, correlationId }) {
+    return startExecution({ identity, flowId, version, input, triggerType, workflowIdOverride, correlationId });
   }
 
   // Inbound webhook ingestion (spec: POST .../triggers/webhooks/{triggerId}). Verify the HMAC
   // signature against the per-trigger secret BEFORE any Temporal call; an invalid/missing signature
   // is 401 with NO run started. A valid signature starts the bound flow with triggerType=webhook and
   // a deterministic workflow id derived from the delivery id (replay dedup -> 202, no second run).
-  async function handleWebhookTrigger({ identity, triggerId, rawBody, signatureHeader, deliveryId, payload }) {
+  async function handleWebhookTrigger({ identity, triggerId, rawBody, signatureHeader, deliveryId, payload, correlationId }) {
     if (!flowTriggerRegistry) {
       throw clientError('Flow triggers are not enabled', 501, 'TRIGGERS_DISABLED');
     }
@@ -908,7 +908,7 @@ export function createFlowExecutor({
     // same id -> Temporal makes the second start a no-op (startExecution returns { deduplicated }).
     const workflowIdOverride = `wh-${triggerId}-${deliveryId ?? randomUUID()}`.replace(/:/g, '_');
     const result = await startTriggeredExecution({
-      identity, flowId, version: null, input: payload, triggerType: 'webhook', workflowIdOverride,
+      identity, flowId, version: null, input: payload, triggerType: 'webhook', workflowIdOverride, correlationId,
     });
     return { accepted: true, executionId: result.executionId, deduplicated: result.deduplicated ?? false };
   }
@@ -1430,6 +1430,7 @@ export function createFlowExecutor({
         return handleWebhookTrigger({
           identity, triggerId: params.triggerId, rawBody: params.rawBody,
           signatureHeader: params.signatureHeader, deliveryId: params.deliveryId, payload: params.payload,
+          correlationId: params.correlationId,
         });
       case 'list_executions':
         return listExecutions({ identity, flowId, status: params.status, clientQuery: params.query });

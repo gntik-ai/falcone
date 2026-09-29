@@ -1432,7 +1432,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
         let payload;
         try { payload = rawBody ? JSON.parse(rawBody) : {}; } catch { payload = { raw: rawBody }; }
         const ctx = {
-          url, identity, registry,
+          url, identity, registry, headers: req.headers,
           rawBody,
           payload,
           signatureHeader: req.headers['x-platform-webhook-signature'],
