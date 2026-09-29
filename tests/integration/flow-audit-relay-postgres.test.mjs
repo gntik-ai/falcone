@@ -46,6 +46,19 @@ test('two PostgreSQL relay replicas never claim the same pending event concurren
         (err) => err.code === 'AUDIT_UNAVAILABLE');
       assert.ok(await store.getDefinition(scope), 'delete rolls back');
 
+      const duplicateId = randomUUID();
+      await store.enqueueAudit({ eventId: duplicateId, eventType: 'flow.definition_created',
+        tenantId: scope.tenantId, workspaceId: scope.workspaceId });
+      const collidingScope = { ...scope, flowId: randomUUID() };
+      await assert.rejects(store.createDefinition({ ...collidingScope, name: 'collision', definition,
+        createdBy: 'actor-test', auditEvent: { eventId: duplicateId,
+          eventType: 'flow.definition_created', tenantId: scope.tenantId, workspaceId: scope.workspaceId } }),
+      (err) => err.code === 'AUDIT_UNAVAILABLE');
+      assert.equal(await store.getDefinition(collidingScope), null, 'event ID conflict rolls back the mutation');
+      const originalAudit = await pool.query('SELECT event_type FROM flow_audit_outbox WHERE event_id = $1', [duplicateId]);
+      assert.equal(originalAudit.rows[0].event_type, 'flow.definition_created');
+      await pool.query('DELETE FROM flow_audit_outbox WHERE event_id = $1', [duplicateId]);
+
       const eventIds = [randomUUID(), randomUUID(), randomUUID()];
       for (const eventId of eventIds) {
         await store.enqueueAudit({ eventId, eventType: 'flow.definition_created',

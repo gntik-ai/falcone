@@ -287,9 +287,12 @@ function createInMemoryFlowStore() {
   const versions = new Map(); // same key -> array of version records (1-based)
   const outbox = [];
   let auditWriter;
-  async function appendAudit(event) {
+  async function appendAudit(event, { allowDuplicate = false } = {}) {
     if (!event) return;
-    if (outbox.some((row) => row.eventId === event.eventId)) return;
+    if (outbox.some((row) => row.eventId === event.eventId)) {
+      if (allowDuplicate) return;
+      throw clientError('Flow audit record could not be persisted', 503, 'AUDIT_UNAVAILABLE');
+    }
     try { await auditWriter?.(event); }
     catch { throw clientError('Flow audit record could not be persisted', 503, 'AUDIT_UNAVAILABLE'); }
     outbox.push(event);
@@ -299,7 +302,7 @@ function createInMemoryFlowStore() {
   return {
     async ensureSchema() { /* no-op */ },
     setAuditWriter(writer) { auditWriter = writer; },
-    async enqueueAudit(event) { await appendAudit(event); },
+    async enqueueAudit(event) { await appendAudit(event, { allowDuplicate: true }); },
     pendingAudit() { return [...outbox]; },
 
     async createDefinition({ tenantId, workspaceId, flowId, name, definitionYaml, definition, dslApiVersion, createdBy, auditEvent }) {
@@ -386,14 +389,17 @@ function createInMemoryFlowStore() {
 }
 
 function createPostgresFlowStore(pool) {
-  async function insertAudit(client, event) {
+  async function insertAudit(client, event, { allowDuplicate = false } = {}) {
     if (!event) return;
     try {
-      await client.query(
+      const result = await client.query(
         `INSERT INTO flow_audit_outbox (event_id, event_type, tenant_id, workspace_id, payload)
          VALUES ($1,$2,$3,$4,$5) ON CONFLICT (event_id) DO NOTHING`,
         [event.eventId, event.eventType, event.tenantId, event.workspaceId, event],
       );
+      if (result.rowCount === 0 && !allowDuplicate) {
+        throw clientError('Flow audit record could not be persisted', 503, 'AUDIT_UNAVAILABLE');
+      }
     } catch {
       throw clientError('Flow audit record could not be persisted', 503, 'AUDIT_UNAVAILABLE');
     }
@@ -467,7 +473,7 @@ function createPostgresFlowStore(pool) {
         ON flow_audit_outbox (delivered_at) WHERE state = 'delivered'`);
     },
 
-    async enqueueAudit(event) { await insertAudit(pool, event); },
+    async enqueueAudit(event) { await insertAudit(pool, event, { allowDuplicate: true }); },
 
     async createDefinition({ tenantId, workspaceId, flowId, name, definitionYaml, definition, dslApiVersion, createdBy, auditEvent }) {
       try {
@@ -1389,6 +1395,7 @@ export function createFlowExecutor({
         };
         const updated = await store.updateDefinition({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId, changes,
           auditEvent: auditEvent(FLOW_AUDIT_EVENT_TYPES.DEFINITION_UPDATED, { identity, flowId, correlationId: params.correlationId }) });
+        if (!updated) throw clientError('Flow not found', 404, 'FLOW_NOT_FOUND');
         return updated;
       }
       case 'delete_definition': {
@@ -1407,6 +1414,7 @@ export function createFlowExecutor({
         }
         const removed = await store.deleteDefinition({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId,
           auditEvent: auditEvent(FLOW_AUDIT_EVENT_TYPES.DEFINITION_DELETED, { identity, flowId, correlationId: params.correlationId }) });
+        if (!removed.removed) throw clientError('Flow not found', 404, 'FLOW_NOT_FOUND');
         return removed;
       }
       case 'validate':
