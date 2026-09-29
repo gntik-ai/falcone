@@ -22,11 +22,12 @@
  * NOTE: the backend is OpenBao (the Vault fork). The KV v2 REST surface, paths, and the X-Vault-Token
  * request header are byte-compatible, so the fake server below (and the asserted protocol) is
  * unchanged by the swap; the client just additionally accepts BAO_* env aliases.
+ * Kubernetes-auth lease tests live in vault-token-lifecycle.test.mjs so their fake clock can run
+ * without a local HTTP listener.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-
 import {
   createVaultKvClient, createWorkspaceSecretStore, vaultStoreFromEnv,
   workspaceSecretPath, secretEnvVarName,

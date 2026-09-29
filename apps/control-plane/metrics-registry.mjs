@@ -65,7 +65,7 @@ export function recordKnativeDependencyEvent(event = {}) {
 }
 
 // Render the full registry in Prometheus text exposition format.
-export function renderMetrics() {
+export function renderMetrics(secretBackend = { state: 'disabled', consecutiveFailures: 0 }) {
   const out = [];
   out.push('# HELP falcone_http_requests_total Total HTTP requests handled.');
   out.push('# TYPE falcone_http_requests_total counter');
@@ -86,6 +86,12 @@ export function renderMetrics() {
   out.push('# HELP falcone_process_uptime_seconds Process uptime in seconds.');
   out.push('# TYPE falcone_process_uptime_seconds gauge');
   out.push(`falcone_process_uptime_seconds ${Math.floor((Date.now() - startedAtMs) / 1000)}`);
+  out.push('# HELP falcone_secret_backend_auth_degraded Whether backend authentication is degraded.');
+  out.push('# TYPE falcone_secret_backend_auth_degraded gauge');
+  out.push(`falcone_secret_backend_auth_degraded ${secretBackend.state === 'degraded' ? 1 : 0}`);
+  out.push('# HELP falcone_secret_backend_auth_consecutive_failures Consecutive backend authentication failures.');
+  out.push('# TYPE falcone_secret_backend_auth_consecutive_failures gauge');
+  out.push(`falcone_secret_backend_auth_consecutive_failures ${Number(secretBackend.consecutiveFailures) || 0}`);
   out.push('# HELP falcone_knative_dependency_events_total Knative availability, deferred cleanup, and recovery events.');
   out.push('# TYPE falcone_knative_dependency_events_total counter');
   for (const [key, value] of knativeDependencyTotal) {

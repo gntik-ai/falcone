@@ -25,6 +25,9 @@ import { readFileSync } from 'node:fs';
 
 const ENC = (s) => encodeURIComponent(String(s));
 const SECRET_ROOT = 'falcone/workspace-secrets';
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+const AUTH_REQUEST_TIMEOUT_MS = 10_000;
+const KV_REJECTION_BACKOFF_MS = 60_000;
 
 /** The Vault KV path for one workspace secret (raw; segments are encoded by the client). */
 export function workspaceSecretPath(tenantId, workspaceId, name) {
@@ -58,6 +61,11 @@ export function createKubernetesAuthTokenProvider({
   namespace,
   serviceAccountJwtPath = '/var/run/secrets/kubernetes.io/serviceaccount/token',
   fetchImpl = globalThis.fetch,
+  now = Date.now,
+  setTimeoutImpl = globalThis.setTimeout,
+  clearTimeoutImpl = globalThis.clearTimeout,
+  random = Math.random,
+  log = console.error,
 } = {}) {
   if (!addr) throw new TypeError('createKubernetesAuthTokenProvider requires a Vault addr');
   if (!role) throw new TypeError('createKubernetesAuthTokenProvider requires a Kubernetes auth role');
@@ -65,29 +73,158 @@ export function createKubernetesAuthTokenProvider({
   const mount = encodeURIComponent(String(authMount).replace(/^\/+|\/+$/g, '') || 'kubernetes');
   let cachedToken = null;
   let expiresAt = 0;
+  let nextRetryAt = 0;
+  let nextKvInvalidationAt = 0;
+  let timer = null;
+  let inFlight = null;
+  const health = { state: 'starting', lastSuccessAt: null, lastFailureAt: null,
+    lastFailureStatus: null, consecutiveFailures: 0, tokenExpiresAt: null };
+  const headers = { 'content-type': 'application/json', accept: 'application/json',
+    ...(namespace ? { 'x-vault-namespace': namespace } : {}) };
 
-  return async () => {
-    const now = Date.now();
-    if (cachedToken && now < expiresAt) return cachedToken;
-    const jwt = readFileSync(serviceAccountJwtPath, 'utf8').trim();
-    const res = await fetchImpl(`${base}/v1/auth/${mount}/login`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json',
-        ...(namespace ? { 'x-vault-namespace': namespace } : {}),
-      },
-      body: JSON.stringify({ role, jwt }),
-    });
-    if (!res.ok) throw vaultError('kubernetes-login', `auth/${authMount}/login`, res.status);
-    const json = await res.json();
-    const token = json?.auth?.client_token;
-    if (!token) throw vaultError('kubernetes-login', `auth/${authMount}/login`, 502);
-    const leaseSeconds = Number(json?.auth?.lease_duration ?? 3600);
+  function clearTimer() {
+    if (timer) clearTimeoutImpl(timer);
+    timer = null;
+  }
+  function schedule(delay, action) {
+    clearTimer();
+    const deadline = now() + Math.max(0, delay);
+    const arm = () => {
+      timer = setTimeoutImpl(() => {
+        timer = null;
+        if (now() < deadline) arm();
+        else void action().catch(() => {});
+      }, Math.min(MAX_TIMER_DELAY_MS, Math.max(0, deadline - now())));
+      timer?.unref?.();
+    };
+    arm();
+  }
+  async function authJson(url, options, op, path) {
+    const controller = new AbortController();
+    let timeout;
+    try {
+      return await Promise.race([
+        (async () => {
+          const res = await fetchImpl(url, { ...options, signal: controller.signal });
+          if (!res.ok) throw vaultError(op, path, res.status);
+          return res.json();
+        })(),
+        new Promise((_, reject) => {
+          timeout = setTimeoutImpl(() => {
+            controller.abort();
+            reject(vaultError('auth', 'request', 502));
+          }, AUTH_REQUEST_TIMEOUT_MS);
+          timeout?.unref?.();
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeoutImpl(timeout);
+    }
+  }
+  function failure(status) {
+    const transition = health.state !== 'degraded';
+    health.state = 'degraded';
+    health.lastFailureAt = new Date(now()).toISOString();
+    health.lastFailureStatus = status;
+    health.consecutiveFailures++;
+    // Log only fixed fields. Neither upstream response bodies nor thrown errors are safe to log.
+    if (transition) log(JSON.stringify({ event: 'secret_backend_auth_failure', role, authMount,
+      status, consecutiveFailures: health.consecutiveFailures }));
+  }
+  function success(token, leaseSeconds, renewable) {
+    const recovered = health.state === 'degraded';
     cachedToken = token;
-    expiresAt = now + Math.max(60, leaseSeconds - 60) * 1000;
-    return cachedToken;
+    const parsedLease = Number(leaseSeconds);
+    const leaseMs = Math.max(1000, (Number.isFinite(parsedLease) && parsedLease > 0 ? parsedLease : 3600) * 1000);
+    expiresAt = now() + leaseMs;
+    nextRetryAt = 0;
+    nextKvInvalidationAt = 0;
+    health.state = 'ok';
+    health.lastSuccessAt = new Date(now()).toISOString();
+    health.consecutiveFailures = 0;
+    health.tokenExpiresAt = new Date(expiresAt).toISOString();
+    if (recovered) log(JSON.stringify({ event: 'secret_backend_auth_recovered', role, authMount,
+      consecutiveFailures: 0 }));
+    // Renew after half the lease, leaving time for a bounded re-login before expiry.
+    schedule(leaseMs * 0.55, () => renewable ? renew() : login());
+  }
+  function singleFlight(action) {
+    if (inFlight) return inFlight;
+    const pending = Promise.resolve().then(action);
+    inFlight = pending;
+    void pending.finally(() => { if (inFlight === pending) inFlight = null; }).catch(() => {});
+    return pending;
+  }
+  function retry() {
+    const cap = Math.min(60_000, 1000 * 2 ** Math.min(health.consecutiveFailures - 1, 6));
+    const delay = cap * (0.5 + random() * 0.5);
+    nextRetryAt = now() + delay;
+    schedule(delay, () => login());
+  }
+  async function performLogin() {
+    try {
+      const jwt = readFileSync(serviceAccountJwtPath, 'utf8').trim();
+      const auth = (await authJson(`${base}/v1/auth/${mount}/login`, {
+        method: 'POST', headers, body: JSON.stringify({ role, jwt }),
+      }, 'kubernetes-login', `auth/${authMount}/login`))?.auth;
+      if (!auth?.client_token) throw vaultError('kubernetes-login', `auth/${authMount}/login`, 502);
+      success(auth.client_token, auth.lease_duration, auth.renewable === true);
+      return cachedToken;
+    } catch (error) {
+      failure(Number(error?.vaultStatus) || 0);
+      retry();
+      throw vaultError('kubernetes-login', `auth/${authMount}/login`, Number(error?.vaultStatus) || 502);
+    }
+  }
+  function login() {
+    return singleFlight(performLogin);
+  }
+  function renew() {
+    return singleFlight(async () => {
+      if (!cachedToken || now() >= expiresAt) return performLogin();
+      try {
+        const previousExpiry = expiresAt;
+        const auth = (await authJson(`${base}/v1/auth/token/renew-self`, {
+          method: 'POST', headers: { ...headers, 'x-vault-token': cachedToken }, body: '{}',
+        }, 'renew-self', 'auth/token/renew-self'))?.auth;
+        const leaseMs = Number(auth?.lease_duration) * 1000;
+        if (!Number.isFinite(leaseMs) || leaseMs <= 0 || now() + leaseMs <= previousExpiry)
+          throw vaultError('renew-self', 'auth/token/renew-self', 502);
+        success(auth?.client_token || cachedToken, auth.lease_duration, auth.renewable === true);
+        return cachedToken;
+      } catch (error) {
+        // A failed renewal is recovered by re-login; report degradation only if that fails too.
+        log(JSON.stringify({ event: 'secret_backend_auth_renewal_failure', role, authMount,
+          status: Number(error?.vaultStatus) || 0 }));
+        return performLogin();
+      }
+    });
+  }
+  const provider = async () => {
+    if (cachedToken && now() < expiresAt) return cachedToken;
+    if (inFlight) return inFlight;
+    if (now() < nextRetryAt) throw vaultError('kubernetes-login', `auth/${authMount}/login`, health.lastFailureStatus || 502);
+    return login();
   };
+  provider.invalidate = async (rejectedToken) => {
+    if (inFlight) await inFlight.catch(() => {});
+    // A second KV 403 after a fresh login usually means a policy denial. Bound token creation
+    // until the next cooldown, while preserving the first invalidate-and-retry attempt.
+    if (now() < nextKvInvalidationAt) return rejectedToken;
+    if (cachedToken === rejectedToken) {
+      cachedToken = null;
+      expiresAt = 0;
+      health.tokenExpiresAt = null;
+      // A failed login has already armed a backoff retry. Keep it alive after a KV 403.
+      if (now() >= nextRetryAt) clearTimer();
+    }
+    return provider();
+  };
+  provider.noteKvRejection = () => { nextKvInvalidationAt = now() + KV_REJECTION_BACKOFF_MS; };
+  provider.getHealthSnapshot = () => ({ ...health });
+  // Start auth without blocking module import, and consume the rejection until a caller arrives.
+  void login().catch(() => {});
+  return provider;
 }
 
 export function createVaultKvClient({ addr, token, tokenProvider, mount = 'secret', namespace, fetchImpl = globalThis.fetch } = {}) {
@@ -97,17 +234,34 @@ export function createVaultKvClient({ addr, token, tokenProvider, mount = 'secre
   const seg = (p) => String(p).split('/').filter(Boolean).map(ENC).join('/');
   const dataUrl = (p) => `${base}/v1/${ENC(mount)}/data/${seg(p)}`;
   const metaUrl = (p) => `${base}/v1/${ENC(mount)}/metadata/${seg(p)}`;
-  const headers = async () => ({
-    'x-vault-token': token || await tokenProvider(),
+  const headers = (activeToken) => ({
+    'x-vault-token': activeToken,
     ...(namespace ? { 'x-vault-namespace': namespace } : {}),
     'content-type': 'application/json',
     accept: 'application/json',
   });
-  const send = async (method, u, body) => fetchImpl(u, {
-    method, headers: await headers(), body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const send = async (method, u, body) => {
+    let activeToken = token || await tokenProvider();
+    const request = () => fetchImpl(u, {
+      method, headers: headers(activeToken), body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    let res = await request();
+    if (res.status === 403 && !token && typeof tokenProvider.invalidate === 'function') {
+      const replacement = await tokenProvider.invalidate(activeToken);
+      if (replacement !== activeToken) {
+        activeToken = replacement;
+        res = await request();
+        if (res.status === 403) tokenProvider.noteKvRejection?.();
+      }
+    }
+    return res;
+  };
 
   return {
+    getHealthSnapshot: () => tokenProvider?.getHealthSnapshot?.() ?? {
+      state: 'ok', lastSuccessAt: null, lastFailureAt: null, lastFailureStatus: null,
+      consecutiveFailures: 0, tokenExpiresAt: null,
+    },
     async writeSecret(path, data) {
       const res = await send('POST', dataUrl(path), { data });
       if (!res.ok) throw vaultError('write', path, res.status);
@@ -215,6 +369,10 @@ export function createWorkspaceSecretStore(client) {
   }
 
   return {
+    getHealthSnapshot: () => client.getHealthSnapshot?.() ?? {
+      state: 'ok', lastSuccessAt: null, lastFailureAt: null, lastFailureStatus: null,
+      consecutiveFailures: 0, tokenExpiresAt: null,
+    },
     validName: (n) => SECRET_NAME_RE.test(String(n ?? '')),
 
     // CREATE or REPLACE the value at the workspace path (KV-v2 new version). Returns metadata only
@@ -310,4 +468,12 @@ export function vaultStoreFromEnv(env = process.env, fetchImpl) {
     fetchImpl,
   });
   return createWorkspaceSecretStore(client);
+}
+
+/** Read-only process health for an optional workspace-secret store. */
+export function vaultStoreHealthSnapshot(store) {
+  return store?.getHealthSnapshot() ?? {
+    state: 'disabled', lastSuccessAt: null, lastFailureAt: null,
+    lastFailureStatus: null, consecutiveFailures: 0, tokenExpiresAt: null,
+  };
 }
