@@ -11,6 +11,11 @@ const durationByRoute = new Map(); // "method|route" -> { buckets:number[], sum,
 const mcpDependencyEvents = new Map(); // "operation|outcome|mode|state|reason" -> count
 const LE = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
 const startedAtMs = Date.now();
+let flowAuditOutbox = { pending: 0, dead_letter: 0, oldest_seconds: 0, failures: 0 };
+
+export function recordFlowAuditOutbox(snapshot) {
+  flowAuditOutbox = { ...flowAuditOutbox, ...snapshot };
+}
 
 const esc = (v) => String(v ?? '').replace(/[\\"\n]/g, '_');
 
@@ -87,6 +92,11 @@ export function renderMetrics() {
   for (const [k, v] of mcpDependencyEvents) {
     const [operation, outcome, mode, state, reason] = k.split('|');
     out.push(`falcone_mcp_knative_dependency_events_total{operation="${esc(operation)}",outcome="${esc(outcome)}",mode="${esc(mode)}",state="${esc(state)}",reason="${esc(reason)}"} ${v}`);
+  }
+  for (const [name, value] of Object.entries(flowAuditOutbox)) {
+    const metric = `falcone_flow_audit_outbox_${name}`;
+    out.push(`# TYPE ${metric} ${name === 'failures' ? 'counter' : 'gauge'}`);
+    out.push(`${metric} ${Number(value) || 0}`);
   }
   out.push('# HELP falcone_process_uptime_seconds Process uptime in seconds.');
   out.push('# TYPE falcone_process_uptime_seconds gauge');

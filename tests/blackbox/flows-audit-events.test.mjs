@@ -38,10 +38,10 @@ function makeFakeTemporal() {
   } };
 }
 
-async function withServer(fn) {
+async function withServer(fn, { auditSink } = {}) {
   const events = [];
   const registry = createConnectionRegistry({ resolveConnection: () => ({ dsn: 'postgres://unused/none' }) });
-  const flowExecutor = createFlowExecutor({ temporalClient: makeFakeTemporal(), temporalAddress: 'fake:7233', auditSink: async (e) => { events.push(e); } });
+  const flowExecutor = createFlowExecutor({ temporalClient: makeFakeTemporal(), temporalAddress: 'fake:7233', auditSink: auditSink ?? (async (e) => { events.push(e); }) });
   const server = createControlPlaneServer({ registry, flowExecutor, logger: { error() {} } });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -54,7 +54,7 @@ const typesOf = (events) => events.map((e) => e.eventType);
 test('bbx-flows-ten-audit-01: create/update/publish/delete emit the four definition events', async () => {
   await withServer(async (baseUrl, events) => {
     const flowId = (await (await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows`, { method: 'POST', headers: A, body: JSON.stringify({ name: 'f', definition: DEF }) })).json()).flowId;
-    await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows/${flowId}`, { method: 'PATCH', headers: A, body: JSON.stringify({ name: 'f2' }) });
+    await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows/${flowId}`, { method: 'PATCH', headers: { ...A, 'x-correlation-id': 'audit-request-1001' }, body: JSON.stringify({ name: 'f2' }) });
     await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows/${flowId}/versions`, { method: 'POST', headers: A });
     await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows/${flowId}`, { method: 'DELETE', headers: A });
     const t = typesOf(events);
@@ -62,6 +62,13 @@ test('bbx-flows-ten-audit-01: create/update/publish/delete emit the four definit
     assert.ok(t.includes(FLOW_AUDIT_EVENT_TYPES.DEFINITION_UPDATED));
     assert.ok(t.includes(FLOW_AUDIT_EVENT_TYPES.VERSION_PUBLISHED));
     assert.ok(t.includes(FLOW_AUDIT_EVENT_TYPES.DEFINITION_DELETED));
+    assert.equal(events.filter((e) => t.includes(e.eventType)).length, 4);
+    assert.equal(events.find((e) => e.eventType === FLOW_AUDIT_EVENT_TYPES.DEFINITION_UPDATED).correlationId, 'audit-request-1001');
+    for (const event of events) {
+      assert.ok(event.eventId);
+      assert.equal(event.outcome, 'succeeded');
+      assert.ok(event.correlationId);
+    }
   });
 });
 
@@ -128,4 +135,26 @@ test('bbx-flows-ten-audit-06: the contract entry registers exactly the eight eve
   // The builder rejects an unknown event type and a missing required field (fail-closed).
   assert.throws(() => buildFlowAuditEvent({ eventType: 'flow.bogus', tenantId: 't', workspaceId: 'w', actorId: 'u', flowId: 'f' }));
   assert.throws(() => buildFlowAuditEvent({ eventType: FLOW_AUDIT_EVENT_TYPES.DEFINITION_CREATED, tenantId: 't', actorId: 'u', flowId: 'f' }));
+});
+
+
+test('bbx-flows-audit-unavailable: failed outbox write rolls back an authoring mutation', async () => {
+  await withServer(async (baseUrl) => {
+    const result = await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows`, {
+      method: 'POST', headers: A, body: JSON.stringify({ name: 'f', definition: DEF }),
+    });
+    assert.equal(result.status, 503);
+    assert.equal((await result.json()).code, 'AUDIT_UNAVAILABLE');
+    const list = await (await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows`, { headers: A })).json();
+    assert.deepEqual(list.items, []);
+  }, { auditSink: async () => { throw new Error('simulated outbox failure'); } });
+});
+
+test('flow audit envelope has stable id and rejects missing correlation id', () => {
+  const event = buildFlowAuditEvent({ eventType: FLOW_AUDIT_EVENT_TYPES.DEFINITION_CREATED,
+    tenantId: 't', workspaceId: 'w', actorId: 'a', flowId: 'f' });
+  assert.ok(event.eventId);
+  assert.equal(event.outcome, 'succeeded');
+  assert.ok(event.correlationId);
+  assert.throws(() => buildFlowAuditEvent({ ...event, correlationId: null }), /correlationId/);
 });

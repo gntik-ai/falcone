@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 // Flow lifecycle audit events (change: add-flows-tenancy-isolation-limits).
 //
 // Every flow lifecycle action emits a tenant-scoped audit event to the existing audit pipeline.
@@ -47,18 +49,22 @@ export function buildFlowAuditEvent({
   // runs. Null for non-execution events. Additive + backward-compatible (change add-flows-triggers).
   triggerType = null,
   occurredAt = new Date().toISOString(),
-  correlationId = null,
+  correlationId = randomUUID(),
+  eventId = randomUUID(),
+  outcome = 'succeeded',
 } = {}) {
   if (!ALL_EVENT_TYPES.has(eventType)) {
     throw new Error(`flow audit: unknown eventType "${eventType}"`);
   }
-  for (const [k, v] of Object.entries({ tenantId, workspaceId, actorId, flowId, occurredAt })) {
+  for (const [k, v] of Object.entries({ tenantId, workspaceId, actorId, flowId, occurredAt, eventId, correlationId, outcome })) {
     if (v === undefined || v === null || v === '') {
       throw new Error(`flow audit: missing required field "${k}" for ${eventType}`);
     }
   }
   return {
+    eventId,
     eventType,
+    outcome,
     category: 'flows',
     tenantId,
     workspaceId,

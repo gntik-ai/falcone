@@ -667,31 +667,31 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     ...(flowExecutor ? [
       // Task-type catalog — the designer palette source (driven by the activity registry).
       ['GET', new RegExp(`${flt}$`), ([w], c) =>
-        runFlows(flowExecutor, { operation: 'list_task_types', identity: c.identity }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'list_task_types', identity: c.identity }, 200)],
       ['GET', new RegExp(`${fl}$`), ([w], c) =>
-        runFlows(flowExecutor, { operation: 'list_definitions', identity: c.identity }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'list_definitions', identity: c.identity }, 200)],
       ['POST', new RegExp(`${fl}$`), ([w], c) =>
-        runFlows(flowExecutor, { operation: 'create_definition', identity: c.identity, body: c.body }, 201)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'create_definition', identity: c.identity, body: c.body }, 201)],
       ['GET', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'get_definition', identity: c.identity, flowId: f }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'get_definition', identity: c.identity, flowId: f }, 200)],
       ['PATCH', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'update_definition', identity: c.identity, flowId: f, body: c.body }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'update_definition', identity: c.identity, flowId: f, body: c.body }, 200)],
       ['DELETE', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'delete_definition', identity: c.identity, flowId: f }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'delete_definition', identity: c.identity, flowId: f }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/validate$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'validate', identity: c.identity, flowId: f }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'validate', identity: c.identity, flowId: f }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'publish_version', identity: c.identity, flowId: f }, 201)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'publish_version', identity: c.identity, flowId: f }, 201)],
       ['GET', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'list_versions', identity: c.identity, flowId: f }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'list_versions', identity: c.identity, flowId: f }, 200)],
       ['GET', new RegExp(`${fl}/([^/]+)/versions/([^/]+)$`), ([w, f, v], c) =>
-        runFlows(flowExecutor, { operation: 'get_version', identity: c.identity, flowId: f, version: Number(v) }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'get_version', identity: c.identity, flowId: f, version: Number(v) }, 200)],
 
       // Execution lifecycle (data-control class).
       ['POST', new RegExp(`${fl}/([^/]+)/executions$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'start_execution', identity: c.identity, flowId: f, version: c.body.version, input: c.body.input }, 201)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'start_execution', identity: c.identity, flowId: f, version: c.body.version, input: c.body.input }, 201)],
       ['GET', new RegExp(`${fl}/([^/]+)/executions$`), ([w, f], c) =>
-        runFlows(flowExecutor, {
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'],
           operation: 'list_executions', identity: c.identity, flowId: f,
           status: c.url.searchParams.get('status') ?? undefined,
           // A client-supplied visibility query/filter is captured but NEVER trusted: the executor
@@ -699,13 +699,13 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
           query: c.url.searchParams.get('query') ?? c.url.searchParams.get('filter') ?? undefined,
         }, 200)],
       ['GET', new RegExp(`${fl}/([^/]+)/executions/([^/]+)$`), ([w, f, e], c) =>
-        runFlows(flowExecutor, { operation: 'get_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'get_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/cancellations$`), ([w, f, e], c) =>
-        runFlows(flowExecutor, { operation: 'cancel_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 202)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'cancel_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 202)],
       ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/retries$`), ([w, f, e], c) =>
-        runFlows(flowExecutor, { operation: 'retry_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 201)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'retry_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 201)],
       ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/signals/([^/]+)$`), ([w, f, e, s], c) =>
-        runFlows(flowExecutor, { operation: 'send_signal', identity: c.identity, flowId: f, executionId: decodeURIComponent(e), signalName: decodeURIComponent(s), payload: c.body }, 202)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'send_signal', identity: c.identity, flowId: f, executionId: decodeURIComponent(e), signalName: decodeURIComponent(s), payload: c.body }, 202)],
 
       // ---- Flow schedule management (change: add-flow-schedule-management-api / #680) ----
       // Operate in place on a flow's cron Temporal Schedule (created on publish): list / get /
@@ -716,15 +716,15 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       // resolves to a non-existent id -> 404 SCHEDULE_NOT_FOUND (no cross-tenant exposure). The
       // list op filters Temporal's namespace-wide listing by the `{tenant}:{ws}:` id prefix.
       ['GET', new RegExp(`${fls}$`), ([w], c) =>
-        runFlows(flowExecutor, { operation: 'list_schedules', identity: c.identity }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'list_schedules', identity: c.identity }, 200)],
       ['GET', new RegExp(`${fl}/([^/]+)/schedule$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'get_schedule', identity: c.identity, flowId: f }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'get_schedule', identity: c.identity, flowId: f }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/schedule/pause$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'pause_schedule', identity: c.identity, flowId: f }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'pause_schedule', identity: c.identity, flowId: f }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/schedule/resume$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'resume_schedule', identity: c.identity, flowId: f }, 200)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'resume_schedule', identity: c.identity, flowId: f }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/schedule/trigger$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'trigger_schedule', identity: c.identity, flowId: f }, 202)],
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'], operation: 'trigger_schedule', identity: c.identity, flowId: f }, 202)],
 
       // ---- Inbound webhook trigger ingestion (HMAC-authenticated) ----
       // The handler verifies the per-trigger HMAC over the RAW body BEFORE any Temporal call; an
@@ -732,7 +732,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       // (202); a replayed delivery id is an idempotent 202 (no second run). { webhook:true } makes
       // the dispatcher read the raw body + signature/delivery headers instead of the JSON path.
       ['POST', new RegExp(`${fwh}$`), ([w, t], c) =>
-        runFlows(flowExecutor, {
+        runFlows(flowExecutor, { correlationId: c.headers['x-correlation-id'],
           operation: 'webhook_trigger', identity: c.identity, triggerId: decodeURIComponent(t),
           rawBody: c.rawBody, signatureHeader: c.signatureHeader, deliveryId: c.deliveryId, payload: c.payload,
         }, 202), { webhook: true }],

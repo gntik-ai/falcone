@@ -99,7 +99,7 @@ The Flows API is registered **only when `TEMPORAL_ADDRESS` is set** (the executo
 | `TEMPORAL_NAMESPACE` | `falcone-flows` | Shared Temporal namespace |
 | `TEMPORAL_TASK_QUEUE` | `flows-main` | Worker task queue |
 | `FLOW_QUOTA_ENFORCE_URL` | — | Quota-evaluator endpoint; when set, hard-limit breaches → `429` |
-| `FLOW_AUDIT_TOPIC` | `falcone.audit.flow-lifecycle` | Kafka topic for flow lifecycle audit (best-effort) |
+| `FLOW_AUDIT_TOPIC` | `falcone.audit.flow-lifecycle` | Platform Kafka topic for durable Flow lifecycle audit; outbox relay publishes with eventId keys |
 | `FLOW_TRIGGER_SECRET_KEY` | — | Master key for per-trigger webhook signing secrets |
 | `FLOWS_ENABLED` | — | Set to `false` to keep the Flows API but suppress the monitoring SSE endpoint |
 

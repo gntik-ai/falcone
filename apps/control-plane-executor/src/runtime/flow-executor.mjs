@@ -278,12 +278,23 @@ function createInMemoryFlowStore() {
   // key: `${tenantId}${workspaceId}${flowId}`
   const defs = new Map();
   const versions = new Map(); // same key -> array of version records (1-based)
+  const outbox = [];
+  let auditWriter;
+  async function appendAudit(event) {
+    if (!event) return;
+    try { await auditWriter?.(event); }
+    catch { throw clientError('Flow audit record could not be persisted', 503, 'AUDIT_UNAVAILABLE'); }
+    outbox.push(event);
+  }
   const key = (t, w, f) => `${t}${w}${f}`;
 
   return {
     async ensureSchema() { /* no-op */ },
+    setAuditWriter(writer) { auditWriter = writer; },
+    async enqueueAudit(event) { await appendAudit(event); },
+    pendingAudit() { return [...outbox]; },
 
-    async createDefinition({ tenantId, workspaceId, flowId, name, definitionYaml, definition, dslApiVersion, createdBy }) {
+    async createDefinition({ tenantId, workspaceId, flowId, name, definitionYaml, definition, dslApiVersion, createdBy, auditEvent }) {
       const k = key(tenantId, workspaceId, flowId);
       if (defs.has(k)) throw clientError('Flow already exists', 409, 'FLOW_EXISTS');
       const now = new Date().toISOString();
@@ -293,6 +304,7 @@ function createInMemoryFlowStore() {
         dsl_api_version: dslApiVersion ?? 'v1.0', status: 'draft',
         created_by: createdBy ?? null, created_at: now, updated_at: now,
       };
+      await appendAudit(auditEvent);
       defs.set(k, row);
       return defRowToResource(row);
     },
@@ -309,10 +321,11 @@ function createInMemoryFlowStore() {
       return defRowToResource(defs.get(key(tenantId, workspaceId, flowId)));
     },
 
-    async updateDefinition({ tenantId, workspaceId, flowId, changes }) {
+    async updateDefinition({ tenantId, workspaceId, flowId, changes, auditEvent }) {
       const k = key(tenantId, workspaceId, flowId);
       const row = defs.get(k);
       if (!row) return null;
+      await appendAudit(auditEvent);
       if (changes.name !== undefined) row.name = changes.name;
       if (changes.definitionYaml !== undefined) row.definition_yaml = changes.definitionYaml;
       if (changes.definition !== undefined) row.definition_json = changes.definition;
@@ -321,13 +334,15 @@ function createInMemoryFlowStore() {
       return defRowToResource(row);
     },
 
-    async deleteDefinition({ tenantId, workspaceId, flowId }) {
+    async deleteDefinition({ tenantId, workspaceId, flowId, auditEvent }) {
       const k = key(tenantId, workspaceId, flowId);
-      const had = defs.delete(k);
+      const had = defs.has(k);
+      if (had) await appendAudit(auditEvent);
+      defs.delete(k);
       return { removed: had };
     },
 
-    async insertVersion({ tenantId, workspaceId, flowId, definitionYaml, definition, dslApiVersion, createdBy }) {
+    async insertVersion({ tenantId, workspaceId, flowId, definitionYaml, definition, dslApiVersion, createdBy, auditEvent }) {
       const k = key(tenantId, workspaceId, flowId);
       const list = versions.get(k) ?? [];
       const version = list.length + 1;
@@ -337,6 +352,7 @@ function createInMemoryFlowStore() {
         dsl_api_version: dslApiVersion ?? 'v1.0', created_by: createdBy ?? null,
         created_at: new Date().toISOString(),
       };
+      await appendAudit(typeof auditEvent === 'function' ? auditEvent(row) : auditEvent);
       list.push(row);
       versions.set(k, list);
       return versionRowToResource(row);
@@ -362,6 +378,33 @@ function createInMemoryFlowStore() {
 }
 
 function createPostgresFlowStore(pool) {
+  async function insertAudit(client, event) {
+    if (!event) return;
+    try {
+      await client.query(
+        `INSERT INTO flow_audit_outbox (event_id, event_type, tenant_id, workspace_id, payload)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [event.eventId, event.eventType, event.tenantId, event.workspaceId, event],
+      );
+    } catch {
+      throw clientError('Flow audit record could not be persisted', 503, 'AUDIT_UNAVAILABLE');
+    }
+  }
+  async function mutateWithAudit(mutate, auditEvent) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await mutate(client);
+      if (result && result.rowCount > 0 && auditEvent) await insertAudit(client, typeof auditEvent === 'function' ? auditEvent(result) : auditEvent);
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
   return {
     async ensureSchema() {
       // The .sql migrations (charts/in-falcone/bootstrap/migrations/20260612-003,-004) own the
@@ -394,17 +437,33 @@ function createPostgresFlowStore(pool) {
         created_at timestamptz NOT NULL DEFAULT now(),
         PRIMARY KEY (flow_id, version)
       )`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS flow_audit_outbox (
+        event_id uuid PRIMARY KEY,
+        event_type text NOT NULL,
+        tenant_id text NOT NULL,
+        workspace_id text NOT NULL,
+        payload jsonb NOT NULL,
+        state text NOT NULL DEFAULT 'pending' CHECK (state IN ('pending','delivered','dead_letter')),
+        attempts integer NOT NULL DEFAULT 0,
+        next_attempt_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        delivered_at timestamptz
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS flow_audit_outbox_pending_idx
+        ON flow_audit_outbox (next_attempt_at, created_at) WHERE state = 'pending'`);
     },
 
-    async createDefinition({ tenantId, workspaceId, flowId, name, definitionYaml, definition, dslApiVersion, createdBy }) {
+    async enqueueAudit(event) { await insertAudit(pool, event); },
+
+    async createDefinition({ tenantId, workspaceId, flowId, name, definitionYaml, definition, dslApiVersion, createdBy, auditEvent }) {
       try {
-        const res = await pool.query(
+        const res = await mutateWithAudit(async (client) => client.query(
           `INSERT INTO flow_definitions
              (tenant_id, workspace_id, flow_id, name, definition_yaml, definition_json, dsl_api_version, created_by)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
            RETURNING *`,
           [tenantId, workspaceId, flowId, name, definitionYaml ?? null, definition ?? {}, dslApiVersion ?? 'v1.0', createdBy ?? null],
-        );
+        ), auditEvent);
         return defRowToResource(res.rows[0]);
       } catch (err) {
         if (err?.code === '23505') throw clientError('Flow already exists', 409, 'FLOW_EXISTS');
@@ -428,8 +487,8 @@ function createPostgresFlowStore(pool) {
       return defRowToResource(res.rows[0]);
     },
 
-    async updateDefinition({ tenantId, workspaceId, flowId, changes }) {
-      const res = await pool.query(
+    async updateDefinition({ tenantId, workspaceId, flowId, changes, auditEvent }) {
+      const res = await mutateWithAudit(async (client) => client.query(
         `UPDATE flow_definitions SET
             name = COALESCE($4, name),
             definition_yaml = COALESCE($5, definition_yaml),
@@ -441,21 +500,21 @@ function createPostgresFlowStore(pool) {
         [tenantId, workspaceId, flowId,
          changes.name ?? null, changes.definitionYaml ?? null,
          changes.definition ?? null, changes.dslApiVersion ?? null],
-      );
+      ), auditEvent);
       return defRowToResource(res.rows[0]);
     },
 
-    async deleteDefinition({ tenantId, workspaceId, flowId }) {
-      const res = await pool.query(
+    async deleteDefinition({ tenantId, workspaceId, flowId, auditEvent }) {
+      const res = await mutateWithAudit(async (client) => client.query(
         `DELETE FROM flow_definitions WHERE tenant_id = $1 AND workspace_id = $2 AND flow_id = $3 RETURNING flow_id`,
         [tenantId, workspaceId, flowId],
-      );
+      ), auditEvent);
       return { removed: res.rowCount > 0 };
     },
 
-    async insertVersion({ tenantId, workspaceId, flowId, definitionYaml, definition, dslApiVersion, createdBy }) {
+    async insertVersion({ tenantId, workspaceId, flowId, definitionYaml, definition, dslApiVersion, createdBy, auditEvent }) {
       // Monotonic server-assigned version number, scoped to the flow.
-      const res = await pool.query(
+      const res = await mutateWithAudit(async (client) => client.query(
         `INSERT INTO flow_versions
            (tenant_id, workspace_id, flow_id, version, definition_yaml, definition_json, dsl_api_version, created_by)
          SELECT $1,$2,$3,
@@ -463,7 +522,7 @@ function createPostgresFlowStore(pool) {
                 $4,$5,$6,$7
          RETURNING *`,
         [tenantId, workspaceId, flowId, definitionYaml ?? null, definition ?? {}, dslApiVersion ?? 'v1.0', createdBy ?? null],
-      );
+      ), (res) => auditEvent?.(res.rows[0]));
       return versionRowToResource(res.rows[0]);
     },
 
@@ -622,9 +681,7 @@ export function createFlowExecutor({
   // flows API is unmetered (no-DB black-box default); production injects a gate backed by the
   // provisioning-orchestrator quota-enforce action. A breach raises 429 QUOTA_EXCEEDED.
   quotaGate,
-  // Audit sink: receives a flow_lifecycle_event envelope per lifecycle action. When absent audit
-  // emission is a no-op (the executor never fails a request because audit is unavailable, but a
-  // production deployment always wires the Kafka producer). Must be best-effort.
+  // Optional in-memory audit writer for black-box tests. Production persists to the outbox.
   auditSink,
   // Trigger registry (change: add-flows-triggers). When injected (here or via setTriggerRegistry to
   // break the construction cycle), publishing a version registers its cron/webhook/platform-event
@@ -679,25 +736,18 @@ export function createFlowExecutor({
     });
   }
 
-  // Best-effort tenant-scoped audit emission. NEVER throws into the request path: a flow action
-  // must not fail because the audit sink is momentarily unavailable (the emission is logged).
-  async function emitAudit(eventType, { identity, flowId, flowVersion, executionId, triggerType } = {}) {
-    if (!auditSink) return;
-    try {
-      const event = buildFlowAuditEvent({
-        eventType,
-        tenantId: identity.tenantId,
-        workspaceId: identity.workspaceId,
-        actorId: identity.actorId ?? `apikey:${identity.roleName ?? 'service'}`,
-        flowId,
-        flowVersion,
-        executionId,
-        triggerType,
-      });
-      await auditSink(event);
-    } catch (err) {
-      logger?.error?.('[flow-executor] audit emit failed:', err?.message ?? err);
-    }
+  // Events are validated before a state change and persisted by the store. The optional
+  // writer is an in-memory test adapter; production uses the Postgres outbox exclusively.
+  store.setAuditWriter?.(auditSink);
+  function auditEvent(eventType, { identity, flowId, flowVersion, executionId, triggerType, correlationId } = {}) {
+    return buildFlowAuditEvent({
+      eventType, tenantId: identity.tenantId, workspaceId: identity.workspaceId,
+      actorId: identity.actorId ?? `apikey:${identity.roleName ?? 'service'}`,
+      flowId, flowVersion, executionId, triggerType, correlationId: correlationId ?? randomUUID(),
+    });
+  }
+  async function emitAudit(eventType, details) {
+    await store.enqueueAudit(auditEvent(eventType, details));
   }
 
   // Count this tenant+workspace's running executions (across all flows) for the
@@ -769,7 +819,7 @@ export function createFlowExecutor({
 
   // -- Execution operations (Temporal-backed) -------------------------------------------------
 
-  async function startExecution({ identity, flowId, version, input, triggerType = 'manual', workflowIdOverride }) {
+  async function startExecution({ identity, flowId, version, input, triggerType = 'manual', workflowIdOverride, correlationId }) {
     const pinned = await resolvePinnedVersion({ identity, flowId, requestedVersion: version });
     // Quota gates run BEFORE any Temporal call so a breach never starts a workflow (spec). Rate
     // gate first (cheap), then concurrency (counts running executions tenant+workspace-scoped).
@@ -804,8 +854,8 @@ export function createFlowExecutor({
       }
       throw err;
     }
-    // Audit AFTER the Temporal ack (the run exists). Best-effort; never fails the request.
-    await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_STARTED, { identity, flowId, flowVersion: pinned.version, executionId: workflowId, triggerType });
+    // Persist the execution event after Temporal acknowledges the run.
+    await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_STARTED, { identity, flowId, flowVersion: pinned.version, executionId: workflowId, triggerType, correlationId });
     return {
       executionId: workflowId,
       workflowId,
@@ -952,7 +1002,7 @@ export function createFlowExecutor({
     return err?.name === 'WorkflowNotFoundError' || err?.code === 5;
   }
 
-  async function cancelExecution({ identity, flowId, executionId }) {
+  async function cancelExecution({ identity, flowId, executionId, correlationId }) {
     // Mutating run path: a foreign prefix is 403 (spec scenario), not 404.
     assertOwnedWorkflowId(executionId, identity, { workspaceId: identity.workspaceId, flowId, forbid: true });
     const client = await temporal.getClient();
@@ -965,11 +1015,11 @@ export function createFlowExecutor({
       if (isWorkflowNotFound(err)) throw clientError('Execution not found', 404, 'EXECUTION_NOT_FOUND');
       throw err;
     }
-    await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_CANCELLED, { identity, flowId, executionId });
+    await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_CANCELLED, { identity, flowId, executionId, correlationId });
     return { executionId, workflowId: executionId, status: 'Cancelling' };
   }
 
-  async function retryExecution({ identity, flowId, executionId }) {
+  async function retryExecution({ identity, flowId, executionId, correlationId }) {
     assertOwnedWorkflowId(executionId, identity, { workspaceId: identity.workspaceId, flowId, forbid: true });
     const client = await temporal.getClient();
     // Recover the original pinned version + input from the source run, then start a fresh run
@@ -989,7 +1039,7 @@ export function createFlowExecutor({
       // No memo: the token travels in the workflow args (tenant envelope), never in a plaintext
       // Temporal memo/visibility entry (#633).
     });
-    await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_RETRY, { identity, flowId, flowVersion: pinned.version, executionId: workflowId });
+    await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_RETRY, { identity, flowId, flowVersion: pinned.version, executionId: workflowId, correlationId });
     return {
       executionId: workflowId,
       workflowId,
@@ -1000,7 +1050,7 @@ export function createFlowExecutor({
     };
   }
 
-  async function sendSignal({ identity, flowId, executionId, signalName, payload }) {
+  async function sendSignal({ identity, flowId, executionId, signalName, payload, correlationId }) {
     assertOwnedWorkflowId(executionId, identity, { workspaceId: identity.workspaceId, flowId, forbid: true });
     // Signal-rate quota gate runs before any Temporal call (spec: per workspace per minute).
     await enforceQuota('flow_signal_rate_per_minute', { identity });
@@ -1043,7 +1093,7 @@ export function createFlowExecutor({
       if (isWorkflowNotFound(err)) throw clientError('Execution is not running', 409, 'EXECUTION_NOT_RUNNING');
       throw err;
     }
-    await emitAudit(FLOW_AUDIT_EVENT_TYPES.SIGNAL_SENT, { identity, flowId, flowVersion: version, executionId });
+    await emitAudit(FLOW_AUDIT_EVENT_TYPES.SIGNAL_SENT, { identity, flowId, flowVersion: version, executionId, correlationId });
     return { executionId, workflowId: executionId, signal: signalName, delivered: true };
   }
 
@@ -1064,7 +1114,7 @@ export function createFlowExecutor({
     return { definitionYaml, definition: definition ?? {} };
   }
 
-  async function createDefinition({ identity, flowId, body }) {
+  async function createDefinition({ identity, flowId, body, correlationId }) {
     const name = body.name;
     if (!name) throw clientError('name is required', 400, 'NAME_REQUIRED');
     // Stored-flow quota gate (per tenant). Usage = current stored definitions for this workspace.
@@ -1085,8 +1135,8 @@ export function createFlowExecutor({
       tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId: id, name,
       definitionYaml, definition, dslApiVersion: definition.apiVersion ?? body.dsl_api_version ?? 'v1.0',
       createdBy: identity.actorId,
+      auditEvent: auditEvent(FLOW_AUDIT_EVENT_TYPES.DEFINITION_CREATED, { identity, flowId: id, correlationId }),
     });
-    await emitAudit(FLOW_AUDIT_EVENT_TYPES.DEFINITION_CREATED, { identity, flowId: created.flowId });
     return created;
   }
 
@@ -1104,7 +1154,7 @@ export function createFlowExecutor({
     return { valid: true };
   }
 
-  async function publishVersion({ identity, flowId }) {
+  async function publishVersion({ identity, flowId, correlationId }) {
     const def = await getDefinitionOr404({ identity, flowId });
     const parsed = resolveParsedDefinition(def);
     const result = runValidation(parsed, { taskTypeCatalog, resolveSubFlow });
@@ -1120,8 +1170,8 @@ export function createFlowExecutor({
       tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId,
       definitionYaml: def.definitionYaml, definition: parsed,
       dslApiVersion: parsed.apiVersion ?? def.dslApiVersion ?? 'v1.0', createdBy: identity.actorId,
+      auditEvent: (row) => auditEvent(FLOW_AUDIT_EVENT_TYPES.VERSION_PUBLISHED, { identity, flowId, flowVersion: row.version, correlationId }),
     });
-    await emitAudit(FLOW_AUDIT_EVENT_TYPES.VERSION_PUBLISHED, { identity, flowId, flowVersion: created.version });
 
     // Trigger plane (change: add-flows-triggers). Register/swap the declared triggers AFTER the
     // version row is durable. Publishing v1 registers; re-publishing (v>1) atomically swaps v(N-1)
@@ -1297,7 +1347,7 @@ export function createFlowExecutor({
     const flowId = params.flowId;
     switch (operation) {
       case 'create_definition':
-        return createDefinition({ identity, flowId, body: params.body ?? {} });
+        return createDefinition({ identity, flowId, body: params.body ?? {}, correlationId: params.correlationId });
       case 'list_definitions':
         return { items: await store.listDefinitions({ tenantId: identity.tenantId, workspaceId: identity.workspaceId }) };
       case 'list_task_types':
@@ -1320,8 +1370,8 @@ export function createFlowExecutor({
           ...(definitionYaml !== null ? { definitionYaml } : {}),
           ...(Object.keys(definition).length > 0 ? { definition, dslApiVersion: definition.apiVersion } : {}),
         };
-        const updated = await store.updateDefinition({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId, changes });
-        await emitAudit(FLOW_AUDIT_EVENT_TYPES.DEFINITION_UPDATED, { identity, flowId });
+        const updated = await store.updateDefinition({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId, changes,
+          auditEvent: auditEvent(FLOW_AUDIT_EVENT_TYPES.DEFINITION_UPDATED, { identity, flowId, correlationId: params.correlationId }) });
         return updated;
       }
       case 'delete_definition': {
@@ -1338,14 +1388,14 @@ export function createFlowExecutor({
             logger?.error?.('[flow-executor] trigger deregister on delete failed:', err?.message ?? err);
           });
         }
-        const removed = await store.deleteDefinition({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId });
-        await emitAudit(FLOW_AUDIT_EVENT_TYPES.DEFINITION_DELETED, { identity, flowId });
+        const removed = await store.deleteDefinition({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId,
+          auditEvent: auditEvent(FLOW_AUDIT_EVENT_TYPES.DEFINITION_DELETED, { identity, flowId, correlationId: params.correlationId }) });
         return removed;
       }
       case 'validate':
         return validateDraft({ identity, flowId });
       case 'publish_version':
-        return publishVersion({ identity, flowId });
+        return publishVersion({ identity, flowId, correlationId: params.correlationId });
       case 'list_versions':
         await getDefinitionOr404({ identity, flowId });
         return { items: await store.listVersions({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId }) };
@@ -1358,7 +1408,7 @@ export function createFlowExecutor({
         return row;
       }
       case 'start_execution':
-        return startExecution({ identity, flowId, version: params.version, input: params.input });
+        return startExecution({ identity, flowId, version: params.version, input: params.input, correlationId: params.correlationId });
       case 'webhook_trigger':
         return handleWebhookTrigger({
           identity, triggerId: params.triggerId, rawBody: params.rawBody,
@@ -1369,11 +1419,11 @@ export function createFlowExecutor({
       case 'get_execution':
         return getExecution({ identity, flowId, executionId: params.executionId });
       case 'cancel_execution':
-        return cancelExecution({ identity, flowId, executionId: params.executionId });
+        return cancelExecution({ identity, flowId, executionId: params.executionId, correlationId: params.correlationId });
       case 'retry_execution':
-        return retryExecution({ identity, flowId, executionId: params.executionId });
+        return retryExecution({ identity, flowId, executionId: params.executionId, correlationId: params.correlationId });
       case 'send_signal':
-        return sendSignal({ identity, flowId, executionId: params.executionId, signalName: params.signalName, payload: params.payload });
+        return sendSignal({ identity, flowId, executionId: params.executionId, signalName: params.signalName, payload: params.payload, correlationId: params.correlationId });
       // Schedule management (#680). list_schedules is workspace-scoped (no flowId); the per-flow ops
       // build the schedule id from the verified identity + validated workspace, so a foreign flow
       // resolves to a non-existent id -> 404 SCHEDULE_NOT_FOUND (cross-tenant access is denied

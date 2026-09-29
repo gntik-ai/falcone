@@ -26,6 +26,9 @@ export const capabilityEnforcementDeniedEvent = {
   category: 'security',
   fields: {
     eventType: { type: 'string', enum: ['capability_enforcement_denied'] },
+    eventId: { type: 'string', description: 'Stable idempotency key for publication' },
+    outcome: { type: 'string', description: 'Outcome of the action' },
+    correlationId: { type: 'string', description: 'Request correlation id' },
     tenantId: { type: 'string', description: 'UUID of the tenant' },
     workspaceId: { type: 'string', nullable: true, description: 'UUID of the workspace if applicable' },
     actorId: { type: 'string', description: 'sub from JWT or client_id' },

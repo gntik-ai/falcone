@@ -220,7 +220,11 @@ anon key is passed as `?apikey=`; the gateway verifies it and enforces tenant sc
 - **Audit** (`packages/audit/src/flow-lifecycle-events.mjs`) emits a tenant-scoped event for each
   of the eight lifecycle actions (`definition_created/updated`, `version_published`,
   `definition_deleted`, `execution_started/cancelled/retry`, `signal_sent`) into the existing
-  audit pipeline, carrying `triggerType` on starts so autonomous runs are attributable.
+  platform-owned audit topic through a PostgreSQL outbox, carrying `eventId`, `outcome`,
+  `correlationId`, and `triggerType` on starts. Definition mutations and their outbox rows
+  commit together; an outbox failure returns `AUDIT_UNAVAILABLE` with no definition change.
+  The relay retries transient Kafka failures and keeps exhausted rows as dead letters.
+  `/metrics` exposes pending depth, oldest pending age, dead-letter count, and relay failures.
 - **Teardown** (`packages/provisioning-orchestrator/src/appliers/workflows-applier.mjs`): a tenant
   purge cascades to the `workflows` domain with the same partial-failure semantics as the other
   domains — it terminates every running execution whose `tenantId` matches (paginated
