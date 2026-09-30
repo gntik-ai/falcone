@@ -3,7 +3,7 @@
 // (workflows/wf-con-002.mjs). Each handler: async (ctx) => { statusCode, body }
 // where ctx = { params, query, body, identity, pool, callerContext }.
 import { createHash, randomUUID } from 'node:crypto';
-import { kcAdmin, safeKeycloakAdminMessage, TENANT_REALM_ROLES } from './kc-admin.mjs';
+import { kcAdmin, normalizeKeycloakAttributes, safeKeycloakAdminMessage, TENANT_REALM_ROLES } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
 import { AUTH_HANDLERS } from './auth-handlers.mjs';
 import { startSaga } from './saga.mjs';
@@ -1143,6 +1143,38 @@ async function iamListRoles(ctx) {
   }));
   return ok(200, { items, total: items.length, page: { after: null, size: items.length } });
 }
+async function iamListScopes(ctx) {
+  const az = await authorizeRealmManage(ctx);
+  if (az.error) return az.error;
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const realm = az.realm;
+  const max = Math.min(200, Math.max(1, Math.trunc(Number(ctx.query?.['page[size]'] ?? ctx.query?.max ?? 200) || 200)));
+  let scopes, defaultScopes, optionalScopes;
+  try {
+    [scopes, defaultScopes, optionalScopes] = await Promise.all([
+      kc.listClientScopes(realm),
+      kc.listRealmDefaultClientScopes(realm),
+      kc.listRealmOptionalClientScopes(realm),
+    ]);
+  } catch (e) {
+    if (e.kcStatus === 404) return err(404, 'REALM_NOT_FOUND', `realm ${realm} not found`);
+    return kcBackedErr(e, 'IAM_LIST_SCOPES_FAILED');
+  }
+  const defaults = new Set(defaultScopes.map((s) => s.name));
+  const optionals = new Set(optionalScopes.map((s) => s.name));
+  const providerCompatibility = {
+    provider: 'keycloak', contractVersion: '2026-03-24',
+    supportedVersions: ['24.x', '25.x', '26.x'], adminApiStability: 'stable_v1',
+  };
+  const items = scopes.slice(0, max).map((s) => ({
+    resourceType: 'iam_scope', realmId: realm, scopeName: s.name, protocol: s.protocol,
+    includeInTokenScope: String(s.attributes?.['include.in.token.scope'] ?? 'false').toLowerCase() === 'true',
+    isDefault: defaults.has(s.name), isOptional: optionals.has(s.name),
+    attributes: normalizeKeycloakAttributes(s.attributes ?? {}),
+    protocolMappers: s.protocolMappers ?? [], assignedClientIds: [], providerCompatibility,
+  }));
+  return ok(200, { items, total: items.length, page: { after: null, size: items.length } });
+}
 async function iamCreateRole(ctx) {
   const roleName = typeof ctx.body?.roleName === 'string' && ctx.body.roleName.trim()
     ? ctx.body.roleName.trim()
@@ -1612,7 +1644,7 @@ export const LOCAL_HANDLERS = {
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential, deleteServiceAccount,
   provisionDatabase, provisionDatabaseGeneric, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,
-  iamListUsers, iamGetUser, iamCreateUser, iamDeleteUser, iamSetUserStatus, iamListRoles, iamGetRole, iamDeleteRole, iamCreateRole, iamListGroups, iamCreateGroup, iamListClients,
+  iamListUsers, iamGetUser, iamCreateUser, iamDeleteUser, iamSetUserStatus, iamListRoles, iamListScopes, iamGetRole, iamDeleteRole, iamCreateRole, iamListGroups, iamCreateGroup, iamListClients,
   iamListRealms, iamGetRealm, iamUpdateRealm,
   iamListUserRoles, iamAssignUserRoles, iamRemoveUserRoles,
   iamListGroupMembers, iamListUserGroups, iamAddUserToGroup, iamRemoveUserFromGroup,
