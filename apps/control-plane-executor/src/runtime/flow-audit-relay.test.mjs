@@ -34,32 +34,47 @@ test('mutation and outbox insert commit together; an insert error rolls both bac
   assert.deepEqual(rows, ['flow', 'audit']);
 });
 
-function fakePool() {
-  const rows = [{ event_id: 'event-1', event_payload: { eventId: 'event-1' }, attempts: 0, delivered: false, failed: false }];
-  let locked = false;
+function fakePool(size = 1) {
+  const rows = Array.from({ length: size }, (_, i) => ({ event_id: `event-${i + 1}`,
+    event_payload: { eventId: `event-${i + 1}` }, attempts: 0, delivered: false, failed: false, due: true }));
+  const locked = new Set();
+  const queries = [];
   return {
     rows,
+    queries,
+    advance() { for (const row of rows) row.due = true; },
     async connect() {
+      const held = new Set();
+      const unlock = () => { for (const id of held) locked.delete(id); held.clear(); };
       return {
         async query(sql, args = []) {
-          if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [] };
+          if (sql === 'BEGIN') return { rows: [] };
+          if (sql === 'COMMIT' || sql === 'ROLLBACK') { unlock(); return { rows: [] }; }
           if (sql.includes('FOR UPDATE SKIP LOCKED')) {
-            if (locked || rows[0].delivered || rows[0].failed) return { rows: [] };
-            locked = true;
-            return { rows: [rows[0]] };
+            const row = rows.find((candidate) => !locked.has(candidate.event_id)
+              && !candidate.delivered && !candidate.failed && candidate.due);
+            if (!row) return { rows: [] };
+            locked.add(row.event_id);
+            held.add(row.event_id);
+            return { rows: [row] };
           }
-          if (sql.includes('SET delivered_at')) rows[0].delivered = true;
+          const row = rows.find((candidate) => candidate.event_id === args[0]);
+          if (sql.includes('SET delivered_at')) row.delivered = true;
           if (sql.includes('SET attempts')) {
-            rows[0].attempts = args[1];
-            rows[0].failed = args[1] >= args[2];
+            row.attempts = args[1];
+            row.failed = args[1] >= args[2];
+            row.due = false;
           }
           return { rows: [] };
         },
-        release() { locked = false; },
+        release() { unlock(); },
       };
     },
-    async query() {
-      return { rows: [{ pending: Number(!rows[0].delivered && !rows[0].failed), failed: Number(rows[0].failed) }] };
+    async query(sql) {
+      queries.push(sql);
+      if (sql.includes('count(*)')) return { rows: [{ count: rows.filter((row) => sql.includes('failed_at IS NOT NULL')
+        ? row.failed : !row.delivered && !row.failed).length }] };
+      return { rows: [] };
     },
   };
 }
@@ -88,6 +103,7 @@ test('relay retries a failed publish, keeps the event ID, and locks out a concur
   const relay = createFlowAuditRelay({ pool, publish: producer });
   await relay.tick();
   assert.equal(pool.rows[0].attempts, 1);
+  pool.advance();
   const pending = relay.tick();
   await new Promise((resolve) => setImmediate(resolve));
   const other = createFlowAuditRelay({ pool, publish: producer });
@@ -104,8 +120,35 @@ test('exhausted row remains persisted and is counted as failed', async () => {
   const relay = createFlowAuditRelay({ pool, publish: async () => { throw new Error('Kafka down'); }, maxAttempts: 2,
     onBacklog: (value) => { backlog = value; } });
   await relay.tick();
+  pool.advance();
   await relay.tick();
   assert.equal(pool.rows[0].failed, true);
   assert.equal(backlog.failed, 1);
   assert.equal(pool.rows.length, 1);
+});
+
+test('default retry budget survives the former twelve-attempt cutoff', async () => {
+  const pool = fakePool();
+  const relay = createFlowAuditRelay({ pool, publish: async () => { throw new Error('Kafka down'); } });
+  for (let i = 0; i < 13; i += 1) {
+    pool.advance();
+    await relay.tick();
+  }
+  assert.equal(pool.rows[0].attempts, 13);
+  assert.equal(pool.rows[0].failed, false);
+});
+
+test('one tick drains a bounded batch and keeps remaining rows pending', async () => {
+  const pool = fakePool(5);
+  const seen = [];
+  const relay = createFlowAuditRelay({ pool, publish: async (event) => { seen.push(event.eventId); }, batchSize: 3 });
+  await relay.tick();
+  assert.deepEqual(seen, ['event-1', 'event-2', 'event-3']);
+  assert.equal(pool.rows.filter((row) => !row.delivered).length, 2);
+  await relay.tick();
+  assert.equal(pool.rows.filter((row) => !row.delivered).length, 0);
+  assert.ok(pool.queries.some((sql) => sql.includes('DELETE FROM flow_audit_outbox')
+    && sql.includes('WHERE delivered_at <')));
+  assert.equal(pool.queries.filter((sql) => sql.includes('count(*)')).length, 4);
+  assert.ok(pool.queries.every((sql) => !sql.includes('count(*) FILTER')));
 });

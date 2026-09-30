@@ -399,7 +399,10 @@ function createPostgresFlowStore(pool) {
         created_at timestamptz NOT NULL DEFAULT now(),
         PRIMARY KEY (flow_id, version)
       )`);
-      await pool.query(`CREATE TABLE IF NOT EXISTS flow_audit_outbox (
+      const auditSchema = await pool.connect();
+      try {
+        await auditSchema.query('BEGIN');
+        await auditSchema.query(`CREATE TABLE IF NOT EXISTS flow_audit_outbox (
         event_id uuid PRIMARY KEY,
         event_payload jsonb NOT NULL,
         attempts integer NOT NULL DEFAULT 0,
@@ -408,8 +411,31 @@ function createPostgresFlowStore(pool) {
         failed_at timestamptz,
         created_at timestamptz NOT NULL DEFAULT now()
       )`);
-      await pool.query(`CREATE INDEX IF NOT EXISTS flow_audit_outbox_due_idx
+        // Create + revoke are atomic so a newly created table is never briefly exposed.
+        // Older installations may also have inherited grants; revoke on every boot.
+        await auditSchema.query('REVOKE ALL PRIVILEGES ON TABLE flow_audit_outbox FROM PUBLIC');
+        await auditSchema.query(`DO $$
+        DECLARE data_role text;
+        BEGIN
+          FOREACH data_role IN ARRAY ARRAY['falcone_service', 'falcone_anon'] LOOP
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = data_role) THEN
+              EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE flow_audit_outbox FROM %I', data_role);
+            END IF;
+          END LOOP;
+        END $$`);
+        await auditSchema.query(`CREATE INDEX IF NOT EXISTS flow_audit_outbox_due_idx
         ON flow_audit_outbox (next_attempt_at) WHERE delivered_at IS NULL AND failed_at IS NULL`);
+        await auditSchema.query(`CREATE INDEX IF NOT EXISTS flow_audit_outbox_failed_idx
+        ON flow_audit_outbox (failed_at) WHERE failed_at IS NOT NULL`);
+        await auditSchema.query(`CREATE INDEX IF NOT EXISTS flow_audit_outbox_delivered_idx
+        ON flow_audit_outbox (delivered_at) WHERE delivered_at IS NOT NULL`);
+        await auditSchema.query('COMMIT');
+      } catch (error) {
+        await auditSchema.query('ROLLBACK').catch(() => {});
+        throw error;
+      } finally {
+        auditSchema.release();
+      }
     },
 
     async createDefinition({ tenantId, workspaceId, flowId, name, definitionYaml, definition, dslApiVersion, createdBy }) {

@@ -257,15 +257,9 @@ async function publishFlowAudit(event) {
     })().catch((err) => { flowAuditProducerP = undefined; throw err; });
   }
   const producer = await flowAuditProducerP;
-  try {
-    await producer.send({ topic: flowAuditTopic, acks: -1, messages: [{
-      key: event.eventId ?? event.flowId, value: JSON.stringify(event),
-    }] });
-  } catch (err) {
-    flowAuditProducerP = undefined;
-    await producer.disconnect().catch(() => {});
-    throw err;
-  }
+  await producer.send({ topic: flowAuditTopic, acks: -1, messages: [{
+    key: event.flowId, value: JSON.stringify(event),
+  }] });
 }
 const flowAuditRelay = process.env.TEMPORAL_ADDRESS ? createFlowAuditRelay({
   pool: keyPool, publish: publishFlowAudit,
@@ -438,26 +432,29 @@ async function recoverHostedMcpCleanup() {
   if (result.recovered > 0) console.info('[control-plane] hosted MCP cleanup batch complete', result);
 }
 
-// Initialise all metadata schemas (they share keyPool) before listening.
-Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), llmExecutor.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve(), flowExecutor ? triggerStore.ensureSchema() : Promise.resolve(), mcpEngine?.ensureSchema() ?? Promise.resolve()])
-  // Wire + START the platform-event trigger consumer AFTER the schemas exist, so the on-boot
-  // subscription can read already-persisted registrations (a flow published in a prior process).
-  // Best-effort: a Temporal/Kafka outage at boot never blocks the HTTP server from listening.
-  .then(() => bootFlowTriggers().catch((error) => console.error('[control-plane] flow-trigger boot wiring failed:', error)))
-  .then(() => {
-    flowAuditRelay?.start();
-    server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
-    void recoverHostedMcpCleanup().catch((error) => console.error('[control-plane] hosted MCP cleanup failed:', error?.message ?? error));
-    mcpCleanupTimer = setInterval(() => {
-      void recoverHostedMcpCleanup().catch((error) => console.error('[control-plane] hosted MCP cleanup failed:', error?.message ?? error));
-    }, mcpCleanupIntervalMs);
-    mcpCleanupTimer.unref?.();
-  })
-  .catch((error) => {
+// Schema failure, including outbox DDL or privilege hardening, must stop the process.
+async function boot() {
+  try {
+    await Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), llmExecutor.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve(), flowExecutor ? triggerStore.ensureSchema() : Promise.resolve(), mcpEngine?.ensureSchema() ?? Promise.resolve()]);
+  } catch (error) {
     console.error('[control-plane] metadata schema init failed:', error?.code ?? error?.message);
-    process.exitCode = 1;
-    void keyPool.end().catch(() => {});
-  });
+    await keyPool.end().catch(() => {});
+    process.exit(1);
+  }
+  // Kafka/Temporal trigger wiring is best effort; the durable outbox is already ready.
+  await bootFlowTriggers().catch((error) => console.error('[control-plane] flow-trigger boot wiring failed:', error));
+  flowAuditRelay?.start();
+  server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
+  void recoverHostedMcpCleanup().catch((error) => console.error('[control-plane] hosted MCP cleanup failed:', error?.message ?? error));
+  mcpCleanupTimer = setInterval(() => {
+    void recoverHostedMcpCleanup().catch((error) => console.error('[control-plane] hosted MCP cleanup failed:', error?.message ?? error));
+  }, mcpCleanupIntervalMs);
+  mcpCleanupTimer.unref?.();
+}
+void boot().catch((error) => {
+  console.error('[control-plane] startup failed:', error?.code ?? error?.message);
+  process.exit(1);
+});
 
 async function shutdown(signal) {
   console.log(`[control-plane] ${signal} received, shutting down`);
