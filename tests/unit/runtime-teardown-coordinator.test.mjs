@@ -121,6 +121,14 @@ test('aggregate deferral rolls back when MCP table presence cannot be checked', 
   assert.deepEqual(calls, ['BEGIN', "SELECT to_regclass('falcone_mcp_state') AS relation", 'ROLLBACK', 'release']);
 });
 
+test('runtime-teardown-05: aggregate deferral rejects a nontransactional pool before writing either state', async () => {
+  let queries = 0;
+  await assert.rejects(() => deferAggregateCleanup({ query: async () => { queries += 1; } }, {
+    tenantId: 't1', resources: [{ resourceId: 'f1' }], correlationId: 'c1',
+  }), /transactional pool/);
+  assert.equal(queries, 0);
+});
+
 test('aggregate response lists an obligation once when it is also pending cleanup', async () => {
   const store = {
     listRuntimeOwnership: async () => ({ tenantId: 't1', functions: [{ resourceId: 'f1', tenantId: 't1' }], mcp: [] }),
