@@ -892,13 +892,13 @@
     "method": "GET",
     "path": "/v1/iam/realms/{realmId}/scopes",
     "family": "iam",
-    "module": "NONE",
-    "export": "",
-    "invoke": "UNKNOWN",
+    "module": "apps/control-plane/b-handlers.mjs",
+    "export": "iamListScopes",
+    "invoke": "localHandler",
     "deps": ["keycloakAdmin"],
     "auth": "tenant scope",
     "subroutes": "no",
-    "notes": "ConsoleAuthPage. GAP - Keycloak.",
+    "notes": "ConsoleAuthPage. Realm owner/admin or superadmin; reads Keycloak client scopes.",
     "consoleUsed": true
   },
   {

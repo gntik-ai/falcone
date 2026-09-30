@@ -292,6 +292,12 @@ export const kcAdmin = {
   async listClientScopes(realm) {
     return (await kc('GET', `/realms/${encodeURIComponent(realm)}/client-scopes`)).json ?? [];
   },
+  async listRealmDefaultClientScopes(realm) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/default-default-client-scopes`)).json ?? [];
+  },
+  async listRealmOptionalClientScopes(realm) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/default-optional-client-scopes`)).json ?? [];
+  },
   // Ensure a client scope exists (idempotent) and return its id.
   async ensureClientScope(realm, name) {
     const list = (await kc('GET', `/realms/${encodeURIComponent(realm)}/client-scopes`)).json ?? [];

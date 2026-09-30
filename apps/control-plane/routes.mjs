@@ -168,6 +168,8 @@ export const routes = [
   { method: 'DELETE', path: '/v1/iam/realms/{realmId}/users/{userId}', localHandler: 'iamDeleteUser', auth: 'authenticated' },
   { method: 'PATCH',  path: '/v1/iam/realms/{realmId}/users/{userId}/status', localHandler: 'iamSetUserStatus', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/iam/realms/{realmId}/roles', localHandler: 'iamListRoles', auth: 'superadmin' },
+  // GET scopes: the owning tenant owner/admin or superadmin (handler authorizes).
+  { method: 'GET',  path: '/v1/iam/realms/{realmId}/scopes', localHandler: 'iamListScopes', auth: 'authenticated' },
   { method: 'POST', path: '/v1/iam/realms/{realmId}/roles', localHandler: 'iamCreateRole', auth: 'superadmin' },
   // GET/DELETE one role by name (fix-iam-route-wiring #598): were NO_ROUTE (404).
   { method: 'GET',    path: '/v1/iam/realms/{realmId}/roles/{roleName}', localHandler: 'iamGetRole', auth: 'superadmin' },
