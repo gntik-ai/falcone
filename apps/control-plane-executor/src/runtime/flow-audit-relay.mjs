@@ -72,8 +72,8 @@ export function createFlowAuditRelay({ pool, publish, intervalMs = 1000, maxAtte
             if (publishFailed) {
               const attempts = row.attempts + 1;
               const delay = Math.min(backoffCapMs, 1000 * 2 ** Math.min(attempts - 1, 30));
-              await client.query(`UPDATE flow_audit_outbox SET attempts = $2,
-                failed_at = CASE WHEN $2 >= $3 THEN now() ELSE NULL END,
+              await client.query(`UPDATE flow_audit_outbox SET attempts = $2::integer,
+                failed_at = CASE WHEN $2::integer >= $3::integer THEN now() ELSE NULL END,
                 next_attempt_at = now() + ($4::integer * interval '1 millisecond')
                 WHERE event_id = $1`, [row.event_id, attempts, maxAttempts, delay]);
             } else {
