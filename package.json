@@ -29,7 +29,7 @@
     "lint:md": "markdownlint-cli2",
     "lint": "npm run validate:repo && npm run lint:md && npm run validate:openapi",
     "lint:snippets": "node scripts/lint-snippet-templates.mjs",
-    "test:unit": "node --test tests/unit/*.test.mjs",
+    "test:unit": "node --test tests/unit/*.test.mjs apps/control-plane-executor/src/runtime/flow-audit-relay.test.mjs apps/control-plane-executor/src/runtime/flow-audit-schema.test.mjs",
     "test:adapters": "node --test tests/adapters/*.test.mjs",
     "test:contracts": "node --test tests/contracts/*.test.mjs",
     "test:e2e:console": "node --test tests/e2e/console/*.test.mjs",

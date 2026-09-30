@@ -80,6 +80,7 @@ export function createFlowAuditRelay({ pool, publish, intervalMs = 1000, maxAtte
               await client.query('UPDATE flow_audit_outbox SET delivered_at = now() WHERE event_id = $1', [row.event_id]);
             }
             await client.query('COMMIT');
+            if (publishFailed) break;
           } catch (err) {
             await client.query('ROLLBACK').catch(() => {});
             throw err;

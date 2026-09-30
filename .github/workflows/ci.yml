@@ -309,6 +309,9 @@ jobs:
       - name: Executor real-stack tests (Postgres + pgvector)
         run: bash tests/env/executor/run.sh
 
+      - name: Flow audit outbox real-stack tests (Postgres + Redpanda)
+        run: bash tests/env/flow-audit-outbox/run.sh
+
       - name: Tear down compose
         if: always()
         run: docker compose -f tests/env/docker-compose.yml down -v
