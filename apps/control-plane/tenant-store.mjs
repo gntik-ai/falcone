@@ -1109,28 +1109,53 @@ export async function deleteTenant(pool, id) {
 }
 
 export async function listRuntimeOwnership(pool, { tenantId, workspaceId }) {
+  const resolvedTenantId = tenantId ?? (workspaceId
+    ? (await pool.query('SELECT tenant_id FROM workspaces WHERE id=$1', [workspaceId])).rows[0]?.tenant_id
+    : null);
+  if (!resolvedTenantId) throw Object.assign(new Error('runtime ownership tenant is unavailable'), { code: 'RUNTIME_OWNERSHIP_UNAVAILABLE' });
   const where = tenantId ? 'tenant_id=$1' : 'workspace_id=$1';
   const { rows: functions } = await pool.query(`SELECT tenant_id AS "tenantId", workspace_id AS "workspaceId", resource_id AS "resourceId", ksvc_name AS "ksvcName" FROM fn_actions WHERE ${where} AND ksvc_name IS NOT NULL`, [tenantId ?? workspaceId]);
   let mcpState = null;
-  try { const r = await pool.query("SELECT state FROM falcone_mcp_state WHERE id='default'"); mcpState = r.rows[0]?.state ?? null; } catch { mcpState = null; }
+  try {
+    mcpState = (await pool.query("SELECT state FROM falcone_mcp_state WHERE id='default'")).rows[0]?.state ?? null;
+  } catch (error) {
+    // The MCP executor creates this table lazily. Other database failures must stop teardown.
+    if (error?.code !== '42P01') throw error;
+  }
   const servers = Array.isArray(mcpState?.servers) ? mcpState.servers : [];
-  const mcp = servers.filter((s) => s && (!tenantId || s.tenantId === tenantId) && (!workspaceId || s.workspaceId === workspaceId))
+  const mcp = servers.filter((s) => s && s.tenantId === resolvedTenantId && (!workspaceId || s.workspaceId === workspaceId))
     .map((s) => ({ type: 'mcp', tenantId: s.tenantId, workspaceId: s.workspaceId, resourceId: s.id ?? s.serverId, name: s.name ?? s.id ?? s.serverId }));
-  return { tenantId: tenantId ?? functions[0]?.tenantId ?? mcp[0]?.tenantId, workspaceId, functions, mcp, mcpState };
+  return { tenantId: resolvedTenantId, workspaceId, functions, mcp, mcpState };
+}
+
+export async function listPendingRuntimeObligations(pool, { tenantId, workspaceId }) {
+  const where = workspaceId ? 'tenant_id=$1 AND workspace_id=$2' : 'tenant_id=$1';
+  const params = workspaceId ? [tenantId, workspaceId] : [tenantId];
+  const { rows } = await pool.query(
+    `SELECT resource_type AS "resourceType", resource_id AS "resourceId"
+       FROM runtime_cleanup_obligations
+      WHERE ${where} AND status <> 'completed'`, params,
+  );
+  return rows;
 }
 
 export async function deferAggregateCleanup(pool, { tenantId, workspaceId, resources = [], correlationId }) {
   if (!tenantId || !correlationId) throw Object.assign(new Error('tenant and correlation are required'), { code: 'INVALID_CLEANUP_SCOPE' });
+  if (typeof pool?.connect !== 'function') throw new TypeError('aggregate cleanup requires a transactional pool');
   const work = async (db) => {
-    let stateRow;
-    try { stateRow = (await db.query("SELECT state FROM falcone_mcp_state WHERE id='default' FOR UPDATE")).rows[0]; } catch { stateRow = null; }
+    // Avoid an undefined-table error inside BEGIN: PostgreSQL would abort the transaction
+    // even if that error were caught, preventing the obligation insert below.
+    const mcpTable = (await db.query("SELECT to_regclass('falcone_mcp_state') AS relation")).rows[0]?.relation;
+    const stateRow = mcpTable
+      ? (await db.query("SELECT state FROM falcone_mcp_state WHERE id='default' FOR UPDATE")).rows[0]
+      : null;
     const state = stateRow?.state;
     let changed = false;
     for (const resource of resources) {
-    const type = resource.type === 'mcp' ? 'mcp' : 'function';
-    const resourceId = resource.resourceId ?? resource.id;
-    if (!resourceId) continue;
-    const obligationId = `${type}:${tenantId}:${resourceId}:delete`;
+      const type = resource.type === 'mcp' ? 'mcp' : 'function';
+      const resourceId = resource.resourceId ?? resource.id;
+      if (!resourceId) continue;
+      const obligationId = `${type}:${tenantId}:${resourceId}:delete`;
       await db.query(`INSERT INTO runtime_cleanup_obligations (obligation_id,resource_type,operation,tenant_id,workspace_id,resource_id,runtime_resource_name,correlation_id,status) VALUES ($1,$2,'delete',$3,$4,$5,$6,$7,'pending') ON CONFLICT (resource_type,tenant_id,resource_id,operation) DO UPDATE SET updated_at=NOW()`, [obligationId, type, tenantId, workspaceId ?? resource.workspaceId ?? null, resourceId, resource.ksvcName ?? resource.name ?? resourceId, correlationId]);
       if (type === 'function') await db.query("UPDATE fn_actions SET lifecycle_status='deletion_pending', deletion_requested_at=COALESCE(deletion_requested_at,NOW()), updated_at=NOW() WHERE tenant_id=$1 AND resource_id=$2", [tenantId, resourceId]);
       if (type === 'mcp' && state) {
@@ -1143,7 +1168,6 @@ export async function deferAggregateCleanup(pool, { tenantId, workspaceId, resou
     }
     if (changed) await db.query("UPDATE falcone_mcp_state SET state=$1::jsonb, updated_at=NOW() WHERE id='default'", [JSON.stringify(state)]);
   };
-  if (typeof pool.connect !== 'function') return work(pool);
   const client = await pool.connect();
   try { await client.query('BEGIN'); await work(client); await client.query('COMMIT'); }
   catch (error) { try { await client.query('ROLLBACK'); } catch {} throw error; }

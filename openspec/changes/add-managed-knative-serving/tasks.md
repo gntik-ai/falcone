@@ -35,6 +35,10 @@
 
 ## 3. Falcone runtime and public contract (`gntik-ai/falcone`)
 
+T12–T21 remain unchecked pending the source scenario and CI evidence in
+[scenario-matrix.md](scenario-matrix.md). Local unit checks do not establish
+managed-mode availability or complete the HTTP, accessibility, and chart gates.
+
 - [ ] T12 Add source-of-truth runtime-mode/readiness configuration and operator/read-only status,
   with generated contracts/clients kept in sync and mutation limited to platform authority.
 - [ ] T13 Gate Function deploy, update, invoke, rollback, and readiness before Knative work; implement
@@ -62,6 +66,11 @@
   pass acceptance; do not advertise managed mode from this design-only change.
 
 ## 5. Acceptance and independent verification
+
+**Blocked:** T22–T27 require a disposable remote OpenShift 4.21 environment with
+cluster-admin authority, the coordinated chart release, live persona journeys,
+cleanup proof, and independent review. No such environment is assigned to this
+source ChangeSet; these tasks remain unchecked and managed mode remains proposed.
 
 - [ ] T22 Run a disposable clean Kubernetes install and a cluster-admin-controlled remote OpenShift
   install without OLM/Serverless Operator; prove all workloads run under `restricted-v2` and remove

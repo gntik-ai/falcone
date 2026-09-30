@@ -58,6 +58,61 @@ test('managed-function-ownership-02: matching cleanup verifies both labels and u
   assert.deepEqual(calls[1].body.preconditions, { uid: 'uid-a', resourceVersion: '7' });
 });
 
+test('managed-function-ownership-02b: deferred cleanup waits for observed absence', async () => {
+  const labels = buildFunctionOwnershipLabels(OWNERSHIP);
+  const existing = { metadata: { labels, uid: 'uid-a', resourceVersion: '7' } };
+  for (const [afterDelete, expectedReason] of [
+    [existing, 'deletion_not_observed'],
+    [statusError(403), null],
+    [statusError(500), null],
+  ]) {
+    const calls = [];
+    await assert.rejects(
+      () => deleteKnativeService('fn-app-hello-abc', {
+        ...OWNERSHIP, verifyAbsence: true,
+        request: async (method) => {
+          calls.push(method);
+          if (calls.length === 1) return existing;
+          if (calls.length === 2) return {};
+          if (afterDelete instanceof Error) throw afterDelete;
+          return afterDelete;
+        },
+      }),
+      (error) => expectedReason ? error?.reason === expectedReason && error?.retained === true
+        : error === afterDelete,
+    );
+    assert.deepEqual(calls, ['GET', 'DELETE', 'GET']);
+  }
+
+  const calls = [];
+  const result = await deleteKnativeService('fn-app-hello-abc', {
+    ...OWNERSHIP, verifyAbsence: true,
+    request: async (method) => {
+      calls.push(method);
+      if (calls.length === 1) return existing;
+      if (method === 'DELETE') return {};
+      throw statusError(404);
+    },
+  });
+  assert.deepEqual(calls, ['GET', 'DELETE', 'GET']);
+  assert.deepEqual(result, { deleted: true, retained: false, reason: 'deleted' });
+
+  const replacementCalls = [];
+  await assert.rejects(
+    () => deleteKnativeService('fn-app-hello-abc', {
+      ...OWNERSHIP, verifyAbsence: true,
+      request: async (method) => {
+        replacementCalls.push(method);
+        if (replacementCalls.length === 1) return existing;
+        if (method === 'DELETE') throw statusError(404);
+        return { metadata: { uid: 'replacement-uid', labels: {} } };
+      },
+    }),
+    (error) => error?.reason === 'deletion_not_observed' && error?.retained === true,
+  );
+  assert.deepEqual(replacementCalls, ['GET', 'DELETE', 'GET']);
+});
+
 test('managed-function-ownership-03: missing or mismatched ownership retains the live Service', async () => {
   for (const labels of [
     {},
@@ -241,12 +296,13 @@ test('managed-function-ownership-08: immediate mismatch retains both runtime and
       deleteFnAction: async () => { logicalDeletes += 1; },
     },
     deleteKnativeService: async () => {
-      throw Object.assign(new Error('retained'), {
+      throw Object.assign(new Error('secret-bearing raw exception'), {
         code: 'FN_RUNTIME_OWNERSHIP_MISMATCH', statusCode: 409, retained: true,
       });
     },
   });
   assert.equal(result.statusCode, 409);
   assert.equal(result.body.code, 'FN_DELETE_FAILED');
+  assert.equal(result.body.message, 'Function runtime cleanup could not be verified.');
   assert.equal(logicalDeletes, 0);
 });

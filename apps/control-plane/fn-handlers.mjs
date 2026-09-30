@@ -562,7 +562,7 @@ async function fnDelete(ctx) {
         functionResourceId: r.resource_id,
       });
     } catch (e) {
-      return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_DELETE_FAILED', String(e.message ?? e));
+      return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_DELETE_FAILED', 'Function runtime cleanup could not be verified.');
     }
   }
 

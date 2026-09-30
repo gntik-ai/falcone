@@ -133,3 +133,28 @@ test('knative-runtime-06: unavailable response is stable, bounded, and correlate
     correlationId: 'corr-123',
   });
 });
+
+test('knative-runtime-07: documented closed states never open the workload gate', () => {
+  const base = JSON.parse(READY_MANAGED);
+  const cases = [
+    ['oversized status', 'managed', 'x'.repeat(16 * 1024 + 1), 'unavailable', 'STATUS_FILE_INVALID'],
+    ['unknown schema', 'managed', JSON.stringify({ ...base, schemaVersion: 'unknown' }), 'unavailable', 'STATUS_FILE_INVALID'],
+    ['mode mismatch', 'external', READY_MANAGED, 'unverified', 'STATUS_MODE_MISMATCH'],
+    ['unsupported version', 'managed', JSON.stringify({ ...base, version: '1.23.0' }), 'unavailable', 'VERSION_UNSUPPORTED'],
+    ...(['missing', 'unreadable', 'invoke_failed'].map((canaryState) => [
+      `external canary ${canaryState}`, 'external',
+      JSON.stringify({ ...base, mode: 'external', externalCanary: { state: canaryState } }),
+      'unverified', `EXTERNAL_CANARY_${canaryState.toUpperCase()}`,
+    ])),
+  ];
+  for (const [label, mode, raw, state, reason] of cases) {
+    const source = createKnativeRuntimeSource({
+      env: { KNATIVE_RUNTIME_MODE: mode }, readFile: () => raw,
+    });
+    const status = source.status();
+    assert.equal(status.state, state, label);
+    assert.equal(status.reason, reason, label);
+    assert.equal(source.canServeWorkloads(status), false, label);
+    assert.match(status.reason, /^[A-Z][A-Z0-9_]{0,63}$/, label);
+  }
+});

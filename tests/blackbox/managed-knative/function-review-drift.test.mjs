@@ -2121,6 +2121,7 @@ test('bbx-933-aggregate-obligation-contract-38: real coordinator pending obligat
   const coordinator = createRuntimeTeardownCoordinator({
     store: {
       async listRuntimeOwnership() { return structuredClone(internalOwnership); },
+      async listPendingRuntimeObligations() { return []; },
       async deferAggregateCleanup() { return undefined; },
     },
     runtime: {
@@ -2317,6 +2318,7 @@ test('bbx-933-aggregate-completion-residual-40: successfully cleaned Function ow
           mcp: [],
         };
       },
+      async listPendingRuntimeObligations() { return []; },
       async deferAggregateCleanup() { throw new Error('successful cleanup must not be deferred'); },
     },
     runtime: {
