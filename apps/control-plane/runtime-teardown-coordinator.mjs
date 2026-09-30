@@ -9,7 +9,7 @@ export function createProductionRuntimeAdapter({ knativeRuntime = null, deleteSe
       if (typeof knativeRuntime?.canServeWorkloads === 'function' ? !knativeRuntime.canServeWorkloads(status) : status.mode !== 'managed' || status.phase === 'unavailable') return { ready: false, pending: [...functions, ...mcp], reason: 'runtime_unavailable' };
       const pending = [];
       for (const fn of functions) {
-        try { await deleteService(fn.ksvcName, { tenantId: fn.tenantId, functionResourceId: fn.resourceId }); }
+        try { await deleteService(fn.ksvcName, { tenantId: fn.tenantId, functionResourceId: fn.resourceId, verifyAbsence: true }); }
         catch (error) { pending.push({ ...fn, reason: error?.statusCode === 409 ? 'precondition_conflict' : 'runtime_delete_failed' }); }
       }
       // MCP cleanup is intentionally delegated to the executor recovery worker. Retain its

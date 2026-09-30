@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRuntimeTeardownCoordinator, createProductionRuntimeAdapter } from '../../apps/control-plane/runtime-teardown-coordinator.mjs';
+import { buildFunctionOwnershipLabels, deleteKnativeService } from '../../apps/control-plane/function-executor.mjs';
 
 function harness(runtime) {
   const calls = [];
   const pool = { query: async (sql, params) => { calls.push({ sql, params }); return { rows: [] }; } };
   const store = {
-    listRuntimeOwnership: async () => ({ tenantId: 't1', functions: [{ resourceId: 'f1', ksvcName: 'ksvc-f1' }], mcpState: { servers: [{ serverId: 'm1', tenantId: 't1' }] } }),
+    listRuntimeOwnership: async () => ({ tenantId: 't1', functions: [{ resourceId: 'f1', tenantId: 't1', ksvcName: 'ksvc-f1' }], mcpState: { servers: [{ serverId: 'm1', tenantId: 't1' }] } }),
     deferAggregateCleanup: async (_pool, value) => calls.push({ defer: value }),
   };
   return { coordinator: createRuntimeTeardownCoordinator({ store, runtime }), pool, calls };
@@ -38,7 +39,36 @@ test('production adapter deletes every owned function when runtime is ready', as
   const deleted = [];
   const adapter = createProductionRuntimeAdapter({ knativeRuntime: { status: () => ({ mode: 'managed', phase: 'ready' }), canServeWorkloads: () => true }, deleteService: async (...args) => deleted.push(args) });
   const result = await adapter.cleanup({ functions: [{ resourceId: 'f1', tenantId: 't1', ksvcName: 'svc1' }], mcp: [] });
-  assert.equal(result.ready, true); assert.deepEqual(deleted[0], ['svc1', { tenantId: 't1', functionResourceId: 'f1' }]);
+  assert.equal(result.ready, true); assert.deepEqual(deleted[0], ['svc1', { tenantId: 't1', functionResourceId: 'f1', verifyAbsence: true }]);
+});
+
+test('runtime-teardown-01: accepted delete stays pending while the owned Service remains', async () => {
+  const calls = [];
+  const existing = {
+    metadata: {
+      labels: buildFunctionOwnershipLabels({ tenantId: 't1', functionResourceId: 'f1' }),
+      uid: 'uid-f1', resourceVersion: '7',
+    },
+  };
+  const adapter = createProductionRuntimeAdapter({
+    knativeRuntime: { status: () => ({ mode: 'managed', phase: 'ready' }), canServeWorkloads: () => true },
+    deleteService: (name, options) => deleteKnativeService(name, {
+      ...options,
+      request: async (method, path, body) => {
+        calls.push({ method, path, body });
+        return method === 'GET' ? existing : {};
+      },
+    }),
+  });
+  const h = harness(adapter);
+  const result = await h.coordinator.purgeTenant(h.pool, 't1', 'c1');
+  assert.equal(result.finalize, undefined);
+  assert.equal(result.statusCode, 202);
+  assert.equal(result.obligations[0].reason, 'precondition_conflict');
+  assert.equal(h.calls[0].defer.correlationId, 'c1');
+  assert.equal(h.calls[0].defer.resources[0].reason, 'precondition_conflict');
+  assert.deepEqual(calls.map(({ method }) => method), ['GET', 'DELETE', 'GET']);
+  assert.deepEqual(calls[1].body.preconditions, { uid: 'uid-f1', resourceVersion: '7' });
 });
 
 test('production adapter keeps conflicts pending and skips deletion while unavailable', async () => {
