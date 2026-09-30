@@ -163,14 +163,16 @@ test('one tick drains a bounded batch and keeps remaining rows pending', async (
     && sql.includes('WHERE delivered_at <')));
   assert.equal(pool.queries.filter((sql) => sql.includes('count(*)')).length, 4);
   assert.ok(pool.queries.every((sql) => !sql.includes('count(*) FILTER')));
+  assert.equal(pool.releases, 2);
 });
 
 test('one failed publish commits its backoff and stops the batch before releasing the client', async () => {
   const pool = fakePool(3);
   const seen = [];
+  let brokerAvailable = false;
   const relay = createFlowAuditRelay({ pool, batchSize: 3, publish: async (event) => {
     seen.push(event.eventId);
-    throw new Error('Kafka unavailable');
+    if (!brokerAvailable) throw new Error('Kafka unavailable');
   } });
   await relay.tick();
   assert.deepEqual(seen, ['event-1']);
@@ -181,6 +183,13 @@ test('one failed publish commits its backoff and stops the batch before releasin
   assert.equal(pool.commits.length, 1);
   assert.equal(pool.commits[0][0].attempts, 1);
   assert.equal(pool.releases, 1);
+
+  brokerAvailable = true;
+  await relay.tick();
+  assert.deepEqual(seen, ['event-1', 'event-2', 'event-3']);
+  assert.deepEqual(pool.rows.map((row) => row.delivered), [false, true, true]);
+  assert.equal(pool.rows[0].attempts, 1);
+  assert.equal(pool.releases, 2);
 });
 
 test('relay success timestamp stays stale when the metadata pool is unavailable', async () => {
