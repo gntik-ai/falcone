@@ -1115,7 +1115,13 @@ export async function listRuntimeOwnership(pool, { tenantId, workspaceId }) {
   if (!resolvedTenantId) throw Object.assign(new Error('runtime ownership tenant is unavailable'), { code: 'RUNTIME_OWNERSHIP_UNAVAILABLE' });
   const where = tenantId ? 'tenant_id=$1' : 'workspace_id=$1';
   const { rows: functions } = await pool.query(`SELECT tenant_id AS "tenantId", workspace_id AS "workspaceId", resource_id AS "resourceId", ksvc_name AS "ksvcName" FROM fn_actions WHERE ${where} AND ksvc_name IS NOT NULL`, [tenantId ?? workspaceId]);
-  const mcpState = (await pool.query("SELECT state FROM falcone_mcp_state WHERE id='default'")).rows[0]?.state ?? null;
+  let mcpState = null;
+  try {
+    mcpState = (await pool.query("SELECT state FROM falcone_mcp_state WHERE id='default'")).rows[0]?.state ?? null;
+  } catch (error) {
+    // The MCP executor creates this table lazily. Other database failures must stop teardown.
+    if (error?.code !== '42P01') throw error;
+  }
   const servers = Array.isArray(mcpState?.servers) ? mcpState.servers : [];
   const mcp = servers.filter((s) => s && s.tenantId === resolvedTenantId && (!workspaceId || s.workspaceId === workspaceId))
     .map((s) => ({ type: 'mcp', tenantId: s.tenantId, workspaceId: s.workspaceId, resourceId: s.id ?? s.serverId, name: s.name ?? s.id ?? s.serverId }));
@@ -1136,8 +1142,12 @@ export async function listPendingRuntimeObligations(pool, { tenantId, workspaceI
 export async function deferAggregateCleanup(pool, { tenantId, workspaceId, resources = [], correlationId }) {
   if (!tenantId || !correlationId) throw Object.assign(new Error('tenant and correlation are required'), { code: 'INVALID_CLEANUP_SCOPE' });
   const work = async (db) => {
-    let stateRow;
-    try { stateRow = (await db.query("SELECT state FROM falcone_mcp_state WHERE id='default' FOR UPDATE")).rows[0]; } catch { stateRow = null; }
+    // Avoid an undefined-table error inside BEGIN: PostgreSQL would abort the transaction
+    // even if that error were caught, preventing the obligation insert below.
+    const mcpTable = (await db.query("SELECT to_regclass('falcone_mcp_state') AS relation")).rows[0]?.relation;
+    const stateRow = mcpTable
+      ? (await db.query("SELECT state FROM falcone_mcp_state WHERE id='default' FOR UPDATE")).rows[0]
+      : null;
     const state = stateRow?.state;
     let changed = false;
     for (const resource of resources) {

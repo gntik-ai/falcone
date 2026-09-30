@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRuntimeTeardownCoordinator, createProductionRuntimeAdapter } from '../../apps/control-plane/runtime-teardown-coordinator.mjs';
 import { buildFunctionOwnershipLabels, deleteKnativeService } from '../../apps/control-plane/function-executor.mjs';
-import { listRuntimeOwnership, listPendingRuntimeObligations } from '../../apps/control-plane/tenant-store.mjs';
+import { listRuntimeOwnership, listPendingRuntimeObligations, deferAggregateCleanup } from '../../apps/control-plane/tenant-store.mjs';
 
 function harness(runtime) {
   const calls = [];
@@ -65,6 +65,72 @@ test('runtime-teardown-03: workspace tenant binding and pending obligation looku
   assert.deepEqual(seen[3].params, ['t1', 'w1']);
   await assert.rejects(() => listRuntimeOwnership({ query: async () => ({ rows: [] }) }, { workspaceId: 'missing' }),
     { code: 'RUNTIME_OWNERSHIP_UNAVAILABLE' });
+});
+
+test('runtime ownership treats only an absent lazy MCP table as empty', async () => {
+  const pool = { query: async (sql) => {
+    if (sql.includes('FROM fn_actions')) return { rows: [{ tenantId: 't1', resourceId: 'f1', ksvcName: 'svc1' }] };
+    if (sql.includes('FROM falcone_mcp_state')) throw Object.assign(new Error('undefined table'), { code: '42P01' });
+    throw new Error('unexpected query');
+  } };
+  const ownership = await listRuntimeOwnership(pool, { tenantId: 't1' });
+  assert.deepEqual(ownership.mcp, []);
+  assert.equal(ownership.mcpState, null);
+  assert.equal(ownership.functions[0].resourceId, 'f1');
+
+  pool.query = async (sql) => {
+    if (sql.includes('FROM fn_actions')) return { rows: [] };
+    throw Object.assign(new Error('database unavailable'), { code: '08006' });
+  };
+  await assert.rejects(() => listRuntimeOwnership(pool, { tenantId: 't1' }), { code: '08006' });
+});
+
+test('aggregate deferral commits a Function obligation without the lazy MCP table', async () => {
+  const calls = [];
+  const client = {
+    query: async (sql) => {
+      calls.push(sql);
+      if (sql.includes('to_regclass')) return { rows: [{ relation: null }] };
+      if (sql.includes('FROM falcone_mcp_state')) throw new Error('missing MCP table was queried');
+      return { rows: [] };
+    },
+    release: () => calls.push('release'),
+  };
+  await deferAggregateCleanup({ connect: async () => client }, {
+    tenantId: 't1', resources: [{ tenantId: 't1', resourceId: 'f1', ksvcName: 'svc1' }], correlationId: 'c1',
+  });
+  assert.equal(calls[0], 'BEGIN');
+  assert.ok(calls.some((sql) => sql.includes('INSERT INTO runtime_cleanup_obligations')));
+  assert.ok(calls.some((sql) => sql.includes("lifecycle_status='deletion_pending'")));
+  assert.deepEqual(calls.slice(-2), ['COMMIT', 'release']);
+});
+
+test('aggregate deferral rolls back when MCP table presence cannot be checked', async () => {
+  const calls = [];
+  const client = {
+    query: async (sql) => {
+      calls.push(sql);
+      if (sql.includes('to_regclass')) throw Object.assign(new Error('database unavailable'), { code: '08006' });
+      return { rows: [] };
+    },
+    release: () => calls.push('release'),
+  };
+  await assert.rejects(() => deferAggregateCleanup({ connect: async () => client }, {
+    tenantId: 't1', resources: [{ resourceId: 'f1' }], correlationId: 'c1',
+  }), { code: '08006' });
+  assert.deepEqual(calls, ['BEGIN', "SELECT to_regclass('falcone_mcp_state') AS relation", 'ROLLBACK', 'release']);
+});
+
+test('aggregate response lists an obligation once when it is also pending cleanup', async () => {
+  const store = {
+    listRuntimeOwnership: async () => ({ tenantId: 't1', functions: [{ resourceId: 'f1', tenantId: 't1' }], mcp: [] }),
+    deferAggregateCleanup: async () => {},
+    listPendingRuntimeObligations: async () => [{ resourceType: 'function', resourceId: 'f1' }],
+  };
+  const coordinator = createRuntimeTeardownCoordinator({ store });
+  const result = await coordinator.purgeTenant({}, 't1', 'c1');
+  assert.equal(result.statusCode, 202);
+  assert.deepEqual(result.obligations, [{ resourceId: 'f1', tenantId: 't1' }]);
 });
 
 test('partial or precondition conflict remains pending', async () => {

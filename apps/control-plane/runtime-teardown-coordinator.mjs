@@ -37,7 +37,12 @@ export function createRuntimeTeardownCoordinator({ store, runtime }) {
       workspaceId: scope.tenantId ? null : id,
     });
     if (!result?.ready || pending.length || obligations.length) {
-      return { pending: true, statusCode: 202, tenantId: ownership.tenantId ?? scope.tenantId, workspaceId: scope.workspaceId ?? (scope.tenantId ? null : id), obligations: [...pending, ...obligations] };
+      const byResource = new Map();
+      for (const item of [...pending, ...obligations]) {
+        const key = `${item.resourceType ?? item.type ?? 'function'}:${item.resourceId ?? item.id}`;
+        if (!byResource.has(key)) byResource.set(key, item);
+      }
+      return { pending: true, statusCode: 202, tenantId: ownership.tenantId ?? scope.tenantId, workspaceId: scope.workspaceId ?? (scope.tenantId ? null : id), obligations: [...byResource.values()] };
     }
     return { pending: false, finalize: true, tenantId: ownership.tenantId ?? scope.tenantId, workspaceId: scope.workspaceId ?? (scope.tenantId ? null : id) };
   };
