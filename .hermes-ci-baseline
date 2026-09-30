@@ -1,0 +1,2 @@
+# Hermes CI baseline marker: makes path-filtered CI jobs run on unchanged main.
+# Lives only on hermes/ci-baseline/* branches; never merged.
