@@ -31,9 +31,20 @@ function ctx(identity, kcAdmin, realmId = REALM, query = {}) {
   return { identity, kcAdmin, pool, params: { realmId }, query };
 }
 const scopes = [
-  { name: 'profile', protocol: 'openid-connect', attributes: { 'include.in.token.scope': 'true', display: ['profile'] }, protocolMappers: [{ name: 'profile mapper' }] },
+  { name: 'profile', protocol: 'openid-connect', attributes: { 'include.in.token.scope': 'true', display: ['profile'] }, protocolMappers: [
+    {
+      id: 'private-keycloak-id', name: 'profile mapper', protocol: 'openid-connect',
+      protocolMapper: 'oidc-usermodel-attribute-mapper', consentRequired: false,
+      config: {
+        'user.attribute': 'profile', 'claim.name': 'profile', multivalued: 'false',
+        'access.token.claim': 'true', 'id.token.claim': 'true', 'userinfo.token.claim': 'false',
+        'jsonType.label': 'String', 'claim.value': 'private-value',
+      },
+    },
+    { id: 'unknown-id', name: 'unknown mapper', protocolMapper: 'oidc-unknown-mapper', config: { 'claim.name': 'unknown' } },
+  ] },
   { name: 'email', protocol: 'openid-connect', attributes: { 'include.in.token.scope': 'false' } },
-  { name: 'offline_access', protocol: 'openid-connect' },
+  { name: 'offline_access' },
 ];
 
 test('console IAM collection GET routes resolve to registered handlers', () => {
@@ -55,7 +66,10 @@ test('superadmin lists mapped scopes with or without a query string', async () =
     resourceType: 'iam_scope', realmId: REALM, scopeName: 'profile', protocol: 'openid-connect',
     includeInTokenScope: true, isDefault: true, isOptional: false,
     attributes: { 'include.in.token.scope': ['true'], display: ['profile'] },
-    protocolMappers: [{ name: 'profile mapper' }], assignedClientIds: [],
+    protocolMappers: [{
+      name: 'profile mapper', mapperType: 'user_attribute', claimName: 'profile',
+      sourceAttribute: 'profile', multivalued: false, tokenTargets: ['access_token', 'id_token'],
+    }], assignedClientIds: [],
     providerCompatibility: {
       provider: 'keycloak', contractVersion: '2026-03-24',
       supportedVersions: ['24.x', '25.x', '26.x'], adminApiStability: 'stable_v1',
@@ -65,6 +79,8 @@ test('superadmin lists mapped scopes with or without a query string', async () =
   assert.equal(result.body.items[1].includeInTokenScope, false);
   assert.deepEqual(result.body.items[1].protocolMappers, []);
   assert.deepEqual(result.body.items[2].attributes, {});
+  assert.equal(result.body.items[2].protocol, 'openid-connect');
+  assert.doesNotMatch(JSON.stringify(result.body), /private-keycloak-id|private-value|unknown-id/);
   assert.deepEqual(kc.calls.map(([name]) => name).sort(), ['defaults', 'optionals', 'scopes']);
 
   const limited = await LOCAL_HANDLERS.iamListScopes(ctx(superadmin, fakeKc(scopes), REALM, { 'page[size]': '1' }));

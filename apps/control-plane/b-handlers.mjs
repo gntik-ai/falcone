@@ -1143,6 +1143,28 @@ async function iamListRoles(ctx) {
   }));
   return ok(200, { items, total: items.length, page: { after: null, size: items.length } });
 }
+function mapIamScopeProtocolMapper(mapper) {
+  const mapperTypes = {
+    'oidc-usermodel-attribute-mapper': 'user_attribute',
+    'oidc-hardcoded-claim-mapper': 'hardcoded_claim',
+    'oidc-audience-mapper': 'audience',
+    'oidc-script-based-protocol-mapper': 'script',
+  };
+  const mapperType = Object.hasOwn(mapperTypes, mapper?.protocolMapper) ? mapperTypes[mapper.protocolMapper] : null;
+  const config = mapper?.config;
+  const claimName = config?.['claim.name'] ?? (mapperType === 'audience' ? 'aud' : null);
+  if (!mapperType || typeof mapper.name !== 'string' || !mapper.name || typeof claimName !== 'string' || !claimName) return null;
+  const tokenTargets = [
+    ['access.token.claim', 'access_token'], ['id.token.claim', 'id_token'],
+    ['userinfo.token.claim', 'userinfo'],
+  ].filter(([key]) => String(config?.[key]).toLowerCase() === 'true').map(([, target]) => target);
+  return {
+    name: mapper.name, mapperType, claimName,
+    ...(typeof config?.['user.attribute'] === 'string' ? { sourceAttribute: config['user.attribute'] } : {}),
+    ...(config?.multivalued != null ? { multivalued: String(config.multivalued).toLowerCase() === 'true' } : {}),
+    tokenTargets,
+  };
+}
 async function iamListScopes(ctx) {
   const az = await authorizeRealmManage(ctx);
   if (az.error) return az.error;
@@ -1167,11 +1189,13 @@ async function iamListScopes(ctx) {
     supportedVersions: ['24.x', '25.x', '26.x'], adminApiStability: 'stable_v1',
   };
   const items = scopes.slice(0, max).map((s) => ({
-    resourceType: 'iam_scope', realmId: realm, scopeName: s.name, protocol: s.protocol,
+    resourceType: 'iam_scope', realmId: realm, scopeName: s.name,
+    protocol: s.protocol === 'saml' ? 'saml' : 'openid-connect',
     includeInTokenScope: String(s.attributes?.['include.in.token.scope'] ?? 'false').toLowerCase() === 'true',
     isDefault: defaults.has(s.name), isOptional: optionals.has(s.name),
     attributes: normalizeKeycloakAttributes(s.attributes ?? {}),
-    protocolMappers: s.protocolMappers ?? [], assignedClientIds: [], providerCompatibility,
+    protocolMappers: (Array.isArray(s.protocolMappers) ? s.protocolMappers : []).map(mapIamScopeProtocolMapper).filter(Boolean),
+    assignedClientIds: [], providerCompatibility,
   }));
   return ok(200, { items, total: items.length, page: { after: null, size: items.length } });
 }
