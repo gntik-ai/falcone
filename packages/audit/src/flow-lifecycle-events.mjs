@@ -1,6 +1,6 @@
 // Flow lifecycle audit events (change: add-flows-tenancy-isolation-limits).
 //
-// Every flow lifecycle action emits a tenant-scoped audit event to the existing audit pipeline.
+// Every flow lifecycle action carries tenant and workspace fields in a platform audit event.
 // The field conventions (tenantId / workspaceId / actorId / occurredAt) follow
 // contract-boundary.mjs::capabilityEnforcementDeniedEvent so the audit consumers (retention
 // classification, anomaly detector, query API) treat flow events identically to every other
@@ -48,6 +48,8 @@ export function buildFlowAuditEvent({
   triggerType = null,
   occurredAt = new Date().toISOString(),
   correlationId = null,
+  outcome = 'succeeded',
+  eventId = null,
 } = {}) {
   if (!ALL_EVENT_TYPES.has(eventType)) {
     throw new Error(`flow audit: unknown eventType "${eventType}"`);
@@ -68,6 +70,8 @@ export function buildFlowAuditEvent({
     executionId,
     triggerType: triggerType != null ? String(triggerType) : null,
     correlationId,
+    outcome,
+    ...(eventId ? { eventId } : {}),
     occurredAt,
   };
 }

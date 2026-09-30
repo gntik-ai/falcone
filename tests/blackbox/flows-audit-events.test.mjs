@@ -23,7 +23,7 @@ import { flowLifecycleEvent } from '../../packages/audit/src/contract-boundary.m
 
 const DEF = { apiVersion: 'v1.0', name: 'f', nodes: [{ id: 'a', type: 'approval', next: 'b' }, { id: 'b', type: 'task', taskType: 't' }] };
 const headersFor = (t, w) => ({ 'content-type': 'application/json', 'x-tenant-id': t, 'x-workspace-id': w, 'x-auth-subject': `admin-${t}` });
-const A = headersFor('tenant_A', 'ws_A');
+const A = { ...headersFor('tenant_A', 'ws_A'), 'x-correlation-id': 'flow-audit-request-123' };
 const B = headersFor('tenant_B', 'ws_B');
 
 function makeFakeTemporal() {
@@ -62,6 +62,14 @@ test('bbx-flows-ten-audit-01: create/update/publish/delete emit the four definit
     assert.ok(t.includes(FLOW_AUDIT_EVENT_TYPES.DEFINITION_UPDATED));
     assert.ok(t.includes(FLOW_AUDIT_EVENT_TYPES.VERSION_PUBLISHED));
     assert.ok(t.includes(FLOW_AUDIT_EVENT_TYPES.DEFINITION_DELETED));
+    for (const event of events.filter((e) => [
+      FLOW_AUDIT_EVENT_TYPES.DEFINITION_CREATED, FLOW_AUDIT_EVENT_TYPES.DEFINITION_UPDATED,
+      FLOW_AUDIT_EVENT_TYPES.VERSION_PUBLISHED, FLOW_AUDIT_EVENT_TYPES.DEFINITION_DELETED,
+    ].includes(e.eventType))) {
+      assert.equal(event.correlationId, 'flow-audit-request-123');
+      assert.equal(event.outcome, 'succeeded');
+      assert.ok(event.eventId);
+    }
   });
 });
 

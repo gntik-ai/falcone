@@ -671,17 +671,17 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       ['GET', new RegExp(`${fl}$`), ([w], c) =>
         runFlows(flowExecutor, { operation: 'list_definitions', identity: c.identity }, 200)],
       ['POST', new RegExp(`${fl}$`), ([w], c) =>
-        runFlows(flowExecutor, { operation: 'create_definition', identity: c.identity, body: c.body }, 201)],
+        runFlows(flowExecutor, { operation: 'create_definition', identity: c.identity, body: c.body, correlationId: c.headers['x-correlation-id'] }, 201)],
       ['GET', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'get_definition', identity: c.identity, flowId: f }, 200)],
       ['PATCH', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'update_definition', identity: c.identity, flowId: f, body: c.body }, 200)],
+        runFlows(flowExecutor, { operation: 'update_definition', identity: c.identity, flowId: f, body: c.body, correlationId: c.headers['x-correlation-id'] }, 200)],
       ['DELETE', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'delete_definition', identity: c.identity, flowId: f }, 200)],
+        runFlows(flowExecutor, { operation: 'delete_definition', identity: c.identity, flowId: f, correlationId: c.headers['x-correlation-id'] }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/validate$`), ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'validate', identity: c.identity, flowId: f }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'publish_version', identity: c.identity, flowId: f }, 201)],
+        runFlows(flowExecutor, { operation: 'publish_version', identity: c.identity, flowId: f, correlationId: c.headers['x-correlation-id'] }, 201)],
       ['GET', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'list_versions', identity: c.identity, flowId: f }, 200)],
       ['GET', new RegExp(`${fl}/([^/]+)/versions/([^/]+)$`), ([w, f, v], c) =>
