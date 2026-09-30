@@ -204,7 +204,7 @@ export async function deployKnativeService(name, source, opts = {}) {
 
 export async function deleteKnativeService(
   name,
-  { tenantId, functionResourceId, request = k8s } = {},
+  { tenantId, functionResourceId, request = k8s, verifyAbsence = false } = {},
 ) {
   const expectedLabels = buildFunctionOwnershipLabels({ tenantId, functionResourceId });
   const namedServicePath = servicePath(name);
@@ -231,6 +231,7 @@ export async function deleteKnativeService(
   // The named delete is not authorized by namespace+name alone: Kubernetes must match both the UID
   // and resourceVersion of the object whose tenant+Function labels were just verified. Replacement
   // or label mutation between GET and DELETE therefore fails closed instead of deleting by name.
+  let deleted = true;
   try {
     await request('DELETE', namedServicePath, {
       apiVersion: 'v1',
@@ -240,11 +241,25 @@ export async function deleteKnativeService(
     });
   } catch (error) {
     if (error.statusCode === 404) {
-      return { deleted: false, retained: false, reason: 'not_found' };
+      deleted = false;
+    } else {
+      throw error;
     }
-    throw error;
   }
-  return { deleted: true, retained: false, reason: 'deleted' };
+  if (verifyAbsence) {
+    // Kubernetes may accept DELETE before the Service disappears. A deferred cleanup cannot
+    // complete its logical record until a fresh read proves the named resource is absent.
+    try {
+      await request('GET', namedServicePath);
+    } catch (error) {
+      if (error.statusCode === 404) {
+        return { deleted, retained: false, reason: deleted ? 'deleted' : 'not_found' };
+      }
+      throw error;
+    }
+    throw ownershipRetentionError('deletion_not_observed');
+  }
+  return { deleted, retained: false, reason: deleted ? 'deleted' : 'not_found' };
 }
 
 // Wait until the ksvc reports Ready (best-effort; invoke also tolerates cold start).

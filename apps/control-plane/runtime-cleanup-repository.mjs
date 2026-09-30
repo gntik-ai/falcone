@@ -196,6 +196,7 @@ export async function recoverFunctionCleanupObligations({
         await deleteRuntimeResource(obligation.runtimeResourceName, {
           tenantId: obligation.tenantId,
           functionResourceId: obligation.resourceId,
+          verifyAbsence: true,
         });
       }
       await repository.completeFunctionDeletion({

@@ -69,7 +69,7 @@ test('runtime-cleanup-02: recovery is readiness-gated, tenant-scoped, and idempo
   assert.deepEqual(recovered, { recovered: 1, failed: 0 });
   assert.deepEqual(deleted, [{
     name: 'ksvc-a',
-    ownership: { tenantId: 'tenant-a', functionResourceId: 'fn-a' },
+    ownership: { tenantId: 'tenant-a', functionResourceId: 'fn-a', verifyAbsence: true },
   }]);
   assert.deepEqual(completed, [{ obligationId: 'cleanup-1', tenantId: 'tenant-a', resourceId: 'fn-a' }]);
 });
@@ -89,7 +89,7 @@ test('runtime-cleanup-02b: ownership mismatch retains logical state and the dura
       releaseForRetry: async (value) => released.push(value),
     },
     deleteRuntimeResource: async (_name, ownership) => {
-      assert.deepEqual(ownership, { tenantId: 'tenant-a', functionResourceId: 'fn-a' });
+      assert.deepEqual(ownership, { tenantId: 'tenant-a', functionResourceId: 'fn-a', verifyAbsence: true });
       throw Object.assign(new Error('retained'), {
         code: 'FN_RUNTIME_OWNERSHIP_MISMATCH', statusCode: 409, retained: true,
       });
