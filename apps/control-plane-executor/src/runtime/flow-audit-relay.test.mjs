@@ -190,6 +190,13 @@ test('one failed publish commits its backoff and stops the batch before releasin
   assert.deepEqual(pool.rows.map((row) => row.delivered), [false, true, true]);
   assert.equal(pool.rows[0].attempts, 1);
   assert.equal(pool.releases, 2);
+
+  pool.advance();
+  await relay.tick();
+  assert.deepEqual(seen, ['event-1', 'event-2', 'event-3', 'event-1']);
+  assert.deepEqual(pool.rows.map((row) => row.delivered), [true, true, true]);
+  assert.equal(pool.rows[0].attempts, 1);
+  assert.equal(pool.releases, 3);
 });
 
 test('relay success timestamp stays stale when the metadata pool is unavailable', async () => {
