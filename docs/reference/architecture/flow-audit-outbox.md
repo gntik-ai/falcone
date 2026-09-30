@@ -7,8 +7,8 @@ The executor relays these rows to `FLOW_AUDIT_TOPIC` (default
 only addresses physical `evt.<workspaceId>.*` topics.
 
 An outbox insert failure rolls back the Flow mutation. The API returns HTTP 503
-with code `AUDIT_UNAVAILABLE`; callers should retry with the same
-`Idempotency-Key`. Kafka failure after a successful mutation leaves the row
+with code `AUDIT_UNAVAILABLE`; callers can retry the rolled-back mutation.
+Gateway callers should reuse their `Idempotency-Key`. Kafka failure after a successful mutation leaves the row
 pending. The relay retries with exponential backoff capped by
 `FLOW_AUDIT_BACKOFF_CAP_MS` (default 60000 ms). The default attempt budget is
 derived from a seven day retry window; `FLOW_AUDIT_MAX_ATTEMPTS` can override
@@ -17,6 +17,9 @@ for 30 days, then purged in batches. Failed rows are never purged.
 
 `falcone_flow_audit_outbox_rows{state="pending"}` and
 `falcone_flow_audit_outbox_rows{state="failed"}` on `/metrics` show the backlog.
+`falcone_flow_audit_relay_last_success_timestamp_seconds` shows when the relay
+last completed a tick, so monitoring can detect a stale backlog gauge when the
+metadata database is unavailable. It is zero until the first successful tick.
 An alert on failed rows needs operator action. After restoring Kafka and the
 platform topic, requeue a specific failed event with an authorized metadata
 database connection:

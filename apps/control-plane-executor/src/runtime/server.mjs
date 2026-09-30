@@ -1321,6 +1321,18 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       }
       const [, re, handler, opts] = match;
       const groups = re.exec(url.pathname).slice(1);
+      // The gateway requires this header, but direct/internal Flow callers may omit it.
+      // Generate a caller-visible ID in that case, and bound supplied IDs before persisting
+      // them in the Flow audit outbox.
+      if (url.pathname.startsWith('/v1/flows/')) {
+        const supplied = req.headers['x-correlation-id'];
+        if (supplied !== undefined && (typeof supplied !== 'string' || !/^[A-Za-z0-9._:-]{8,128}$/.test(supplied))) {
+          return sendJson(res, 400, { code: 'INVALID_CORRELATION_ID', message: 'Invalid X-Correlation-Id header' });
+        }
+        const correlationId = supplied ?? randomUUID();
+        req.headers['x-correlation-id'] = correlationId;
+        res.setHeader('x-correlation-id', correlationId);
+      }
 
       // SSE routes accept the anon key via ?apikey= (EventSource can't set headers).
       const queryApiKey = opts?.sse ? url.searchParams.get('apikey') : undefined;

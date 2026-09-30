@@ -1,4 +1,4 @@
-import { setFlowAuditBacklog } from './metrics-registry.mjs';
+import { recordFlowAuditRelaySuccess, setFlowAuditBacklog } from './metrics-registry.mjs';
 
 export async function withFlowAuditTransaction(pool, mutate, eventForResult, transactionalStore) {
   const client = await pool.connect();
@@ -30,7 +30,8 @@ const bounded = (value, fallback, low, high) => Math.max(low, Math.min(high, Num
 // deduplicate on that stable ID without losing an event.
 export function createFlowAuditRelay({ pool, publish, intervalMs = 1000, maxAttempts,
   backoffCapMs = 60000, retryWindowMs = 7 * 24 * 60 * 60 * 1000,
-  batchSize = 100, retentionDays = 30, onBacklog = setFlowAuditBacklog }) {
+  batchSize = 100, retentionDays = 30, onBacklog = setFlowAuditBacklog,
+  onSuccess = recordFlowAuditRelaySuccess }) {
   intervalMs = bounded(intervalMs, 1000, 100, 60000);
   backoffCapMs = bounded(backoffCapMs, 60000, 1000, 3600000);
   retryWindowMs = bounded(retryWindowMs, 7 * 24 * 60 * 60 * 1000, 60000, 30 * 24 * 60 * 60 * 1000);
@@ -99,6 +100,7 @@ export function createFlowAuditRelay({ pool, publish, intervalMs = 1000, maxAtte
           WHERE failed_at IS NOT NULL`),
       ]);
       onBacklog({ pending: pending.rows[0].count, failed: failed.rows[0].count });
+      onSuccess();
     } finally {
       running = false;
     }

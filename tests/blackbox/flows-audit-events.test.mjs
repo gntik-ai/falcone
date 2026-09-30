@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
-import { createFlowExecutor } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
+import { createFlowExecutor, createFlowStore } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
 import { FLOW_AUDIT_EVENT_TYPES, buildFlowAuditEvent } from '../../packages/audit/src/flow-lifecycle-events.mjs';
 import { flowLifecycleEvent } from '../../packages/audit/src/contract-boundary.mjs';
 
@@ -71,6 +71,46 @@ test('bbx-flows-ten-audit-01: create/update/publish/delete emit the four definit
       assert.ok(event.eventId);
     }
   });
+});
+
+test('direct Flow requests return a generated correlation ID and reject unbounded IDs', async () => {
+  await withServer(async (baseUrl, events) => {
+    const url = `${baseUrl}/v1/flows/workspaces/ws_B/flows`;
+    const accepted = await fetch(url, { method: 'POST', headers: B,
+      body: JSON.stringify({ name: 'f', definition: DEF }) });
+    assert.equal(accepted.status, 201);
+    const correlationId = accepted.headers.get('x-correlation-id');
+    assert.match(correlationId, /^[A-Za-z0-9._:-]{8,128}$/);
+    assert.equal(events[0].correlationId, correlationId);
+
+    const rejected = await fetch(url, { method: 'POST',
+      headers: { ...B, 'x-correlation-id': 'x'.repeat(129) },
+      body: JSON.stringify({ name: 'f', definition: DEF }) });
+    assert.equal(rejected.status, 400);
+    assert.equal((await rejected.json()).code, 'INVALID_CORRELATION_ID');
+    assert.equal(events.length, 1);
+  });
+});
+
+test('failed audited delete leaves the definition and its triggers intact', async () => {
+  const store = createFlowStore();
+  const identity = { tenantId: 'tenant_A', workspaceId: 'ws_A', actorId: 'admin-A', roles: ['tenant_admin'] };
+  await store.createDefinition({ tenantId: identity.tenantId, workspaceId: identity.workspaceId,
+    flowId: 'flow-1', name: 'f', definition: DEF });
+  store.withMutationAudit = async () => {
+    throw Object.assign(new Error('Flow audit is unavailable'), { statusCode: 503, code: 'AUDIT_UNAVAILABLE' });
+  };
+  let deregistrations = 0;
+  const flowExecutor = createFlowExecutor({ store, temporalClient: makeFakeTemporal(), temporalAddress: 'fake:7233',
+    flowTriggerRegistry: { async deregisterTriggers() { deregistrations += 1; } } });
+  try {
+    await assert.rejects(flowExecutor.executeFlows({ operation: 'delete_definition', identity, flowId: 'flow-1' }),
+      (err) => err.statusCode === 503 && err.code === 'AUDIT_UNAVAILABLE');
+    assert.ok(await store.getDefinition({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId: 'flow-1' }));
+    assert.equal(deregistrations, 0);
+  } finally {
+    await flowExecutor.close();
+  }
 });
 
 test('bbx-flows-ten-audit-02: execution start/cancel/retry/signal emit the four execution events', async () => {

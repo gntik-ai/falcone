@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildFlowAuditEvent, FLOW_AUDIT_EVENT_TYPES } from '../../../../packages/audit/src/flow-lifecycle-events.mjs';
 import { createFlowAuditRelay, withFlowAuditTransaction } from './flow-audit-relay.mjs';
+import { renderMetrics } from './metrics-registry.mjs';
 
 test('mutation and outbox insert commit together; an insert error rolls both back', async () => {
   const rows = [];
@@ -151,4 +152,16 @@ test('one tick drains a bounded batch and keeps remaining rows pending', async (
     && sql.includes('WHERE delivered_at <')));
   assert.equal(pool.queries.filter((sql) => sql.includes('count(*)')).length, 4);
   assert.ok(pool.queries.every((sql) => !sql.includes('count(*) FILTER')));
+});
+
+test('relay success timestamp stays stale when the metadata pool is unavailable', async () => {
+  const pool = fakePool();
+  const relay = createFlowAuditRelay({ pool, publish: async () => {} });
+  await relay.tick();
+  const metric = () => Number(renderMetrics().match(/^falcone_flow_audit_relay_last_success_timestamp_seconds (\d+)$/m)[1]);
+  const lastSuccess = metric();
+  assert.ok(lastSuccess > 0);
+  pool.connect = async () => { throw new Error('metadata pool unavailable'); };
+  await assert.rejects(relay.tick(), /metadata pool unavailable/);
+  assert.equal(metric(), lastSuccess);
 });

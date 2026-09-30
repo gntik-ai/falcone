@@ -505,7 +505,7 @@
                 }
               }
             },
-            "description": "AUDIT_UNAVAILABLE: the Flow mutation was rolled back because its audit outbox row could not be stored. Retry the request with the same Idempotency-Key."
+            "description": "AUDIT_UNAVAILABLE: the Flow mutation was rolled back because its audit outbox row could not be stored. Retry the request; gateway callers should reuse their Idempotency-Key."
           },
           "504": {
             "content": {

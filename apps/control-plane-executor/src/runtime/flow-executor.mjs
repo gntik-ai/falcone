@@ -1391,16 +1391,15 @@ export function createFlowExecutor({
         if (await hasActiveExecutions({ identity, flowId })) {
           throw clientError('Flow has active executions and cannot be deleted', 409, 'FLOW_HAS_ACTIVE_EXECUTIONS');
         }
-        // Deregister ALL trigger artifacts (schedule + secrets + registrations) BEFORE deleting the
-        // definition so no Temporal Schedule or webhook secret outlives the flow (spec: schedule
-        // removed before the deletion is acknowledged; no orphaned trigger artifacts).
+        const removed = await mutateWithAudit(FLOW_AUDIT_EVENT_TYPES.DEFINITION_DELETED, identity, flowId, params.correlationId,
+          (tx) => tx.deleteDefinition({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId }));
+        // Keep triggers intact if the audited deletion rolls back. Remove them before
+        // acknowledging a committed deletion so callers do not observe stale triggers.
         if (flowTriggerRegistry) {
           await flowTriggerRegistry.deregisterTriggers(flowId, identity).catch((err) => {
             logger?.error?.('[flow-executor] trigger deregister on delete failed:', err?.message ?? err);
           });
         }
-        const removed = await mutateWithAudit(FLOW_AUDIT_EVENT_TYPES.DEFINITION_DELETED, identity, flowId, params.correlationId,
-          (tx) => tx.deleteDefinition({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId }));
         return removed;
       }
       case 'validate':
