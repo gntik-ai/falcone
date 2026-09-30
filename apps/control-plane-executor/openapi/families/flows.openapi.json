@@ -497,6 +497,16 @@
             },
             "description": "Gateway rejected one or more invalid or oversized request headers."
           },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "AUDIT_UNAVAILABLE: the Flow mutation was rolled back because its audit outbox row could not be stored. Retry the request; gateway callers should reuse their Idempotency-Key."
+          },
           "504": {
             "content": {
               "application/json": {

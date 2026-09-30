@@ -26,7 +26,7 @@ const toLogical = (physical, workspaceId) => physical.slice(workspacePrefix(work
 export function createEventsExecutor(options = {}) {
   const brokers = (options.brokers ?? '').split(',').map((b) => b.trim()).filter(Boolean)
   if (brokers.length === 0) throw new TypeError('createEventsExecutor requires brokers')
-  const kafka = new Kafka({ clientId: 'in-falcone-control-plane', brokers, logLevel: logLevel.NOTHING, ...resolveKafkaSecurity() })
+  const kafka = options.kafkaClient ?? new Kafka({ clientId: 'in-falcone-control-plane', brokers, logLevel: logLevel.NOTHING, ...resolveKafkaSecurity() })
   let producerP = null
   let adminP = null
 

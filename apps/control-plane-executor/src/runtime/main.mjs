@@ -19,6 +19,7 @@ import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingM
 import { createLlmExecutor, createLlmProviderStore, createLlmUsageStore } from './llm-executor.mjs';
 import { parseAllowedSecretPrefixes } from './byok-provider-guard.mjs';
 import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
+import { createFlowAuditRelay } from './flow-audit-relay.mjs';
 import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './flow-monitoring-executor.mjs';
 import { wireFlowTriggers, createTriggerStore } from './flow-trigger-registry.mjs';
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
@@ -236,21 +237,36 @@ const flowQuotaGate = process.env.FLOW_QUOTA_ENFORCE_URL
     })
   : undefined;
 
-// Flow audit sink (change: add-flows-tenancy-isolation-limits). Best-effort: emits each flow
-// lifecycle event to the audit Kafka topic via the events executor when configured; otherwise a
-// no-op (definitions/executions still work; production wires Kafka). NEVER fails a flow request.
+// Dedicated platform producer. Tenant events APIs cannot address this physical topic.
 const flowAuditTopic = process.env.FLOW_AUDIT_TOPIC ?? 'falcone.audit.flow-lifecycle';
-const flowAuditSink = eventsExecutor
-  ? async (event) => {
-      try {
-        await eventsExecutor.executeEvents({
-          operation: 'publish', topic: flowAuditTopic,
-          identity: { tenantId: event.tenantId, workspaceId: event.workspaceId },
-          payload: { messages: [{ key: event.tenantId, value: event }] },
-        });
-      } catch (err) { console.error('[control-plane] flow audit publish failed:', err?.message ?? err); }
-    }
-  : undefined;
+if (flowAuditTopic.startsWith('evt.')) throw new Error('FLOW_AUDIT_TOPIC must be platform-scoped');
+let flowAuditProducerP;
+async function publishFlowAudit(event) {
+  if (!process.env.KAFKA_BROKERS) throw new Error('Kafka brokers unavailable');
+  if (!flowAuditProducerP) {
+    flowAuditProducerP = (async () => {
+      const { Kafka, logLevel } = await import('kafkajs');
+      const kafka = new Kafka({
+        clientId: 'falcone-flow-audit',
+        brokers: process.env.KAFKA_BROKERS.split(',').map((b) => b.trim()).filter(Boolean),
+        logLevel: logLevel.NOTHING, ...resolveKafkaSecurity(),
+      });
+      const producer = kafka.producer({ idempotent: true, maxInFlightRequests: 1 });
+      await producer.connect();
+      return producer;
+    })().catch((err) => { flowAuditProducerP = undefined; throw err; });
+  }
+  const producer = await flowAuditProducerP;
+  await producer.send({ topic: flowAuditTopic, acks: -1, messages: [{
+    key: event.flowId, value: JSON.stringify(event),
+  }] });
+}
+const flowAuditRelay = process.env.TEMPORAL_ADDRESS ? createFlowAuditRelay({
+  pool: keyPool, publish: publishFlowAudit,
+  intervalMs: process.env.FLOW_AUDIT_RELAY_INTERVAL_MS,
+  maxAttempts: process.env.FLOW_AUDIT_MAX_ATTEMPTS,
+  backoffCapMs: process.env.FLOW_AUDIT_BACKOFF_CAP_MS,
+}) : undefined;
 
 const flowExecutor = process.env.TEMPORAL_ADDRESS
   ? createFlowExecutor({
@@ -261,7 +277,7 @@ const flowExecutor = process.env.TEMPORAL_ADDRESS
       // Enforce FLW-E006: validate/publish reject any taskType not in the catalog.
       taskTypeCatalog: TASK_TYPE_NAMES,
       quotaGate: flowQuotaGate,
-      auditSink: flowAuditSink,
+      auditSink: publishFlowAudit,
     })
   : undefined;
 
@@ -416,26 +432,35 @@ async function recoverHostedMcpCleanup() {
   if (result.recovered > 0) console.info('[control-plane] hosted MCP cleanup batch complete', result);
 }
 
-// Initialise all metadata schemas (they share keyPool) before listening.
-Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), llmExecutor.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve(), flowExecutor ? triggerStore.ensureSchema() : Promise.resolve(), mcpEngine?.ensureSchema() ?? Promise.resolve()])
-  .catch((error) => console.error('[control-plane] metadata schema init failed:', error))
-  // Wire + START the platform-event trigger consumer AFTER the schemas exist, so the on-boot
-  // subscription can read already-persisted registrations (a flow published in a prior process).
-  // Best-effort: a Temporal/Kafka outage at boot never blocks the HTTP server from listening.
-  .then(() => bootFlowTriggers())
-  .catch((error) => console.error('[control-plane] flow-trigger boot wiring failed:', error))
-  .finally(() => {
-    server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
+// Schema failure, including outbox DDL or privilege hardening, must stop the process.
+async function boot() {
+  try {
+    await Promise.all([apiKeyStore.ensureSchema(), embeddingStore.ensureSchema(), mappingStore.ensureSchema(), llmExecutor.ensureSchema(), flowExecutor?.ensureSchema() ?? Promise.resolve(), flowExecutor ? triggerStore.ensureSchema() : Promise.resolve(), mcpEngine?.ensureSchema() ?? Promise.resolve()]);
+  } catch (error) {
+    console.error('[control-plane] metadata schema init failed:', error?.code ?? error?.message);
+    await keyPool.end().catch(() => {});
+    process.exit(1);
+  }
+  // Kafka/Temporal trigger wiring is best effort; the durable outbox is already ready.
+  await bootFlowTriggers().catch((error) => console.error('[control-plane] flow-trigger boot wiring failed:', error));
+  flowAuditRelay?.start();
+  server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
+  void recoverHostedMcpCleanup().catch((error) => console.error('[control-plane] hosted MCP cleanup failed:', error?.message ?? error));
+  mcpCleanupTimer = setInterval(() => {
     void recoverHostedMcpCleanup().catch((error) => console.error('[control-plane] hosted MCP cleanup failed:', error?.message ?? error));
-    mcpCleanupTimer = setInterval(() => {
-      void recoverHostedMcpCleanup().catch((error) => console.error('[control-plane] hosted MCP cleanup failed:', error?.message ?? error));
-    }, mcpCleanupIntervalMs);
-    mcpCleanupTimer.unref?.();
-  });
+  }, mcpCleanupIntervalMs);
+  mcpCleanupTimer.unref?.();
+}
+void boot().catch((error) => {
+  console.error('[control-plane] startup failed:', error?.code ?? error?.message);
+  process.exit(1);
+});
 
 async function shutdown(signal) {
   console.log(`[control-plane] ${signal} received, shutting down`);
   if (mcpCleanupTimer) clearInterval(mcpCleanupTimer);
+  flowAuditRelay?.stop();
+  await flowAuditProducerP?.then((producer) => producer.disconnect()).catch(() => {});
   server.close(() => {});
   await registry.end().catch(() => {});
   // keyPool backs BOTH apiKeyStore and embeddingStore; ending it once covers both.

@@ -9,6 +9,15 @@
 const requestsTotal = new Map();   // "method|route|status" -> count
 const durationByRoute = new Map(); // "method|route" -> { buckets:number[], sum, count }
 const mcpDependencyEvents = new Map(); // "operation|outcome|mode|state|reason" -> count
+let flowAuditBacklog = { pending: 0, failed: 0 };
+let flowAuditRelayLastSuccessSeconds = 0;
+
+export function setFlowAuditBacklog({ pending, failed }) {
+  flowAuditBacklog = { pending: Number(pending) || 0, failed: Number(failed) || 0 };
+}
+export function recordFlowAuditRelaySuccess() {
+  flowAuditRelayLastSuccessSeconds = Math.floor(Date.now() / 1000);
+}
 const LE = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
 const startedAtMs = Date.now();
 
@@ -66,6 +75,13 @@ export function recordMcpDependency({ operation, outcome, mode, state, reason })
 // Render the full registry in Prometheus text exposition format.
 export function renderMetrics() {
   const out = [];
+  out.push('# HELP falcone_flow_audit_outbox_rows Flow audit rows awaiting delivery or exhausted.');
+  out.push('# TYPE falcone_flow_audit_outbox_rows gauge');
+  out.push(`falcone_flow_audit_outbox_rows{state="pending"} ${flowAuditBacklog.pending}`);
+  out.push(`falcone_flow_audit_outbox_rows{state="failed"} ${flowAuditBacklog.failed}`);
+  out.push('# HELP falcone_flow_audit_relay_last_success_timestamp_seconds Last successful relay tick as a Unix timestamp; zero before the first success.');
+  out.push('# TYPE falcone_flow_audit_relay_last_success_timestamp_seconds gauge');
+  out.push(`falcone_flow_audit_relay_last_success_timestamp_seconds ${flowAuditRelayLastSuccessSeconds}`);
   out.push('# HELP falcone_http_requests_total Total HTTP requests handled.');
   out.push('# TYPE falcone_http_requests_total counter');
   for (const [k, v] of requestsTotal) {

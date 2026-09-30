@@ -671,17 +671,17 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       ['GET', new RegExp(`${fl}$`), ([w], c) =>
         runFlows(flowExecutor, { operation: 'list_definitions', identity: c.identity }, 200)],
       ['POST', new RegExp(`${fl}$`), ([w], c) =>
-        runFlows(flowExecutor, { operation: 'create_definition', identity: c.identity, body: c.body }, 201)],
+        runFlows(flowExecutor, { operation: 'create_definition', identity: c.identity, body: c.body, correlationId: c.headers['x-correlation-id'] }, 201)],
       ['GET', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'get_definition', identity: c.identity, flowId: f }, 200)],
       ['PATCH', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'update_definition', identity: c.identity, flowId: f, body: c.body }, 200)],
+        runFlows(flowExecutor, { operation: 'update_definition', identity: c.identity, flowId: f, body: c.body, correlationId: c.headers['x-correlation-id'] }, 200)],
       ['DELETE', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'delete_definition', identity: c.identity, flowId: f }, 200)],
+        runFlows(flowExecutor, { operation: 'delete_definition', identity: c.identity, flowId: f, correlationId: c.headers['x-correlation-id'] }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/validate$`), ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'validate', identity: c.identity, flowId: f }, 200)],
       ['POST', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
-        runFlows(flowExecutor, { operation: 'publish_version', identity: c.identity, flowId: f }, 201)],
+        runFlows(flowExecutor, { operation: 'publish_version', identity: c.identity, flowId: f, correlationId: c.headers['x-correlation-id'] }, 201)],
       ['GET', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'list_versions', identity: c.identity, flowId: f }, 200)],
       ['GET', new RegExp(`${fl}/([^/]+)/versions/([^/]+)$`), ([w, f, v], c) =>
@@ -1321,6 +1321,18 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       }
       const [, re, handler, opts] = match;
       const groups = re.exec(url.pathname).slice(1);
+      // The gateway requires this header, but direct/internal Flow callers may omit it.
+      // Generate a caller-visible ID in that case, and bound supplied IDs before persisting
+      // them in the Flow audit outbox.
+      if (url.pathname.startsWith('/v1/flows/')) {
+        const supplied = req.headers['x-correlation-id'];
+        if (supplied !== undefined && (typeof supplied !== 'string' || !/^[A-Za-z0-9._:-]{8,128}$/.test(supplied))) {
+          return sendJson(res, 400, { code: 'INVALID_CORRELATION_ID', message: 'Invalid X-Correlation-Id header' });
+        }
+        const correlationId = supplied ?? randomUUID();
+        req.headers['x-correlation-id'] = correlationId;
+        res.setHeader('x-correlation-id', correlationId);
+      }
 
       // SSE routes accept the anon key via ?apikey= (EventSource can't set headers).
       const queryApiKey = opts?.sse ? url.searchParams.get('apikey') : undefined;
