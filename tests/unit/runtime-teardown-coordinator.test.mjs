@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRuntimeTeardownCoordinator, createProductionRuntimeAdapter } from '../../apps/control-plane/runtime-teardown-coordinator.mjs';
 import { buildFunctionOwnershipLabels, deleteKnativeService } from '../../apps/control-plane/function-executor.mjs';
+import { createKnativeRuntimeSource } from '../../apps/control-plane/knative-runtime.mjs';
 import { listRuntimeOwnership, listPendingRuntimeObligations, deferAggregateCleanup } from '../../apps/control-plane/tenant-store.mjs';
 
 function harness(runtime) {
@@ -45,6 +46,64 @@ test('runtime-teardown-02: outstanding obligation blocks finalization after the 
   assert.equal(result.statusCode, 202);
   assert.deepEqual(result.obligations, [{ resourceType: 'function', resourceId: 'f1' }]);
   assert.deepEqual(calls, []);
+});
+
+test('runtime-teardown-06: disabled or unavailable runtime finalizes an empty tenant or workspace', async () => {
+  for (const mode of ['disabled', 'managed', 'external']) {
+    const runtime = createProductionRuntimeAdapter({
+      knativeRuntime: createKnativeRuntimeSource({ env: mode === 'disabled' ? {} : { KNATIVE_RUNTIME_MODE: mode }, readFile: () => { throw new Error('missing status'); } }),
+      deleteService: async () => { throw new Error('unexpected delete'); },
+    });
+    for (const target of ['tenant', 'workspace']) {
+      let deferrals = 0;
+      const store = {
+        listRuntimeOwnership: async () => ({ tenantId: 't1', workspaceId: target === 'workspace' ? 'w1' : undefined, functions: [], mcp: [] }),
+        listPendingRuntimeObligations: async () => [],
+        deferAggregateCleanup: async () => { deferrals += 1; },
+      };
+      const coordinator = createRuntimeTeardownCoordinator({ store, runtime });
+      const result = target === 'tenant'
+        ? await coordinator.purgeTenant({}, 't1', 'c1')
+        : await coordinator.purgeWorkspace({}, 'w1', 'c1');
+      assert.equal(result.finalize, true, `${mode} ${target}`);
+      assert.equal(result.pending, false, `${mode} ${target}`);
+      assert.equal(deferrals, 0, `${mode} ${target}`);
+    }
+  }
+});
+
+test('runtime-teardown-07: unavailable runtime retains owned resources and outstanding obligations', async () => {
+  for (const mode of ['disabled', 'managed']) {
+    const runtime = createProductionRuntimeAdapter({
+      knativeRuntime: createKnativeRuntimeSource({ env: mode === 'disabled' ? {} : { KNATIVE_RUNTIME_MODE: mode }, readFile: () => { throw new Error('missing status'); } }),
+      deleteService: async () => { throw new Error('unexpected delete'); },
+    });
+    const deferrals = [];
+    let ownership = { tenantId: 't1', functions: [{ tenantId: 't1', resourceId: 'f1', ksvcName: 'svc1' }], mcp: [] };
+    let obligations = [];
+    const store = {
+      listRuntimeOwnership: async () => ownership,
+      listPendingRuntimeObligations: async () => obligations,
+      deferAggregateCleanup: async (_pool, value) => deferrals.push(value),
+    };
+    const coordinator = createRuntimeTeardownCoordinator({ store, runtime });
+    const ownedResult = await coordinator.purgeTenant({}, 't1', 'c1');
+    assert.equal(ownedResult.statusCode, 202, mode);
+    assert.deepEqual(deferrals[0].resources, ownership.functions, mode);
+    ownership = { tenantId: 't1', functions: [], mcp: [] };
+    obligations = [{ resourceType: 'function', resourceId: 'f1' }];
+    const obligationResult = await coordinator.purgeTenant({}, 't1', 'c1');
+    assert.equal(obligationResult.statusCode, 202, mode);
+    assert.deepEqual(obligationResult.obligations, obligations, mode);
+    assert.equal(deferrals.length, 1, mode);
+  }
+});
+
+test('runtime-teardown-08: unavailable adapter cannot discard an owned resource', async () => {
+  const h = harness({ cleanup: async () => ({ ready: false, pending: [] }) });
+  const result = await h.coordinator.purgeTenant(h.pool, 't1', 'c1');
+  assert.equal(result.statusCode, 202);
+  assert.deepEqual(h.calls[0].defer.resources, [{ resourceId: 'f1', tenantId: 't1', ksvcName: 'ksvc-f1' }]);
 });
 
 test('runtime-teardown-03: workspace tenant binding and pending obligation lookup remain scoped', async () => {
@@ -177,9 +236,9 @@ test('runtime-teardown-01: accepted delete stays pending while the owned Service
   const result = await h.coordinator.purgeTenant(h.pool, 't1', 'c1');
   assert.equal(result.finalize, undefined);
   assert.equal(result.statusCode, 202);
-  assert.equal(result.obligations[0].reason, 'precondition_conflict');
+  assert.equal(result.obligations[0].reason, 'deletion_not_observed');
   assert.equal(h.calls[0].defer.correlationId, 'c1');
-  assert.equal(h.calls[0].defer.resources[0].reason, 'precondition_conflict');
+  assert.equal(h.calls[0].defer.resources[0].reason, 'deletion_not_observed');
   assert.deepEqual(calls.map(({ method }) => method), ['GET', 'DELETE', 'GET']);
   assert.deepEqual(calls[1].body.preconditions, { uid: 'uid-f1', resourceVersion: '7' });
 });

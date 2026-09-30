@@ -10,7 +10,11 @@ export function createProductionRuntimeAdapter({ knativeRuntime = null, deleteSe
       const pending = [];
       for (const fn of functions) {
         try { await deleteService(fn.ksvcName, { tenantId: fn.tenantId, functionResourceId: fn.resourceId, verifyAbsence: true }); }
-        catch (error) { pending.push({ ...fn, reason: error?.statusCode === 409 ? 'precondition_conflict' : 'runtime_delete_failed' }); }
+        catch (error) {
+          const reason = error?.reason === 'deletion_not_observed' ? 'deletion_not_observed'
+            : error?.statusCode === 409 ? 'precondition_conflict' : 'runtime_delete_failed';
+          pending.push({ ...fn, reason });
+        }
       }
       // MCP cleanup is intentionally delegated to the executor recovery worker. Retain its
       // snapshot and obligation until that owner-safe boundary confirms deletion.
@@ -26,9 +30,12 @@ export function createRuntimeTeardownCoordinator({ store, runtime }) {
   const run = async (pool, scope, id, correlationId) => {
     const ownership = await store.listRuntimeOwnership(pool, { ...scope, [scope.tenantId ? 'tenantId' : 'workspaceId']: id });
     const result = await adapter.cleanup({ ...ownership, ...scope, tenantId: ownership.tenantId ?? scope.tenantId, workspaceId: scope.workspaceId ?? id, correlationId });
-    const pending = result?.pending ?? (!result?.ready ? [...(ownership.functions ?? []), ...(ownership.mcp ?? [])] : []);
-    if (!result?.ready || pending.length) {
-      await store.deferAggregateCleanup(pool, { tenantId: ownership.tenantId ?? scope.tenantId, workspaceId: scope.workspaceId ?? (scope.tenantId ? null : id), resources: pending.length ? pending : [...(ownership.functions ?? []), ...(ownership.mcp ?? [])], correlationId });
+    const owned = [...(ownership.functions ?? []), ...(ownership.mcp ?? [])];
+    // An unavailable runtime cannot block teardown when nothing is owned. If an adapter
+    // disagrees with the ownership snapshot, retain every owned resource instead.
+    const pending = result?.ready ? (result.pending ?? []) : (result?.pending?.length ? result.pending : owned);
+    if (pending.length) {
+      await store.deferAggregateCleanup(pool, { tenantId: ownership.tenantId ?? scope.tenantId, workspaceId: scope.workspaceId ?? (scope.tenantId ? null : id), resources: pending, correlationId });
     }
     // A worker may still own a durable retry after the current logical snapshot becomes empty.
     // Never finalize the parent while that obligation is pending or processing.
@@ -36,7 +43,7 @@ export function createRuntimeTeardownCoordinator({ store, runtime }) {
       tenantId: ownership.tenantId ?? scope.tenantId,
       workspaceId: scope.tenantId ? null : id,
     });
-    if (!result?.ready || pending.length || obligations.length) {
+    if (pending.length || obligations.length) {
       const byResource = new Map();
       for (const item of [...pending, ...obligations]) {
         const key = `${item.resourceType ?? item.type ?? 'function'}:${item.resourceId ?? item.id}`;
