@@ -460,7 +460,7 @@ async function shutdown(signal) {
   console.log(`[control-plane] ${signal} received, shutting down`);
   if (mcpCleanupTimer) clearInterval(mcpCleanupTimer);
   flowAuditRelay?.stop();
-  await (await flowAuditProducerP)?.disconnect().catch(() => {});
+  await flowAuditProducerP?.then((producer) => producer.disconnect()).catch(() => {});
   server.close(() => {});
   await registry.end().catch(() => {});
   // keyPool backs BOTH apiKeyStore and embeddingStore; ending it once covers both.

@@ -59817,6 +59817,16 @@
               }
             }
           },
+          "503": {
+            "description": "AUDIT_UNAVAILABLE: the Flow mutation was rolled back because its audit outbox row could not be stored. Retry the request; gateway callers should reuse their Idempotency-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "504": {
             "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
             "content": {
