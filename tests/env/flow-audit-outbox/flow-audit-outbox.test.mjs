@@ -86,8 +86,9 @@ test('definition writes persist and publish audit events across a broker outage'
       await consumer.subscribe({ topic: TOPIC, fromBeginning: true });
       await consumer.run({ eachMessage: async ({ message }) => {
         const event = JSON.parse(message.value.toString());
-        if (event.flowId !== flowId) return;
+        if (!expected.has(event.eventId)) return;
         assert.equal(message.key.toString(), flowId);
+        assert.equal(event.flowId, flowId);
         assert.equal(event.tenantId, identity.tenantId);
         assert.equal(event.workspaceId, identity.workspaceId);
         assert.equal(event.eventType, expected.get(event.eventId));
