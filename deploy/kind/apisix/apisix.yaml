@@ -168,6 +168,9 @@ routes:
             X-Request-Id: $request_id
             x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
           remove:
+            # API-key credentials must use 2006-key and its per-key bucket.
+            - apikey
+            - x-api-key
             - x-tenant-id
             - x-workspace-id
             - x-auth-subject
@@ -301,7 +304,7 @@ routes:
   # ---- Anon/service API-key data-plane routes (Supabase-style) ----
   # Selected by the `apikey: flc_...` header (vars), at higher priority than the JWT
   # data routes (2005-2008 above) so a key request wins; without the header the request
-  # falls through to the JWT route -> control-plane. These forward to the EXECUTOR, which
+  # falls through to the JWT route (Mongo -> executor). These forward to the EXECUTOR, which
   # verifies the key and derives tenant/workspace FROM the key (authoritative over any
   # client-supplied identity header).
   #

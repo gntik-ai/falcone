@@ -49,6 +49,16 @@ test('Mongo bearer route requires explicit issuer verification and keeps gateway
   assert.match(bearer, /x-gateway-auth: "\$\{\{GATEWAY_SHARED_SECRET\}\}"/);
 });
 
+test('Mongo bearer route removes API-key headers that could bypass the per-key route', () => {
+  const remove = route('2006').split('          remove:\n')[1].split('\n    upstream:')[0];
+  for (const header of ['apikey', 'x-api-key']) {
+    assert.match(remove, new RegExp(`^            - ${header}$`, 'm'));
+  }
+  // A canonical key header still selects the unchanged higher-priority route.
+  assert.match(route('2006-key'), /\["http_apikey", "~~", "\^flc_"\]/);
+  assert.match(route('2006-key'), /key: \$http_apikey/);
+});
+
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const chartPath = process.env.FALCONE_CHART_PATH ?? resolve(repoRoot, '../falcone-charts/charts/in-falcone');
 const helmAvailable = spawnSync('helm', ['version', '--short'], { encoding: 'utf8' }).status === 0;
@@ -120,6 +130,9 @@ test('rendered chart and kind route 2006 agree on upstream, auth, and policy',
       assert.ok(kindRoute.includes(`- ${header.toLowerCase()}`));
     }
     const chartHeaders = plugins['proxy-rewrite'].headers.set;
+    for (const header of ['apikey', 'x-api-key']) {
+      assert.ok(plugins['proxy-rewrite'].headers.remove.includes(header), `${header} must be removed by the chart`);
+    }
     for (const header of ['X-Correlation-Id', 'X-Request-Id', 'x-gateway-auth']) {
       assert.ok(kindRoute.includes(`${header}: ${header === 'x-gateway-auth' ? '"' : ''}${chartHeaders[header]}`));
     }

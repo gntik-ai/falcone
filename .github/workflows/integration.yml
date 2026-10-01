@@ -6,6 +6,7 @@ on:
       - .github/workflows/integration.yml
       - deploy/kind/apisix/apisix.yaml
       - tests/e2e/deployment/mongo-gateway-bearer.test.mjs
+      - tests/e2e/helpers/prepare-mongo-gateway.mjs
       - tests/blackbox/mongo-gateway-route.test.mjs
       - tests/contracts/gateway-policy.contract.test.mjs
       - tests/unit/gateway-policy.test.mjs
@@ -122,14 +123,12 @@ jobs:
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: ci-plan-enforcement-admin
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD }}
           E2E_PLAN_ENFORCEMENT_CLIENT_SECRET: ${{ env.E2E_PLAN_ENFORCEMENT_CLIENT_SECRET }}
-          E2E_MONGO_CLIENT_SECRET: ${{ env.E2E_MONGO_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           kubectl exec -n "$E2E_NAMESPACE" deployment/falcone-keycloak -- \
             env KEYCLOAK_ADMIN_USERNAME="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME" \
                 KEYCLOAK_ADMIN_PASSWORD="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD" \
                 PLAN_ENFORCEMENT_CLIENT_SECRET="$E2E_PLAN_ENFORCEMENT_CLIENT_SECRET" \
-                E2E_MONGO_CLIENT_SECRET="$E2E_MONGO_CLIENT_SECRET" \
             bash -ec '
               KC=/opt/keycloak/bin/kcadm.sh
               "$KC" config credentials --server http://localhost:8080 --realm master \
@@ -143,14 +142,6 @@ jobs:
                 --uusername service-account-plan-enforcement-ci --rolename superadmin
               "$KC" add-roles -r in-falcone-platform --cclientid realm-management \
                 --uusername service-account-plan-enforcement-ci --rolename impersonation
-              # Mint through this in-cluster host so the token issuer matches
-              # the kind verifier's configured issuer_base_url.
-              "$KC" create realms -s realm=mongo-980-ci -s enabled=true
-              "$KC" create clients -r mongo-980-ci \
-                -s clientId=mongo-bearer-ci -s enabled=true -s publicClient=false \
-                -s standardFlowEnabled=false -s directAccessGrantsEnabled=false \
-                -s serviceAccountsEnabled=true -s clientAuthenticatorType=client-secret \
-                -s secret="$E2E_MONGO_CLIENT_SECRET"
             '
 
       - name: Route Kafka metadata to the local port-forward
@@ -159,14 +150,51 @@ jobs:
       - name: Route Keycloak issuer host to the local port-forward
         run: echo '127.0.0.1 falcone-keycloak' | sudo tee -a /etc/hosts >/dev/null
 
+      - name: Register disposable Mongo tenant and workspaces
+        env:
+          CONTROL_PLANE_URL: http://localhost:3233
+          KEYCLOAK_URL: http://falcone-keycloak:8080
+          SUPERADMIN_CLIENT_ID: plan-enforcement-ci
+          SUPERADMIN_CLIENT_SECRET: ${{ env.E2E_PLAN_ENFORCEMENT_CLIENT_SECRET }}
+        run: node tests/e2e/helpers/prepare-mongo-gateway.mjs
+
+      - name: Provision workspace-bound Mongo tenant client
+        env:
+          E2E_NAMESPACE: falcone-plan-enforcement
+        run: |
+          set -euo pipefail
+          kubectl exec -n "$E2E_NAMESPACE" deployment/falcone-keycloak -- \
+            env KEYCLOAK_ADMIN_USERNAME=ci-plan-enforcement-admin \
+                KEYCLOAK_ADMIN_PASSWORD="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD" \
+                MONGO_REALM="$FALCONE_MONGO_REALM" \
+                MONGO_WORKSPACE_ID="$FALCONE_MONGO_WORKSPACE_ID" \
+                MONGO_CLIENT_SECRET="$E2E_MONGO_CLIENT_SECRET" \
+            bash -ec '
+              KC=/opt/keycloak/bin/kcadm.sh
+              "$KC" config credentials --server http://localhost:8080 --realm master \
+                --user "$KEYCLOAK_ADMIN_USERNAME" --password "$KEYCLOAK_ADMIN_PASSWORD"
+              mongo_client_uuid=$("$KC" create clients -r "$MONGO_REALM" -i \
+                -s clientId=mongo-bearer-ci -s enabled=true -s publicClient=false \
+                -s standardFlowEnabled=false -s directAccessGrantsEnabled=false \
+                -s serviceAccountsEnabled=true -s clientAuthenticatorType=client-secret \
+                -s secret="$MONGO_CLIENT_SECRET")
+              "$KC" create "clients/$mongo_client_uuid/protocol-mappers/models" -r "$MONGO_REALM" \
+                -s name=workspace-binding -s protocol=openid-connect \
+                -s protocolMapper=oidc-hardcoded-claim-mapper \
+                -s "config={\"claim.name\":\"workspace_id\",\"claim.value\":\"$MONGO_WORKSPACE_ID\",\"jsonType.label\":\"String\",\"access.token.claim\":\"true\"}"
+              "$KC" add-roles -r "$MONGO_REALM" \
+                --uusername service-account-mongo-bearer-ci --rolename tenant_admin
+            '
+
       - name: Mongo tenant bearer gateway round trip
         env:
           FALCONE_MONGO_REQUIRED: 'true'
           FALCONE_MONGO_GATEWAY_URL: http://localhost:9080
-          FALCONE_MONGO_TOKEN_URL: http://falcone-keycloak:8080/realms/mongo-980-ci/protocol/openid-connect/token
+          FALCONE_MONGO_TOKEN_URL: http://falcone-keycloak:8080/realms/${{ env.FALCONE_MONGO_REALM }}/protocol/openid-connect/token
           FALCONE_MONGO_CLIENT_ID: mongo-bearer-ci
           FALCONE_MONGO_CLIENT_SECRET: ${{ env.E2E_MONGO_CLIENT_SECRET }}
-          FALCONE_MONGO_WORKSPACE_ID: ws-mongo-980-ci
+          FALCONE_MONGO_WORKSPACE_ID: ${{ env.FALCONE_MONGO_WORKSPACE_ID }}
+          FALCONE_MONGO_OTHER_WORKSPACE_ID: ${{ env.FALCONE_MONGO_OTHER_WORKSPACE_ID }}
         run: node --test tests/e2e/deployment/mongo-gateway-bearer.test.mjs
 
       - name: Plan-enforcement coherence tests

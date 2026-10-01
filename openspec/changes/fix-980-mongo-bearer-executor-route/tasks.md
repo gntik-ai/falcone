@@ -1,3 +1,29 @@
+## Latest source checker repair handoff (2026-10-01)
+
+This attempt starts from supplied source HEAD `7391c3222b0bd20c482e4a2182a2f9683ceb8bfc`, with a clean assigned worktree and branch `agent/falcone/980/5fcefe28-5a92-5e96-a3cd-6b1369cd20d6`. Git worktree metadata matches the supplied lease path. The following record supersedes the preceding attempt's pin-complete and validation records below.
+
+- [x] Route 2006 now removes `apikey` and `x-api-key` before forwarding to the executor. Regression coverage requires both removals and the rendered bootstrap route's removals. Canonical `apikey: flc_*` requests continue selecting higher-priority 2006-key; that entire route is byte-identical to source base `3a7306f20454db8a90f95a93a4049305efd1bce1`.
+- [x] Correct the stale standalone routing comment: Mongo bearer traffic reaches the executor.
+- [x] CI setup creates a disposable tenant and two registered workspaces through the control-plane API. It configures a tenant service-account client with an explicit `workspace_id` mapper and `tenant_admin` role. The live gate asserts those claims before exercising Mongo, so an unbound token cannot silently pass the isolation test. Only resource identifiers are persisted; credentials stay in memory and masked CI environment variables.
+- [x] Extend the live gate with workspace-A-token/workspace-B-path denial without document disclosure, API-key list and service write/delete, read-only-key `data:write` denial even when a valid JWT accompanies the canonical key header, mixed bearer/`x-api-key` handling, a bounded 130-request burst yielding 429, and a fresh key succeeding afterwards. Revoke issued keys in cleanup; the existing always-run namespace teardown removes the disposable fixture. All requests and the live test have timeouts.
+- [ ] Deployment maker: copy `deploy/kind/apisix/apisix.yaml` byte-for-byte into `charts/in-falcone/files/apisix/standalone/apisix.yaml` and add both API-key headers to route 2006's proxy-rewrite removal list in `charts/in-falcone/values.yaml`. Source canonical SHA256: `b0f0dab91383adb32d6f4f5917e2093fda24758c8b18e7b00b132d2a298824f4`. Preserve route 2006-key and all authentication and rendering gates.
+- [ ] Pin state: **pin pending deployment repair**. Both workflow pins remain `ac1e66a401acc62e09337920980c39233b5eaad6`. The deployment head will change when the required header repair is committed; refresh both source pins only after that head is final. Full standalone/bootstrap parity must then pass. The parity gate remains enabled and will reject the preceding chart copy.
+- [ ] Deployment maker: correct its handoff's fixture statement to justify the existing live-deployment fixture, APISIX mount/volume repair assertions and managed-ConfigMap contract assertion changes, in addition to the umbrella SHA256 and flow-audit baseline. Resolve the planned LuaJIT versus deployment CI Lua 5.4 discrepancy. No source fixture or baseline is changed in this repair.
+
+Bounded local validation:
+
+- PASS: route security/upstream/precedence tests and existing kind chart plugin mounts (4 checks), using `FALCONE_CHART_PATH` for the supplied deployment worktree and `node --test --experimental-test-isolation=none --test-name-pattern='Mongo bearer route|kind APISIX pod' tests/blackbox/mongo-gateway-route.test.mjs` (45-second bound).
+- PASS: executor JWT crypto verification, including signed tenant/workspace binding (9 checks, 30-second bound).
+- PASS with an auxiliary read-only loader: gateway-policy unit and API-key route contract (14 checks, 45-second bound). `/tmp/falcone-980-readonly-loader.mjs` supplies the installed toolchain's YAML 2.9.1 and maps the existing chart-relative reads to the assigned deployment path; it does not modify repository code or fixtures. Native runs cannot import the existing `yaml` dependency because repository dependencies are not installed. PR CI must rerun with the repository's frozen dependencies.
+- PASS: JavaScript syntax for both integration files, parsed workflow YAML and `bash -n` for every integration run block; `git diff --check`; route 2006-key comparison against base.
+- SKIPPED: native gateway-policy unit/API-key contract and full gateway-policy contract require installed dependencies (`yaml`, and `ajv`/`cel-js` in the full contract import graph). No dependency versions or lockfiles need changing.
+- SKIPPED: live kind gate (no stack/configuration), executor identity server tests (sandbox rejects loopback binding with `listen EPERM`), and Lua/LuaJIT verifier checks (runtimes absent). Image scans/builds, chart release checks and full staging-infrastructure contract, including shell syntax, require PR CI/release infrastructure.
+- SKIPPED until the deployment repair: full chart/bootstrap route parity. The source checks cover the fixed route; this source assignment cannot edit the deployment worktree, and the byte-equality/Helm removal assertions remain required.
+
+Release questions remain unchanged: confirm platform-only audience enforcement for tenant tokens, track the shared bearer client-IP bucket separately, verify live staging issuer/ConfigMap evidence and executor egress, obtain prod hosts, and confirm the BusyBox digest in the airgap mirror. No deploy, merge, push, credential retrieval, or unrelated source change is part of this repair.
+
+## Previous attempt records (historical)
+
 ## Source repository
 
 - [x] Point kind route 2006 at the executor with the host-scoped verifier schema and preserve route 2006-key.
