@@ -60,6 +60,26 @@ test('an invalid Bearer JWT fails closed (401) even with x-tenant-id present', a
   assert.equal((await res.json()).code, 'UNAUTHENTICATED');
 });
 
+test('a workspace-bound bearer token cannot address another Mongo workspace', async () => {
+  const boundVerifier = {
+    async verify() {
+      return { tenantId: 'ten-jwt', workspaceId: 'ws-a', credentialWorkspaceId: 'ws-a', actorId: 'admin-1' };
+    },
+  };
+  const boundServer = createControlPlaneServer({ registry, jwtVerifier: boundVerifier, logger: { error() {} } });
+  await new Promise((r) => boundServer.listen(0, '127.0.0.1', r));
+  try {
+    const url = `http://127.0.0.1:${boundServer.address().port}/v1/mongo/workspaces/ws-b/data/db/collections/c/documents`;
+    const res = await fetch(url, {
+      headers: { authorization: 'Bearer valid.tenant.token', 'x-tenant-id': 'victim' },
+    });
+    assert.equal(res.status, 403);
+    assert.equal((await res.json()).code, 'FORBIDDEN');
+  } finally {
+    await new Promise((r) => boundServer.close(r));
+  }
+});
+
 test('no credential → gateway-injected x-tenant-id header still trusted (Helm/OIDC path)', async () => {
   const res = await fetch(keys('ws-admin'), { headers: { 'x-tenant-id': 'ten-admin', 'x-auth-subject': 'admin-1' } });
   assert.equal(res.status, 200);
