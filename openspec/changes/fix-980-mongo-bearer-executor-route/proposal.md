@@ -11,10 +11,12 @@ Bearer `/v1/mongo/*` requests currently reach a control plane without Mongo hand
 - Source `KEYCLOAK_ISSUER` and `KEYCLOAK_JWKS_URL` for the executor and the gateway verifier from staging and prod values. No dev issuer may appear in those renders.
 - Make the staging `falcone-apisix-standalone` routes ConfigMap chart managed. Render the canonical routes in the release namespace with route 2006 updated and `llmwiki-s2-mongo-jwt` removed. Keep the explicit APISIX plugin list and deterministic Helm rendering.
 - Mount the plugin and APISIX config overlay in the kind profile. Gate the change with gateway-policy, route parity, render, Lua, and kind bearer round-trip tests.
+- Loading the verifier changes the default and prod APISIX pod configuration as well as staging: the chart adds an explicit plugin list, a config overlay, and a plugin mount. Review APISIX metrics and the rendered `prometheus.enable_export_server` setting during rollout.
+- Configuring `KEYCLOAK_ISSUER`, `KEYCLOAK_JWKS_URL`, and `KEYCLOAK_AUDIENCE` enables bearer verification on every executor-served route, including events and functions. Tenant-realm JWKS requests from the executor use the public issuer host, so staging and prod executors need egress to their configured public Keycloak hosts.
 
 ## Rollout and rollback
 
-Before the operator-gated staging sync, record the live ConfigMap SHA256 and diff its routes against the render. Verify bearer Mongo traffic before removing the staging workaround in the same synced revision. Reverting the ChangeSet restores the previous ConfigMap; route 2006-key remains independent. No source work deploys or syncs staging.
+Before the operator-gated staging sync, record the live ConfigMap SHA256 and diff its routes against the render. Verify bearer Mongo traffic and another executor-served data-plane family after the same synced revision removes the staging workaround. Check APISIX plugin loading and metrics, and confirm executor egress to the public Keycloak host. Reverting the ChangeSet restores the previous ConfigMap; route 2006-key remains independent. No source work deploys or syncs staging.
 
 ## Configuration decision
 
