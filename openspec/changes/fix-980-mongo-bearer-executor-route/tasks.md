@@ -7,7 +7,7 @@
 
 ## Deployment repository and release gates
 
-- [x] Implement the host-scoped APISIX verifier with realm validation, platform-only audience enforcement, bounded JWKS cache, and failure-path Lua tests.
+- [ ] Complete the host-scoped APISIX verifier with realm validation, platform-only audience enforcement, bounded JWKS cache, fetch load protection, and failure-path Lua tests.
 - [x] Render route 2006 and executor issuer/JWKS settings from environment values; verify staging and prod renders contain no dev issuer.
 - [x] Mount the verifier Lua file and APISIX config overlay in kind; pass the source kind pod wiring test.
 - [x] Render the staging standalone ConfigMap from canonical routes and compare it with a recorded live baseline plus the #980 delta.
