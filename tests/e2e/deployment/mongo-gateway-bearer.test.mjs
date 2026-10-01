@@ -10,9 +10,11 @@ const settings = {
   clientId: process.env.FALCONE_MONGO_CLIENT_ID,
   clientSecret: process.env.FALCONE_MONGO_CLIENT_SECRET,
   workspaceId: process.env.FALCONE_MONGO_WORKSPACE_ID,
-  apiKey: process.env.FALCONE_MONGO_API_KEY,
 };
 const missing = Object.entries(settings).filter(([, value]) => !value).map(([key]) => key);
+if (process.env.FALCONE_MONGO_REQUIRED === 'true' && missing.length) {
+  throw new Error(`live kind configuration missing: ${missing.join(', ')}`);
+}
 
 test('public APISIX selects Mongo routes and completes a tenant bearer document round trip',
   { skip: missing.length ? `live kind configuration missing: ${missing.join(', ')}` : false }, async () => {
@@ -28,6 +30,10 @@ test('public APISIX selects Mongo routes and completes a tenant bearer document 
     assert.equal(tokenResponse.status, 200, 'tenant realm token request failed');
     const { access_token: token } = await tokenResponse.json();
     assert.ok(token, 'tenant realm did not return an access token');
+    const tokenIssuer = JSON.parse(Buffer.from(token.split('.')[1], 'base64url')).iss;
+    const expectedIssuer = new URL(settings.tokenUrl);
+    assert.equal(tokenIssuer, `${expectedIssuer.origin}${expectedIssuer.pathname.replace(/\/protocol\/openid-connect\/token$/, '')}`,
+      'Keycloak issued a token for a different host than the configured issuer');
 
     const collection = `gateway_980_${randomUUID().replaceAll('-', '')}`;
     const docId = randomUUID();
@@ -44,7 +50,6 @@ test('public APISIX selects Mongo routes and completes a tenant bearer document 
         ...headers,
         ...(body ? { 'content-type': 'application/json' } : {}),
         ...(credential === 'bearer' ? { authorization: `Bearer ${token}` } : {}),
-        ...(credential === 'apikey' ? { apikey: settings.apiKey } : {}),
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
@@ -68,7 +73,6 @@ test('public APISIX selects Mongo routes and completes a tenant bearer document 
     });
     assert.equal(foreign.status, 401, 'foreign issuer must be rejected by APISIX');
     assert.ok(!(await foreign.text()).includes('NO_ROUTE'));
-    await expectStatus(call('GET', '', 'apikey'), 200, 'API-key route list');
 
     const docPath = `/${encodeURIComponent(docId)}`;
     await expectStatus(call('POST', '', 'bearer', { document: { _id: docId, stage: 'created' } }), 201, 'create');

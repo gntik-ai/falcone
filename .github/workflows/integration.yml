@@ -1,6 +1,12 @@
 name: scheduled-integration
 
 on:
+  pull_request:
+    paths:
+      - .github/workflows/integration.yml
+      - deploy/kind/apisix/apisix.yaml
+      - tests/e2e/deployment/mongo-gateway-bearer.test.mjs
+      - scripts/lib/gateway-policy.mjs
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
@@ -11,7 +17,7 @@ permissions:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
-  FALCONE_CHARTS_REF: '62c3975b4964fedfc821db5d8787e697e2f7af94'
+  FALCONE_CHARTS_REF: 'defe3722fa77de9c973b440b43d35e4015d6f477'
 
 jobs:
   plan-enforcement:
@@ -76,13 +82,16 @@ jobs:
           keycloak_admin_password="$(openssl rand -hex 24)"
           superadmin_password="$(openssl rand -hex 24)"
           plan_enforcement_client_secret="$(openssl rand -hex 24)"
+          mongo_client_secret="$(openssl rand -hex 24)"
           printf '::add-mask::%s\n' "$keycloak_admin_password"
           printf '::add-mask::%s\n' "$superadmin_password"
           printf '::add-mask::%s\n' "$plan_enforcement_client_secret"
+          printf '::add-mask::%s\n' "$mongo_client_secret"
           {
             echo "E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD=$keycloak_admin_password"
             echo "E2E_BOOTSTRAP_SUPERADMIN_PASSWORD=$superadmin_password"
             echo "E2E_PLAN_ENFORCEMENT_CLIENT_SECRET=$plan_enforcement_client_secret"
+            echo "E2E_MONGO_CLIENT_SECRET=$mongo_client_secret"
           } >> "$GITHUB_ENV"
 
       - name: Provision plan-enforcement services with the deterministic Helm adapter
@@ -94,6 +103,7 @@ jobs:
           # The pinned chart uses a release digest that is not present in kind.
           # This isolated run instead consumes the local tag loaded above.
           E2E_USE_LOCAL_CONTROL_PLANE_IMAGE: 'true'
+          E2E_FERRETDB: 'true'
           E2E_APISIX_STANDALONE_CONFIG_FILE: deploy/kind/apisix/apisix.yaml
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: ci-plan-enforcement-admin
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD }}
@@ -107,12 +117,14 @@ jobs:
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: ci-plan-enforcement-admin
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD }}
           E2E_PLAN_ENFORCEMENT_CLIENT_SECRET: ${{ env.E2E_PLAN_ENFORCEMENT_CLIENT_SECRET }}
+          E2E_MONGO_CLIENT_SECRET: ${{ env.E2E_MONGO_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           kubectl exec -n "$E2E_NAMESPACE" deployment/falcone-keycloak -- \
             env KEYCLOAK_ADMIN_USERNAME="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME" \
                 KEYCLOAK_ADMIN_PASSWORD="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD" \
                 PLAN_ENFORCEMENT_CLIENT_SECRET="$E2E_PLAN_ENFORCEMENT_CLIENT_SECRET" \
+                E2E_MONGO_CLIENT_SECRET="$E2E_MONGO_CLIENT_SECRET" \
             bash -ec '
               KC=/opt/keycloak/bin/kcadm.sh
               "$KC" config credentials --server http://localhost:8080 --realm master \
@@ -126,10 +138,31 @@ jobs:
                 --uusername service-account-plan-enforcement-ci --rolename superadmin
               "$KC" add-roles -r in-falcone-platform --cclientid realm-management \
                 --uusername service-account-plan-enforcement-ci --rolename impersonation
+              # Mint through this in-cluster host so the token issuer matches
+              # the kind verifier's configured issuer_base_url.
+              "$KC" create realms -s realm=mongo-980-ci -s enabled=true
+              "$KC" create clients -r mongo-980-ci \
+                -s clientId=mongo-bearer-ci -s enabled=true -s publicClient=false \
+                -s standardFlowEnabled=false -s directAccessGrantsEnabled=false \
+                -s serviceAccountsEnabled=true -s clientAuthenticatorType=client-secret \
+                -s secret="$E2E_MONGO_CLIENT_SECRET"
             '
 
       - name: Route Kafka metadata to the local port-forward
         run: echo '127.0.0.1 falcone-kafka' | sudo tee -a /etc/hosts >/dev/null
+
+      - name: Route Keycloak issuer host to the local port-forward
+        run: echo '127.0.0.1 falcone-keycloak' | sudo tee -a /etc/hosts >/dev/null
+
+      - name: Mongo tenant bearer gateway round trip
+        env:
+          FALCONE_MONGO_REQUIRED: 'true'
+          FALCONE_MONGO_GATEWAY_URL: http://localhost:9080
+          FALCONE_MONGO_TOKEN_URL: http://falcone-keycloak:8080/realms/mongo-980-ci/protocol/openid-connect/token
+          FALCONE_MONGO_CLIENT_ID: mongo-bearer-ci
+          FALCONE_MONGO_CLIENT_SECRET: ${{ env.E2E_MONGO_CLIENT_SECRET }}
+          FALCONE_MONGO_WORKSPACE_ID: ws-mongo-980-ci
+        run: node --test tests/e2e/deployment/mongo-gateway-bearer.test.mjs
 
       - name: Plan-enforcement coherence tests
         env:
