@@ -6,6 +6,11 @@ on:
       - .github/workflows/integration.yml
       - deploy/kind/apisix/apisix.yaml
       - tests/e2e/deployment/mongo-gateway-bearer.test.mjs
+      - tests/blackbox/mongo-gateway-route.test.mjs
+      - tests/contracts/gateway-policy.contract.test.mjs
+      - tests/unit/gateway-policy.test.mjs
+      - tests/unit/control-plane-jwt-identity.test.mjs
+      - tests/unit/control-plane-jwt-verify.test.mjs
       - scripts/lib/gateway-policy.mjs
   schedule:
     - cron: '17 3 * * *'

@@ -75,6 +75,31 @@ test('issuer / audience are enforced when configured', async () => {
   assert.equal(id.tenantId, 'ten-jwt');
 });
 
+test('a signed tenant-realm token derives tenant identity from the realm and keeps its workspace binding', async () => {
+  const urls = [];
+  const v = createJwtVerifier({
+    jwksUrl: 'https://kc.test/realms/platform/protocol/openid-connect/certs',
+    issuer: 'https://kc.test/realms/platform',
+    audience: 'in-falcone',
+    fetchImpl: async (url) => {
+      urls.push(url);
+      return { ok: true, json: async () => ({ keys: [jwk] }) };
+    },
+    now: () => NOW,
+  });
+  const identity = await v.verify(signRs256({
+    ...baseClaims,
+    iss: 'https://kc.test/realms/tenant-a',
+    tenant_id: 'victim-tenant',
+    aud: 'tenant-app',
+    workspace_id: 'ws-a',
+  }), 'ws-b');
+  assert.equal(identity.tenantId, 'tenant-a');
+  assert.equal(identity.workspaceId, 'ws-a');
+  assert.equal(identity.credentialWorkspaceId, 'ws-a');
+  assert.deepEqual(urls, ['https://kc.test/realms/tenant-a/protocol/openid-connect/certs']);
+});
+
 test('unknown kid triggers a single JWKS refetch (key rotation), then rejects if still absent', async () => {
   fetchCount = 0;
   await verifier.verify(signRs256(baseClaims)); // primes/uses cache

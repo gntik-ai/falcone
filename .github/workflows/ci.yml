@@ -58,6 +58,11 @@ jobs:
       - name: Contract tests
         run: pnpm test:contracts
 
+      - name: Mongo gateway route and kind chart parity
+        run: |
+          helm version --short
+          node --test tests/blackbox/mongo-gateway-route.test.mjs
+
       - name: Console E2E scaffolding
         run: pnpm test:e2e:console
 
