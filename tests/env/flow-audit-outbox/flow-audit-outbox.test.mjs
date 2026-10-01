@@ -63,6 +63,7 @@ test('definition writes persist and publish audit events across a broker outage'
     const afterFailure = await pool.query('SELECT event_id, attempts, delivered_at, next_attempt_at, failed_at FROM flow_audit_outbox WHERE event_payload->>\'flowId\' = $1 AND delivered_at IS NULL ORDER BY created_at, event_id', [flowId]);
     assert.deepEqual(afterFailure.rows.map((row) => row.attempts), [1, 0]);
     assert.ok(afterFailure.rows[0].next_attempt_at > pending.rows[0].next_attempt_at);
+    assert.deepEqual(afterFailure.rows[1].next_attempt_at, pending.rows[1].next_attempt_at);
     assert.ok(afterFailure.rows.every((row) => row.failed_at === null));
 
     compose('unpause');
