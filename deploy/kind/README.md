@@ -88,6 +88,17 @@ login). Proven end-to-end through the gateway with a real superadmin JWT:
   `REALM_BRUTE_FORCE_PERMANENT_LOCKOUT` (default `false`, so a locked account auto-recovers). A
   malformed value falls back to its default; protection is disabled only by an explicit `false`.
   See `docs/reference/architecture/realm-brute-force-protection.md`.
+
+Mongo bearer route 2006 and the kind executor require `aud: falcone-data-api`
+(also accepted as an exact array member). Tenant-app provisioning now adds the
+`falcone-data-api-audience` mapper idempotently; `azp` does not satisfy this check.
+For an existing stack, run `node scripts/backfill-tenant-realm-audience.mjs`
+with the existing Secret-backed Keycloak admin/DB environment for a dry run,
+then `--apply`, then `--apply` again to verify zero repairs, before enabling
+tenant audience enforcement. The script ships at `/repo/scripts/` in the
+control-plane image and `/app/scripts/` in the executor image. For paired
+staging/prod rollout gates and flag names, see
+`openspec/changes/fix-980-mongo-bearer-executor-route/proposal.md`.
 - `POST /v1/tenants/{id}/users` (create user in the tenant realm + assign realm
   roles), `GET /v1/tenants/{id}/users`.
 - `POST /v1/tenants/{id}/workspaces` (workspace record), `GET /v1/workspaces`,

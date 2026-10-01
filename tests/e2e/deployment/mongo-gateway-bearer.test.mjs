@@ -6,8 +6,10 @@ import { randomUUID } from 'node:crypto';
 
 const settings = {
   gateway: process.env.FALCONE_MONGO_GATEWAY_URL,
+  executor: process.env.FALCONE_MONGO_EXECUTOR_URL,
   tokenUrl: process.env.FALCONE_MONGO_TOKEN_URL,
   clientId: process.env.FALCONE_MONGO_CLIENT_ID,
+  wrongAudienceClientId: process.env.FALCONE_MONGO_WRONG_AUDIENCE_CLIENT_ID,
   clientSecret: process.env.FALCONE_MONGO_CLIENT_SECRET,
   workspaceId: process.env.FALCONE_MONGO_WORKSPACE_ID,
   otherWorkspaceId: process.env.FALCONE_MONGO_OTHER_WORKSPACE_ID,
@@ -34,6 +36,9 @@ test('public APISIX selects Mongo routes and completes a tenant bearer document 
     const { access_token: token } = await tokenResponse.json();
     assert.ok(token, 'tenant realm did not return an access token');
     const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+    const tenantAudience = process.env.FALCONE_MONGO_TENANT_AUDIENCE ?? 'falcone-data-api';
+    const audiences = (claims) => Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+    assert.ok(audiences(claims).includes(tenantAudience), 'CI tenant token must carry the data API audience');
     assert.equal(claims.workspace_id, settings.workspaceId, 'CI token must bind workspace A');
     assert.ok(claims.realm_access?.roles?.includes('tenant_admin'), 'CI token must permit API-key management');
     assert.notEqual(settings.workspaceId, settings.otherWorkspaceId, 'isolation requires two workspaces');
@@ -87,13 +92,35 @@ test('public APISIX selects Mongo routes and completes a tenant bearer document 
     assert.equal(foreign.status, 401, 'foreign issuer must be rejected by APISIX');
     assert.ok(!(await foreign.text()).includes('NO_ROUTE'));
 
+    const negativeResponse = await fetch(settings.tokenUrl, {
+      method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'client_credentials',
+        client_id: settings.wrongAudienceClientId, client_secret: settings.clientSecret }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    assert.equal(negativeResponse.status, 200, 'negative fixture must be a valid signed tenant token');
+    const { access_token: wrongAudienceToken } = await negativeResponse.json();
+    assert.ok(wrongAudienceToken, 'negative fixture token missing');
+    const negativeClaims = JSON.parse(Buffer.from(wrongAudienceToken.split('.')[1], 'base64url'));
+    assert.equal(negativeClaims.iss, claims.iss);
+    assert.equal(negativeClaims.azp, tenantAudience, 'negative fixture must cover azp-only audience bypass');
+    assert.ok(!audiences(negativeClaims).includes(tenantAudience), 'negative fixture must lack the required aud');
+    for (const baseUrl of [origin, settings.executor.replace(/\/$/, '')]) {
+      const rejected = await fetch(`${baseUrl}${path}`, {
+        headers: { ...headers, authorization: `Bearer ${wrongAudienceToken}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+      assert.equal(rejected.status, 401, 'wrong aud must be rejected at gateway and direct executor');
+      assert.ok(!(await rejected.text()).includes('NO_ROUTE'));
+    }
+
     const docPath = `/${encodeURIComponent(docId)}`;
     await expectStatus(call('POST', '', 'bearer', { document: { _id: docId, stage: 'created' } }), 201, 'create');
     try {
       const get = await expectStatus(call('GET', docPath), 200, 'get');
       assert.equal(get.item?._id, docId);
       const crossWorkspace = await request('GET', `${pathFor(settings.otherWorkspaceId)}${docPath}`);
-      assert.ok([403, 404].includes(crossWorkspace.status), 'workspace A token must not read workspace B');
+      assert.equal(crossWorkspace.status, 403, 'workspace A token must not read workspace B');
       const deniedBody = await crossWorkspace.text();
       assert.ok(!deniedBody.includes(docId) && !deniedBody.includes('created'), 'workspace denial must not disclose the document');
       const list = await expectStatus(call('GET'), 200, 'list');

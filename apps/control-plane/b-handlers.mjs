@@ -149,11 +149,14 @@ async function createTenant(ctx) {
     // stamps the owning tenant id (== realm name) so tokens carry tenant_id for claim consumers,
     // while the executor independently derives it from the verified issuer. (No separate
     // compensation: the client lives in the realm, which createRealm's compensation deletes.)
-    await saga.step('createTenantAppClient',
+    const clientUuid = await saga.step('createTenantAppClient',
       async () => {
         const clientUuid = await kc.createPublicAppClient(realm, { clientId: `${slug}-app`, name: `${displayName} App` });
         await kc.addHardcodedClaimMapper(realm, clientUuid, { name: 'tenant_id', claimName: 'tenant_id', claimValue: tenantId });
+        return clientUuid;
       });
+    await saga.step('ensureTenantAudienceMapper',
+      () => kc.ensureTenantAudienceMapper(realm, clientUuid));
 
     let owner = null;
     if (body.ownerUsername || body.ownerEmail) {

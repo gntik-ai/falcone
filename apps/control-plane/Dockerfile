@@ -72,6 +72,8 @@ COPY packages/webhook-engine            /repo/packages/webhook-engine
 # exits (server.mjs) -> CrashLoopBackOff on any build after v0.6.3.
 COPY packages/workspace-docs-service    /repo/packages/workspace-docs-service
 COPY apps/control-plane-executor                 /repo/apps/control-plane-executor
+COPY apps/control-plane/kc-admin.mjs              /repo/apps/control-plane/kc-admin.mjs
+COPY scripts/backfill-tenant-realm-audience.mjs    /repo/scripts/backfill-tenant-realm-audience.mjs
 
 # Source modules under apps/control-plane use repository-relative ../../packages imports.
 # The image flattens control-plane files into /app, so preserve that resolved absolute seam

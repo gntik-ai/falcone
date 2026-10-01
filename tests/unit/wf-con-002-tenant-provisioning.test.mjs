@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { kcAdmin } from '../../apps/control-plane/kc-admin.mjs';
 
 import { _resetForTest as resetIdempotencyStore } from '../../apps/control-plane-executor/src/workflows/idempotency-store.mjs';
 import { _resetForTest as resetJobStatus } from '../../apps/control-plane-executor/src/workflows/job-status.mjs';
@@ -102,6 +103,7 @@ test('async action success updates job status to succeeded', async () => {
     async createRealm() {
       return { realmId: 'tenant-one' };
     },
+    async ensureTenantAppAudience() {},
     async writeTenantRecord() {
       return { tenantId: 'tenant-one' };
     },
@@ -127,6 +129,7 @@ test('async action failing at Kafka step marks create_kafka_namespace', async ()
     async createRealm() {
       return { realmId: 'tenant-one' };
     },
+    async ensureTenantAppAudience() {},
     async writeTenantRecord() {
       return { tenantId: 'tenant-one' };
     },
@@ -179,4 +182,61 @@ test('duplicate pending idempotency key returns cached jobRef without new regist
   assert.equal(second.status, 'pending');
   assert.equal(second.jobRef, first.jobRef);
   assert.equal(registered, 1);
+});
+
+test('WF-CON-002 adds the tenant-app audience once before recording the tenant, including action retry', async () => {
+  const mappers = [];
+  let mapperPosts = 0;
+  const originalFetch = globalThis.fetch;
+  const methods = { findClient: kcAdmin.findClient, listClientMappers: kcAdmin.listClientMappers };
+  kcAdmin.findClient = async (realm, clientId) => {
+    assert.equal(realm, 'tenant-one');
+    assert.equal(clientId, 'tenant-one-app');
+    return { id: 'app-one' };
+  };
+  kcAdmin.listClientMappers = async () => mappers;
+  globalThis.fetch = async (url, init = {}) => {
+    if (url.endsWith('/realms/master/protocol/openid-connect/token')) {
+      return new Response(JSON.stringify({ access_token: 'fake-token', expires_in: 300 }));
+    }
+    assert.match(url, /\/clients\/app-one\/protocol-mappers\/models$/);
+    assert.equal(init.method, 'POST');
+    mapperPosts += 1;
+    mappers.push(JSON.parse(init.body));
+    return new Response(null, { status: 201 });
+  };
+  __setWorkflowDependenciesForTest({
+    createRealm: async () => ({ realmId: 'tenant-one' }),
+    updateJobStatus: async () => {},
+    writeTenantRecord: async () => {
+      assert.equal(mappers.length, 1, 'audience setup must precede tenant record');
+      return { tenantId: 'tenant-one' };
+    },
+    createTopicNamespace: async () => ({ namespaceId: 'tenant-one' }),
+    registerApisixRoutes: async () => ({ routeId: 'route-one' }),
+  });
+  try {
+    const action = { ...request(), jobRef: 'test-job' };
+    assert.equal((await runTenantProvisioningAction(action)).status, 'succeeded');
+    assert.equal((await runTenantProvisioningAction(action)).status, 'succeeded');
+    assert.equal(mapperPosts, 1);
+    assert.equal(mappers[0].config['included.custom.audience'], 'falcone-data-api');
+  } finally {
+    globalThis.fetch = originalFetch;
+    Object.assign(kcAdmin, methods);
+  }
+});
+
+test('audience setup failure aborts provisioning and identifies the failing step', async () => {
+  let recordCalls = 0;
+  __setWorkflowDependenciesForTest({
+    createRealm: async () => ({ realmId: 'tenant-one' }),
+    updateJobStatus: async () => {},
+    ensureTenantAppAudience: async () => { throw new Error('mapper unavailable'); },
+    writeTenantRecord: async () => { recordCalls += 1; },
+  });
+  const result = await runTenantProvisioningAction({ ...request(), jobRef: 'test-job' });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.errorSummary.failedStep, 'ensure_tenant_app_audience');
+  assert.equal(recordCalls, 0);
 });

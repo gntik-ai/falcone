@@ -81,6 +81,7 @@ function buildCtx({ slugTaken = false, insertBehavior = 'ok' } = {}) {
     async createRealmRole() {},
     async createPublicAppClient() { return 'client-uuid-1'; },
     async addHardcodedClaimMapper() {},
+    async ensureTenantAudienceMapper() {},
     async createUser() { return 'user-1'; },
     async assignRealmRoles() {},
   };

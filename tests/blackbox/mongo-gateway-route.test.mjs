@@ -34,6 +34,8 @@ test('Mongo bearer route requires explicit issuer verification and keeps gateway
   assert.match(bearer, /jwks_base_url: "http:\/\/falcone-keycloak:8080"/);
   assert.match(bearer, /platform_realm: "in-falcone-platform"/);
   assert.match(bearer, /audience: "in-falcone"/);
+  assert.match(bearer, /tenant_audience: "falcone-data-api"/);
+  assert.match(bearer, /enforce_tenant_audience: true/);
   assert.doesNotMatch(bearer, /issuers:/);
   assert.match(bearer, /cache_max_entries: 128/);
   for (const plugin of ['limit-count', 'client-control', 'request-validation', 'proxy-rewrite']) {
@@ -89,7 +91,7 @@ test('rendered chart and kind route 2006 agree on upstream, auth, and policy',
     const verifier = plugins['issuer-jwks-auth'];
     assert.ok(verifier);
     assert.equal(verifier.issuers, undefined);
-    for (const field of ['issuer_base_url', 'jwks_base_url', 'platform_realm', 'audience']) {
+    for (const field of ['issuer_base_url', 'jwks_base_url', 'platform_realm', 'audience', 'tenant_audience']) {
       const value = kindRoute.match(new RegExp(`${field}: "([^"]+)"`));
       assert.ok(value, `${field} missing from kind route`);
       assert.equal(typeof verifier[field], 'string', `${field} missing from chart route`);
@@ -101,7 +103,8 @@ test('rendered chart and kind route 2006 agree on upstream, auth, and policy',
       }
     }
     assert.deepEqual(Object.keys(verifier).sort(),
-      ['issuer_base_url', 'jwks_base_url', 'platform_realm', 'audience', 'cache_ttl', 'cache_max_entries', 'timeout'].sort());
+      ['issuer_base_url', 'jwks_base_url', 'platform_realm', 'audience', 'tenant_audience', 'enforce_tenant_audience', 'cache_ttl', 'cache_max_entries', 'timeout'].sort());
+    assert.equal(verifier.enforce_tenant_audience, true);
     for (const field of ['cache_ttl', 'cache_max_entries', 'timeout']) {
       assert.equal(verifier[field], Number(kindRoute.match(new RegExp(`${field}: (\\d+)`))[1]), field);
     }

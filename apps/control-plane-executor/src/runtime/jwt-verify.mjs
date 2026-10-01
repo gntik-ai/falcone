@@ -77,6 +77,8 @@ export function createJwtVerifier({
   jwksUrl,
   issuer,
   audience,
+  tenantAudience,
+  enforceTenantAudience = false,
   fetchImpl = fetch,
   clockToleranceSec = 60,
   cacheMs = 300_000,
@@ -84,8 +86,14 @@ export function createJwtVerifier({
   revocationCheck = undefined,
   now = () => Date.now(),
 } = {}) {
+  if (typeof enforceTenantAudience !== 'boolean') throw new Error('enforceTenantAudience must be boolean');
+  if (enforceTenantAudience && (typeof tenantAudience !== 'string' || !tenantAudience.trim())) {
+    throw new Error('tenant audience is required when enforcement is enabled');
+  }
+  if (enforceTenantAudience && !jwksUrl) throw new Error('JWKS URL is required when tenant audience enforcement is enabled');
   if (!jwksUrl) return undefined;
   const { realmsBase, platformRealm } = deriveRealmTopology(issuer, jwksUrl);
+  if (enforceTenantAudience && !realmsBase) throw new Error('Keycloak realm topology is required when tenant audience enforcement is enabled');
   const platformIssuer = issuer || (realmsBase ? `${realmsBase}${platformRealm}` : undefined);
   // Per-issuer JWKS caches (each realm has its own signing keys).
   const caches = new Map();
@@ -152,12 +160,15 @@ export function createJwtVerifier({
       const t = Math.floor(now() / 1000);
       if (typeof claims.exp === 'number' && t > claims.exp + clockToleranceSec) throw new Error('token expired');
       if (typeof claims.nbf === 'number' && t + clockToleranceSec < claims.nbf) throw new Error('token not yet valid');
-      // Audience is enforced for the platform realm (its app clients share KEYCLOAK_AUDIENCE);
-      // per-tenant realms use their own app-client audiences, so the realm-bound issuer is the
-      // trust boundary there rather than a single configured audience.
+      // Platform behavior is unchanged. Tenant enforcement uses the dedicated data-API
+      // audience, matched exactly in aud (string or array); azp is never a substitute.
       if (trust.kind === 'platform' && audience) {
         const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
         if (!aud.includes(audience)) throw new Error('audience mismatch');
+      }
+      if (trust.kind === 'tenant' && enforceTenantAudience) {
+        const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+        if (!aud.includes(tenantAudience)) throw new Error('tenant audience mismatch');
       }
       // Stateful revocation/rotation cutoff (parity with apps/control-plane/jwt-verify.mjs):
       // offline validation cannot see a revoked/rotated SA credential. The injected hook (DB-backed,
@@ -171,5 +182,16 @@ export function createJwtVerifier({
       if (trust.kind === 'tenant') identity.tenantId = trust.realm;
       return identity;
     },
+  };
+}
+
+export function tenantAudienceOptionsFromEnv(env = process.env) {
+  const flag = env.KEYCLOAK_ENFORCE_TENANT_AUDIENCE;
+  if (flag !== undefined && flag !== 'true' && flag !== 'false') {
+    throw new Error('KEYCLOAK_ENFORCE_TENANT_AUDIENCE must be true or false');
+  }
+  return {
+    tenantAudience: env.KEYCLOAK_TENANT_AUDIENCE,
+    enforceTenantAudience: flag === 'true',
   };
 }

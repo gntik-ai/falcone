@@ -23,7 +23,7 @@ import { createFlowAuditRelay } from './flow-audit-relay.mjs';
 import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './flow-monitoring-executor.mjs';
 import { wireFlowTriggers, createTriggerStore } from './flow-trigger-registry.mjs';
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
-import { createJwtVerifier, deriveRealmTopology } from './jwt-verify.mjs';
+import { createJwtVerifier, deriveRealmTopology, tenantAudienceOptionsFromEnv } from './jwt-verify.mjs';
 import { createSaRevocationCheck } from './sa-revocation.mjs';
 import { createMcpEngine } from './mcp-engine.mjs';
 import { createMcpPostgresStore } from './mcp-pg-store.mjs';
@@ -205,6 +205,7 @@ const jwtVerifier = createJwtVerifier({
   jwksUrl: process.env.KEYCLOAK_JWKS_URL,
   issuer: process.env.KEYCLOAK_ISSUER,
   audience: process.env.KEYCLOAK_AUDIENCE,
+  ...tenantAudienceOptionsFromEnv(),
   revocationCheck: createSaRevocationCheck({
     pool: keyPool,
     realmsBase: saRealmsBase,
