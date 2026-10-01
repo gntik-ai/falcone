@@ -2,19 +2,20 @@
 
 ## Why
 
-The kind APISIX bearer route for `/v1/mongo/*` sends requests to the control plane, which does not host the Mongo document handlers. The chart route uses a single platform-realm OIDC discovery endpoint, so tenant-realm tokens cannot pass gateway authentication.
+Bearer `/v1/mongo/*` requests currently reach a control plane without Mongo handlers, or fail gateway authentication for tenant realms. The executor has the Mongo handlers and already verifies JWT identity and workspace binding.
 
-## Change
+## What changes
 
-- Route 2006 to the executor and require an issuer-allowlisted JWKS verifier. The issuer list comes from configured realms. Reject missing credentials, unknown issuers, failed JWKS fetches, and invalid JWTs before forwarding.
-- Keep the route-local rate limit, body cap, request validation, correlation and request IDs. Remove client identity headers and inject the Secret-backed gateway trust header. Leave route 2006-key untouched.
-- Keep the chart values as the canonical source for deployed routes. The deployment repository supplies the APISIX verifier plugin, its explicit realm list, and the rendered route. It also verifies that the rendered chart upstream and kind upstream agree.
-- Retain the executor's verified-JWT identity path and credential workspace check. No Mongo handler changes are needed.
+- Route 2006 to the executor. Require `issuer-jwks-auth` before request validation and retain the rate limit, body cap, correlation headers, identity-header stripping, and Secret-backed `x-gateway-auth` injection. Leave route 2006-key unchanged.
+- Trust every strictly named realm beneath the environment's configured Keycloak issuer base. Fetch keys only beneath the configured JWKS base. Enforce the configured audience for the platform realm; tenant realm tokens use their issuer as the trust boundary. Fail closed on malformed tokens, foreign issuers, and JWKS errors.
+- Source `KEYCLOAK_ISSUER` and `KEYCLOAK_JWKS_URL` for the executor and the gateway verifier from staging and prod values. No dev issuer may appear in those renders.
+- Make the staging `falcone-apisix-standalone` routes ConfigMap chart managed. Render the canonical routes in the release namespace with route 2006 updated and `llmwiki-s2-mongo-jwt` removed. Keep the explicit APISIX plugin list and deterministic Helm rendering.
+- Mount the plugin and APISIX config overlay in the kind profile. Gate the change with gateway-policy, route parity, render, Lua, and kind bearer round-trip tests.
 
 ## Rollout and rollback
 
-The standalone staging ConfigMap is operator managed and needs a separate approved update after the chart render is reviewed. Record its previous SHA before that update. Reverting route 2006 restores the prior bearer failure; API-key route 2006-key remains independent.
+Before the operator-gated staging sync, record the live ConfigMap SHA256 and diff its routes against the render. Verify bearer Mongo traffic before removing the staging workaround in the same synced revision. Reverting the ChangeSet restores the previous ConfigMap; route 2006-key remains independent. No source work deploys or syncs staging.
 
-## Open configuration decision
+## Configuration decision
 
-The deployment owner must provide the authoritative tenant realm list from realm configuration and update it when realms are provisioned. A static list denies newly provisioned tenants until refreshed. The gateway must never construct the allow-list from JWT contents.
+The operator decision of 2026-10-01 trusts any valid realm name on the environment's Keycloak, so newly provisioned tenant realms require no values update or APISIX restart. The issuer base and JWKS base are explicit configuration; no token field may choose a host. Staging and prod public issuer and in-cluster JWKS base URLs must be confirmed by the deployment owner before release.

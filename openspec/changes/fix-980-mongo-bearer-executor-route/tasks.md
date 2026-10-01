@@ -1,15 +1,15 @@
 ## Source repository
 
-- [x] Point kind route 2006 at the executor; add the route-local verifier and policy plugins.
-- [x] Keep route 2006-key unchanged.
-- [x] Test the kind route and executor workspace binding.
+- [x] Point kind route 2006 at the executor with the host-scoped verifier schema and preserve route 2006-key.
+- [x] Require `issuer-jwks-auth` for public-api-mongo in the gateway-policy package and contract while other product routes retain `openid-connect`.
+- [x] Cover route policy, chart/kind parity, kind pod wiring, executor workspace rejection, and a live kind bearer document round trip.
+- [x] Record the revised operator decision and a requirements delta.
 
 ## Deployment repository and release gates
 
-- [ ] Implement and mount the issuer-allowlisted APISIX verifier with bounded JWKS cache.
-- [ ] Render chart route 2006 with the same verifier and executor upstream; provide the explicit realm configuration and keep 2006-key unchanged.
-- [x] Add source-side chart/kind parity, kind pod wiring, and live APISIX round-trip tests.
-- [ ] Pass the kind pod wiring test and run the live APISIX round trip after the chart kind profile mounts the plugin and config overlay.
-- [ ] Resolve the unmodified gateway-policy unit test failure: it still requires openid-connect on route 2006, while this change requires issuer-jwks-auth instead. The policy package is outside this ChangeSet's permitted edits.
-- [ ] Render staging and prod with their own platform and tenant issuer lists, and configure the executor verifier for those realms.
-- [ ] Update the staging standalone ConfigMap only through the operator-gated release process and record its SHA.
+- [ ] Implement the host-scoped APISIX verifier with realm validation, platform-only audience enforcement, bounded JWKS cache, and failure-path Lua tests.
+- [ ] Render route 2006 and executor issuer/JWKS settings from environment values; verify staging and prod renders contain no dev issuer.
+- [ ] Mount the verifier Lua file and APISIX config overlay in kind; pass the source kind pod wiring test.
+- [ ] Render the staging standalone ConfigMap from canonical routes and compare it with a recorded live baseline plus the #980 delta.
+- [ ] Run the kind bearer round trip through public APISIX, including unauthenticated and foreign-issuer 401 checks.
+- [ ] Record the live staging ConfigMap SHA256, review the diff, then perform the operator-gated sync and post-rollout verification.

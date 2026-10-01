@@ -5,7 +5,8 @@ import {
   collectGatewayPolicyViolations,
   evaluateAccessAssertion,
   listEnabledApisixRoutes,
-  readGatewayPolicyValues
+  readGatewayPolicyValues,
+  requiredProductPlugins
 } from '../../scripts/lib/gateway-policy.mjs';
 import { readPublicRouteCatalog } from '../../scripts/lib/public-api.mjs';
 import { readDomainModel } from '../../scripts/lib/domain-model.mjs';
@@ -16,6 +17,13 @@ test('gateway policy package remains internally consistent', () => {
   assert.equal(values.gatewayPolicy.errorEnvelope.schema, 'ErrorResponse');
   assert.ok(Object.keys(values.gatewayPolicy.qos.profiles).length > 0);
   assert.deepEqual(collectGatewayPolicyViolations(), []);
+});
+
+test('Mongo requires realm JWKS authentication while other product routes retain OIDC', () => {
+  assert.ok(requiredProductPlugins('mongo').includes('issuer-jwks-auth'));
+  assert.ok(!requiredProductPlugins('mongo').includes('openid-connect'));
+  assert.ok(requiredProductPlugins('events').includes('openid-connect'));
+  assert.ok(!requiredProductPlugins('events').includes('issuer-jwks-auth'));
 });
 
 test('enabled APISIX routes honor passthrough mode switches', () => {

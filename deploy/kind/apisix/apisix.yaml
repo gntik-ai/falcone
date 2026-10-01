@@ -132,13 +132,12 @@ routes:
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     plugins:
       cors: {}
-      # The issuer list is provisioned from realm configuration. Add tenant realms here when
-      # they are provisioned; never derive an allowed issuer from an unverified token.
+      # Only realm names beneath the configured Keycloak base may select JWKS endpoints.
       issuer-jwks-auth:
-        issuers:
-          - issuer: "http://falcone-keycloak:8080/realms/in-falcone-platform"
-            jwks_uri: "http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs"
-            audiences: ["in-falcone"]
+        issuer_base_url: "http://falcone-keycloak:8080"
+        jwks_base_url: "http://falcone-keycloak:8080"
+        platform_realm: "in-falcone-platform"
+        audience: "in-falcone"
         cache_ttl: 300
         cache_max_entries: 128
         timeout: 3

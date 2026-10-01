@@ -58,6 +58,16 @@ test('public APISIX selects Mongo routes and completes a tenant bearer document 
     assert.equal(unauthenticated.status, 401, 'unauthenticated request must be rejected by APISIX');
     const unauthenticatedBody = await unauthenticated.text();
     assert.ok(!unauthenticatedBody.includes('NO_ROUTE'));
+    const foreignToken = [
+      { alg: 'RS256', kid: 'foreign-key' },
+      { iss: 'https://foreign.invalid/realms/tenant-a', aud: 'in-falcone', exp: Math.floor(Date.now() / 1000) + 60 },
+      'invalid-signature',
+    ].map((part) => typeof part === 'string' ? part : Buffer.from(JSON.stringify(part)).toString('base64url')).join('.');
+    const foreign = await fetch(`${origin}${path}`, {
+      headers: { ...headers, authorization: `Bearer ${foreignToken}` },
+    });
+    assert.equal(foreign.status, 401, 'foreign issuer must be rejected by APISIX');
+    assert.ok(!(await foreign.text()).includes('NO_ROUTE'));
     await expectStatus(call('GET', '', 'apikey'), 200, 'API-key route list');
 
     const docPath = `/${encodeURIComponent(docId)}`;

@@ -30,7 +30,11 @@ test('Mongo bearer route requires explicit issuer verification and keeps gateway
   const bearer = route('2006');
   assert.match(bearer, /issuer-jwks-auth:/);
   assert.doesNotMatch(bearer, /openid-connect:/);
-  assert.match(bearer, /issuers:\s*\n\s*- issuer: "http:\/\/falcone-keycloak:8080\/realms\/in-falcone-platform"/);
+  assert.match(bearer, /issuer_base_url: "http:\/\/falcone-keycloak:8080"/);
+  assert.match(bearer, /jwks_base_url: "http:\/\/falcone-keycloak:8080"/);
+  assert.match(bearer, /platform_realm: "in-falcone-platform"/);
+  assert.match(bearer, /audience: "in-falcone"/);
+  assert.doesNotMatch(bearer, /issuers:/);
   assert.match(bearer, /cache_max_entries: 128/);
   for (const plugin of ['limit-count', 'client-control', 'request-validation', 'proxy-rewrite']) {
     assert.ok(bearer.includes(`${plugin}:`), `${plugin} missing`);
@@ -72,18 +76,26 @@ test('rendered chart and kind route 2006 agree on upstream, auth, and policy',
     const plugins = chartRoute.plugins;
     const verifier = plugins['issuer-jwks-auth'];
     assert.ok(verifier);
-    assert.equal(verifier.issuers.length, 1);
-    const kindIssuer = kindRoute.match(/- issuer: "([^"]+)"/)[1];
-    const kindJwks = kindRoute.match(/jwks_uri: "([^"]+)"/)[1];
-    const realmPath = (url) => new URL(url).pathname.replace(/^\/auth\//, '/');
-    assert.equal(realmPath(verifier.issuers[0].issuer), realmPath(kindIssuer));
-    assert.equal(realmPath(verifier.issuers[0].jwks_uri), realmPath(kindJwks));
-    assert.deepEqual(verifier.issuers[0].audiences,
-      JSON.parse(kindRoute.match(/audiences: (\[[^\n]+\])/)[1]));
+    assert.equal(verifier.issuers, undefined);
+    for (const field of ['issuer_base_url', 'jwks_base_url', 'platform_realm', 'audience']) {
+      const value = kindRoute.match(new RegExp(`${field}: "([^"]+)"`));
+      assert.ok(value, `${field} missing from kind route`);
+      assert.equal(typeof verifier[field], 'string', `${field} missing from chart route`);
+      if (field.endsWith('_url')) {
+        const normalizedPath = (url) => new URL(url).pathname.replace(/^\/auth\/?$/, '/').replace(/\/$/, '');
+        assert.equal(normalizedPath(verifier[field]), normalizedPath(value[1]), field);
+      } else {
+        assert.equal(verifier[field], value[1], field);
+      }
+    }
+    assert.deepEqual(Object.keys(verifier).sort(),
+      ['issuer_base_url', 'jwks_base_url', 'platform_realm', 'audience', 'cache_ttl', 'cache_max_entries', 'timeout'].sort());
     for (const field of ['cache_ttl', 'cache_max_entries', 'timeout']) {
       assert.equal(verifier[field], Number(kindRoute.match(new RegExp(`${field}: (\\d+)`))[1]), field);
     }
 
+    assert.deepEqual(Object.keys(plugins).sort(),
+      ['issuer-jwks-auth', 'cors', 'limit-count', 'client-control', 'request-validation', 'proxy-rewrite'].sort());
     for (const name of ['cors', 'limit-count', 'client-control', 'request-validation', 'proxy-rewrite']) {
       assert.ok(plugins[name], `${name} missing from chart`);
       assert.ok(kindRoute.includes(`${name}:`), `${name} missing from kind`);
@@ -109,6 +121,8 @@ test('rendered chart and kind route 2006 agree on upstream, auth, and policy',
     for (const header of ['X-Correlation-Id', 'X-Request-Id', 'x-gateway-auth']) {
       assert.ok(kindRoute.includes(`${header}: ${header === 'x-gateway-auth' ? '"' : ''}${chartHeaders[header]}`));
     }
+    assert.deepEqual(Object.keys(chartHeaders).sort(),
+      ['X-Correlation-Id', 'X-Request-Id', 'x-gateway-auth'].sort());
   });
 
 test('kind APISIX pod mounts the Mongo verifier and its enabled plugin config',
