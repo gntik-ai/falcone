@@ -525,6 +525,12 @@ export function collectDeploymentChartViolations(
 ) {
   const violations = [];
 
+  // The pinned chart does not yet feed this value to the control-plane saga,
+  // and kind mounts a canonical route table with this fixed audience (#980).
+  if (values?.gateway?.mongoBearer?.tenantAudience !== 'falcone-data-api') {
+    violations.push('gateway.mongoBearer.tenantAudience must remain falcone-data-api until the control-plane provisioner and kind routes consume the configured audience.');
+  }
+
   if (chart?.apiVersion !== 'v2') {
     violations.push('Root deployment chart must use apiVersion v2.');
   }

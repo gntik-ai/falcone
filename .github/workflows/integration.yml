@@ -23,7 +23,7 @@ permissions:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
-  FALCONE_CHARTS_REF: 'ef5a926bcfadf3a2e6d9136dd44bda1db221eca6'
+  FALCONE_CHARTS_REF: '13fcbfee738d2dd49da3928831871fa0da469ace'
 
 jobs:
   plan-enforcement:

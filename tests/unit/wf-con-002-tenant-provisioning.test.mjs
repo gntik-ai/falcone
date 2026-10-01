@@ -184,7 +184,7 @@ test('duplicate pending idempotency key returns cached jobRef without new regist
   assert.equal(registered, 1);
 });
 
-test('WF-CON-002 adds the tenant-app audience once before recording the tenant, including action retry', async () => {
+test('WF-CON-002 adds tenant identity and audience once before recording the tenant, including action retry', async () => {
   const mappers = [];
   let mapperPosts = 0;
   const originalFetch = globalThis.fetch;
@@ -209,7 +209,7 @@ test('WF-CON-002 adds the tenant-app audience once before recording the tenant, 
     createRealm: async () => ({ realmId: 'tenant-one' }),
     updateJobStatus: async () => {},
     writeTenantRecord: async () => {
-      assert.equal(mappers.length, 1, 'audience setup must precede tenant record');
+      assert.equal(mappers.length, 2, 'identity and audience setup must precede tenant record');
       return { tenantId: 'tenant-one' };
     },
     createTopicNamespace: async () => ({ namespaceId: 'tenant-one' }),
@@ -219,8 +219,13 @@ test('WF-CON-002 adds the tenant-app audience once before recording the tenant, 
     const action = { ...request(), jobRef: 'test-job' };
     assert.equal((await runTenantProvisioningAction(action)).status, 'succeeded');
     assert.equal((await runTenantProvisioningAction(action)).status, 'succeeded');
-    assert.equal(mapperPosts, 1);
-    assert.equal(mappers[0].config['included.custom.audience'], 'falcone-data-api');
+    assert.equal(mapperPosts, 2);
+    const identity = mappers.find((mapper) => mapper.name === 'tenant_id');
+    assert.equal(identity.config['claim.value'], 'tenant-one');
+    assert.equal(identity.protocolMapper, 'oidc-hardcoded-claim-mapper');
+    const audience = mappers.filter((mapper) => mapper.protocolMapper === 'oidc-audience-mapper');
+    assert.equal(audience.length, 1);
+    assert.equal(audience[0].config['included.custom.audience'], 'falcone-data-api');
   } finally {
     globalThis.fetch = originalFetch;
     Object.assign(kcAdmin, methods);

@@ -29,6 +29,15 @@ test('deployment chart stays internally consistent with packaging guidance', () 
   assert.deepEqual(violations, []);
 });
 
+test('deployment validation rejects a custom tenant audience until all provisioners and kind routes are wired', () => {
+  const values = structuredClone(readRootValues());
+  values.gateway.mongoBearer.tenantAudience = 'custom-data-api';
+  const violations = collectDeploymentChartViolations(
+    readRootChart(), values, readDeploymentTopology(), readWrapperChart(), readDomainModel()
+  );
+  assert.ok(violations.some((violation) => violation.includes('tenantAudience must remain falcone-data-api')));
+});
+
 test('deployment chart validation detects missing dependency aliases and values layers', () => {
   const brokenChart = structuredClone(readRootChart());
   brokenChart.dependencies = brokenChart.dependencies.filter((entry) => entry.alias !== 'ferretdb');

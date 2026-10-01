@@ -62,15 +62,39 @@ test('existing conflicting or duplicate named mapper fails without a POST', asyn
   assert.equal(postCount(), 1);
 });
 
-test('tenant app creation and mapper retry reuse the existing client and mapper', async () => {
+test('tenant app creation and retry reuse the client, tenant identity and audience mappers', async () => {
   const kc = fakeKeycloak();
   kc.clients.length = 0;
   const input = { clientId: 'acme-app', name: 'Acme App', audience };
   await kcAdmin.ensureTenantAppAudience('tenant-a', input);
   await kcAdmin.ensureTenantAppAudience('tenant-a', input);
   assert.equal(kc.clients.length, 1);
-  assert.equal(kc.mappers.length, 1);
-  assert.equal(kc.calls.filter((call) => call.method === 'POST').length, 2, 'one client and one mapper');
+  assert.equal(kc.mappers.length, 2);
+  const identity = kc.mappers.find((mapper) => mapper.name === 'tenant_id');
+  assert.equal(identity.protocolMapper, 'oidc-hardcoded-claim-mapper');
+  assert.deepEqual(identity.config, {
+    'claim.name': 'tenant_id', 'claim.value': 'tenant-a', 'jsonType.label': 'String',
+    'access.token.claim': 'true', 'id.token.claim': 'true', 'userinfo.token.claim': 'true',
+  });
+  assert.equal(kc.mappers.filter((mapper) => mapper.name === TENANT_AUDIENCE_MAPPER_NAME).length, 1);
+  assert.equal(kc.calls.filter((call) => call.method === 'POST').length, 3, 'one client and two distinct mappers');
+});
+
+test('existing tenant app gets its missing identity mapper once; conflicting identity fails before audience setup', async () => {
+  const kc = fakeKeycloak();
+  const input = { clientId: 'acme-app', audience };
+  await kcAdmin.ensureTenantAppAudience('tenant-a', input);
+  await kcAdmin.ensureTenantAppAudience('tenant-a', input);
+  assert.equal(kc.calls.filter((call) => call.method === 'POST').length, 2);
+  const identity = kc.mappers.find((mapper) => mapper.name === 'tenant_id');
+  identity.config['claim.value'] = 'other-tenant';
+  const before = kc.calls.length;
+  await assert.rejects(kcAdmin.ensureTenantAppAudience('tenant-a', input), /identity mapper configuration mismatch/);
+  assert.deepEqual(kc.calls.slice(before).map((call) => call.method), ['GET', 'GET']);
+  identity.config['claim.value'] = 'tenant-a';
+  kc.mappers.push({ ...identity });
+  await assert.rejects(kcAdmin.ensureTenantAppAudience('tenant-a', input), /identity mapper configuration mismatch/);
+  assert.equal(kc.calls.filter((call) => call.method === 'POST').length, 2);
 });
 
 test('dry run lists missing mapper without mutations; apply then re-apply is a no-op', async () => {

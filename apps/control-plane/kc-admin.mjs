@@ -465,6 +465,26 @@ export const kcAdmin = {
   async listClientMappers(realm, clientUuid) {
     return (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/protocol-mappers/models`)).json ?? [];
   },
+  // Keep WF-CON-002 app clients aligned with the saga, including on retries.
+  async ensureTenantIdMapper(realm, clientUuid) {
+    if (!realm || !clientUuid) throw new Error('realm and tenant app client are required');
+    const mappers = await this.listClientMappers(realm, clientUuid);
+    const existing = mappers.filter((mapper) => mapper.name === 'tenant_id');
+    if (existing.length) {
+      const mapper = existing[0];
+      if (existing.length !== 1 || mapper.protocol !== 'openid-connect'
+        || mapper.protocolMapper !== 'oidc-hardcoded-claim-mapper'
+        || mapper.config?.['claim.name'] !== 'tenant_id'
+        || mapper.config?.['claim.value'] !== realm
+        || mapper.config?.['jsonType.label'] !== 'String'
+        || ['access.token.claim', 'id.token.claim', 'userinfo.token.claim'].some((key) => mapper.config?.[key] !== 'true')) {
+        throw new Error('tenant identity mapper configuration mismatch');
+      }
+      return { created: false };
+    }
+    await this.addHardcodedClaimMapper(realm, clientUuid, { name: 'tenant_id', claimName: 'tenant_id', claimValue: realm });
+    return { created: true };
+  },
   // Read first: retries must never POST a second mapper with the same name.
   async ensureTenantAudienceMapper(realm, clientUuid, audience = tenantDataApiAudience()) {
     tenantDataApiAudience({ KEYCLOAK_TENANT_AUDIENCE: audience });
@@ -492,6 +512,7 @@ export const kcAdmin = {
     if (!realm || !clientId) throw new Error('realm and tenant app client ID are required');
     const client = await this.findClient(realm, clientId);
     const clientUuid = client?.id ?? await this.createPublicAppClient(realm, { clientId, name });
+    await this.ensureTenantIdMapper(realm, clientUuid);
     return this.ensureTenantAudienceMapper(realm, clientUuid, audience);
   },
   async getClientSecret(realm, clientUuid) {

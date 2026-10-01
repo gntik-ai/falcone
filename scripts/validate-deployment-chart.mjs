@@ -1,9 +1,20 @@
 import { collectDeploymentChartViolations, readRootChart, readRootValues, readWrapperChart } from './lib/deployment-chart.mjs';
-import { readDeploymentTopology } from './lib/deployment-topology.mjs';
+import { deepMerge, readDeploymentTopology } from './lib/deployment-topology.mjs';
+import { readYaml } from './lib/quality-gates.mjs';
+
+let values = readRootValues();
+const args = process.argv.slice(2);
+for (let index = 0; index < args.length; index += 2) {
+  if (args[index] !== '--values' || !args[index + 1] || args[index + 1].startsWith('--')) {
+    console.error('Usage: node scripts/validate-deployment-chart.mjs [--values path ...]');
+    process.exit(1);
+  }
+  values = deepMerge(values, readYaml(args[index + 1]));
+}
 
 const violations = collectDeploymentChartViolations(
   readRootChart(),
-  readRootValues(),
+  values,
   readDeploymentTopology(),
   readWrapperChart()
 );
