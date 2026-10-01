@@ -36,7 +36,7 @@ test('Mongo bearer route requires explicit issuer verification and keeps gateway
     assert.ok(bearer.includes(`${plugin}:`), `${plugin} missing`);
   }
   assert.match(bearer, /rejected_code: 429/);
-  assert.match(bearer, /max_body_size: 262144/);
+  assert.match(bearer, /max_body_size: 1048576/);
   for (const header of ['x-tenant-id', 'x-workspace-id', 'x-auth-subject', 'x-actor-roles']) {
     assert.ok(bearer.includes(`${header}: ""`), `${header} must be removed`);
   }
@@ -49,8 +49,9 @@ const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const chartPath = process.env.FALCONE_CHART_PATH ?? resolve(repoRoot, '../falcone-charts/charts/in-falcone');
 const helmAvailable = spawnSync('helm', ['version', '--short'], { encoding: 'utf8' }).status === 0;
 
-test('rendered chart and kind route 2006 use the same Mongo auth plugin and executor upstream',
-  { skip: !existsSync(chartPath) || !helmAvailable ? 'chart or helm unavailable' : false }, () => {
+test('rendered chart and kind route 2006 agree on upstream, auth, and policy',
+  { skip: !helmAvailable ? 'helm unavailable' : false }, () => {
+    assert.ok(existsSync(chartPath), `chart missing at ${chartPath}; set FALCONE_CHART_PATH`);
     const rendered = spawnSync('helm', ['template', 'falcone', chartPath,
       '--namespace', 'falcone', '--show-only', 'templates/bootstrap-payload-configmap.yaml'],
     { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
@@ -60,10 +61,75 @@ test('rendered chart and kind route 2006 use the same Mongo auth plugin and exec
     const chartRoute = JSON.parse(afterRoute.split(/\n  [\w.-]+: \|/)[0].replace(/^    /gm, ''));
     const kindRoute = route('2006');
     assert.equal(chartRoute.uri, '/v1/mongo/*');
-    assert.ok(chartRoute.plugins['issuer-jwks-auth']);
+    assert.equal(chartRoute.priority, Number(kindRoute.match(/priority: (\d+)/)[1]));
+    assert.deepEqual(chartRoute.methods, JSON.parse(kindRoute.match(/methods: (\[[^\n]+\])/)[1]));
     assert.equal(chartRoute.plugins['openid-connect'], undefined);
     assert.match(kindRoute, /issuer-jwks-auth:/);
     assert.deepEqual(Object.keys(chartRoute.upstream.nodes),
       ['falcone-control-plane-executor.falcone.svc.cluster.local:8080']);
     assert.match(kindRoute, /falcone-control-plane-executor\.falcone\.svc\.cluster\.local:8080/);
+
+    const plugins = chartRoute.plugins;
+    const verifier = plugins['issuer-jwks-auth'];
+    assert.ok(verifier);
+    assert.equal(verifier.issuers.length, 1);
+    const kindIssuer = kindRoute.match(/- issuer: "([^"]+)"/)[1];
+    const kindJwks = kindRoute.match(/jwks_uri: "([^"]+)"/)[1];
+    const realmPath = (url) => new URL(url).pathname.replace(/^\/auth\//, '/');
+    assert.equal(realmPath(verifier.issuers[0].issuer), realmPath(kindIssuer));
+    assert.equal(realmPath(verifier.issuers[0].jwks_uri), realmPath(kindJwks));
+    assert.deepEqual(verifier.issuers[0].audiences,
+      JSON.parse(kindRoute.match(/audiences: (\[[^\n]+\])/)[1]));
+    for (const field of ['cache_ttl', 'cache_max_entries', 'timeout']) {
+      assert.equal(verifier[field], Number(kindRoute.match(new RegExp(`${field}: (\\d+)`))[1]), field);
+    }
+
+    for (const name of ['cors', 'limit-count', 'client-control', 'request-validation', 'proxy-rewrite']) {
+      assert.ok(plugins[name], `${name} missing from chart`);
+      assert.ok(kindRoute.includes(`${name}:`), `${name} missing from kind`);
+    }
+    for (const field of ['count', 'time_window', 'rejected_code']) {
+      assert.equal(plugins['limit-count'][field],
+        Number(kindRoute.match(new RegExp(`${field}: (\\d+)`))[1]), field);
+    }
+    for (const field of ['key', 'key_type']) {
+      assert.equal(plugins['limit-count'][field], kindRoute.match(new RegExp(`${field}: ([^\\n]+)`))[1], field);
+    }
+    assert.equal(plugins['client-control'].max_body_size,
+      Number(kindRoute.match(/max_body_size: (\d+)/)[1]));
+    assert.deepEqual(plugins['request-validation'].header_schema.required,
+      JSON.parse(kindRoute.match(/required: (\[[^\n]+\])/)[1]));
+    for (const header of ['X-Tenant-Id', 'X-Workspace-Id', 'X-Auth-Subject', 'X-Actor-Roles']) {
+      assert.equal(plugins['request-validation'].header_schema.properties[header].maxLength, 0);
+      assert.match(kindRoute, new RegExp(`${header}: \\{ type: string, maxLength: 0 \\}`));
+      assert.ok(plugins['proxy-rewrite'].headers.remove.includes(header.toLowerCase()));
+      assert.ok(kindRoute.includes(`${header.toLowerCase()}: ""`));
+    }
+    const chartHeaders = plugins['proxy-rewrite'].headers.set;
+    for (const header of ['X-Correlation-Id', 'X-Request-Id', 'x-gateway-auth']) {
+      assert.ok(kindRoute.includes(`${header}: ${header === 'x-gateway-auth' ? '"' : ''}${chartHeaders[header]}`));
+    }
+  });
+
+test('kind APISIX pod mounts the Mongo verifier and its enabled plugin config',
+  { skip: !helmAvailable ? 'helm unavailable' : false }, () => {
+    assert.ok(existsSync(chartPath), `chart missing at ${chartPath}; set FALCONE_CHART_PATH`);
+    const kindValues = resolve(chartPath, '../../deploy/kind/values-kind.yaml');
+    assert.ok(existsSync(kindValues), `kind values missing at ${kindValues}`);
+    const rendered = spawnSync('helm', ['template', 'falcone', chartPath,
+      '--namespace', 'falcone', '-f', kindValues,
+      '--show-only', 'charts/apisix/templates/workload.yaml'],
+    { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+    assert.equal(rendered.status, 0, rendered.stderr);
+    const pod = rendered.stdout;
+    const podVolumes = pod.split('\n      volumes:\n')[1];
+    assert.ok(podVolumes, 'kind APISIX pod has no volumes');
+    for (const name of ['standalone-config', 'apisix-config-source', 'apisix-config-overlay', 'issuer-jwks-auth']) {
+      assert.match(podVolumes, new RegExp(`name: ${name}(?:\\n|$)`), `${name} volume missing`);
+    }
+    for (const name of ['apisix-config-source', 'apisix-config-overlay']) {
+      assert.match(pod, new RegExp(`mountPath: [^\\n]+\\n\\s+name: ${name}`), `${name} init mount missing`);
+    }
+    assert.match(pod, /mountPath: \/usr\/local\/apisix\/conf\/config\.yaml\n\s+name: apisix-config-overlay/);
+    assert.match(pod, /mountPath: \/usr\/local\/apisix\/falcone\/apisix\/plugins\/issuer-jwks-auth\.lua\n\s+name: issuer-jwks-auth/);
   });

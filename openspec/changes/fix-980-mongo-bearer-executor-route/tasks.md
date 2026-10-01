@@ -8,5 +8,8 @@
 
 - [ ] Implement and mount the issuer-allowlisted APISIX verifier with bounded JWKS cache.
 - [ ] Render chart route 2006 with the same verifier and executor upstream; provide the explicit realm configuration and keep 2006-key unchanged.
-- [ ] Verify chart and kind route parity, gateway authentication failures, and bearer Mongo document round trip.
+- [x] Add source-side chart/kind parity, kind pod wiring, and live APISIX round-trip tests.
+- [ ] Pass the kind pod wiring test and run the live APISIX round trip after the chart kind profile mounts the plugin and config overlay.
+- [ ] Resolve the unmodified gateway-policy unit test failure: it still requires openid-connect on route 2006, while this change requires issuer-jwks-auth instead. The policy package is outside this ChangeSet's permitted edits.
+- [ ] Render staging and prod with their own platform and tenant issuer lists, and configure the executor verifier for those realms.
 - [ ] Update the staging standalone ConfigMap only through the operator-gated release process and record its SHA.

@@ -150,7 +150,7 @@ routes:
         key: $http_x_tenant_id $http_x_workspace_id
         allow_degradation: false
       client-control:
-        max_body_size: 262144
+        max_body_size: 1048576
       request-validation:
         header_schema:
           type: object
