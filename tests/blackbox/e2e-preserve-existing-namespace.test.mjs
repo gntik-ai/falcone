@@ -32,6 +32,7 @@ case "$command_name" in
     case " $* " in
       *" config current-context "*) printf '%s\n' 'kind-falcone-bbx'; exit 0 ;;
       *" port-forward "*) trap 'exit 0' TERM INT; while sleep 1; do :; done ;;
+      *" apply "*) cat >/dev/null; exit 0 ;;
     esac
     if [[ " $* " == *" get --raw "* ]]; then
       discovery_path="\${*: -1}"
@@ -207,12 +208,30 @@ case "$command_name" in
     exit 0
     ;;
   helm)
-    if [[ "$1" == "install" && "\${2:-}" == "--help" ]]; then
-      printf '%s\n' 'Usage: helm install [NAME] [CHART] [flags]' '      --rollback-on-failure   if set, the installation will be rolled back on failure'
+    if [[ ( "$1" == "install" || "$1" == "upgrade" ) && "\${2:-}" == "--help" ]]; then
+      [[ "\${BBX_HELM_HELP_FAIL:-false}" == "true" ]] && exit 1
+      if [[ "\${BBX_HELM_MAJOR:-4}" == "3" ]]; then
+        printf '%s\n' '      --atomic   roll back changes on failure'
+      else
+        printf '%s\n' '      --rollback-on-failure   roll back changes on failure' '      --server-side string   apply changes server-side'
+      fi
       exit 0
+    fi
+    if [[ "$1" == "install" || "$1" == "upgrade" ]]; then
+      if [[ "\${BBX_HELM_MAJOR:-4}" == "3" && " $* " == *" --server-side="* ]]; then
+        printf '%s\n' 'Error: unknown flag: --server-side' >&2
+        exit 2
+      fi
+      if [[ "\${BBX_HELM_MAJOR:-4}" == "4" && " $* " != *" --server-side=false "* ]]; then
+        printf '%s\n' 'Helm 4 must explicitly retain client-side apply' >&2
+        exit 2
+      fi
     fi
     if [[ " $* " == *" template "* ]]; then
       case "$BBX_SCENARIO" in
+        helm-temporal)
+          printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-schema'
+          ;;
         rendered-namespace-conflict)
           printf '%s\n' 'apiVersion: v1' 'kind: Namespace' 'metadata:' "  name: $E2E_NAMESPACE" '  labels:' '    unsafe-bbx-change: rejected'
           ;;
@@ -314,7 +333,11 @@ case "$command_name" in
   npm|pnpm|yarn)
     exit 0
     ;;
-  docker|jq)
+  jq)
+    cat >/dev/null
+    exit 0
+    ;;
+  docker)
     exit 0
     ;;
 esac
@@ -472,7 +495,7 @@ function mutations(invocation) {
   return invocation.calls.filter(({ command, args }) => (
     command === 'helm'
     && /(?:^|\s)(?:upgrade|install|uninstall|delete|rollback)(?:\s|$)/.test(args)
-    && !/^install\s+--help(?:\s|$)/.test(args)
+    && !/^(?:install|upgrade)\s+--help(?:\s|$)/.test(args)
   ) || (
     command === 'kubectl' && /(?:^|\s)(?:apply|create|delete|patch|replace|label|annotate|edit|scale|set)(?:\s|$)/.test(args)
   ))
@@ -499,6 +522,43 @@ function isDiscoveryCall({ command, args }) {
     || /(?:^|\s)get\s+--raw\s+\/apis?(?:\/|\s|$)/.test(args)
   )
 }
+
+test('E2E installs retain client-side apply with Helm 3 and Helm 4', async (t) => {
+  for (const major of ['3', '4']) {
+    for (const mode of ['preserve-existing', 'ephemeral', 'temporal']) {
+      await t.test(`Helm ${major}, ${mode}`, () => {
+        const invocation = invokeHarness(mode === 'temporal' ? 'helm-temporal' : 'preserve-success', {
+          BBX_HELM_MAJOR: major,
+          E2E_NAMESPACE_MODE: mode === 'preserve-existing' ? mode : 'ephemeral',
+          E2E_EXPECTED_NAMESPACE_UID: namespaceUid,
+        })
+        try {
+          assert.equal(invocation.result.status, 0, invocation.output)
+          const installs = mutations(invocation).filter(({ command, args }) => command === 'helm' && /^(?:install|upgrade)\s/.test(args))
+          assert.equal(installs.length, 1, 'exactly one Helm install must run')
+          assert.equal(installs[0].args.includes('--server-side=false'), major === '4')
+          if (mode === 'preserve-existing') {
+            assert.ok(installs[0].args.includes(major === '3' ? '--atomic' : '--rollback-on-failure'))
+            assert.deepEqual(namespaceMutations(invocation), [])
+          } else {
+            assert.match(installs[0].args, /^upgrade --install /)
+            assert.equal(installs[0].args.includes('--no-hooks'), mode === 'temporal')
+            assert.equal(installs[0].args.includes('--wait'), mode !== 'temporal')
+          }
+        } finally { invocation.cleanup() }
+      })
+    }
+  }
+})
+
+test('E2E refuses a Helm apply when subcommand help cannot be inspected', () => {
+  const invocation = invokeHarness('preserve-success', { BBX_HELM_HELP_FAIL: 'true' })
+  try {
+    assert.notEqual(invocation.result.status, 0)
+    assert.match(invocation.output, /Could not inspect Helm's apply capability/)
+    assert.equal(mutations(invocation).filter(({ command }) => command === 'helm').length, 0)
+  } finally { invocation.cleanup() }
+})
 
 // bbx-933-001 | fn-e2e-preserve-existing-namespace | OpenSpec #### Scenario: Existing namespace E2E execution is explicitly attested and non-destructive
 test('issue E2E harness preserves an attested existing namespace without weakening ephemeral cleanup', async (t) => {

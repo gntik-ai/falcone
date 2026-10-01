@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - .github/workflows/integration.yml
+      - tests/e2e/stack.sh
+      - tests/blackbox/e2e-preserve-existing-namespace.test.mjs
       - deploy/kind/apisix/apisix.yaml
       - tests/e2e/deployment/mongo-gateway-bearer.test.mjs
       - tests/e2e/helpers/prepare-mongo-gateway.mjs
@@ -58,6 +60,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Validate E2E Helm compatibility and namespace safety
+        run: node --test tests/blackbox/e2e-preserve-existing-namespace.test.mjs
 
       - name: Create isolated kind cluster
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0

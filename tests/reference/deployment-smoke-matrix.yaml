@@ -86,10 +86,10 @@ smoke_scenarios:
     platform: kubernetes
     expected_exposure_kind: Ingress
     expected_hostnames:
-      api: api.staging.in-falcone.example.com
-      console: console.staging.in-falcone.example.com
-      identity: iam.staging.in-falcone.example.com
-      realtime: realtime.staging.in-falcone.example.com
+      api: api.baas.musematic.ai
+      console: baas.musematic.ai
+      identity: iam.baas.musematic.ai
+      realtime: realtime.baas.musematic.ai
     required_resources:
       - Namespace
       - ConfigMap
@@ -101,10 +101,10 @@ smoke_scenarios:
     platform: openshift
     expected_exposure_kind: Route
     expected_hostnames:
-      api: api.staging.in-falcone.example.com
-      console: console.staging.in-falcone.example.com
-      identity: iam.staging.in-falcone.example.com
-      realtime: realtime.staging.in-falcone.example.com
+      api: api.baas.musematic.ai
+      console: baas.musematic.ai
+      identity: iam.baas.musematic.ai
+      realtime: realtime.baas.musematic.ai
     required_resources:
       - Namespace
       - ConfigMap

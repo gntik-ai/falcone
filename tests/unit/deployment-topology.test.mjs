@@ -40,6 +40,25 @@ test('deepMerge preserves layered inheritance order for nested values', () => {
   assert.equal(merged.publicSurface.routePrefixes.controlPlane, '/control-plane');
 });
 
+test('staging topology keeps live hostname parity and rejects stale placeholders on both platforms', () => {
+  const topology = readDeploymentTopology();
+  const staging = topology.environment_profiles.find((profile) => profile.id === 'staging');
+  assert.deepEqual(staging.hostnames, {
+    api: 'api.baas.musematic.ai',
+    console: 'baas.musematic.ai',
+    identity: 'iam.baas.musematic.ai',
+    realtime: 'realtime.baas.musematic.ai'
+  });
+  for (const surface of ['api', 'console', 'identity', 'realtime']) {
+    const brokenTopology = structuredClone(topology);
+    brokenTopology.environment_profiles.find((profile) => profile.id === 'staging').hostnames[surface] = 'stale.example.com';
+    const violations = collectDeploymentTopologyViolations(brokenTopology, readDeploymentSmokeMatrix(), readJson(OPENAPI_PATH));
+    for (const platform of ['kubernetes', 'openshift']) {
+      assert.ok(violations.includes(`Resolved values for staging/${platform} hostname ${surface} must align with deployment topology.`));
+    }
+  }
+});
+
 test('resolveValues applies environment and platform overlays deterministically', () => {
   const resolved = resolveValues('prod', 'openshift');
 

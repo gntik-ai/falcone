@@ -157,10 +157,10 @@
       "id": "staging",
       "purpose": "Pre-production verification with production-like controls",
       "hostnames": {
-        "api": "api.staging.in-falcone.example.com",
-        "console": "console.staging.in-falcone.example.com",
-        "identity": "iam.staging.in-falcone.example.com",
-        "realtime": "realtime.staging.in-falcone.example.com"
+        "api": "api.baas.musematic.ai",
+        "console": "baas.musematic.ai",
+        "identity": "iam.baas.musematic.ai",
+        "realtime": "realtime.baas.musematic.ai"
       },
       "operational_profile": {
         "log_level": "info",
