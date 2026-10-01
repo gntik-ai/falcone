@@ -488,7 +488,7 @@ export const kcAdmin = {
   // Read first: retries must never POST a second mapper with the same name.
   async ensureTenantAudienceMapper(realm, clientUuid, audience = tenantDataApiAudience()) {
     tenantDataApiAudience({ KEYCLOAK_TENANT_AUDIENCE: audience });
-    if (!realm || !clientUuid) throw new Error('realm and tenant app client are required');
+    if (!realm || !clientUuid) throw new Error('realm and tenant client are required');
     const mappers = await this.listClientMappers(realm, clientUuid);
     const existing = mappers.filter((mapper) => mapper.name === TENANT_AUDIENCE_MAPPER_NAME);
     if (existing.length) {

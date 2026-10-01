@@ -11,6 +11,7 @@ function fakeKeycloak() {
   const clients = [{ id: 'app-uuid', clientId: 'acme-app', attributes: { 'in-falcone.kind': 'tenant-app' } },
     { id: 'console-uuid', clientId: 'console' }];
   const mappers = [];
+  const mappersByClient = new Map([['app-uuid', mappers]]);
   const calls = [];
   globalThis.fetch = async (url, init = {}) => {
     const path = new URL(url).pathname;
@@ -20,11 +21,16 @@ function fakeKeycloak() {
     }
     calls.push({ method, path });
     if (path.endsWith('/protocol-mappers/models')) {
-      assert.match(path, /clients\/app-uuid\//, 'only the tenant-app gets a mapper');
-      if (method === 'GET') return new Response(JSON.stringify(mappers));
+      const clientUuid = path.match(/\/clients\/([^/]+)\/protocol-mappers\/models$/)[1];
+      assert.ok(clients.some((client) => client.id === clientUuid
+        && ['tenant-app', 'service-account'].includes(client.attributes?.['in-falcone.kind'])),
+      'only managed data-API clients get a mapper');
+      if (!mappersByClient.has(clientUuid)) mappersByClient.set(clientUuid, []);
+      const clientMappers = mappersByClient.get(clientUuid);
+      if (method === 'GET') return new Response(JSON.stringify(clientMappers));
       const mapper = JSON.parse(init.body);
-      assert.ok(!mappers.some((existing) => existing.name === mapper.name), 'duplicate mapper POST');
-      mappers.push(mapper);
+      assert.ok(!clientMappers.some((existing) => existing.name === mapper.name), 'duplicate mapper POST');
+      clientMappers.push(mapper);
       return new Response(null, { status: 201 });
     }
     if (path.endsWith('/clients')) {
@@ -35,7 +41,7 @@ function fakeKeycloak() {
     }
     throw new Error('unexpected fake Keycloak request');
   };
-  return { clients, mappers, calls };
+  return { clients, mappers, mappersByClient, calls };
 }
 
 test('audience mapper lists before POST, emits only the access-token audience, retry is a no-op', async () => {
@@ -97,22 +103,52 @@ test('existing tenant app gets its missing identity mapper once; conflicting ide
   assert.equal(kc.calls.filter((call) => call.method === 'POST').length, 2);
 });
 
-test('dry run lists missing mapper without mutations; apply then re-apply is a no-op', async () => {
+test('dry run lists app and service-account mappers without mutations; apply then re-apply is a no-op', async () => {
   const kc = fakeKeycloak();
+  kc.clients.push(
+    { id: 'sa-uuid', clientId: 'sa-acme-worker', attributes: { 'in-falcone.kind': 'service-account' } },
+    { id: 'disabled-sa-uuid', clientId: 'sa-acme-disabled', enabled: false, attributes: { 'in-falcone.kind': 'service-account' } },
+  );
   const output = [];
   const opts = { kcAdmin, audience, loadTenantRealms: async () => ['tenant-a', 'tenant-a'], outStream: { write: (s) => output.push(s) } };
   const dry = await runBackfill(opts);
   assert.equal(dry.exitCode, 0);
-  assert.deepEqual(dry.result.inspected, [{ realm: 'tenant-a', missing: [{ id: 'app-uuid', clientId: 'acme-app' }] }]);
+  assert.deepEqual(dry.result.inspected, [{ realm: 'tenant-a', missing: [
+    { id: 'app-uuid', clientId: 'acme-app' },
+    { id: 'sa-uuid', clientId: 'sa-acme-worker' },
+    { id: 'disabled-sa-uuid', clientId: 'sa-acme-disabled' },
+  ] }]);
   assert.equal(kc.calls.filter((call) => call.method !== 'GET').length, 0);
   const apply = await runBackfill({ ...opts, argv: ['--apply'] });
-  assert.equal(apply.result.counts.repaired, 1);
+  assert.equal(apply.result.counts.repaired, 3);
   const again = await runBackfill({ ...opts, argv: ['--apply'] });
   assert.equal(again.result.counts.needingWork, 0);
   assert.equal(again.result.counts.repaired, 0);
   assert.equal(kc.mappers.length, 1);
-  assert.equal(kc.calls.filter((call) => call.method === 'POST').length, 1);
+  for (const clientId of ['sa-uuid', 'disabled-sa-uuid']) {
+    const mappers = kc.mappersByClient.get(clientId);
+    assert.equal(mappers.length, 1);
+    assert.equal(mappers[0].config['included.custom.audience'], audience);
+    assert.equal(mappers[0].protocolMapper, 'oidc-audience-mapper');
+  }
+  assert.equal(kc.calls.filter((call) => call.method === 'POST').length, 3);
   assert.ok(!output.join('').includes('fake-token'));
+});
+
+test('reconciliation rejects conflicting service-account mappers before any repair', async () => {
+  const kc = fakeKeycloak();
+  kc.clients.push({ id: 'sa-uuid', clientId: 'sa-acme-worker', attributes: { 'in-falcone.kind': 'service-account' } });
+  await kcAdmin.ensureTenantAudienceMapper('tenant-a', 'sa-uuid', audience);
+  kc.mappersByClient.get('sa-uuid')[0].config['included.custom.audience'] = 'other';
+  const before = kc.calls.length;
+  const result = await runBackfill({
+    argv: ['--apply'], kcAdmin, audience, loadTenantRealms: async () => ['tenant-a'], outStream: { write() {} },
+  });
+  assert.equal(result.exitCode, 1);
+  assert.deepEqual(result.result.failed, [{ realm: 'tenant-a', phase: 'inspect' }]);
+  assert.equal(result.result.counts.repaired, 0);
+  assert.ok(kc.calls.slice(before).every((call) => call.method === 'GET'));
+  assert.equal(kc.mappers.length, 0, 'no partial tenant-app repair');
 });
 
 test('reconciliation reports missing client/provider failures and redacts raw errors', async () => {
@@ -120,6 +156,11 @@ test('reconciliation reports missing client/provider failures and redacts raw er
   const opts = { audience, loadTenantRealms: async () => ['tenant-a'], outStream: { write: (s) => output.push(s) } };
   const missing = await runBackfill({ ...opts, kcAdmin: { listClients: async () => [] } });
   assert.equal(missing.exitCode, 1);
+  const saOnly = await runBackfill({ ...opts, kcAdmin: {
+    listClients: async () => [{ id: 'sa-uuid', attributes: { 'in-falcone.kind': 'service-account' } }],
+    listClientMappers: async () => assert.fail('missing tenant-app must still fail before inspection'),
+  } });
+  assert.equal(saOnly.exitCode, 1);
   const error = await runBackfill({ ...opts, kcAdmin: { listClients: async () => { throw new Error('OAuth-private-material'); } } });
   assert.equal(error.exitCode, 1);
   assert.deepEqual(error.result.failed, [{ realm: 'tenant-a', phase: 'inspect' }]);

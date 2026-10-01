@@ -915,6 +915,7 @@ async function createServiceAccount(ctx) {
   try {
     if (await kc.findClient(r.realm, clientId)) return err(409, 'SA_EXISTS', `service account client ${clientId} already exists`);
     const uuid = await kc.createConfidentialClient(r.realm, { clientId, name: displayName, serviceAccountsEnabled: true });
+    await kc.ensureTenantAudienceMapper(r.realm, uuid);
     const rec = await store.insertServiceAccount(pool, { id: saId, workspaceId: r.ws.id, tenantId: r.ws.tenant_id, iamRealm: r.realm, kcClientId: clientId, kcClientUuid: uuid, displayName, createdBy: identity.sub });
     // Top-level serviceAccountId is what the console persists to fetch the SA back.
     return ok(201, { serviceAccountId: rec.id, ...serviceAccountOut({ ...rec, iam_realm: r.realm }), serviceAccount: rec });

@@ -1,4 +1,4 @@
-// #980: reconcile tenant-app audiences BEFORE enabling enforcement in staging/prod.
+// #980: reconcile tenant-app and service-account audiences BEFORE enabling enforcement.
 // Dry-run by default. Uses the existing kc-admin Secret-backed environment; never logs
 // credentials or upstream error bodies. Run only in the operator's announced window.
 import { pathToFileURL } from 'node:url';
@@ -21,8 +21,10 @@ export function parseBackfillArgs(argv = []) {
 
 export async function inspectRealm(kcAdmin, realm, audience) {
   const clients = (await kcAdmin.listClients(realm))
-    .filter((client) => client.attributes?.['in-falcone.kind'] === 'tenant-app');
-  if (!clients.length) throw new Error('tenant-app client missing');
+    .filter((client) => ['tenant-app', 'service-account'].includes(client.attributes?.['in-falcone.kind']));
+  if (!clients.some((client) => client.attributes?.['in-falcone.kind'] === 'tenant-app')) {
+    throw new Error('tenant-app client missing');
+  }
   const missing = [];
   for (const client of clients) {
     const mappers = await kcAdmin.listClientMappers(realm, client.id);
