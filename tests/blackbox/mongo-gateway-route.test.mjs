@@ -42,7 +42,7 @@ test('Mongo bearer route requires explicit issuer verification and keeps gateway
   assert.match(bearer, /rejected_code: 429/);
   assert.match(bearer, /max_body_size: 1048576/);
   for (const header of ['x-tenant-id', 'x-workspace-id', 'x-auth-subject', 'x-actor-roles']) {
-    assert.ok(bearer.includes(`${header}: ""`), `${header} must be removed`);
+    assert.ok(bearer.includes(`- ${header}`), `${header} must be removed`);
   }
   assert.match(bearer, /X-Correlation-Id: \$http_x_correlation_id/);
   assert.match(bearer, /X-Request-Id: \$request_id/);
@@ -56,6 +56,8 @@ const helmAvailable = spawnSync('helm', ['version', '--short'], { encoding: 'utf
 test('rendered chart and kind route 2006 agree on upstream, auth, and policy',
   { skip: !helmAvailable ? 'helm unavailable' : false }, () => {
     assert.ok(existsSync(chartPath), `chart missing at ${chartPath}; set FALCONE_CHART_PATH`);
+    const standaloneRouteTable = readFileSync(resolve(chartPath, 'files/apisix/standalone/apisix.yaml'), 'utf8');
+    assert.equal(routeTable, standaloneRouteTable, 'kind and chart standalone routes must be byte-identical');
     const rendered = spawnSync('helm', ['template', 'falcone', chartPath,
       '--namespace', 'falcone', '--show-only', 'templates/bootstrap-payload-configmap.yaml'],
     { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
@@ -115,7 +117,7 @@ test('rendered chart and kind route 2006 agree on upstream, auth, and policy',
       assert.equal(plugins['request-validation'].header_schema.properties[header].maxLength, 0);
       assert.match(kindRoute, new RegExp(`${header}: \\{ type: string, maxLength: 0 \\}`));
       assert.ok(plugins['proxy-rewrite'].headers.remove.includes(header.toLowerCase()));
-      assert.ok(kindRoute.includes(`${header.toLowerCase()}: ""`));
+      assert.ok(kindRoute.includes(`- ${header.toLowerCase()}`));
     }
     const chartHeaders = plugins['proxy-rewrite'].headers.set;
     for (const header of ['X-Correlation-Id', 'X-Request-Id', 'x-gateway-auth']) {

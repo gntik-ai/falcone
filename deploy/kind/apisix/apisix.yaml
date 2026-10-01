@@ -166,11 +166,12 @@ routes:
           set:
             X-Correlation-Id: $http_x_correlation_id
             X-Request-Id: $request_id
-            x-tenant-id: ""
-            x-workspace-id: ""
-            x-auth-subject: ""
-            x-actor-roles: ""
             x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
+          remove:
+            - x-tenant-id
+            - x-workspace-id
+            - x-auth-subject
+            - x-actor-roles
     upstream:
       type: roundrobin
       scheme: http
