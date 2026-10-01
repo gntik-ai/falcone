@@ -40,9 +40,13 @@ function fakePool(size = 1) {
     event_payload: { eventId: `event-${i + 1}` }, attempts: 0, delivered: false, failed: false, due: true }));
   const locked = new Set();
   const queries = [];
+  const commits = [];
+  let releases = 0;
   return {
     rows,
     queries,
+    commits,
+    get releases() { return releases; },
     advance() { for (const row of rows) row.due = true; },
     async connect() {
       const held = new Set();
@@ -50,7 +54,13 @@ function fakePool(size = 1) {
       return {
         async query(sql, args = []) {
           if (sql === 'BEGIN') return { rows: [] };
-          if (sql === 'COMMIT' || sql === 'ROLLBACK') { unlock(); return { rows: [] }; }
+          if (sql === 'COMMIT' || sql === 'ROLLBACK') {
+            if (sql === 'COMMIT') commits.push(rows.map((row) => ({
+              attempts: row.attempts, delivered: row.delivered, due: row.due,
+            })));
+            unlock();
+            return { rows: [] };
+          }
           if (sql.includes('FOR UPDATE SKIP LOCKED')) {
             const row = rows.find((candidate) => !locked.has(candidate.event_id)
               && !candidate.delivered && !candidate.failed && candidate.due);
@@ -65,10 +75,11 @@ function fakePool(size = 1) {
             row.attempts = args[1];
             row.failed = args[1] >= args[2];
             row.due = false;
+            row.backoffMs = args[3];
           }
           return { rows: [] };
         },
-        release() { unlock(); },
+        release() { releases += 1; unlock(); },
       };
     },
     async query(sql) {
@@ -152,6 +163,40 @@ test('one tick drains a bounded batch and keeps remaining rows pending', async (
     && sql.includes('WHERE delivered_at <')));
   assert.equal(pool.queries.filter((sql) => sql.includes('count(*)')).length, 4);
   assert.ok(pool.queries.every((sql) => !sql.includes('count(*) FILTER')));
+  assert.equal(pool.releases, 2);
+});
+
+test('one failed publish commits its backoff and stops the batch before releasing the client', async () => {
+  const pool = fakePool(3);
+  const seen = [];
+  let brokerAvailable = false;
+  const relay = createFlowAuditRelay({ pool, batchSize: 3, publish: async (event) => {
+    seen.push(event.eventId);
+    if (!brokerAvailable) throw new Error('Kafka unavailable');
+  } });
+  await relay.tick();
+  assert.deepEqual(seen, ['event-1']);
+  assert.deepEqual(pool.rows.map((row) => row.attempts), [1, 0, 0]);
+  assert.deepEqual(pool.rows.map((row) => row.delivered), [false, false, false]);
+  assert.equal(pool.rows[0].backoffMs, 1000);
+  assert.equal(pool.rows[0].due, false);
+  assert.equal(pool.commits.length, 1);
+  assert.equal(pool.commits[0][0].attempts, 1);
+  assert.equal(pool.releases, 1);
+
+  brokerAvailable = true;
+  await relay.tick();
+  assert.deepEqual(seen, ['event-1', 'event-2', 'event-3']);
+  assert.deepEqual(pool.rows.map((row) => row.delivered), [false, true, true]);
+  assert.equal(pool.rows[0].attempts, 1);
+  assert.equal(pool.releases, 2);
+
+  pool.advance();
+  await relay.tick();
+  assert.deepEqual(seen, ['event-1', 'event-2', 'event-3', 'event-1']);
+  assert.deepEqual(pool.rows.map((row) => row.delivered), [true, true, true]);
+  assert.equal(pool.rows[0].attempts, 1);
+  assert.equal(pool.releases, 3);
 });
 
 test('relay success timestamp stays stale when the metadata pool is unavailable', async () => {
