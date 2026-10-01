@@ -1,5 +1,20 @@
 # Source #980 handoff (2026-10-01)
 
+## Follow-up verification from assigned HEAD 9cc094a2
+
+This attempt started at the supplied `9cc094a2a7a87dfee5d036791c4b57aeb6612b21` on the assigned branch/worktree, with no uncommitted changes. The execution contract, lease identity, R2 policy and bounded OpenSpec were supplied in the instruction bundle. Deployment HEAD is still `13fcbfee738d2dd49da3928831871fa0da469ace`, with a clean worktree. The checker findings describe an earlier state: both workflow pins already equal that deployment HEAD at the supplied source HEAD. The identity-mapper alignment and custom-audience validation guard are also already committed. These repairs are preserved.
+
+- [x] Add a regression check to the existing Mongo route parity suite that reads both workflow pins and compares them to the Git HEAD of the actual deployment checkout. It requires exactly one full immutable pin in each workflow and runs independently of Helm availability.
+- [x] PASS: `FALCONE_CHART_PATH=/srv/engineering/worktrees/falcone-charts/5fcefe28-5a92-5e96-a3cd-6b1369cd20d6/charts/in-falcone timeout 45s node --test --experimental-test-isolation=none tests/blackbox/mongo-gateway-route.test.mjs` (6/6). Checks pins, byte-identical canonical routes, upstream selection, audience/policy parity, API-key header removal and kind plugin/config mounts.
+- [x] PASS: `timeout 45s node --test --experimental-test-isolation=none tests/unit/control-plane-jwt-verify.test.mjs tests/unit/tenant-data-api-audience.test.mjs tests/blackbox/tenant-realm-token-issuance.test.mjs tests/blackbox/kind-control-plane-multirealm-jwt.test.mjs` (32/32). Includes tenant audience string/array/missing/azp-only cases, fail-closed configuration, unchanged platform/control-plane behavior, mapper retries/conflicts and dry-run/apply/reapply.
+- [x] PASS: bounded `helm lint --strict` against the assigned deployment chart for default, staging, prod and kind (each invocation limited to 45 seconds). Changed test syntax and `git diff --check` pass.
+- [ ] SKIPPED after import failures: native gateway-policy unit/contract and deployment-chart validation suites need the existing `yaml` dependency; saga audience tests need `kafkajs`; WF-CON-002 needs `cel-js`. No manifest or lockfile change is required. CI must run these with frozen dependencies.
+- [ ] SKIPPED: chart render/flow-audit/baseline suites also need missing repository dependencies; Lua tests need LuaJIT; live kind CRUD, direct-executor/gateway 401, workspace 403, API-key scope/rate-limit checks and image builds/scans need the configured stack/container images. Managed-knative package extraction and identity HTTP tests remain CI gates as documented below.
+
+No source behavior, workflow pin, dependency, deployment file or render baseline changed in this attempt. One additional local commit records the regression check and this handoff. Existing rollout restrictions remain mandatory: keep the audience at `falcone-data-api`, validate all values layers, reconcile existing staging/prod realms and prepare non-app executor clients before enabling enforcement. Staging stays false until the subsequent operator-gated values revision. The truncated-addendum confirmation remains a release follow-up. No network, deploy, merge, push, credentials or cluster mutation was used.
+
+## Previous attempt handoff retained
+
 Assigned starting HEAD: `49d18d6aa44885aac1ffca373a01bd1910a74425`, branch `agent/falcone/980/5fcefe28-5a92-5e96-a3cd-6b1369cd20d6`. The worktree was clean; its path, Git metadata and branch match the assigned lease. R2, source repository only. All previous committed #980 work is preserved. The execution contract, OpenSpec, acceptance criteria and risk policy were supplied in the instruction bundle; there are no additional local agent instructions.
 
 ## Checker repairs in this attempt

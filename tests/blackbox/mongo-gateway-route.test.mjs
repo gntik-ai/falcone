@@ -65,6 +65,22 @@ const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const chartPath = process.env.FALCONE_CHART_PATH ?? resolve(repoRoot, '../falcone-charts/charts/in-falcone');
 const helmAvailable = spawnSync('helm', ['version', '--short'], { encoding: 'utf8' }).status === 0;
 
+test('both workflow pins match the deployment checkout used for Mongo route parity', () => {
+  assert.ok(existsSync(chartPath), `chart missing at ${chartPath}; set FALCONE_CHART_PATH`);
+  const chartRepo = resolve(chartPath, '../..');
+  const head = spawnSync('git', ['-c', `safe.directory=${chartRepo}`, '-C', chartRepo, 'rev-parse', 'HEAD'],
+    { encoding: 'utf8' });
+  assert.equal(head.status, 0, head.stderr);
+  const deploymentHead = head.stdout.trim();
+  assert.match(deploymentHead, /^[a-f0-9]{40}$/);
+  for (const workflow of ['ci.yml', 'integration.yml']) {
+    const contents = readFileSync(resolve(repoRoot, '.github/workflows', workflow), 'utf8');
+    const pins = [...contents.matchAll(/^  FALCONE_CHARTS_REF: '([a-f0-9]{40})'$/gm)];
+    assert.equal(pins.length, 1, `${workflow} must have one immutable chart pin`);
+    assert.equal(pins[0][1], deploymentHead, `${workflow} must pin the deployment checkout used for parity`);
+  }
+});
+
 test('rendered chart and kind route 2006 agree on upstream, auth, and policy',
   { skip: !helmAvailable ? 'helm unavailable' : false }, () => {
     assert.ok(existsSync(chartPath), `chart missing at ${chartPath}; set FALCONE_CHART_PATH`);
