@@ -5,15 +5,15 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  axios: '>=1.18.0'
+  axios: '>=1.20.0'
   esbuild: '>=0.25.0'
   picomatch: '>=2.3.2'
   fast-uri: ^3.1.6
   fast-xml-parser: ^5.7.0
   fast-xml-builder: ^1.1.7
   react-router: ^6.30.4
-  minimatch@9>brace-expansion: 5.0.9
-  minimatch@10>brace-expansion: 5.0.9
+  minimatch@9>brace-expansion: 5.0.11
+  minimatch@10>brace-expansion: 5.0.11
   ip-address: ^10.4.0
   follow-redirects: ^1.16.0
   postcss: ^8.5.18
@@ -31,6 +31,8 @@ overrides:
   linkify-it: ^5.0.2
   browserslist: ^4.28.7
   smol-toml: ^1.7.1
+  undici@6: ^6.28.1
+  '@grpc/grpc-js': ^1.14.5
 
 importers:
 
@@ -106,8 +108,8 @@ importers:
         specifier: ^2.5.0
         version: 2.5.0
       undici:
-        specifier: ^6.28.0
-        version: 6.28.0
+        specifier: ^6.28.1
+        version: 6.29.0
       yaml:
         specifier: 2.8.3
         version: 2.8.3
@@ -247,7 +249,7 @@ importers:
     devDependencies:
       vitepress:
         specifier: ^1.6.3
-        version: 1.6.4(@algolia/client-search@5.50.1)(@types/node@22.19.15)(@types/react@18.3.28)(axios@1.18.1)(jiti@1.21.7)(postcss@8.5.23)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(terser@5.48.0)(typescript@5.9.3)(yaml@2.8.3)
+        version: 1.6.4(@algolia/client-search@5.50.1)(@types/node@22.19.15)(@types/react@18.3.28)(axios@1.20.0)(jiti@1.21.7)(postcss@8.5.23)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(terser@5.48.0)(typescript@5.9.3)(yaml@2.8.3)
 
   packages/adapters: {}
 
@@ -409,8 +411,8 @@ importers:
         specifier: ^8.13.1
         version: 8.16.3
       undici:
-        specifier: ^6.28.0
-        version: 6.28.0
+        specifier: ^6.28.1
+        version: 6.29.0
 
   packages/workspace-docs-service:
     dependencies:
@@ -439,8 +441,8 @@ importers:
         specifier: ^8
         version: 8.16.3
       undici:
-        specifier: ^6.28.0
-        version: 6.28.0
+        specifier: ^6.28.1
+        version: 6.29.0
       uuid:
         specifier: ^14
         version: 14.0.0
@@ -1062,8 +1064,8 @@ packages:
   '@fontsource-variable/inter@5.2.8':
     resolution: {integrity: sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ==}
 
-  '@grpc/grpc-js@1.14.4':
-    resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
+  '@grpc/grpc-js@1.14.5':
+    resolution: {integrity: sha512-7VZM+SVdEcUUqSQeNI3zM8Qs/BhQKZndPo2h5VkYkAM8Iz0wJIa8mKV5ekQGqG8UUsnkQ0NMxIxwkIHYvj0qOw==}
     engines: {node: '>=12.10.0'}
 
   '@grpc/proto-loader@0.8.1':
@@ -2067,7 +2069,7 @@ packages:
     resolution: {integrity: sha512-fbGYivgK5uBTRt7p5F3zy6VrETlV9RtZjBqd1/HxGdjdckBgBM4ugP8LHpjolqTj14TXTxSK1ZfgPbHYyGuH7g==}
     peerDependencies:
       async-validator: ^4
-      axios: '>=1.18.0'
+      axios: '>=1.20.0'
       change-case: ^5
       drauu: ^0.4
       focus-trap: ^7
@@ -2289,8 +2291,8 @@ packages:
     peerDependencies:
       postcss: ^8.5.18
 
-  axios@1.18.1:
-    resolution: {integrity: sha512-3nTvFlvpn9Zu/RkHUqtc7/+al4UpRW5az71ap5zccp6e8RAYEzhMTecX8Dz1wWDYrPpUoB1HAQEGEAEvUr7S9g==}
+  axios@1.20.0:
+    resolution: {integrity: sha512-r8aOh8j9cGKpgQAqpzrUHnSIc6a59Y3Xf/cv8sy1DrHCkZHzQGEuoq1tARk6qSyDdtQGSDgpb9kFlruzPvrgwg==}
 
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
@@ -2311,8 +2313,8 @@ packages:
   bowser@2.14.1:
     resolution: {integrity: sha512-tzPjzCxygAKWFOJP011oxFHs57HzIhOEracIgAePE4pqB3LikALKnSzUyU4MGs9/iCEUuHlAJTjTc5M+u7YEGg==}
 
-  brace-expansion@5.0.9:
-    resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
+  brace-expansion@5.0.11:
+    resolution: {integrity: sha512-awigjhi6cLTh90bdw6+QJ9CtmJmyYhEIi70iCbc8Rozn04Fw9FeQIBjv/E22FFGuCGx1bLJyUfB64x/szUSXUg==}
     engines: {node: 20 || >=22}
 
   braces@3.0.3:
@@ -3990,8 +3992,8 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
-  undici@6.28.0:
-    resolution: {integrity: sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA==}
+  undici@6.29.0:
+    resolution: {integrity: sha512-R+RODBqp6i2pPflGdq+xIOUkl+RNfGgHwoinecKu/JCuf2uO06cOKoDbI2P7Dn6KcswdKwrczbU6IYJ6K8X+wg==}
     engines: {node: '>=18.17'}
 
   unicorn-magic@0.4.0:
@@ -5178,7 +5180,7 @@ snapshots:
 
   '@fontsource-variable/inter@5.2.8': {}
 
-  '@grpc/grpc-js@1.14.4':
+  '@grpc/grpc-js@1.14.5':
     dependencies:
       '@grpc/proto-loader': 0.8.1
       '@js-sdsl/ordered-map': 4.4.2
@@ -5949,7 +5951,7 @@ snapshots:
 
   '@temporalio/client@1.18.1':
     dependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       '@temporalio/common': 1.18.1
       '@temporalio/proto': 1.18.1
       abort-controller: 3.0.0
@@ -5967,7 +5969,7 @@ snapshots:
 
   '@temporalio/core-bridge@1.18.1':
     dependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       '@temporalio/common': 1.18.1
 
   '@temporalio/nexus@1.18.1':
@@ -6010,7 +6012,7 @@ snapshots:
 
   '@temporalio/worker@1.18.1(tslib@2.8.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       '@swc/core': 1.15.41
       '@temporalio/activity': 1.18.1
       '@temporalio/client': 1.18.1
@@ -6394,13 +6396,13 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@vueuse/integrations@12.8.2(axios@1.18.1)(focus-trap@7.8.0)(typescript@5.9.3)':
+  '@vueuse/integrations@12.8.2(axios@1.20.0)(focus-trap@7.8.0)(typescript@5.9.3)':
     dependencies:
       '@vueuse/core': 12.8.2(typescript@5.9.3)
       '@vueuse/shared': 12.8.2(typescript@5.9.3)
       vue: 3.5.32(typescript@5.9.3)
     optionalDependencies:
-      axios: 1.18.1(debug@4.4.3)
+      axios: 1.20.0(debug@4.4.3)
       focus-trap: 7.8.0
     transitivePeerDependencies:
       - typescript
@@ -6621,7 +6623,7 @@ snapshots:
       postcss: 8.5.23
       postcss-value-parser: 4.2.0
 
-  axios@1.18.1(debug@4.4.3):
+  axios@1.20.0(debug@4.4.3):
     dependencies:
       follow-redirects: 1.16.0(debug@4.4.3)
       form-data: 4.0.6
@@ -6641,7 +6643,7 @@ snapshots:
 
   bowser@2.14.1: {}
 
-  brace-expansion@5.0.9:
+  brace-expansion@5.0.11:
     dependencies:
       balanced-match: 4.0.4
 
@@ -7634,11 +7636,11 @@ snapshots:
 
   minimatch@10.2.4:
     dependencies:
-      brace-expansion: 5.0.9
+      brace-expansion: 5.0.11
 
   minimatch@9.0.9:
     dependencies:
-      brace-expansion: 5.0.9
+      brace-expansion: 5.0.11
 
   minipass@7.1.3: {}
 
@@ -7727,7 +7729,7 @@ snapshots:
 
   node-vault@0.10.10:
     dependencies:
-      axios: 1.18.1(debug@4.4.3)
+      axios: 1.20.0(debug@4.4.3)
       debug: 4.4.3
       mustache: 4.2.0
       tv4: 1.3.0
@@ -8368,7 +8370,7 @@ snapshots:
 
   undici-types@6.21.0: {}
 
-  undici@6.28.0: {}
+  undici@6.29.0: {}
 
   unicorn-magic@0.4.0: {}
 
@@ -8457,7 +8459,7 @@ snapshots:
       terser: 5.48.0
       yaml: 2.8.3
 
-  vitepress@1.6.4(@algolia/client-search@5.50.1)(@types/node@22.19.15)(@types/react@18.3.28)(axios@1.18.1)(jiti@1.21.7)(postcss@8.5.23)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(terser@5.48.0)(typescript@5.9.3)(yaml@2.8.3):
+  vitepress@1.6.4(@algolia/client-search@5.50.1)(@types/node@22.19.15)(@types/react@18.3.28)(axios@1.20.0)(jiti@1.21.7)(postcss@8.5.23)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(terser@5.48.0)(typescript@5.9.3)(yaml@2.8.3):
     dependencies:
       '@docsearch/css': 3.8.2
       '@docsearch/js': 3.8.2(@algolia/client-search@5.50.1)(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)
@@ -8470,7 +8472,7 @@ snapshots:
       '@vue/devtools-api': 7.7.9
       '@vue/shared': 3.5.32
       '@vueuse/core': 12.8.2(typescript@5.9.3)
-      '@vueuse/integrations': 12.8.2(axios@1.18.1)(focus-trap@7.8.0)(typescript@5.9.3)
+      '@vueuse/integrations': 12.8.2(axios@1.20.0)(focus-trap@7.8.0)(typescript@5.9.3)
       focus-trap: 7.8.0
       mark.js: 8.11.1
       minisearch: 7.2.0
