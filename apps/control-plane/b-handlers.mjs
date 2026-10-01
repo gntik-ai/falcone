@@ -912,14 +912,22 @@ async function createServiceAccount(ctx) {
   const saId = randomUUID();
   const clientId = `sa-${r.ws.slug ?? r.ws.id.slice(0, 8)}-${slugify(displayName)}`;
   const kc = ctx.kcAdmin ?? kcAdmin;
+  let unrecordedClientUuid;
   try {
     if (await kc.findClient(r.realm, clientId)) return err(409, 'SA_EXISTS', `service account client ${clientId} already exists`);
     const uuid = await kc.createConfidentialClient(r.realm, { clientId, name: displayName, serviceAccountsEnabled: true });
+    unrecordedClientUuid = uuid;
     await kc.ensureTenantAudienceMapper(r.realm, uuid);
     const rec = await store.insertServiceAccount(pool, { id: saId, workspaceId: r.ws.id, tenantId: r.ws.tenant_id, iamRealm: r.realm, kcClientId: clientId, kcClientUuid: uuid, displayName, createdBy: identity.sub });
+    unrecordedClientUuid = undefined;
     // Top-level serviceAccountId is what the console persists to fetch the SA back.
     return ok(201, { serviceAccountId: rec.id, ...serviceAccountOut({ ...rec, iam_realm: r.realm }), serviceAccount: rec });
   } catch (e) {
+    // Compensate only this attempt's client when mapper setup or recording fails.
+    // Cleanup is best-effort; retain the original redacted error if Keycloak is unavailable.
+    if (unrecordedClientUuid) {
+      try { await kc.deleteClient(r.realm, unrecordedClientUuid); } catch { /* best-effort */ }
+    }
     return kcBackedErr(e, 'CREATE_SA_FAILED');
   }
 }

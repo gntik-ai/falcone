@@ -124,7 +124,7 @@ for (const existing of [false, true]) {
   });
 }
 
-test('service-account mapper failure prevents a successful account record and redacts the error', async () => {
+test('service-account mapper failure cleans up the new client and redacts the error', async () => {
   const calls = [];
   const ctx = serviceAccountContext({
     findClient: async () => null,
@@ -135,10 +135,73 @@ test('service-account mapper failure prevents a successful account record and re
       calls.push('mapper');
       throw new KeycloakAdminError({ status: 500, statusCode: 502, body: { error: 'OAuth-private-material' } });
     },
+    deleteClient: async (realm, uuid) => {
+      assert.equal(realm, 'tenant-one');
+      assert.equal(uuid, 'sa-one');
+      calls.push('delete');
+    },
   }, async () => assert.fail('account must not be recorded without the audience'));
   const result = await LOCAL_HANDLERS.createServiceAccount(ctx);
   assert.equal(result.statusCode, 502);
   assert.equal(result.body.code, 'CREATE_SA_FAILED');
   assert.ok(!JSON.stringify(result).includes('OAuth-private-material'));
-  assert.deepEqual(calls, ['client', 'mapper']);
+  assert.deepEqual(calls, ['client', 'mapper', 'delete']);
+});
+
+for (const failure of ['mapper', 'record']) {
+  test(`service-account retry succeeds after ${failure} failure without SA_EXISTS`, async () => {
+    let client;
+    let failOnce = true;
+    let deletions = 0;
+    const fail = () => {
+      failOnce = false;
+      if (failure === 'mapper') {
+        throw new KeycloakAdminError({ status: 500, body: { error: 'provider-private-material' } });
+      }
+      throw new Error('database unavailable');
+    };
+    const ctx = serviceAccountContext({
+      findClient: async () => client,
+      createConfidentialClient: async () => { client = { id: 'sa-one' }; return client.id; },
+      ensureTenantAudienceMapper: async () => { if (failure === 'mapper' && failOnce) fail(); },
+      deleteClient: async (realm, uuid) => {
+        assert.equal(realm, 'tenant-one');
+        assert.equal(uuid, client.id);
+        deletions += 1;
+        client = undefined;
+      },
+    }, async (_sql, values) => {
+      if (failure === 'record' && failOnce) fail();
+      return { rows: [{ id: values[0], status: 'active', kc_client_id: values[4] }] };
+    });
+    const failed = await LOCAL_HANDLERS.createServiceAccount(ctx);
+    assert.equal(failed.statusCode, 502);
+    assert.equal(failed.body.code, 'CREATE_SA_FAILED');
+    assert.ok(!JSON.stringify(failed).includes('provider-private-material'));
+    assert.equal(client, undefined);
+    assert.equal(deletions, 1);
+    const retried = await LOCAL_HANDLERS.createServiceAccount(ctx);
+    assert.equal(retried.statusCode, 201);
+    assert.ok(client, 'successful creation must retain its client');
+    assert.equal(deletions, 1);
+    const duplicate = await LOCAL_HANDLERS.createServiceAccount(ctx);
+    assert.equal(duplicate.statusCode, 409);
+    assert.equal(duplicate.body.code, 'SA_EXISTS');
+    assert.equal(deletions, 1, 'an existing client must never be compensated');
+  });
+}
+
+test('service-account cleanup failure preserves the original redacted provider error', async () => {
+  const ctx = serviceAccountContext({
+    findClient: async () => null,
+    createConfidentialClient: async () => 'sa-one',
+    ensureTenantAudienceMapper: async () => {
+      throw new KeycloakAdminError({ status: 403, body: { error: 'mapper-private-material' } });
+    },
+    deleteClient: async () => { throw new Error('cleanup-private-material'); },
+  }, async () => assert.fail('account must not be recorded without the audience'));
+  const result = await LOCAL_HANDLERS.createServiceAccount(ctx);
+  assert.equal(result.statusCode, 403);
+  assert.equal(result.body.code, 'CREATE_SA_FAILED');
+  assert.doesNotMatch(JSON.stringify(result), /mapper-private-material|cleanup-private-material/);
 });
