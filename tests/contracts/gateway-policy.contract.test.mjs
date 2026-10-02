@@ -5,7 +5,7 @@ import {
   listEnabledApisixRoutes,
   readGatewayPolicyValues,
   REQUIRED_PASSTHROUGH_PLUGINS,
-  REQUIRED_PRODUCT_PLUGINS
+  requiredProductPlugins
 } from '../../scripts/lib/gateway-policy.mjs';
 import { readGatewayRouting, readPublicRouteCatalog } from '../../scripts/lib/public-api.mjs';
 import {
@@ -25,7 +25,7 @@ test('gateway contract publishes APISIX policy for every public family and passt
     assert.ok(route, `missing APISIX route for family ${family.id}`);
     assert.equal(route.uri, `${family.pathPrefix}/*`);
     assert.equal(route.labels['gateway.in-falcone.io/family'], family.id);
-    assert.deepEqual(Object.keys(route.plugins).sort(), REQUIRED_PRODUCT_PLUGINS.slice().sort());
+    assert.deepEqual(Object.keys(route.plugins).sort(), requiredProductPlugins(family.id).slice().sort());
     assert.equal(route.plugins['limit-count'].rejected_code, 429);
     assert.ok(route.plugins['client-control'].max_body_size > 0);
 

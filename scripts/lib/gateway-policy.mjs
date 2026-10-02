@@ -8,6 +8,12 @@ export const ENVIRONMENTS = ['dev', 'sandbox', 'staging', 'prod'];
 export const PASSTHROUGH_MODES = ['enabled', 'limited', 'disabled'];
 export const REQUIRED_PROPAGATED_HEADER_KEYS = ['subject', 'username', 'tenantId', 'workspaceId', 'planId', 'scopes', 'roles'];
 export const REQUIRED_PRODUCT_PLUGINS = ['openid-connect', 'cors', 'limit-count', 'client-control', 'request-validation', 'proxy-rewrite'];
+export const REQUIRED_MONGO_PRODUCT_PLUGINS = REQUIRED_PRODUCT_PLUGINS.map((plugin) =>
+  plugin === 'openid-connect' ? 'issuer-jwks-auth' : plugin
+);
+export function requiredProductPlugins(familyId) {
+  return familyId === 'mongo' ? REQUIRED_MONGO_PRODUCT_PLUGINS : REQUIRED_PRODUCT_PLUGINS;
+}
 export const REQUIRED_PASSTHROUGH_PLUGINS = [
   'openid-connect',
   'cors',
@@ -411,10 +417,13 @@ function collectApisixRouteViolations(values, gatewayRouting, violations) {
       continue;
     }
 
-    for (const plugin of REQUIRED_PRODUCT_PLUGINS) {
+    for (const plugin of requiredProductPlugins(family.id)) {
       if (!(plugin in (route.plugins ?? {}))) {
         violations.push(`APISIX route public-api-${family.id} must enable plugin ${plugin}.`);
       }
+    }
+    if (family.id === 'mongo' && 'openid-connect' in (route.plugins ?? {})) {
+      violations.push('APISIX route public-api-mongo must use issuer-jwks-auth instead of openid-connect.');
     }
 
     if (route.labels?.['gateway.in-falcone.io/family'] !== family.id) {

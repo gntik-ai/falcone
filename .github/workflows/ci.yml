@@ -13,7 +13,7 @@ permissions:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
-  FALCONE_CHARTS_REF: '62c3975b4964fedfc821db5d8787e697e2f7af94'
+  FALCONE_CHARTS_REF: '00bc9de332ac699c422cb90fb00b23b7943f1790'
 
 jobs:
   quality:
@@ -57,6 +57,11 @@ jobs:
 
       - name: Contract tests
         run: pnpm test:contracts
+
+      - name: Mongo gateway route and kind chart parity
+        run: |
+          helm version --short
+          node --test tests/blackbox/mongo-gateway-route.test.mjs
 
       - name: Console E2E scaffolding
         run: pnpm test:e2e:console

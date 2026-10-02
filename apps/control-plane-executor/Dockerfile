@@ -33,6 +33,8 @@ COPY apps/control-plane/knative-runtime.mjs /app/apps/control-plane/knative-runt
 COPY apps/control-plane/audit-store.mjs /app/apps/control-plane/audit-store.mjs
 COPY apps/control-plane/audit-hash.mjs /app/apps/control-plane/audit-hash.mjs
 COPY apps/control-plane/runtime-cleanup-repository.mjs /app/apps/control-plane/runtime-cleanup-repository.mjs
+COPY apps/control-plane/kc-admin.mjs /app/apps/control-plane/kc-admin.mjs
+COPY scripts/backfill-tenant-realm-audience.mjs /app/scripts/backfill-tenant-realm-audience.mjs
 COPY packages/adapters/src /app/packages/adapters/src
 COPY packages/internal-contracts/src /app/packages/internal-contracts/src
 # Realtime executor (add-ferretdb-realtime-cdc-remediation #460) imports the shared logical-

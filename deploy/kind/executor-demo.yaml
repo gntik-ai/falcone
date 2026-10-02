@@ -159,6 +159,8 @@ spec:
             # Verify Bearer JWTs directly (Keycloak platform realm) so admin requests —
             # e.g. API-key issuance — authenticate without the gateway injecting x-tenant-id.
             - { name: KEYCLOAK_JWKS_URL, value: "http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs" }
+            - { name: KEYCLOAK_TENANT_AUDIENCE, value: "falcone-data-api" }
+            - { name: KEYCLOAK_ENFORCE_TENANT_AUDIENCE, value: "true" }
             # Gateway trust signal (fix-executor-ddl-db-ownership-guard, B3): without this,
             # the executor trusted client-supplied x-tenant-id/x-workspace-id headers
             # UNCONDITIONALLY (legacy dev mode), so a direct (non-gateway) caller could spoof

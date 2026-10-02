@@ -11,6 +11,22 @@ const BASE = (process.env.KEYCLOAK_BASE_URL || 'http://falcone-keycloak:8080').r
 const ADMIN_USER = process.env.KEYCLOAK_ADMIN_USERNAME || 'admin';
 const ADMIN_PASS = process.env.KEYCLOAK_ADMIN_PASSWORD || '';
 
+export const TENANT_AUDIENCE_MAPPER_NAME = 'falcone-data-api-audience';
+
+export function tenantDataApiAudience(env = process.env) {
+  const audience = env.KEYCLOAK_TENANT_AUDIENCE ?? 'falcone-data-api';
+  if (typeof audience !== 'string' || !audience.trim()) throw new Error('tenant data API audience is required');
+  return audience;
+}
+
+export function isTenantAudienceMapper(mapper, audience) {
+  return mapper?.name === TENANT_AUDIENCE_MAPPER_NAME
+    && mapper.protocol === 'openid-connect'
+    && mapper.protocolMapper === 'oidc-audience-mapper'
+    && mapper.config?.['included.custom.audience'] === audience
+    && mapper.config?.['access.token.claim'] === 'true';
+}
+
 export const KEYCLOAK_ADMIN_SAFE_MESSAGE = 'Identity provider operation failed. Please retry or contact support if the problem continues.';
 
 function diagnosticBody(body) {
@@ -445,6 +461,59 @@ export const kcAdmin = {
         'access.token.claim': 'true', 'id.token.claim': 'true', 'userinfo.token.claim': 'true',
       },
     });
+  },
+  async listClientMappers(realm, clientUuid) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/protocol-mappers/models`)).json ?? [];
+  },
+  // Keep WF-CON-002 app clients aligned with the saga, including on retries.
+  async ensureTenantIdMapper(realm, clientUuid) {
+    if (!realm || !clientUuid) throw new Error('realm and tenant app client are required');
+    const mappers = await this.listClientMappers(realm, clientUuid);
+    const existing = mappers.filter((mapper) => mapper.name === 'tenant_id');
+    if (existing.length) {
+      const mapper = existing[0];
+      if (existing.length !== 1 || mapper.protocol !== 'openid-connect'
+        || mapper.protocolMapper !== 'oidc-hardcoded-claim-mapper'
+        || mapper.config?.['claim.name'] !== 'tenant_id'
+        || mapper.config?.['claim.value'] !== realm
+        || mapper.config?.['jsonType.label'] !== 'String'
+        || ['access.token.claim', 'id.token.claim', 'userinfo.token.claim'].some((key) => mapper.config?.[key] !== 'true')) {
+        throw new Error('tenant identity mapper configuration mismatch');
+      }
+      return { created: false };
+    }
+    await this.addHardcodedClaimMapper(realm, clientUuid, { name: 'tenant_id', claimName: 'tenant_id', claimValue: realm });
+    return { created: true };
+  },
+  // Read first: retries must never POST a second mapper with the same name.
+  async ensureTenantAudienceMapper(realm, clientUuid, audience = tenantDataApiAudience()) {
+    tenantDataApiAudience({ KEYCLOAK_TENANT_AUDIENCE: audience });
+    if (!realm || !clientUuid) throw new Error('realm and tenant client are required');
+    const mappers = await this.listClientMappers(realm, clientUuid);
+    const existing = mappers.filter((mapper) => mapper.name === TENANT_AUDIENCE_MAPPER_NAME);
+    if (existing.length) {
+      if (existing.length !== 1 || !isTenantAudienceMapper(existing[0], audience)) {
+        throw new Error('tenant audience mapper configuration mismatch');
+      }
+      return { created: false };
+    }
+    await kc('POST', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/protocol-mappers/models`, {
+      name: TENANT_AUDIENCE_MAPPER_NAME,
+      protocol: 'openid-connect', protocolMapper: 'oidc-audience-mapper',
+      config: {
+        'included.custom.audience': audience,
+        'access.token.claim': 'true', 'id.token.claim': 'false',
+      },
+    });
+    return { created: true };
+  },
+  async ensureTenantAppAudience(realm, { clientId, name, audience = tenantDataApiAudience() }) {
+    tenantDataApiAudience({ KEYCLOAK_TENANT_AUDIENCE: audience });
+    if (!realm || !clientId) throw new Error('realm and tenant app client ID are required');
+    const client = await this.findClient(realm, clientId);
+    const clientUuid = client?.id ?? await this.createPublicAppClient(realm, { clientId, name });
+    await this.ensureTenantIdMapper(realm, clientUuid);
+    return this.ensureTenantAudienceMapper(realm, clientUuid, audience);
   },
   async getClientSecret(realm, clientUuid) {
     return (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/client-secret`)).json?.value ?? null;

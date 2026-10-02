@@ -1,5 +1,6 @@
 import * as kafkaAdmin from '../../../../packages/adapters/src/kafka-admin.mjs';
 import * as keycloakAdmin from '../../../../packages/adapters/src/keycloak-admin.mjs';
+import { kcAdmin } from '../../../control-plane/kc-admin.mjs';
 import {
   OPENWHISK_WORKFLOW_ACTION_REFS,
   dispatchWorkflowAction
@@ -23,6 +24,10 @@ function createDependencyError(capability) {
 
 const defaultDependencies = {
   createRealm: keycloakAdmin.createRealm,
+  ensureTenantAppAudience: ({ request, realm }) => kcAdmin.ensureTenantAppAudience(realm?.realmId, {
+    clientId: `${request.input.tenantSlug}-app`,
+    name: `${request.input.tenantDisplayName} App`,
+  }),
   writeTenantRecord: async () => {
     throw createDependencyError('writeTenantRecord');
   },
@@ -68,6 +73,7 @@ export function __resetWorkflowDependenciesForTest() {
 export async function runTenantProvisioningAction(request) {
   const jobRef = request.jobRef ?? await registerJob('WF-CON-002', request.idempotencyKey, request.callerContext);
   const affectedResources = [];
+  let currentStep = 'create_keycloak_realm';
 
   try {
     await dependencies.updateJobStatus(jobRef, 'running', null);
@@ -75,12 +81,18 @@ export async function runTenantProvisioningAction(request) {
     const realm = await dependencies.createRealm({ request, jobRef });
     affectedResources.push({ type: 'keycloak_realm', id: realm?.realmId ?? request.input.tenantSlug ?? 'tenant-realm' });
 
+    currentStep = 'ensure_tenant_app_audience';
+    await dependencies.ensureTenantAppAudience({ request, jobRef, realm });
+
+    currentStep = 'write_tenant_record';
     const tenantRecord = await dependencies.writeTenantRecord({ request, jobRef, realm });
     affectedResources.push({ type: 'tenant_record', id: tenantRecord?.tenantId ?? request.input.tenantSlug ?? 'tenant-record' });
 
+    currentStep = 'create_kafka_namespace';
     const topicNamespace = await dependencies.createTopicNamespace({ request, jobRef, tenantRecord });
     affectedResources.push({ type: 'kafka_topic_namespace', id: topicNamespace?.namespaceId ?? request.input.tenantSlug ?? 'topic-namespace' });
 
+    currentStep = 'register_apisix_routes';
     const apisixRoute = await dependencies.registerApisixRoutes({ request, jobRef, tenantRecord, topicNamespace });
     affectedResources.push({ type: 'apisix_route_configuration', id: apisixRoute?.routeId ?? request.input.tenantSlug ?? 'apisix-routes' });
 
@@ -105,13 +117,7 @@ export async function runTenantProvisioningAction(request) {
     await markSucceeded(request.idempotencyKey, result);
     return result;
   } catch (error) {
-    const failedStep = error?.failedStep ?? error?.step ?? (affectedResources.length === 0
-      ? 'create_keycloak_realm'
-      : affectedResources.length === 1
-        ? 'write_tenant_record'
-        : affectedResources.length === 2
-          ? 'create_kafka_namespace'
-          : 'register_apisix_routes');
+    const failedStep = error?.failedStep ?? error?.step ?? currentStep;
     const failure = {
       code: error?.code ?? 'DOWNSTREAM_UNAVAILABLE',
       message: error?.message ?? 'Tenant provisioning failed.',

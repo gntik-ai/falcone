@@ -29,9 +29,14 @@ printf '%s\t%s\n' "$command_name" "$*" >>"$BBX_COMMAND_LOG"
 case "$command_name" in
   kubectl)
     kubectl_args_lower="\${*,,}"
+    if [[ "$1" == "wait" && -n "\${BBX_FAIL_WAIT:-}" && "\${2:-}" == "$BBX_FAIL_WAIT" ]]; then
+      printf '%s\n' 'injected readiness failure' >&2
+      exit 1
+    fi
     case " $* " in
       *" config current-context "*) printf '%s\n' 'kind-falcone-bbx'; exit 0 ;;
       *" port-forward "*) trap 'exit 0' TERM INT; while sleep 1; do :; done ;;
+      *" apply "*) cat >/dev/null; exit 0 ;;
     esac
     if [[ " $* " == *" get --raw "* ]]; then
       discovery_path="\${*: -1}"
@@ -207,12 +212,42 @@ case "$command_name" in
     exit 0
     ;;
   helm)
-    if [[ "$1" == "install" && "\${2:-}" == "--help" ]]; then
-      printf '%s\n' 'Usage: helm install [NAME] [CHART] [flags]' '      --rollback-on-failure   if set, the installation will be rolled back on failure'
+    if [[ ( "$1" == "install" || "$1" == "upgrade" ) && "\${2:-}" == "--help" ]]; then
+      [[ "\${BBX_HELM_HELP_FAIL:-false}" == "true" ]] && exit 1
+      if [[ "\${BBX_HELM_MAJOR:-4}" == "3" ]]; then
+        printf '%s\n' '      --atomic   roll back changes on failure'
+      else
+        printf '%s\n' '      --rollback-on-failure   roll back changes on failure' '      --server-side string   apply changes server-side'
+      fi
       exit 0
+    fi
+    if [[ "$1" == "install" || "$1" == "upgrade" ]]; then
+      if [[ "\${BBX_HELM_MAJOR:-4}" == "3" && " $* " == *" --server-side="* ]]; then
+        printf '%s\n' 'Error: unknown flag: --server-side' >&2
+        exit 2
+      fi
+      if [[ "\${BBX_HELM_MAJOR:-4}" == "4" && " $* " != *" --server-side=false "* ]]; then
+        printf '%s\n' 'Helm 4 must explicitly retain client-side apply' >&2
+        exit 2
+      fi
     fi
     if [[ " $* " == *" template "* ]]; then
       case "$BBX_SCENARIO" in
+        helm-temporal|helm-temporal-eso|helm-temporal-large)
+          printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-schema'
+          if [[ "$BBX_SCENARIO" == "helm-temporal-large" && " $* " != *" -s "* ]]; then
+            # Exceed the pipe buffer after the marker: an early-exiting reader
+            # must not turn the renderer's SIGPIPE into a non-Temporal install.
+            awk 'BEGIN { for (i = 0; i < 20000; i++) print "# remaining chart manifest" }' || exit $?
+          fi
+          ;;
+        helm-render-error|helm-render-error-after-marker)
+          if [[ "$BBX_SCENARIO" == "helm-render-error-after-marker" ]]; then
+            printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-schema'
+          fi
+          printf '%s\n' 'injected Helm render failure' >&2
+          exit 75
+          ;;
         rendered-namespace-conflict)
           printf '%s\n' 'apiVersion: v1' 'kind: Namespace' 'metadata:' "  name: $E2E_NAMESPACE" '  labels:' '    unsafe-bbx-change: rejected'
           ;;
@@ -314,7 +349,11 @@ case "$command_name" in
   npm|pnpm|yarn)
     exit 0
     ;;
-  docker|jq)
+  jq)
+    cat >/dev/null
+    exit 0
+    ;;
+  docker)
     exit 0
     ;;
 esac
@@ -472,7 +511,7 @@ function mutations(invocation) {
   return invocation.calls.filter(({ command, args }) => (
     command === 'helm'
     && /(?:^|\s)(?:upgrade|install|uninstall|delete|rollback)(?:\s|$)/.test(args)
-    && !/^install\s+--help(?:\s|$)/.test(args)
+    && !/^(?:install|upgrade)\s+--help(?:\s|$)/.test(args)
   ) || (
     command === 'kubectl' && /(?:^|\s)(?:apply|create|delete|patch|replace|label|annotate|edit|scale|set)(?:\s|$)/.test(args)
   ))
@@ -499,6 +538,150 @@ function isDiscoveryCall({ command, args }) {
     || /(?:^|\s)get\s+--raw\s+\/apis?(?:\/|\s|$)/.test(args)
   )
 }
+
+test('E2E installs retain client-side apply with Helm 3 and Helm 4', async (t) => {
+  for (const major of ['3', '4']) {
+    for (const mode of ['preserve-existing', 'ephemeral', 'temporal']) {
+      await t.test(`Helm ${major}, ${mode}`, () => {
+        const invocation = invokeHarness(mode === 'temporal' ? 'helm-temporal' : 'preserve-success', {
+          BBX_HELM_MAJOR: major,
+          E2E_NAMESPACE_MODE: mode === 'preserve-existing' ? mode : 'ephemeral',
+          E2E_EXPECTED_NAMESPACE_UID: namespaceUid,
+        })
+        try {
+          assert.equal(invocation.result.status, 0, invocation.output)
+          const installs = mutations(invocation).filter(({ command, args }) => command === 'helm' && /^(?:install|upgrade)\s/.test(args))
+          assert.equal(installs.length, 1, 'exactly one Helm install must run')
+          assert.equal(installs[0].args.includes('--server-side=false'), major === '4')
+          if (mode === 'preserve-existing') {
+            assert.ok(installs[0].args.includes(major === '3' ? '--atomic' : '--rollback-on-failure'))
+            assert.deepEqual(namespaceMutations(invocation), [])
+          } else {
+            assert.match(installs[0].args, /^upgrade --install /)
+            assert.equal(installs[0].args.includes('--no-hooks'), mode === 'temporal')
+            assert.equal(installs[0].args.includes('--wait'), mode !== 'temporal')
+            assert.ok(!installs[0].args.includes('global.createNamespace=true'), 'ordinary E2E changed auxiliary namespace ownership')
+          }
+        } finally { invocation.cleanup() }
+      })
+    }
+  }
+})
+
+test('E2E refuses a Helm apply when subcommand help cannot be inspected', () => {
+  const invocation = invokeHarness('preserve-success', { BBX_HELM_HELP_FAIL: 'true' })
+  try {
+    assert.notEqual(invocation.result.status, 0)
+    assert.match(invocation.output, /Could not inspect Helm's apply capability/)
+    assert.equal(mutations(invocation).filter(({ command }) => command === 'helm').length, 0)
+  } finally { invocation.cleanup() }
+})
+
+test('large Temporal renders retain the phased install with Helm 3 and Helm 4', async (t) => {
+  for (const major of ['3', '4']) {
+    await t.test(`Helm ${major}`, () => {
+      const invocation = invokeHarness('helm-temporal-large', {
+        BBX_HELM_MAJOR: major,
+        E2E_NAMESPACE_MODE: 'ephemeral',
+      })
+      try {
+        assert.equal(invocation.result.status, 0, invocation.output)
+        const installs = mutations(invocation).filter(({ command }) => command === 'helm')
+        assert.equal(installs.length, 1)
+        assert.match(installs[0].args, /--no-hooks/)
+        assert.doesNotMatch(installs[0].args, /--wait(?:\s|$)/)
+        assert.ok(invocation.calls.some(({ command, args }) => command === 'kubectl'
+          && /wait job\/falcone-temporal-bootstrap /.test(args)), 'Temporal bootstrap was skipped')
+      } finally { invocation.cleanup() }
+    })
+  }
+})
+
+test('failed Helm renders cannot select either install path', async (t) => {
+  for (const scenario of ['helm-render-error', 'helm-render-error-after-marker']) {
+    await t.test(scenario, () => {
+      const invocation = invokeHarness(scenario, { E2E_NAMESPACE_MODE: 'ephemeral' })
+      try {
+        assert.notEqual(invocation.result.status, 0, invocation.output)
+        assert.match(invocation.output, /Could not render the chart for Temporal detection/)
+        assert.equal(mutations(invocation).filter(({ command }) => command === 'helm').length, 0,
+          'a failed render reached Helm installation')
+      } finally { invocation.cleanup() }
+    })
+  }
+})
+
+test('isolated CI renders auxiliary namespaces and preserves ESO gates in the phased install', () => {
+  const invocation = invokeHarness('helm-temporal-eso', {
+    E2E_NAMESPACE_MODE: 'ephemeral',
+    E2E_CREATE_AUXILIARY_NAMESPACES: 'true',
+    E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: 'bbx-admin',
+    E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: secretSentinel,
+    E2E_BOOTSTRAP_SUPERADMIN_PASSWORD: secretSentinel,
+  })
+  try {
+    assert.equal(invocation.result.status, 0, invocation.output)
+    const helmCalls = invocation.calls.filter(({ command, args }) => command === 'helm'
+      && /^(?:template|upgrade --install)\s/.test(args))
+    assert.ok(helmCalls.length > 1)
+    for (const { args } of helmCalls) {
+      assert.match(args, /(?:^|\s)--set global\.createNamespace=true(?:\s|$)/)
+    }
+    const indexOf = (command, pattern) => invocation.calls.findIndex((call) => call.command === command && pattern.test(call.args))
+    const install = indexOf('helm', /^upgrade --install /)
+    const preflight = indexOf('kubectl', /wait job\/eso-preflight /)
+    const webhook = indexOf('kubectl', /wait job\/eso-webhook-wait /)
+    const openbao = indexOf('kubectl', /wait job\/openbao-init /)
+    const store = indexOf('kubectl', /wait clustersecretstore\/openbao-backend /)
+    const secrets = indexOf('kubectl', /wait externalsecret --all /)
+    const bootstrap = indexOf('kubectl', /wait job\/falcone-in-falcone-bootstrap /)
+    assert.ok(preflight >= 0 && preflight < install, 'ESO ownership must be checked before installation')
+    assert.ok(install < webhook && webhook < openbao && openbao < store && store < secrets && secrets < bootstrap,
+      'ESO/OpenBao readiness must gate platform bootstrap')
+    for (const name of ['platform-postgresql', 'platform-documentdb', 'platform-kafka', 'platform-s3', 'platform-temporal', 'gateway-apisix', 'iam-keycloak']) {
+      assert.ok(helmCalls.some(({ args }) => args.includes(`-s charts/eso/templates/external-secrets/${name}.yaml`)), `${name} ExternalSecrets were skipped`)
+    }
+    assert.doesNotMatch(invocation.output, new RegExp(secretSentinel))
+  } finally { invocation.cleanup() }
+})
+
+test('auxiliary namespace opt-in cannot escape preserve-existing preflight', () => {
+  const invocation = invokeHarness('preserve-success', {
+    E2E_NAMESPACE_MODE: 'preserve-existing',
+    E2E_EXPECTED_NAMESPACE_UID: namespaceUid,
+    E2E_CREATE_AUXILIARY_NAMESPACES: 'true',
+  })
+  try {
+    assertRejectedBeforeMutation(invocation, 'auxiliary namespace opt-in in preserve-existing mode')
+  } finally { invocation.cleanup() }
+})
+
+test('phased CI fails closed when an ESO ownership or readiness gate fails', async (t) => {
+  for (const [failedWait, nextCommand, nextPattern] of [
+    ['job/eso-preflight', 'helm', /^upgrade --install /],
+    ['job/eso-webhook-wait', 'helm', /-s charts\/openbao\/templates\/openbao-init-job\.yaml/],
+    ['clustersecretstore/openbao-backend', 'helm', /-s charts\/eso\/templates\/external-secrets\//],
+    ['externalsecret', 'helm', /-s templates\/bootstrap-job\.yaml/],
+  ]) {
+    await t.test(failedWait, () => {
+      const invocation = invokeHarness('helm-temporal-eso', {
+        E2E_NAMESPACE_MODE: 'ephemeral',
+        E2E_CREATE_AUXILIARY_NAMESPACES: 'true',
+        E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: 'bbx-admin',
+        E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: secretSentinel,
+        E2E_BOOTSTRAP_SUPERADMIN_PASSWORD: secretSentinel,
+        BBX_FAIL_WAIT: failedWait,
+      })
+      try {
+        assert.notEqual(invocation.result.status, 0, invocation.output)
+        assert.match(invocation.output, /injected readiness failure/)
+        assert.ok(!invocation.calls.some(({ command, args }) => command === nextCommand && nextPattern.test(args)),
+          `continued after ${failedWait} failed`)
+        assert.doesNotMatch(invocation.output, new RegExp(secretSentinel))
+      } finally { invocation.cleanup() }
+    })
+  }
+})
 
 // bbx-933-001 | fn-e2e-preserve-existing-namespace | OpenSpec #### Scenario: Existing namespace E2E execution is explicitly attested and non-destructive
 test('issue E2E harness preserves an attested existing namespace without weakening ephemeral cleanup', async (t) => {

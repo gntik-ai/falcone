@@ -13,6 +13,7 @@
 #   E2E_NAMESPACE_MODE (default ephemeral; or preserve-existing) ·
 #   E2E_EXPECTED_NAMESPACE_UID (mandatory with preserve-existing) ·
 #   E2E_USE_LOCAL_CONTROL_PLANE_IMAGE=true (isolated kind CI only; use loaded tag) ·
+#   E2E_CREATE_AUXILIARY_NAMESPACES=true (isolated kind CI only; chart owns ESO/OpenBao namespaces) ·
 #   DEPLOY_CMD (ephemeral-only full override) · E2E_CONFIRM_CONTEXT=1 (allow non-local context)
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo root
@@ -54,6 +55,20 @@ FWD="${E2E_FWD:-svc/falcone-frontend:3000:80 svc/falcone-backend:8080:80}"
 BASE="${E2E_BASE_URL:-http://localhost:3000}"
 
 require() { command -v "$1" >/dev/null 2>&1 || { echo "Missing '$1'." >&2; exit 2; }; }
+
+# Helm 3 applies client-side already; Helm 4 needs an explicit opt-out. Inspect
+# the actual subcommand so both versions retain the same apply behavior.
+helm_client_apply() {
+  local help client_flags=()
+  help="$(helm "$1" --help 2>/dev/null)" || {
+    echo "Could not inspect Helm's apply capability." >&2
+    return 2
+  }
+  if grep -Eq '^[[:space:]]+--server-side([[:space:]]|$)' <<<"$help"; then
+    client_flags=(--server-side=false)
+  fi
+  helm "$@" "${client_flags[@]}"
+}
 
 guard() {
   local ctx; ctx="$(kubectl config current-context 2>/dev/null || true)"
@@ -507,6 +522,10 @@ preserve_up() {
     echo "DEPLOY_CMD is not permitted with preserve-existing; only the preflighted Helm install is allowed." >&2
     return 2
   }
+  [ "${E2E_CREATE_AUXILIARY_NAMESPACES:-false}" = "false" ] || {
+    echo "Auxiliary namespace creation is not permitted with preserve-existing." >&2
+    return 2
+  }
   require helm
   if [ -L "$STATE_DIR" ] || { [ -e "$STATE_DIR" ] && [ ! -d "$STATE_DIR" ]; } || \
     { [ -d "$STATE_DIR" ] && find "$STATE_DIR" -mindepth 1 -print -quit | grep -q .; }; then
@@ -586,7 +605,7 @@ preserve_up() {
   PRESERVE_UP_ARMED=1
 
   echo ">> Installing one preflighted Helm release into the attested existing namespace ..."
-  if ! helm install "$REL" "$chart" "${values[@]}" -n "$NS" "${rollback_flag[@]}" --skip-schema-validation --server-side=false --wait --timeout 15m >"$STATE_DIR/install.log" 2>&1; then
+  if ! helm_client_apply install "$REL" "$chart" "${values[@]}" -n "$NS" "${rollback_flag[@]}" --skip-schema-validation --wait --timeout 15m >"$STATE_DIR/install.log" 2>&1; then
     preserve_release_storage || true
     echo "Preserve-existing Helm install failed; trap cleanup is removing any verified release." >&2
     return 1
@@ -802,9 +821,18 @@ case "${1:-up}" in
       if [ "${E2E_USE_LOCAL_CONTROL_PLANE_IMAGE:-false}" = "true" ]; then
         HELM_IMAGE_ARGS=(--set-string controlPlane.image.digest=)
       fi
+      # The shared kind profile assumes ESO/OpenBao namespaces already exist.
+      # A disposable CI cluster instead lets the chart own those namespaces.
+      # Use the same override for every hook render and the actual install.
+      HELM_NAMESPACE_ARGS=()
+      case "${E2E_CREATE_AUXILIARY_NAMESPACES:-false}" in
+        true) HELM_NAMESPACE_ARGS=(--set global.createNamespace=true) ;;
+        false) : ;;
+        *) echo "E2E_CREATE_AUXILIARY_NAMESPACES must be true or false." >&2; exit 2 ;;
+      esac
       helm_render() {
         helm template "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" \
-          "${HELM_IMAGE_ARGS[@]}" --skip-schema-validation "$@"
+          "${HELM_IMAGE_ARGS[@]}" "${HELM_NAMESPACE_ARGS[@]}" --skip-schema-validation "$@"
       }
       apply_ci_hook() {
         local template_path="$1" hook_namespace="$2" hook_job="$3"
@@ -819,6 +847,8 @@ case "${1:-up}" in
       # This creates only random, short-lived values inside the isolated kind
       # cluster; no credential is placed in a values file or emitted to logs.
       if [ "$PLATFORM_BOOTSTRAP_ENABLED" -eq 1 ]; then
+        echo ">> Checking ESO ownership before the phased CI install ..."
+        apply_ci_hook charts/eso/templates/eso-preflight.yaml "$NS" eso-preflight
         echo ">> Preparing chart-owned CI credentials and OpenBao TLS ..."
         apply_ci_hook templates/webhook-key-lifecycle.yaml "$NS" "${REL}-in-falcone-webhook-key-credential"
         apply_ci_hook templates/webhook-database-credentials.yaml "$NS" "${REL}-in-falcone-webhook-db-credential"
@@ -853,15 +883,21 @@ case "${1:-up}" in
       #   3. Wait for Temporal frontend then run the Temporal and platform
       #      Keycloak bootstrap Jobs out-of-band.
       #   4. Wait for all Deployments + StatefulSets to stabilise (retries self-heal).
-      TEMPORAL_ENABLED=0
-      helm_render 2>/dev/null \
-        | grep -q 'falcone-temporal-schema' && TEMPORAL_ENABLED=1 || true
+      # Consume the complete render: grep -q closes its pipe at the first
+      # match, making a large Helm render fail with SIGPIPE under pipefail.
+      # A real render error must stop setup rather than select the standard
+      # install path and reintroduce the Temporal bootstrap deadlock.
+      if ! TEMPORAL_ENABLED="$(helm_render 2>/dev/null \
+        | awk '/falcone-temporal-schema/ { enabled = 1 } END { print enabled + 0 }')"; then
+        echo "Could not render the chart for Temporal detection; refusing Helm installation." >&2
+        exit 2
+      fi
 
       if [ "$TEMPORAL_ENABLED" -eq 1 ]; then
         echo ">> Temporal schema job rendered: phased deploy to break bootstrap deadlock ..."
         # Phase 1 — deploy everything without hooks; no --wait so CrashLoopBackOffs are OK.
-        helm upgrade --install --skip-schema-validation --server-side=false --no-hooks \
-          "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}"
+        helm_client_apply upgrade --install --skip-schema-validation --no-hooks \
+          "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}" "${HELM_NAMESPACE_ARGS[@]}"
 
         # Phase 2 — wait for PostgreSQL then run schema job.
         echo ">> Waiting for PostgreSQL ..."
@@ -881,9 +917,20 @@ case "${1:-up}" in
         # Run it after its StatefulSet exists so workloads get a live, unsealed
         # OpenBao rather than only a mounted TLS Secret.
         if [ "$PLATFORM_BOOTSTRAP_ENABLED" -eq 1 ]; then
+          echo ">> Waiting for the ESO webhook ..."
+          apply_ci_hook charts/eso/templates/eso-webhook-wait.yaml eso-system eso-webhook-wait
           echo ">> Initialising OpenBao ..."
           kubectl rollout status statefulset/openbao -n secret-store --timeout=5m
           apply_ci_hook charts/openbao/templates/openbao-init-job.yaml secret-store openbao-init
+          # --no-hooks also omits the store and ExternalSecret hooks. Restore
+          # their chart-defined order after webhook/TLS/OpenBao readiness;
+          # do not substitute direct Secret writes for ESO reconciliation.
+          helm_render -s charts/eso/templates/cluster-secret-store.yaml | kubectl apply -f -
+          kubectl wait clustersecretstore/openbao-backend --for=condition=Ready --timeout=5m
+          for secret_template in platform-postgresql platform-documentdb platform-kafka platform-s3 platform-temporal gateway-apisix iam-keycloak; do
+            helm_render -s "charts/eso/templates/external-secrets/${secret_template}.yaml" | kubectl apply -f -
+          done
+          kubectl wait externalsecret --all -n "$NS" --for=condition=Ready --timeout=5m
         fi
 
         echo ">> Waiting for Temporal frontend ..."
@@ -916,7 +963,7 @@ case "${1:-up}" in
         # No Temporal: standard helm install with hooks.
         # --skip-schema-validation: in-falcone chart has strict JSON-schema constraints that
         # reject unknown/overridden keys even in valid e2e overlay combinations (known quirk).
-        helm upgrade --install --skip-schema-validation --server-side=false "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}" --wait --timeout 15m
+        helm_client_apply upgrade --install --skip-schema-validation "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}" "${HELM_NAMESPACE_ARGS[@]}" --wait --timeout 15m
       fi
     fi
     # Clean up SeaweedFS overlay temp file if it was created.

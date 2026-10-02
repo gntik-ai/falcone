@@ -11,7 +11,7 @@ permissions:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
-  FALCONE_CHARTS_REF: '62c3975b4964fedfc821db5d8787e697e2f7af94'
+  FALCONE_CHARTS_REF: '00bc9de332ac699c422cb90fb00b23b7943f1790'
 
 jobs:
   plan-enforcement:
@@ -47,6 +47,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate E2E Helm compatibility and namespace safety
+        run: node --test tests/blackbox/e2e-preserve-existing-namespace.test.mjs
+
       - name: Create isolated kind cluster
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
@@ -76,13 +79,16 @@ jobs:
           keycloak_admin_password="$(openssl rand -hex 24)"
           superadmin_password="$(openssl rand -hex 24)"
           plan_enforcement_client_secret="$(openssl rand -hex 24)"
+          mongo_client_secret="$(openssl rand -hex 24)"
           printf '::add-mask::%s\n' "$keycloak_admin_password"
           printf '::add-mask::%s\n' "$superadmin_password"
           printf '::add-mask::%s\n' "$plan_enforcement_client_secret"
+          printf '::add-mask::%s\n' "$mongo_client_secret"
           {
             echo "E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD=$keycloak_admin_password"
             echo "E2E_BOOTSTRAP_SUPERADMIN_PASSWORD=$superadmin_password"
             echo "E2E_PLAN_ENFORCEMENT_CLIENT_SECRET=$plan_enforcement_client_secret"
+            echo "E2E_MONGO_CLIENT_SECRET=$mongo_client_secret"
           } >> "$GITHUB_ENV"
 
       - name: Provision plan-enforcement services with the deterministic Helm adapter
@@ -94,11 +100,15 @@ jobs:
           # The pinned chart uses a release digest that is not present in kind.
           # This isolated run instead consumes the local tag loaded above.
           E2E_USE_LOCAL_CONTROL_PLANE_IMAGE: 'true'
+          # The shared kind profile expects pre-existing ESO/OpenBao namespaces.
+          # This fresh cluster needs the chart to create its auxiliary namespaces.
+          E2E_CREATE_AUXILIARY_NAMESPACES: 'true'
+          E2E_FERRETDB: 'true'
           E2E_APISIX_STANDALONE_CONFIG_FILE: deploy/kind/apisix/apisix.yaml
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: ci-plan-enforcement-admin
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD }}
           E2E_BOOTSTRAP_SUPERADMIN_PASSWORD: ${{ env.E2E_BOOTSTRAP_SUPERADMIN_PASSWORD }}
-          E2E_FWD: svc/falcone-apisix:9080:9080 svc/falcone-control-plane:3233:8080 svc/falcone-web-console:3000:3000 svc/falcone-keycloak:8080:8080 svc/falcone-kafka:9092:9092
+          E2E_FWD: svc/falcone-apisix:9080:9080 svc/falcone-control-plane:3233:8080 svc/falcone-control-plane-executor:38080:8080 svc/falcone-web-console:3000:3000 svc/falcone-keycloak:8080:8080 svc/falcone-kafka:9092:9092
         run: bash tests/e2e/stack.sh up
 
       - name: Provision ephemeral plan-enforcement client
@@ -130,6 +140,72 @@ jobs:
 
       - name: Route Kafka metadata to the local port-forward
         run: echo '127.0.0.1 falcone-kafka' | sudo tee -a /etc/hosts >/dev/null
+
+      - name: Route Keycloak issuer host to the local port-forward
+        run: echo '127.0.0.1 falcone-keycloak' | sudo tee -a /etc/hosts >/dev/null
+
+      - name: Register disposable Mongo tenant and workspaces
+        env:
+          CONTROL_PLANE_URL: http://localhost:3233
+          KEYCLOAK_URL: http://falcone-keycloak:8080
+          SUPERADMIN_CLIENT_ID: plan-enforcement-ci
+          SUPERADMIN_CLIENT_SECRET: ${{ env.E2E_PLAN_ENFORCEMENT_CLIENT_SECRET }}
+        run: node tests/e2e/helpers/prepare-mongo-gateway.mjs
+
+      - name: Provision workspace-bound Mongo tenant client
+        env:
+          E2E_NAMESPACE: falcone-plan-enforcement
+        run: |
+          set -euo pipefail
+          kubectl exec -n "$E2E_NAMESPACE" deployment/falcone-keycloak -- \
+            env KEYCLOAK_ADMIN_USERNAME=ci-plan-enforcement-admin \
+                KEYCLOAK_ADMIN_PASSWORD="$E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD" \
+                MONGO_REALM="$FALCONE_MONGO_REALM" \
+                MONGO_WORKSPACE_ID="$FALCONE_MONGO_WORKSPACE_ID" \
+                MONGO_CLIENT_SECRET="$E2E_MONGO_CLIENT_SECRET" \
+            bash -ec '
+              KC=/opt/keycloak/bin/kcadm.sh
+              "$KC" config credentials --server http://localhost:8080 --realm master \
+                --user "$KEYCLOAK_ADMIN_USERNAME" --password "$KEYCLOAK_ADMIN_PASSWORD"
+              mongo_client_uuid=$("$KC" create clients -r "$MONGO_REALM" -i \
+                -s clientId=mongo-bearer-ci -s enabled=true -s publicClient=false \
+                -s standardFlowEnabled=false -s directAccessGrantsEnabled=false \
+                -s serviceAccountsEnabled=true -s clientAuthenticatorType=client-secret \
+                -s secret="$MONGO_CLIENT_SECRET")
+              "$KC" create "clients/$mongo_client_uuid/protocol-mappers/models" -r "$MONGO_REALM" \
+                -s name=workspace-binding -s protocol=openid-connect \
+                -s protocolMapper=oidc-hardcoded-claim-mapper \
+                -s "config={\"claim.name\":\"workspace_id\",\"claim.value\":\"$MONGO_WORKSPACE_ID\",\"jsonType.label\":\"String\",\"access.token.claim\":\"true\"}"
+              mapper_names=$("$KC" get "clients/$mongo_client_uuid/protocol-mappers/models" -r "$MONGO_REALM" \
+                --fields name --format csv --noquotes)
+              if ! printf "%s\n" "$mapper_names" | grep -Fxq falcone-data-api-audience; then
+                "$KC" create "clients/$mongo_client_uuid/protocol-mappers/models" -r "$MONGO_REALM" \
+                  -s name=falcone-data-api-audience -s protocol=openid-connect \
+                  -s protocolMapper=oidc-audience-mapper \
+                  -s "config={\"included.custom.audience\":\"falcone-data-api\",\"access.token.claim\":\"true\",\"id.token.claim\":\"false\"}"
+              fi
+              "$KC" add-roles -r "$MONGO_REALM" \
+                --uusername service-account-mongo-bearer-ci --rolename tenant_admin
+              # No audience mapper: azp equals the data audience, which must still get 401.
+              "$KC" create clients -r "$MONGO_REALM" \
+                -s clientId=falcone-data-api -s enabled=true -s publicClient=false \
+                -s standardFlowEnabled=false -s directAccessGrantsEnabled=false \
+                -s serviceAccountsEnabled=true -s clientAuthenticatorType=client-secret \
+                -s secret="$MONGO_CLIENT_SECRET"
+            '
+
+      - name: Mongo tenant bearer gateway round trip
+        env:
+          FALCONE_MONGO_REQUIRED: 'true'
+          FALCONE_MONGO_GATEWAY_URL: http://localhost:9080
+          FALCONE_MONGO_EXECUTOR_URL: http://localhost:38080
+          FALCONE_MONGO_TOKEN_URL: http://falcone-keycloak:8080/realms/${{ env.FALCONE_MONGO_REALM }}/protocol/openid-connect/token
+          FALCONE_MONGO_CLIENT_ID: mongo-bearer-ci
+          FALCONE_MONGO_WRONG_AUDIENCE_CLIENT_ID: falcone-data-api
+          FALCONE_MONGO_CLIENT_SECRET: ${{ env.E2E_MONGO_CLIENT_SECRET }}
+          FALCONE_MONGO_WORKSPACE_ID: ${{ env.FALCONE_MONGO_WORKSPACE_ID }}
+          FALCONE_MONGO_OTHER_WORKSPACE_ID: ${{ env.FALCONE_MONGO_OTHER_WORKSPACE_ID }}
+        run: node --test tests/e2e/deployment/mongo-gateway-bearer.test.mjs
 
       - name: Plan-enforcement coherence tests
         env:
