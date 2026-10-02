@@ -233,8 +233,20 @@ case "$command_name" in
     fi
     if [[ " $* " == *" template "* ]]; then
       case "$BBX_SCENARIO" in
-        helm-temporal|helm-temporal-eso)
+        helm-temporal|helm-temporal-eso|helm-temporal-large)
           printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-schema'
+          if [[ "$BBX_SCENARIO" == "helm-temporal-large" && " $* " != *" -s "* ]]; then
+            # Exceed the pipe buffer after the marker: an early-exiting reader
+            # must not turn the renderer's SIGPIPE into a non-Temporal install.
+            awk 'BEGIN { for (i = 0; i < 20000; i++) print "# remaining chart manifest" }' || exit $?
+          fi
+          ;;
+        helm-render-error|helm-render-error-after-marker)
+          if [[ "$BBX_SCENARIO" == "helm-render-error-after-marker" ]]; then
+            printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-schema'
+          fi
+          printf '%s\n' 'injected Helm render failure' >&2
+          exit 75
           ;;
         rendered-namespace-conflict)
           printf '%s\n' 'apiVersion: v1' 'kind: Namespace' 'metadata:' "  name: $E2E_NAMESPACE" '  labels:' '    unsafe-bbx-change: rejected'
@@ -563,6 +575,40 @@ test('E2E refuses a Helm apply when subcommand help cannot be inspected', () => 
     assert.match(invocation.output, /Could not inspect Helm's apply capability/)
     assert.equal(mutations(invocation).filter(({ command }) => command === 'helm').length, 0)
   } finally { invocation.cleanup() }
+})
+
+test('large Temporal renders retain the phased install with Helm 3 and Helm 4', async (t) => {
+  for (const major of ['3', '4']) {
+    await t.test(`Helm ${major}`, () => {
+      const invocation = invokeHarness('helm-temporal-large', {
+        BBX_HELM_MAJOR: major,
+        E2E_NAMESPACE_MODE: 'ephemeral',
+      })
+      try {
+        assert.equal(invocation.result.status, 0, invocation.output)
+        const installs = mutations(invocation).filter(({ command }) => command === 'helm')
+        assert.equal(installs.length, 1)
+        assert.match(installs[0].args, /--no-hooks/)
+        assert.doesNotMatch(installs[0].args, /--wait(?:\s|$)/)
+        assert.ok(invocation.calls.some(({ command, args }) => command === 'kubectl'
+          && /wait job\/falcone-temporal-bootstrap /.test(args)), 'Temporal bootstrap was skipped')
+      } finally { invocation.cleanup() }
+    })
+  }
+})
+
+test('failed Helm renders cannot select either install path', async (t) => {
+  for (const scenario of ['helm-render-error', 'helm-render-error-after-marker']) {
+    await t.test(scenario, () => {
+      const invocation = invokeHarness(scenario, { E2E_NAMESPACE_MODE: 'ephemeral' })
+      try {
+        assert.notEqual(invocation.result.status, 0, invocation.output)
+        assert.match(invocation.output, /Could not render the chart for Temporal detection/)
+        assert.equal(mutations(invocation).filter(({ command }) => command === 'helm').length, 0,
+          'a failed render reached Helm installation')
+      } finally { invocation.cleanup() }
+    })
+  }
 })
 
 test('isolated CI renders auxiliary namespaces and preserves ESO gates in the phased install', () => {

@@ -883,9 +883,15 @@ case "${1:-up}" in
       #   3. Wait for Temporal frontend then run the Temporal and platform
       #      Keycloak bootstrap Jobs out-of-band.
       #   4. Wait for all Deployments + StatefulSets to stabilise (retries self-heal).
-      TEMPORAL_ENABLED=0
-      helm_render 2>/dev/null \
-        | grep -q 'falcone-temporal-schema' && TEMPORAL_ENABLED=1 || true
+      # Consume the complete render: grep -q closes its pipe at the first
+      # match, making a large Helm render fail with SIGPIPE under pipefail.
+      # A real render error must stop setup rather than select the standard
+      # install path and reintroduce the Temporal bootstrap deadlock.
+      if ! TEMPORAL_ENABLED="$(helm_render 2>/dev/null \
+        | awk '/falcone-temporal-schema/ { enabled = 1 } END { print enabled + 0 }')"; then
+        echo "Could not render the chart for Temporal detection; refusing Helm installation." >&2
+        exit 2
+      fi
 
       if [ "$TEMPORAL_ENABLED" -eq 1 ]; then
         echo ">> Temporal schema job rendered: phased deploy to break bootstrap deadlock ..."
