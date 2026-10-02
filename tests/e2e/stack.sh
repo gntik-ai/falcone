@@ -55,6 +55,20 @@ BASE="${E2E_BASE_URL:-http://localhost:3000}"
 
 require() { command -v "$1" >/dev/null 2>&1 || { echo "Missing '$1'." >&2; exit 2; }; }
 
+# Helm 3 applies client-side already; Helm 4 needs an explicit opt-out. Inspect
+# the actual subcommand so both versions retain the same apply behavior.
+helm_client_apply() {
+  local help client_flags=()
+  help="$(helm "$1" --help 2>/dev/null)" || {
+    echo "Could not inspect Helm's apply capability." >&2
+    return 2
+  }
+  if grep -Eq '^[[:space:]]+--server-side([[:space:]]|$)' <<<"$help"; then
+    client_flags=(--server-side=false)
+  fi
+  helm "$@" "${client_flags[@]}"
+}
+
 guard() {
   local ctx; ctx="$(kubectl config current-context 2>/dev/null || true)"
   [ -z "$ctx" ] && { echo "No kube-context. Expected ./kubeconfig-test-cluster-b.yaml or a local cluster." >&2; exit 2; }
@@ -586,7 +600,7 @@ preserve_up() {
   PRESERVE_UP_ARMED=1
 
   echo ">> Installing one preflighted Helm release into the attested existing namespace ..."
-  if ! helm install "$REL" "$chart" "${values[@]}" -n "$NS" "${rollback_flag[@]}" --skip-schema-validation --server-side=false --wait --timeout 15m >"$STATE_DIR/install.log" 2>&1; then
+  if ! helm_client_apply install "$REL" "$chart" "${values[@]}" -n "$NS" "${rollback_flag[@]}" --skip-schema-validation --wait --timeout 15m >"$STATE_DIR/install.log" 2>&1; then
     preserve_release_storage || true
     echo "Preserve-existing Helm install failed; trap cleanup is removing any verified release." >&2
     return 1
@@ -619,6 +633,47 @@ preserve_up() {
   PRESERVE_MANIFEST=""
 }
 
+# The chart renders some namespaced objects outside the release namespace: the ESO
+# subchart puts its controller RBAC in `eso-system`. A disposable cluster has no
+# such namespace, so the ephemeral lifecycle creates each missing one and labels it
+# as owned by this stack's namespace. `down` removes only namespaces carrying that
+# exact owner, so an existing ESO installation, or another stack run's namespace, is
+# never touched.
+AUX_NAMESPACES="${E2E_AUXILIARY_NAMESPACES:-eso-system}"
+AUX_OWNER_LABEL="falcone.e2e/auxiliary-owner"
+
+ensure_auxiliary_namespaces() {
+  local aux
+  for aux in $AUX_NAMESPACES; do
+    case "$aux" in
+      ''|*[!a-z0-9-]*|-*|*-) echo "Unsafe auxiliary namespace name: '$aux'." >&2; exit 2 ;;
+      kube-system|kube-public|kube-node-lease|default|openshift*) echo "Refusing protected auxiliary namespace '$aux'." >&2; exit 2 ;;
+    esac
+    if kubectl get namespace "$aux" >/dev/null 2>&1; then
+      continue
+    fi
+    echo ">> Creating auxiliary namespace '$aux' for the chart's out-of-release objects ..."
+    kubectl create namespace "$aux"
+    # The owner label names this stack's namespace, so another stack run never removes
+    # it. The Helm ownership metadata lets a profile that renders Namespace/$aux itself
+    # (global.createNamespace=true) adopt it instead of failing on an unowned object.
+    kubectl label namespace "$aux" --overwrite >/dev/null \
+      "$AUX_OWNER_LABEL=$NS" app.kubernetes.io/managed-by=Helm
+    kubectl annotate namespace "$aux" --overwrite >/dev/null \
+      "meta.helm.sh/release-name=$REL" "meta.helm.sh/release-namespace=$NS"
+  done
+}
+
+remove_owned_auxiliary_namespaces() {
+  local aux owner
+  for aux in $AUX_NAMESPACES; do
+    owner="$(kubectl get namespace "$aux" --ignore-not-found -o "jsonpath={.metadata.labels['falcone\\.e2e/auxiliary-owner']}" 2>/dev/null || true)"
+    if [ "$owner" = "$NS" ]; then
+      kubectl delete namespace "$aux" --ignore-not-found --wait=false
+    fi
+  done
+}
+
 case "${1:-up}" in
   up)
     require kubectl; guard
@@ -633,6 +688,7 @@ case "${1:-up}" in
     echo ">> Recreating namespace '$NS' (clean slate) ..."
     kubectl delete namespace "$NS" --ignore-not-found --wait=true
     kubectl create namespace "$NS"
+    ensure_auxiliary_namespaces
 
     # The kind chart profile uses a standalone APISIX route table mounted from a
     # ConfigMap.  Let isolated CI provide that route table before Helm renders
@@ -860,7 +916,7 @@ case "${1:-up}" in
       if [ "$TEMPORAL_ENABLED" -eq 1 ]; then
         echo ">> Temporal schema job rendered: phased deploy to break bootstrap deadlock ..."
         # Phase 1 — deploy everything without hooks; no --wait so CrashLoopBackOffs are OK.
-        helm upgrade --install --skip-schema-validation --server-side=false --no-hooks \
+        helm_client_apply upgrade --install --skip-schema-validation --no-hooks \
           "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}"
 
         # Phase 2 — wait for PostgreSQL then run schema job.
@@ -916,7 +972,7 @@ case "${1:-up}" in
         # No Temporal: standard helm install with hooks.
         # --skip-schema-validation: in-falcone chart has strict JSON-schema constraints that
         # reject unknown/overridden keys even in valid e2e overlay combinations (known quirk).
-        helm upgrade --install --skip-schema-validation --server-side=false "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}" --wait --timeout 15m
+        helm_client_apply upgrade --install --skip-schema-validation "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}" --wait --timeout 15m
       fi
     fi
     # Clean up SeaweedFS overlay temp file if it was created.
@@ -946,6 +1002,7 @@ case "${1:-up}" in
     # engine (StatefulSet + PVC) are namespace-scoped and torn down with it, same as every other
     # component (add-ferretdb-document-store-e2e #464, task 8.4).
     kubectl delete namespace "$NS" --ignore-not-found --wait=false
+    remove_owned_auxiliary_namespaces
     echo ">> Namespace '$NS' deleted (all pods removed). Cluster left intact."
     ;;
   status)
