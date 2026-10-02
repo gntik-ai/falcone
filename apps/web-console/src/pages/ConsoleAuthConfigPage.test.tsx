@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -5,14 +6,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConsoleAuthConfigPage } from './ConsoleAuthConfigPage'
 
 const mockUseConsoleContext = vi.fn()
+const mockRoles = vi.hoisted(() => ({ current: ['tenant_owner'] }))
 const authConfigApi = vi.hoisted(() => ({
   getTenantAuthConfig: vi.fn(),
   updateTenantAuthConfig: vi.fn(),
-  deleteTenantIdentityProvider: vi.fn()
+  deleteTenantIdentityProvider: vi.fn(),
+  upsertTenantIdentityProvider: vi.fn()
 }))
 
+vi.mock('@/lib/console-permissions', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/console-permissions')>('@/lib/console-permissions')
+  return { ...actual, useConsolePermissions: () => actual.getConsolePermissions(mockRoles.current) }
+})
 vi.mock('@/lib/console-context', () => ({ useConsoleContext: () => mockUseConsoleContext() }))
-vi.mock('@/services/authConfigApi', () => authConfigApi)
+vi.mock('@/services/authConfigApi', async () => ({
+  ...await vi.importActual<typeof import('@/services/authConfigApi')>('@/services/authConfigApi'),
+  ...authConfigApi
+}))
 
 const baseConfig = {
   tenantId: 'ten_1',
@@ -23,7 +33,7 @@ const baseConfig = {
   rememberMe: false,
   verifyEmail: false,
   identityProviders: [
-    { alias: 'google', providerId: 'google', enabled: true, displayName: 'Google' }
+    { alias: 'google', providerId: 'google', enabled: true, displayName: 'Google', clientId: 'old-id', clientSecretSet: true, defaultScope: 'email', callbackUrl: null }
   ]
 }
 
@@ -33,6 +43,8 @@ function apiError(status: number, message = 'boom') {
 
 describe('ConsoleAuthConfigPage (#782)', () => {
   beforeEach(() => {
+    mockRoles.current = ['tenant_owner']
+    authConfigApi.upsertTenantIdentityProvider.mockReset()
     authConfigApi.getTenantAuthConfig.mockReset()
     authConfigApi.updateTenantAuthConfig.mockReset()
     authConfigApi.deleteTenantIdentityProvider.mockReset()
@@ -171,5 +183,91 @@ describe('ConsoleAuthConfigPage (#782)', () => {
 
     await waitFor(() => expect(authConfigApi.getTenantAuthConfig).toHaveBeenCalledWith('ten_2'))
     expect(await screen.findByText('Realm: ten-2-realm')).toBeInTheDocument()
+  })
+})
+
+
+describe('tenant social provider management (#950)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRoles.current = ['tenant_owner']
+    mockUseConsoleContext.mockReturnValue({ activeTenantId: 'ten_1', activeTenant: { label: 'Acme' } })
+    authConfigApi.getTenantAuthConfig.mockResolvedValue(baseConfig)
+    authConfigApi.upsertTenantIdentityProvider.mockResolvedValue({ identityProviders: baseConfig.identityProviders })
+  })
+  afterEach(cleanup)
+
+  it('creates from a template and clears the write-only input before the response', async () => {
+    const secret = randomUUID()
+    render(<ConsoleAuthConfigPage />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Crear proveedor' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.selectOptions(within(dialog).getByLabelText('Plantilla'), 'github')
+    await userEvent.type(within(dialog).getByLabelText('Client ID'), 'test-id')
+    await userEvent.type(within(dialog).getByLabelText('Client secret'), secret)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar proveedor' }))
+    await waitFor(() => expect(authConfigApi.upsertTenantIdentityProvider).toHaveBeenCalledWith('ten_1', 'github', expect.objectContaining({ providerId: 'github', config: expect.objectContaining({ clientId: 'test-id', clientSecret: secret }) })))
+    expect(screen.queryByDisplayValue(secret)).not.toBeInTheDocument()
+  })
+
+  it('edit starts with an empty secret and omits it when saving other fields', async () => {
+    render(<ConsoleAuthConfigPage />)
+    await userEvent.click(await screen.findByRole('button', { name: /editar proveedor/i }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByLabelText('Client secret')).toHaveValue('')
+    expect(within(dialog).getByText(/déjalo vacío para conservarlo/i)).toBeInTheDocument()
+    await userEvent.clear(within(dialog).getByLabelText('Nombre visible'))
+    await userEvent.type(within(dialog).getByLabelText('Nombre visible'), 'Updated')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar proveedor' }))
+    await waitFor(() => expect(authConfigApi.upsertTenantIdentityProvider).toHaveBeenCalledWith('ten_1', 'google', { providerId: 'google', enabled: true, displayName: 'Updated', config: { clientId: 'old-id', defaultScope: 'email' } }))
+  })
+
+  it('blocks duplicate aliases before sending a PUT', async () => {
+    render(<ConsoleAuthConfigPage />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Crear proveedor' }))
+    expect(screen.getByText(/ya existe un proveedor con este alias/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar proveedor' })).toBeDisabled()
+    expect(authConfigApi.upsertTenantIdentityProvider).not.toHaveBeenCalled()
+  })
+
+  it('renders the fallback path and persists a toggle without submitting a secret', async () => {
+    render(<ConsoleAuthConfigPage />)
+    expect(await screen.findByText(/URL pública no configurada/i)).toHaveTextContent('/realms/ten-1-realm/broker/google/endpoint')
+    await userEvent.click(screen.getByRole('button', { name: /deshabilitar proveedor/i }))
+    await waitFor(() => expect(authConfigApi.upsertTenantIdentityProvider).toHaveBeenCalledWith('ten_1', 'google', { providerId: 'google', enabled: false }))
+  })
+
+  it('renders and copies a configured callback URL', async () => {
+    const url = 'https://id.example/realms/tenant/broker/google/endpoint'
+    authConfigApi.getTenantAuthConfig.mockResolvedValue({ ...baseConfig, identityProviders: [{ ...baseConfig.identityProviders[0], callbackUrl: url }] })
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    render(<ConsoleAuthConfigPage />)
+    expect(await screen.findByText(url)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /copiar URL de callback/i }))
+    expect(writeText).toHaveBeenCalledWith(url)
+  })
+
+  it('provides recovery instructions for a toggle conflict without echoing the error', async () => {
+    const secret = randomUUID()
+    authConfigApi.upsertTenantIdentityProvider.mockRejectedValueOnce(apiError(409, secret))
+    render(<ConsoleAuthConfigPage />)
+    await userEvent.click(await screen.findByRole('button', { name: /deshabilitar proveedor/i }))
+    expect(await screen.findByText(/recarga la lista o edita el proveedor y vuelve a introducir el secreto/i)).toBeInTheDocument()
+    expect(screen.queryByText(secret)).not.toBeInTheDocument()
+  })
+
+  it.each(['tenant_viewer', 'tenant_developer', 'workspace_admin', 'platform_operator'])('hides management controls for %s', async (role) => {
+    mockRoles.current = [role]
+    render(<ConsoleAuthConfigPage />)
+    await screen.findByText('Google')
+    expect(screen.queryByRole('button', { name: /crear proveedor|editar proveedor|eliminar proveedor|deshabilitar proveedor|guardar cambios/i })).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/permitir el registro/i)).toBeDisabled()
+  })
+
+  it.each(['superadmin', 'tenant_owner', 'tenant_admin'])('shows management controls for %s', async (role) => {
+    mockRoles.current = [role]
+    render(<ConsoleAuthConfigPage />)
+    expect(await screen.findByRole('button', { name: 'Crear proveedor' })).toBeInTheDocument()
   })
 })

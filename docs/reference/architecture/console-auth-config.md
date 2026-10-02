@@ -49,20 +49,57 @@ the *persisted* value, and a polite (`aria-live="polite"`) success notice is ann
 
 ## Identity providers
 
-`GET …/auth-config` also returns the realm's configured social identity providers
-(`identityProviders: [{ alias, providerId, enabled, displayName }]`, from Keycloak's
-`identity-provider/instances`). The screen lists them **read-only** (alias, provider type, display
-name, enabled/disabled badge) and offers a **guarded delete** per provider — a confirmation dialog
-(shared `DestructiveConfirmationDialog`/`useDestructiveOp`, `WARNING` tier: removing one social login
-method does not affect other providers or username/password access) that, on confirm, calls
-`DELETE /v1/tenants/{tenantId}/auth-config/identity-providers/{alias}` and reloads the config.
+Authorized roles (`superadmin`, `tenant_owner`, `tenant_admin`) can create from a template,
+edit, enable/disable and delete providers. All management controls, including login-setting
+writes, use `tenant.auth-config.manage` from `lib/console-permissions`; workspace and platform
+operator roles do not inherit this permission. Server authorization remains
+`authorizeAuthConfig` / `canManageTenant`. Non-admin roles see a read-only view if data is
+available; the current server also refuses their GET with 403.
 
-**Deferred follow-up:** creating or editing an identity provider
-(`PUT /v1/tenants/{tenantId}/auth-config/identity-providers/{alias}`, which needs a provider-specific
-form — OIDC/SAML endpoints, client id/secret, etc.) is **not** exposed by this screen yet. The backend
-route already exists and is owner-authorized; a future change can add the write form once its UX is
-scoped (tracked in `openspec/changes/add-console-auth-config-management/design.md`). Shipping a
-read-only, correctly-populated list now is preferred over a partial/broken create form.
+Supported built-in templates are `google`, `github`, `microsoft`, `gitlab`, `facebook`, and
+`linkedin-openid-connect`. Generic OIDC/SAML endpoints are excluded. Aliases match
+`[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}`. The create dialog rejects duplicate aliases, while the API
+remains idempotent on alias. The template of an existing provider cannot change.
+
+`PUT /v1/tenants/{tenantId}/auth-config/identity-providers/{alias}` accepts `providerId`,
+`displayName`, `enabled`, and only `clientId`, `clientSecret`, `defaultScope` in `config`.
+Unknown templates/config keys or invalid aliases return `400 VALIDATION_ERROR` before Keycloak
+I/O; creating without both credentials returns 400 with no Keycloak write. Existing callers
+sending other config keys must migrate to this narrower contract. Existing Keycloak config
+keys are retained when merging an edit.
+The console submits `displayName` and `defaultScope` even when empty: clearing an input
+explicitly clears that setting. The empty display name is stored as `''`; the console falls
+back to the alias for the visible label. Omitted fields preserve their existing values.
+
+The client secret is write-only: it stays in an uncontrolled password input, is cleared before
+awaiting the request, and is never placed in React state or browser storage. An empty edit
+omits `clientSecret`; the adapter preserves the existing secret. A non-empty edit replaces it.
+Reads and PUT responses expose only `clientSecretSet`, `clientId`, `defaultScope`, and provider
+metadata, never the secret. Upstream social-provider error bodies are discarded, and audit
+records carry route, tenant and outcome metadata only (`tenant.social-provider.upsert`).
+
+Keycloak 26.1.0 admin GET returns `clientSecret` masked as `**********`. An edit without a
+replacement retains that mask in the PUT config: Keycloak's IdentityProviderResource substitutes
+the actual stored credential before persisting it. The adapter's fake-Keycloak regression covers
+masked reads, edits and config-less toggles and asserts the mask never becomes the stored secret.
+Caller-supplied masks are rejected as invalid credentials. A real replacement overwrites the
+read mask. Staging must still verify preservation and login against the deployed version before
+release. A concurrent deletion or template change requiring new credentials returns
+`400 VALIDATION_ERROR` with no write, rather than a generic upstream failure.
+
+Each provider includes `callbackUrl`. It derives the public base (including any context path)
+from the existing control-plane `KEYCLOAK_ISSUER` setting and renders
+`{publicKeycloakBase}/realms/{realm}/broker/{alias}/endpoint`. No internal admin hostname is
+used. When the issuer is absent or invalid, the value is null and the console displays the
+path pattern for operator setup. A configured URL has a copy action. Deployment wiring, if
+needed, belongs in the deployment repository and must use existing values and secret gates.
+The deployment values wire the issuer only for the executor; the control-plane callback therefore
+remains null in those environments. Product confirmation of whether a configured public URL is
+required at release remains pending; the path pattern is the supported fallback.
+
+Deletion retains the existing shared `DestructiveConfirmationDialog` / `useDestructiveOp`
+confirmation, then calls DELETE and reloads the list. Enable/disable sends a PUT patch containing
+only `providerId` and `enabled`. Test-connection and a browser OAuth round-trip remain follow-ups.
 
 ## The wire
 

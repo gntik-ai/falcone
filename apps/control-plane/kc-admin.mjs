@@ -1,3 +1,5 @@
+import { mergeSocialProvider, socialProviderView, SocialProviderValidationError } from './social-providers.mjs';
+
 // Keycloak admin client for the control-plane (domain B).
 //
 // The repo's createTenant/user sagas are stubs (workflows/wf-con-002.mjs:
@@ -183,7 +185,8 @@ async function kc(method, path, body) {
   const text = await res.text();
   let json; try { json = text ? JSON.parse(text) : null; } catch { json = text; }
   if (!res.ok) {
-    throw new KeycloakAdminError({ method, path, status: res.status, statusCode: res.status, body: json });
+    throw new KeycloakAdminError({ method, path, status: res.status, statusCode: res.status,
+      body: path.includes('/identity-provider/') ? null : json });
   }
   // Keycloak returns 201 + Location header (no body) on creates; surface the id.
   const loc = res.headers.get('location');
@@ -282,16 +285,25 @@ export const kcAdmin = {
   // ---- social identity providers (Keycloak /identity-provider/instances) ------
   async listIdentityProviders(realm) {
     const list = (await kc('GET', `/realms/${encodeURIComponent(realm)}/identity-provider/instances`)).json ?? [];
-    return list.map((p) => ({ alias: p.alias, providerId: p.providerId, enabled: p.enabled !== false, displayName: p.displayName ?? null }));
+    return list.map((p) => socialProviderView(p, realm));
   },
   // Create-or-update a social IdP (idempotent on alias): POST when new, PUT when it exists.
-  async upsertIdentityProvider(realm, { alias, providerId, enabled = true, displayName, config = {} }) {
-    const rep = { alias, providerId, enabled: enabled !== false, displayName: displayName ?? alias, config };
-    let exists = false;
-    try { await kc('GET', `/realms/${encodeURIComponent(realm)}/identity-provider/instances/${encodeURIComponent(alias)}`); exists = true; }
+  async upsertIdentityProvider(realm, patch) {
+    const path = `/realms/${encodeURIComponent(realm)}/identity-provider/instances`;
+    let current = null;
+    try { current = (await kc('GET', `${path}/${encodeURIComponent(patch.alias)}`)).json; }
     catch (e) { if (e.kcStatus !== 404) throw e; }
-    if (exists) await kc('PUT', `/realms/${encodeURIComponent(realm)}/identity-provider/instances/${encodeURIComponent(alias)}`, rep);
-    else await kc('POST', `/realms/${encodeURIComponent(realm)}/identity-provider/instances`, rep);
+    if (current && current.providerId !== patch.providerId) {
+      throw new SocialProviderValidationError();
+    }
+    // Recheck creation requirements here as well, in case the provider was deleted
+    // between the handler's read and this read. No incomplete provider is written.
+    if (!current && (!patch.config?.clientId?.trim() || !patch.config?.clientSecret?.trim())) {
+      throw new SocialProviderValidationError();
+    }
+    const rep = mergeSocialProvider(current, patch);
+    if (current) await kc('PUT', `${path}/${encodeURIComponent(patch.alias)}`, rep);
+    else await kc('POST', path, rep);
   },
   async deleteIdentityProvider(realm, alias) {
     try { await kc('DELETE', `/realms/${encodeURIComponent(realm)}/identity-provider/instances/${encodeURIComponent(alias)}`); }

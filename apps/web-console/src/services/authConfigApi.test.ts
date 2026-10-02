@@ -11,6 +11,7 @@ import {
   deleteTenantIdentityProvider,
   getTenantAuthConfig,
   updateTenantAuthConfig,
+  upsertTenantIdentityProvider,
   type TenantAuthConfig
 } from './authConfigApi'
 
@@ -48,6 +49,12 @@ describe('authConfigApi — tenant realm auth-config routes (#782)', () => {
   it('updateTenantAuthConfig can carry more than one boolean in a single patch', async () => {
     await updateTenantAuthConfig('ten_1', { verifyEmail: true, rememberMe: false })
     expect(lastCall()).toEqual([base, { method: 'PUT', body: { verifyEmail: true, rememberMe: false } }])
+  })
+
+  it('upserts a social provider with PUT, encoded scope and write-only request credentials', async () => {
+    const patch = { providerId: 'google', displayName: 'Google', config: { clientId: 'test', clientSecret: 'dummy-secret' } }
+    await upsertTenantIdentityProvider('ten/特', 'google work', patch)
+    expect(lastCall()).toEqual(['/v1/tenants/ten%2F%E7%89%B9/auth-config/identity-providers/google%20work', { method: 'PUT', body: patch }])
   })
 
   it('deleteTenantIdentityProvider → DELETE …/auth-config/identity-providers/{alias}', async () => {
