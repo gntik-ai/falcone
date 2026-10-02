@@ -619,6 +619,40 @@ preserve_up() {
   PRESERVE_MANIFEST=""
 }
 
+# The chart renders some namespaced objects outside the release namespace: the ESO
+# subchart puts its controller RBAC in `eso-system`. A disposable cluster has no
+# such namespace, so the ephemeral lifecycle creates each missing one and labels it
+# as its own. `down` removes only the namespaces that carry that label, so an
+# existing ESO installation on a developer cluster is never touched.
+AUX_NAMESPACES="${E2E_AUXILIARY_NAMESPACES:-eso-system}"
+AUX_OWNER_LABEL="falcone.e2e/auxiliary-owner"
+
+ensure_auxiliary_namespaces() {
+  local aux
+  for aux in $AUX_NAMESPACES; do
+    case "$aux" in
+      ''|*[!a-z0-9-]*|-*|*-) echo "Unsafe auxiliary namespace name: '$aux'." >&2; exit 2 ;;
+      kube-system|kube-public|kube-node-lease|default|openshift*) echo "Refusing protected auxiliary namespace '$aux'." >&2; exit 2 ;;
+    esac
+    if kubectl get namespace "$aux" >/dev/null 2>&1; then
+      continue
+    fi
+    echo ">> Creating auxiliary namespace '$aux' for the chart's out-of-release objects ..."
+    kubectl create namespace "$aux"
+    kubectl label namespace "$aux" "$AUX_OWNER_LABEL=stack-sh" --overwrite >/dev/null
+  done
+}
+
+remove_owned_auxiliary_namespaces() {
+  local aux owner
+  for aux in $AUX_NAMESPACES; do
+    owner="$(kubectl get namespace "$aux" --ignore-not-found -o "jsonpath={.metadata.labels['falcone\\.e2e/auxiliary-owner']}" 2>/dev/null || true)"
+    if [ "$owner" = "stack-sh" ]; then
+      kubectl delete namespace "$aux" --ignore-not-found --wait=false
+    fi
+  done
+}
+
 case "${1:-up}" in
   up)
     require kubectl; guard
@@ -633,6 +667,7 @@ case "${1:-up}" in
     echo ">> Recreating namespace '$NS' (clean slate) ..."
     kubectl delete namespace "$NS" --ignore-not-found --wait=true
     kubectl create namespace "$NS"
+    ensure_auxiliary_namespaces
 
     # The kind chart profile uses a standalone APISIX route table mounted from a
     # ConfigMap.  Let isolated CI provide that route table before Helm renders
@@ -946,6 +981,7 @@ case "${1:-up}" in
     # engine (StatefulSet + PVC) are namespace-scoped and torn down with it, same as every other
     # component (add-ferretdb-document-store-e2e #464, task 8.4).
     kubectl delete namespace "$NS" --ignore-not-found --wait=false
+    remove_owned_auxiliary_namespaces
     echo ">> Namespace '$NS' deleted (all pods removed). Cluster left intact."
     ;;
   status)
