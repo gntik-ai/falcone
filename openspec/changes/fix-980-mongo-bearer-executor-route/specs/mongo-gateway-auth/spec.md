@@ -2,7 +2,7 @@
 
 ### Requirement: Integration remains scheduled or manually dispatched
 
-Under operator addenda 14 and 15, `.github/workflows/integration.yml` SHALL have exactly `schedule` (cron `17 3 * * *`) and `workflow_dispatch` in its `on` block, as on main. The entire `pull_request` block, including its paths filter, SHALL be absent. All other workflow content, including chart pins, Mongo bearer steps and jobs, SHALL remain unchanged. Existing ESO namespace and Helm 3/4 handling in `tests/e2e/stack.sh` SHALL be retained.
+Under operator addenda 14 and 15, `.github/workflows/integration.yml` SHALL have exactly `schedule` (cron `17 3 * * *`) and `workflow_dispatch` in its `on` block, as on main. The entire `pull_request` block, including its paths filter, SHALL be absent. Under addendum 9, both workflow chart pins SHALL equal the final deployment ChangeSet head. All other workflow content, including Mongo bearer steps and jobs, SHALL remain unchanged. Existing ESO namespace and Helm 3/4 handling in `tests/e2e/stack.sh` SHALL be retained.
 
 #### Scenario: Deferred full-stack proof
 

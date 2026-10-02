@@ -1,5 +1,25 @@
 # Source #980 handoff (2026-10-01)
 
+## Final deployment pin repair from assigned HEAD f047ce88 (2026-10-02)
+
+The assigned source worktree started clean at `f047ce888da07c2f5aac2f9ab7fd9ef9209a405e` on `agent/falcone/980/5fcefe28-5a92-5e96-a3cd-6b1369cd20d6`; its path and Git metadata match the supplied worktree lease. The supplied implement-issue contract, OpenSpec and R2 policy bound this source-only continuation. The paired deployment checkout is clean at final HEAD `00bc9de332ac699c422cb90fb00b23b7943f1790`. This section supersedes historical pin statements below; all prior committed source repairs are retained.
+
+- [x] Reproduce the checker's blocking pin assertion, then update both `FALCONE_CHARTS_REF` pins to the final deployment head under addendum 9. The pin is the only change to each workflow.
+- [x] Update proposal and spec with the final pin contract and rollout caveat. Historical releases missing both Mongo verifier blocks inherit enforcement true and a release-local JWKS host; apply reviewed environment values and reconcile clients before enforcement. Argo-managed staging explicitly retains enforcement false. Template checks reject a partial migration with only one block present despite the schema no longer requiring the top-level gateway key.
+- [x] Preserve addenda 14/15: integration has exactly schedule `17 3 * * *` and `workflow_dispatch`, matching base `3a7306f`; its PR trigger remains absent. The existing ESO namespace and Helm 3/4 handling are unchanged.
+- [ ] Prove the kind bearer round trip (CRUD, wrong-audience 401, workspace B 403). Deferred to #1051 along with the remaining full-stack bring-up timeout and re-enabling the integration PR trigger. Plan-enforcement integration is not a gate for this ChangeSet; quality, unit, contract and chart release checks remain gates.
+
+### Bounded validation for the final pin repair
+
+- [x] PASS: `FALCONE_CHART_PATH=/srv/engineering/worktrees/falcone-charts/5fcefe28-5a92-5e96-a3cd-6b1369cd20d6/charts/in-falcone timeout 60s node --test --experimental-test-isolation=none tests/blackbox/mongo-gateway-route.test.mjs tests/unit/control-plane-jwt-verify.test.mjs tests/unit/tenant-data-api-audience.test.mjs tests/blackbox/tenant-realm-token-issuance.test.mjs tests/blackbox/kind-control-plane-multirealm-jwt.test.mjs tests/unit/sa-revocation-check.test.mjs` (71/71). Covers both final pins, deterministic chart/kind parity, executor audience rejection and fail-closed configuration, unchanged control-plane behavior, mapper idempotency and reconciliation dry-run/apply/reapply with redacted reports.
+- [x] PASS: Python/PyYAML asserts integration's trigger keys and cron equal the supplied main/base block, and both complete workflows equal assigned HEAD with only their pins replaced. Route `2006-key` is byte-identical to base `3a7306f`, and `tests/e2e/stack.sh` has no diff. `bash -n tests/e2e/stack.sh` and `git diff --check` pass.
+- [ ] SKIPPED: dependency-backed provisioning, workflow provisioning, gateway-policy unit/contract and deployment validation suites are not rerun because the assigned worktree has no `node_modules`; run with frozen dependencies in PR CI. This repair needs no dependency or lockfile change.
+- [ ] SKIPPED: Lua/LuaJIT tests (runtime absent), deployment revision24/packaged-recovery and temporal-bootstrap-048 groups (long-running archive extraction), and image builds/scans (container images/network unavailable) remain CI/release checks. No deployment source or render baseline is changed here. The kind bearer proof remains deferred to #1051.
+
+Local evidence artifact ID `falcone-980-final-pin-auth.tap` under `/tmp`, SHA256 `60f2d7d5b82ab69d9ffb4abf33afb0ba459293753bb5219b182baa445a837dad`. Node's default test isolation could not launch the suite in this sandbox; the bounded run used the existing no-isolation invocation above and executed every assertion.
+
+The control-plane verifier `apps/control-plane/jwt-verify.mjs` retains its tenant behavior as a follow-up. Prod Keycloak hosts remain an operator release gate. Staging enforcement must remain false until reconciliation evidence and a subsequent reviewed values revision. No credentials, network, live Keycloak/Kubernetes action, deploy, merge or push were used. This repair is recorded in one additional local source commit.
+
 ## Addenda 14/15 repair from assigned HEAD 01353c0a (2026-10-02)
 
 The assigned worktree started clean at `01353c0a14110579e51c22e8a2f6dce4ef7bb0aa` on `agent/falcone/980/5fcefe28-5a92-5e96-a3cd-6b1369cd20d6`. Its path and Git metadata match the supplied lease. The supplied implement-issue contract, OpenSpec and R2 policy bound this source-only continuation. The paired deployment checkout is clean at `74e073e156c710eea0e68ae5a9d6de8a31484810`; both existing chart pins already match it. All prior committed repairs are retained.
