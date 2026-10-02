@@ -18,10 +18,10 @@ test('secret is preserved for missing/empty patches and replaced only for a non-
   assert.equal(mergeSocialProvider(current, { config: { clientSecret: 'replacement' } }).config.clientSecret, 'replacement');
 });
 
-test('masked admin reads fail closed unless a real replacement is supplied', () => {
+test('masked admin reads retain the Keycloak preservation sentinel unless replaced', () => {
   const masked = { ...current, config: { clientSecret: '**********' } };
-  for (const config of [{}, { clientSecret: '' }, { clientSecret: '**********' }]) {
-    assert.throws(() => mergeSocialProvider(masked, { config }), { code: 'MASKED_IDENTITY_PROVIDER_SECRET' });
+  for (const config of [{}, { clientSecret: '' }, { clientId: 'new-id' }]) {
+    assert.equal(mergeSocialProvider(masked, { config }).config.clientSecret, '**********');
   }
   assert.equal(mergeSocialProvider(masked, { config: { clientSecret: secret } }).config.clientSecret, secret);
 });
@@ -52,37 +52,58 @@ test('real Keycloak adapter uses read-merge-PUT; list, create and upstream error
   const writes = [];
   let stored = structuredClone(current);
   let failWrite = false;
+  // Keycloak 26.1.0 admin GET masks secrets; IdentityProviderResource PUT replaces
+  // an unchanged SECRET_VALUE with the actual credential before storing the config.
+  const adminView = () => ({ ...stored, config: { ...stored.config,
+    ...(stored.config.clientSecret ? { clientSecret: '**********' } : {}) } });
   t.mock.method(globalThis, 'fetch', async (url, init = {}) => {
     const method = init.method ?? 'GET';
     const path = new URL(url).pathname;
     if (path.endsWith('/protocol/openid-connect/token')) return Response.json({ access_token: 'test-token', expires_in: 3600 });
-    if (method === 'GET' && path.endsWith('/instances')) return Response.json(stored ? [stored] : []);
-    if (method === 'GET') return stored ? Response.json(stored) : Response.json({}, { status: 404 });
-    writes.push([method, JSON.parse(init.body)]);
+    if (method === 'GET' && path.endsWith('/instances')) return Response.json(stored ? [adminView()] : []);
+    if (method === 'GET') return stored ? Response.json(adminView()) : Response.json({}, { status: 404 });
+    const next = JSON.parse(init.body);
+    writes.push([method, structuredClone(next)]);
     if (failWrite) return Response.json({ error: secret }, { status: 500 });
-    stored = JSON.parse(init.body);
+    if (method === 'PUT' && next.config.clientSecret === '**********') {
+      next.config.clientSecret = stored.config.clientSecret;
+    }
+    stored = next;
     return new Response(null, { status: method === 'POST' ? 201 : 204 });
   });
   for (const config of [{ clientId: 'new-id' }, { clientSecret: '' }, {}]) {
     await kcAdmin.upsertIdentityProvider('tenant', { alias: 'google', providerId: 'google', enabled: false, config });
     assert.equal(writes.at(-1)[0], 'PUT');
-    assert.equal(writes.at(-1)[1].config.clientSecret, secret);
+    assert.equal(writes.at(-1)[1].config.clientSecret, '**********');
+    assert.equal(stored.config.clientSecret, secret);
     assert.equal(stored.enabled, false);
     assert.equal(stored.config.providerSpecific, 'retained');
   }
-  assert.ok(!JSON.stringify(await kcAdmin.listIdentityProviders('tenant')).includes(secret));
+  // The console toggle has no config at all; toggling back must also preserve it.
+  await kcAdmin.upsertIdentityProvider('tenant', { alias: 'google', providerId: 'google', enabled: true });
+  assert.equal(stored.enabled, true);
+  assert.equal(writes.at(-1)[1].config.clientSecret, '**********');
+  assert.equal(stored.config.clientSecret, secret);
+  const list = await kcAdmin.listIdentityProviders('tenant');
+  assert.equal(list[0].clientSecretSet, true);
+  assert.ok(!JSON.stringify(list).includes(secret));
+  assert.ok(!JSON.stringify(list).includes('**********'));
+  const beforeMismatch = writes.length;
+  await assert.rejects(kcAdmin.upsertIdentityProvider('tenant', { alias: 'google', providerId: 'github', config: {} }), { code: 'SOCIAL_PROVIDER_VALIDATION_ERROR', statusCode: 400 });
+  assert.equal(writes.length, beforeMismatch);
   await kcAdmin.upsertIdentityProvider('tenant', { alias: 'google', providerId: 'google', config: { clientSecret: 'replacement' } });
   assert.equal(stored.config.clientSecret, 'replacement');
   stored = null;
   const before = writes.length;
-  await assert.rejects(kcAdmin.upsertIdentityProvider('tenant', { alias: 'google', providerId: 'google', config: { clientId: 'test' } }));
+  await assert.rejects(kcAdmin.upsertIdentityProvider('tenant', { alias: 'google', providerId: 'google', config: { clientId: 'test' } }), { code: 'SOCIAL_PROVIDER_VALIDATION_ERROR', statusCode: 400 });
   assert.equal(writes.length, before);
   await kcAdmin.upsertIdentityProvider('tenant', { alias: 'google', providerId: 'google', config: { clientId: 'test', clientSecret: secret } });
   assert.equal(writes.at(-1)[0], 'POST');
-  stored.config.clientSecret = '**********';
-  const beforeMasked = writes.length;
-  await assert.rejects(kcAdmin.upsertIdentityProvider('tenant', { alias: 'google', providerId: 'google', config: {} }), (error) => error.statusCode === 409);
-  assert.equal(writes.length, beforeMasked);
+  await kcAdmin.upsertIdentityProvider('tenant', { alias: 'google', providerId: 'google', config: { defaultScope: '' }, displayName: '', enabled: false });
+  assert.equal(stored.config.clientSecret, secret);
+  assert.equal(stored.config.defaultScope, '');
+  assert.equal(stored.displayName, '');
+  assert.equal(stored.enabled, false);
   await kcAdmin.upsertIdentityProvider('tenant', { alias: 'google', providerId: 'google', config: { clientSecret: secret } });
   assert.equal(stored.config.clientSecret, secret);
   failWrite = true;

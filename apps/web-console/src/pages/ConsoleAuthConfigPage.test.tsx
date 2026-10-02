@@ -246,6 +246,14 @@ describe('tenant social provider management (#950)', () => {
     expect(writeText).toHaveBeenCalledWith(url)
   })
 
+  it('provides recovery instructions for a toggle conflict without echoing the error', async () => {
+    authConfigApi.upsertTenantIdentityProvider.mockRejectedValueOnce(apiError(409, 'dummy-secret-from-upstream'))
+    render(<ConsoleAuthConfigPage />)
+    await userEvent.click(await screen.findByRole('button', { name: /deshabilitar proveedor/i }))
+    expect(await screen.findByText(/recarga la lista o edita el proveedor y vuelve a introducir el secreto/i)).toBeInTheDocument()
+    expect(screen.queryByText(/dummy-secret-from-upstream/i)).not.toBeInTheDocument()
+  })
+
   it.each(['tenant_viewer', 'tenant_developer', 'workspace_admin', 'platform_operator'])('hides management controls for %s', async (role) => {
     mockRoles.current = [role]
     render(<ConsoleAuthConfigPage />)

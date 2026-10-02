@@ -1,3 +1,7 @@
+// Tenant realm auth-config console surface (#782, #950).
+// Authorized tenant owners/admins and superadmins manage login flags and built-in
+// social providers through the tenant API. Provider secrets are write-only; edits
+// and toggles preserve them in Keycloak. Deletion uses the shared confirmation flow.
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { TenantSocialProviderDialog } from '@/components/console/TenantSocialProviderDialog'
@@ -226,7 +230,11 @@ export function ConsoleAuthConfigPage() {
       const result = await upsertTenantIdentityProvider(tenantId, provider.alias, { providerId: provider.providerId, enabled: !provider.enabled })
       providersSaved(tenantId, result.identityProviders)
     } catch (error) {
-      if (currentTenantRef.current === tenantId) setSaveError(describeConsoleError(error, 'No se pudo actualizar el proveedor.'))
+      if (currentTenantRef.current === tenantId) {
+        setSaveError(getConsoleErrorStatus(error) === 409
+          ? 'No se pudo actualizar el proveedor por un conflicto. Recarga la lista o edita el proveedor y vuelve a introducir el secreto.'
+          : describeConsoleError(error, 'No se pudo actualizar el proveedor.'))
+      }
     } finally {
       setSaving(false)
     }

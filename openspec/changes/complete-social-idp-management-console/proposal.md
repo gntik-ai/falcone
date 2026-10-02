@@ -17,7 +17,7 @@ stored config is retained. Callback URLs derive from KEYCLOAK_ISSUER or remain n
 
 ## Risk and rollback
 
-R1. Credential preservation is covered with fake-Keycloak read/merge/write tests. Masked direct
-admin reads fail closed without a replacement, pending deployed-version verification. Reverting
+R1. Credential preservation is covered with fake-Keycloak read/merge/write tests that model
+Keycloak 26.1.0 masked GET and server-side secret substitution on PUT. Reverting
 the source image restores the prior console; providers in Keycloak remain and need no migration.
 No deployment, realm migration, generic OIDC/SAML, OpenAPI/SDK change or application federation.

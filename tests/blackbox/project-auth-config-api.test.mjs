@@ -36,6 +36,7 @@ import assert from 'node:assert/strict';
 import { LOCAL_HANDLERS as HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
 import { auditEventForRoute } from '../../apps/control-plane/audit-writer.mjs';
 import { kcAdmin, TENANT_REALM_SCOPES } from '../../apps/control-plane/kc-admin.mjs';
+import { mergeSocialProvider, SocialProviderValidationError } from '../../apps/control-plane/social-providers.mjs';
 
 const ACME = 'acme-11111111';
 const GLOBEX = 'globex-22222222';
@@ -62,12 +63,15 @@ function fakeKc(initial = {}) {
     rememberMe: true,
     ...initial.realm,
   };
-  let providers = [...(initial.providers ?? [])];
+  let providers = structuredClone(initial.providers ?? []);
   return {
     calls,
+    storedProvider: (alias) => structuredClone(providers.find((p) => p.alias === alias)),
     getRealmAuthConfig: async (r) => {
       calls.push(['getRealmAuthConfig', r]);
-      return { ...realm, identityProviders: providers.map((p) => ({ ...p })) };
+      // Match Keycloak 26's admin read, never return the stored credential.
+      return { ...realm, identityProviders: providers.map((p) => ({ ...p,
+        config: { ...p.config, ...(p.config?.clientSecret ? { clientSecret: '**********' } : {}) } })) };
     },
     setRealmAuthConfig: async (r, patch) => {
       calls.push(['setRealmAuthConfig', r, patch]);
@@ -77,9 +81,12 @@ function fakeKc(initial = {}) {
       calls.push(['upsertIdentityProvider', r, idp]);
       const existing = providers.find((p) => p.alias === idp.alias);
       providers = providers.filter((p) => p.alias !== idp.alias);
-      const config = { ...existing?.config, ...idp.config };
-      if (!idp.config?.clientSecret && existing?.config?.clientSecret) config.clientSecret = existing.config.clientSecret;
-      providers.push({ ...existing, ...idp, config, enabled: idp.enabled ?? existing?.enabled ?? true });
+      const read = existing ? { ...existing, config: { ...existing.config,
+        ...(existing.config?.clientSecret ? { clientSecret: '**********' } : {}) } } : null;
+      const next = mergeSocialProvider(read, idp);
+      // Keycloak's PUT sentinel substitution keeps the actual stored secret.
+      if (existing && next.config.clientSecret === '**********') next.config.clientSecret = existing.config.clientSecret;
+      providers.push(next);
     },
     deleteIdentityProvider: async (r, alias) => {
       calls.push(['deleteIdentityProvider', r, alias]);
@@ -254,6 +261,8 @@ test('950: edits/toggles omit secret and never leak secret through reads, writes
       const context = ctx(identity, { kc, alias: 'google', body: { tenantId: GLOBEX, providerId: 'google', enabled: false, displayName: 'Edited', config } });
       const result = await HANDLERS.setSocialProvider(context);
       assert.equal(result.statusCode, 200);
+      assert.equal(kc.storedProvider('google').config.clientSecret, secret);
+      assert.equal(kc.storedProvider('google').enabled, false);
       const audit = auditEventForRoute({ localHandler: 'setSocialProvider', method: 'PUT', path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}' }, context, result);
       assert.equal(audit.actionType, 'tenant.social-provider.upsert');
       assert.equal(audit.tenantId, ACME);
@@ -261,6 +270,11 @@ test('950: edits/toggles omit secret and never leak secret through reads, writes
       assert.ok(!JSON.stringify([result, audit]).includes(secret));
     }
   }
+  const toggle = await HANDLERS.setSocialProvider(ctx(acmeOwner, { kc, alias: 'google', body: { providerId: 'google', enabled: true } }));
+  assert.equal(toggle.statusCode, 200);
+  assert.equal(kc.storedProvider('google').enabled, true);
+  assert.equal(kc.storedProvider('google').config.clientSecret, secret);
+  assert.ok(!JSON.stringify(toggle).includes(secret));
   const read = await HANDLERS.getAuthConfig(ctx(acmeOwner, { kc: fakeKc({ providers: [provider] }) }));
   assert.equal(read.body.identityProviders[0].clientSecretSet, true);
   assert.ok(!JSON.stringify(read).includes(secret));
@@ -273,4 +287,14 @@ test('950: edits/toggles omit secret and never leak secret through reads, writes
     assert.equal(audit.outcome, outcome);
     assert.ok(!JSON.stringify([result, audit]).includes(secret));
   }
+});
+
+test('950: adapter race validation returns VALIDATION_ERROR without exposing request secrets', async () => {
+  const secret = 'dummy-race-secret-950';
+  const kc = fakeKc({ providers: [{ alias: 'google', providerId: 'google' }] });
+  kc.upsertIdentityProvider = async () => { throw new SocialProviderValidationError(); };
+  const result = await HANDLERS.setSocialProvider(ctx(acmeOwner, { kc, alias: 'google', body: { providerId: 'google', config: { clientSecret: secret } } }));
+  assert.equal(result.statusCode, 400);
+  assert.equal(result.body.code, 'VALIDATION_ERROR');
+  assert.ok(!JSON.stringify(result).includes(secret));
 });

@@ -5,7 +5,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, normalizeKeycloakAttributes, safeKeycloakAdminMessage, TENANT_REALM_ROLES } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
-import { socialProviderView, validateSocialProvider } from './social-providers.mjs';
+import { socialProviderView, validateSocialProvider, SocialProviderValidationError } from './social-providers.mjs';
 import { AUTH_HANDLERS } from './auth-handlers.mjs';
 import { startSaga } from './saga.mjs';
 import { provisionWorkspaceDatabase, rotateWorkspaceDatabaseCredential, dropWorkspaceDatabase } from './dataplane.mjs';
@@ -1609,6 +1609,7 @@ async function setSocialProvider(ctx) {
     return ok(200, { tenantId: az.tenant.id, realm: az.realm, alias, providerId,
       identityProviders: (cfg.identityProviders ?? []).map((p) => socialProviderView(p, az.realm)) });
   } catch (e) {
+    if (e instanceof SocialProviderValidationError) return err(400, 'VALIDATION_ERROR', e.message);
     // Upstream failures can echo credential material, even in an ordinary Error.
     return err(statusFromError(e), 'SOCIAL_PROVIDER_WRITE_FAILED', KEYCLOAK_ADMIN_SAFE_MESSAGE);
   }

@@ -3,6 +3,16 @@ export const SOCIAL_PROVIDER_IDS = ['google', 'github', 'microsoft', 'gitlab', '
 const CONFIG_KEYS = new Set(['clientId', 'clientSecret', 'defaultScope']);
 export const isMaskedSecret = (value) => typeof value === 'string' && /^\*+$/.test(value);
 
+// The provider can change between the handler's read and the adapter's read.
+// Keep these validation failures distinct from upstream errors, without request data.
+export class SocialProviderValidationError extends Error {
+  constructor() {
+    super('Provider changed during update; refresh and check the template and required credentials');
+    this.code = 'SOCIAL_PROVIDER_VALIDATION_ERROR';
+    this.statusCode = 400;
+  }
+}
+
 export function validateSocialProvider(alias, body) {
   if (typeof alias !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(alias)) return 'Invalid identity-provider alias';
   if (!SOCIAL_PROVIDER_IDS.includes(body.providerId ?? alias)) return 'Unsupported social providerId';
@@ -18,7 +28,7 @@ export function validateSocialProvider(alias, body) {
 }
 
 export function socialProviderView(provider, realm, env = process.env) {
-  // KEYCLOAK_ISSUER is the existing control-plane public issuer setting. Never use
+  // KEYCLOAK_ISSUER supplies the public issuer when configured. Never use
   // the internal admin base as a public hostname or guess when the setting is absent.
   let base = null;
   try {
@@ -40,16 +50,11 @@ export function socialProviderView(provider, realm, env = process.env) {
 
 export function mergeSocialProvider(current, patch) {
   const config = { ...(current?.config ?? {}) };
-  // A masked read cannot be safely merged into a replacement config. Fail closed
-  // without a new secret: neither omission nor literal stars may wipe credentials.
-  if (isMaskedSecret(config.clientSecret)) {
-    if (!patch.config?.clientSecret || isMaskedSecret(patch.config.clientSecret)) {
-      const error = new Error('Cannot safely preserve a masked identity-provider secret');
-      error.code = 'MASKED_IDENTITY_PROVIDER_SECRET';
-      throw error;
-    }
-    delete config.clientSecret;
-  }
+  // Keycloak 26.1.0 masks admin GET secrets with SECRET_VALUE (**********).
+  // IdentityProviderResource substitutes the stored secret when PUT receives that
+  // unchanged mask. Preserve the read value; omission/empty input must not erase it.
+  // Request-supplied masks are rejected by validateSocialProvider, never accepted
+  // as replacement credentials. A real replacement overwrites the read value below.
   for (const [key, value] of Object.entries(patch.config ?? {})) {
     if (key === 'clientSecret' && (!value || isMaskedSecret(value))) continue;
     config[key] = value;

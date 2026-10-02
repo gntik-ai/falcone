@@ -1,4 +1,4 @@
-import { mergeSocialProvider, socialProviderView } from './social-providers.mjs';
+import { mergeSocialProvider, socialProviderView, SocialProviderValidationError } from './social-providers.mjs';
 
 // Keycloak admin client for the control-plane (domain B).
 //
@@ -294,19 +294,14 @@ export const kcAdmin = {
     try { current = (await kc('GET', `${path}/${encodeURIComponent(patch.alias)}`)).json; }
     catch (e) { if (e.kcStatus !== 404) throw e; }
     if (current && current.providerId !== patch.providerId) {
-      throw new KeycloakAdminError({ status: 400, statusCode: 400 });
+      throw new SocialProviderValidationError();
     }
     // Recheck creation requirements here as well, in case the provider was deleted
     // between the handler's read and this read. No incomplete provider is written.
     if (!current && (!patch.config?.clientId?.trim() || !patch.config?.clientSecret?.trim())) {
-      throw new KeycloakAdminError({ status: 400, statusCode: 400 });
+      throw new SocialProviderValidationError();
     }
-    let rep;
-    try { rep = mergeSocialProvider(current, patch); }
-    catch (error) {
-      if (error.code !== 'MASKED_IDENTITY_PROVIDER_SECRET') throw error;
-      throw new KeycloakAdminError({ status: 409, statusCode: 409 });
-    }
+    const rep = mergeSocialProvider(current, patch);
     if (current) await kc('PUT', `${path}/${encodeURIComponent(patch.alias)}`, rep);
     else await kc('POST', path, rep);
   },

@@ -67,6 +67,9 @@ Unknown templates/config keys or invalid aliases return `400 VALIDATION_ERROR` b
 I/O; creating without both credentials returns 400 with no Keycloak write. Existing callers
 sending other config keys must migrate to this narrower contract. Existing Keycloak config
 keys are retained when merging an edit.
+The console submits `displayName` and `defaultScope` even when empty: clearing an input
+explicitly clears that setting. The empty display name is stored as `''`; the console falls
+back to the alias for the visible label. Omitted fields preserve their existing values.
 
 The client secret is write-only: it stays in an uncontrolled password input, is cleared before
 awaiting the request, and is never placed in React state or browser storage. An empty edit
@@ -75,11 +78,14 @@ Reads and PUT responses expose only `clientSecretSet`, `clientId`, `defaultScope
 metadata, never the secret. Upstream social-provider error bodies are discarded, and audit
 records carry route, tenant and outcome metadata only (`tenant.social-provider.upsert`).
 
-If the direct Keycloak admin read returns a masked secret such as `**********`, an edit without
-a replacement fails closed with 409 and makes no write. This prevents either a mask or an
-omitted config entry from overwriting the stored credential. The deployed Keycloak version's
-masking behavior must be revalidated in staging before release; a mask must never be stored as
-a literal secret. Supplying a real replacement works even when the old read is masked.
+Keycloak 26.1.0 admin GET returns `clientSecret` masked as `**********`. An edit without a
+replacement retains that mask in the PUT config: Keycloak's IdentityProviderResource substitutes
+the actual stored credential before persisting it. The adapter's fake-Keycloak regression covers
+masked reads, edits and config-less toggles and asserts the mask never becomes the stored secret.
+Caller-supplied masks are rejected as invalid credentials. A real replacement overwrites the
+read mask. Staging must still verify preservation and login against the deployed version before
+release. A concurrent deletion or template change requiring new credentials returns
+`400 VALIDATION_ERROR` with no write, rather than a generic upstream failure.
 
 Each provider includes `callbackUrl`. It derives the public base (including any context path)
 from the existing control-plane `KEYCLOAK_ISSUER` setting and renders
@@ -87,6 +93,9 @@ from the existing control-plane `KEYCLOAK_ISSUER` setting and renders
 used. When the issuer is absent or invalid, the value is null and the console displays the
 path pattern for operator setup. A configured URL has a copy action. Deployment wiring, if
 needed, belongs in the deployment repository and must use existing values and secret gates.
+The deployment values wire the issuer only for the executor; the control-plane callback therefore
+remains null in those environments. Product confirmation of whether a configured public URL is
+required at release remains pending; the path pattern is the supported fallback.
 
 Deletion retains the existing shared `DestructiveConfirmationDialog` / `useDestructiveOp`
 confirmation, then calls DELETE and reloads the list. Enable/disable sends a PUT patch containing
