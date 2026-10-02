@@ -1,20 +1,6 @@
 name: scheduled-integration
 
 on:
-  pull_request:
-    paths:
-      - .github/workflows/integration.yml
-      - tests/e2e/stack.sh
-      - tests/blackbox/e2e-preserve-existing-namespace.test.mjs
-      - deploy/kind/apisix/apisix.yaml
-      - tests/e2e/deployment/mongo-gateway-bearer.test.mjs
-      - tests/e2e/helpers/prepare-mongo-gateway.mjs
-      - tests/blackbox/mongo-gateway-route.test.mjs
-      - tests/contracts/gateway-policy.contract.test.mjs
-      - tests/unit/gateway-policy.test.mjs
-      - tests/unit/control-plane-jwt-identity.test.mjs
-      - tests/unit/control-plane-jwt-verify.test.mjs
-      - scripts/lib/gateway-policy.mjs
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:

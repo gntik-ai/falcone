@@ -1,5 +1,13 @@
 ## ADDED Requirements
 
+### Requirement: Integration remains scheduled or manually dispatched
+
+Under operator addenda 14 and 15, `.github/workflows/integration.yml` SHALL have exactly `schedule` (cron `17 3 * * *`) and `workflow_dispatch` in its `on` block, as on main. The entire `pull_request` block, including its paths filter, SHALL be absent. All other workflow content, including chart pins, Mongo bearer steps and jobs, SHALL remain unchanged. Existing ESO namespace and Helm 3/4 handling in `tests/e2e/stack.sh` SHALL be retained.
+
+#### Scenario: Deferred full-stack proof
+
+The existing Plan-enforcement full-stack bring-up timeout SHALL NOT gate this ChangeSet. #1051 owns fixing the remaining timeout, re-enabling the integration PR trigger and proving the kind bearer CRUD, wrong-audience 401 and workspace-mismatch 403 round trip. That round-trip task SHALL remain unchecked until proved. Quality, unit, contract and chart release checks SHALL remain gates.
+
 ### Requirement: Mongo bearer traffic is gateway authenticated and workspace bound
 
 Bearer `/v1/mongo/*` traffic SHALL use route 2006 to reach the control plane executor. The gateway SHALL authenticate the token with signing keys from a configured Keycloak JWKS base, where the issuer is the configured issuer base followed by `/realms/` and a strictly validated realm name. The verifier SHALL never fetch an issuer outside that base, SHALL use a bounded cache, and SHALL reject malformed, expired, unsigned, invalid-signature, unknown-key, and foreign-issuer tokens with 401 before reaching an upstream. Failed JWKS fetches SHALL not evict successfully cached keys, and each gateway worker SHALL bound its JWKS fetch rate or concurrent fetches. Platform-realm tokens SHALL meet the existing configured audience rule. With `gateway.mongoBearer.enforceTenantAudience` true, tenant-realm tokens SHALL contain `gateway.mongoBearer.tenantAudience` (default `falcone-data-api`) in `aud`, as an exact string or array member. Gateway and executor SHALL reject missing/wrong `aud` with 401, including when `azp` equals the required audience. Enforcement with an empty or absent configured tenant audience SHALL fail closed by configuration/schema rejection or 401. Newly created tenant realms SHALL require no route configuration change.

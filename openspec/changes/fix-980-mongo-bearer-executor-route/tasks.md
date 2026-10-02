@@ -1,5 +1,29 @@
 # Source #980 handoff (2026-10-01)
 
+## Addenda 14/15 repair from assigned HEAD 01353c0a (2026-10-02)
+
+The assigned worktree started clean at `01353c0a14110579e51c22e8a2f6dce4ef7bb0aa` on `agent/falcone/980/5fcefe28-5a92-5e96-a3cd-6b1369cd20d6`. Its path and Git metadata match the supplied lease. The supplied implement-issue contract, OpenSpec and R2 policy bound this source-only continuation. The paired deployment checkout is clean at `74e073e156c710eea0e68ae5a9d6de8a31484810`; both existing chart pins already match it. All prior committed repairs are retained.
+
+- [x] Apply operator addenda 14 and 15: delete the entire integration `pull_request` block, including paths. Retain schedule `17 3 * * *` and `workflow_dispatch`; make no other workflow change.
+- [x] Update proposal and spec with the integration trigger contract and #1051 deferral. Keep the prior `tests/e2e/stack.sh` ESO namespace, Helm 3/4 and complete-render Temporal detection repairs.
+- [ ] Prove the kind bearer round trip (CRUD, wrong-audience 401, workspace B 403). Deferred to #1051, which also owns the remaining full-stack bring-up timeout and re-enabling the integration PR trigger.
+
+The reported Plan-enforcement CI failure times out during Temporal schema/frontend bring-up before the integration suites run. Per addenda 14/15 it is a known main failure, not a gate for #980; two causes were addressed in #1050, and the remaining timeout belongs to #1051. This handoff supersedes earlier historical statements below requiring Plan-enforcement or the kind round trip in this ChangeSet's PR CI. Quality, unit, contract and chart release checks remain mandatory; no job, test or supply-chain gate is weakened. The control-plane verifier `apps/control-plane/jwt-verify.mjs` retains its tenant behavior as an explicit follow-up. Prod Keycloak hosts remain an operator release gate.
+
+### Bounded validation for addenda 14/15
+
+- [x] PASS: `timeout 150s node --test --experimental-test-isolation=none tests/blackbox/e2e-preserve-existing-namespace.test.mjs` (53/53, 95 seconds). Rechecks Helm 3/4, ESO namespace ownership/readiness, fail-closed rendering and cleanup without a live cluster.
+- [x] PASS: parse `integration.yml` using Python YAML and assert exactly schedule/manual dispatch, cron `17 3 * * *`, and equality with the supplied main/base trigger block. Assert the whole file equals assigned HEAD with only the entire PR block removed. Both chart pins still equal the clean deployment head.
+- [x] PASS: `FALCONE_CHART_PATH=/srv/engineering/worktrees/falcone-charts/5fcefe28-5a92-5e96-a3cd-6b1369cd20d6/charts/in-falcone timeout 60s node --test --experimental-test-isolation=none tests/blackbox/mongo-gateway-route.test.mjs tests/unit/control-plane-jwt-verify.test.mjs tests/unit/tenant-data-api-audience.test.mjs tests/blackbox/tenant-realm-token-issuance.test.mjs tests/blackbox/kind-control-plane-multirealm-jwt.test.mjs tests/unit/sa-revocation-check.test.mjs` (71/71). Covers route/chart parity and pins, audience/issuer rejection, unchanged control-plane rules, and reconciliation dry-run/apply/reapply. Route `2006-key` is also byte-identical to base `3a7306f`.
+- [x] PASS: `bash -n tests/e2e/stack.sh` and `git diff --check`.
+- [ ] SKIPPED after setup import errors: `timeout 45s node --test --experimental-test-isolation=none tests/unit/tenant-provisioning-audience.test.mjs tests/unit/wf-con-002-tenant-provisioning.test.mjs tests/unit/gateway-policy.test.mjs tests/contracts/gateway-policy.contract.test.mjs`. Existing `kafkajs`, `cel-js` and `yaml` packages are absent; no assertions execute. Frozen-dependency PR CI must run these unchanged gates. No dependency manifest or lockfile update is needed.
+- [ ] SKIPPED: the matching `timeout 45s node --test --experimental-test-isolation=none tests/integration/plan-enforcement/suites/*.test.mjs` self-skips all thirteen suites because stack/endpoints/client environment are not configured (zero executed tests). Full-stack bring-up and the kind bearer proof remain deferred to #1051. No Kubernetes mutation was attempted.
+- [ ] SKIPPED: Lua tests require absent Lua/LuaJIT; deployment render/flow-audit/revision24 recovery suites require installed repository dependencies in the paired repository; image builds/scans require container images/network. These checks remain in PR CI/release gates as applicable; the source maker changes no deployment file or render baseline.
+
+Local evidence artifacts (ID is the filename under `/tmp`, SHA256): `falcone-980-addenda-auth.tap` = `a58ff2b72a0cb9a1d85bd7636cd15f83b166bb7a0a7a37723740d0cc93632b2d`; `falcone-980-addenda-e2e-harness.tap` = `89420abbda0cb1cee3aba610c0ef49f021531e5df699ddb3321e8cd02c252c26`; `falcone-980-addenda-dependencies.tap` = `ef76f1acc376f391c883a8701bc4b2c57caaf0dd7f1b7779aec6a0dd4290458a`; `falcone-980-addenda-plan-enforcement.tap` = `8de4b995289efe53dbff84f5aa8425dd33bbba338028096e52e85b4a2f1970a1`.
+
+No credentials were retrieved, no live Keycloak/Kubernetes action or network was used, and no deploy, merge or push was performed. This repair is recorded in one additional local source commit.
+
 ## Current CI repair from assigned HEAD 0b4916e4 (2026-10-02)
 
 The assigned source worktree started clean at `0b4916e425c839a1fe6c3b01baea1735ef1dc164` on `agent/falcone/980/5fcefe28-5a92-5e96-a3cd-6b1369cd20d6`; its path, branch and Git metadata match the supplied lease. The instruction bundle supplies the implement-issue contract, OpenSpec, acceptance criteria and R2 policy. The paired deployment checkout remains clean at final HEAD `74e073e156c710eea0e68ae5a9d6de8a31484810`; both workflow pins already equal that head. Earlier attempt records below are historical.
