@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -197,15 +198,16 @@ describe('tenant social provider management (#950)', () => {
   afterEach(cleanup)
 
   it('creates from a template and clears the write-only input before the response', async () => {
+    const secret = randomUUID()
     render(<ConsoleAuthConfigPage />)
     await userEvent.click(await screen.findByRole('button', { name: 'Crear proveedor' }))
     const dialog = screen.getByRole('dialog')
     await userEvent.selectOptions(within(dialog).getByLabelText('Plantilla'), 'github')
     await userEvent.type(within(dialog).getByLabelText('Client ID'), 'test-id')
-    await userEvent.type(within(dialog).getByLabelText('Client secret'), 'dummy-secret-950')
+    await userEvent.type(within(dialog).getByLabelText('Client secret'), secret)
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar proveedor' }))
-    await waitFor(() => expect(authConfigApi.upsertTenantIdentityProvider).toHaveBeenCalledWith('ten_1', 'github', expect.objectContaining({ providerId: 'github', config: expect.objectContaining({ clientId: 'test-id', clientSecret: 'dummy-secret-950' }) })))
-    expect(screen.queryByDisplayValue('dummy-secret-950')).not.toBeInTheDocument()
+    await waitFor(() => expect(authConfigApi.upsertTenantIdentityProvider).toHaveBeenCalledWith('ten_1', 'github', expect.objectContaining({ providerId: 'github', config: expect.objectContaining({ clientId: 'test-id', clientSecret: secret }) })))
+    expect(screen.queryByDisplayValue(secret)).not.toBeInTheDocument()
   })
 
   it('edit starts with an empty secret and omits it when saving other fields', async () => {
@@ -247,11 +249,12 @@ describe('tenant social provider management (#950)', () => {
   })
 
   it('provides recovery instructions for a toggle conflict without echoing the error', async () => {
-    authConfigApi.upsertTenantIdentityProvider.mockRejectedValueOnce(apiError(409, 'dummy-secret-from-upstream'))
+    const secret = randomUUID()
+    authConfigApi.upsertTenantIdentityProvider.mockRejectedValueOnce(apiError(409, secret))
     render(<ConsoleAuthConfigPage />)
     await userEvent.click(await screen.findByRole('button', { name: /deshabilitar proveedor/i }))
     expect(await screen.findByText(/recarga la lista o edita el proveedor y vuelve a introducir el secreto/i)).toBeInTheDocument()
-    expect(screen.queryByText(/dummy-secret-from-upstream/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(secret)).not.toBeInTheDocument()
   })
 
   it.each(['tenant_viewer', 'tenant_developer', 'workspace_admin', 'platform_operator'])('hides management controls for %s', async (role) => {

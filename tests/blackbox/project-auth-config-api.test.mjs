@@ -30,6 +30,7 @@
  * bbx-568-07: createRealm applies the template's required client scopes
  *             (TENANT_REALM_SCOPES) — they are no longer missing
  */
+import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -252,7 +253,7 @@ test('950: PUT/DELETE role matrix denies with zero Keycloak calls', async () => 
 });
 
 test('950: edits/toggles omit secret and never leak secret through reads, writes, errors or audit', async () => {
-  const secret = 'dummy-social-secret-950';
+  const secret = randomUUID();
   const provider = { alias: 'google', providerId: 'google', enabled: true,
     config: { clientId: 'test', clientSecret: secret } };
   const kc = fakeKc({ providers: [provider] });
@@ -290,7 +291,7 @@ test('950: edits/toggles omit secret and never leak secret through reads, writes
 });
 
 test('950: adapter race validation returns VALIDATION_ERROR without exposing request secrets', async () => {
-  const secret = 'dummy-race-secret-950';
+  const secret = randomUUID();
   const kc = fakeKc({ providers: [{ alias: 'google', providerId: 'google' }] });
   kc.upsertIdentityProvider = async () => { throw new SocialProviderValidationError(); };
   const result = await HANDLERS.setSocialProvider(ctx(acmeOwner, { kc, alias: 'google', body: { providerId: 'google', config: { clientSecret: secret } } }));
