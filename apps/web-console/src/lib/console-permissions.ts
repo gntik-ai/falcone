@@ -22,6 +22,7 @@ import { readConsoleShellSession } from '@/lib/console-session'
 // UI value (the console never renders per-leaf-action controls); each `PermissionAction` below maps
 // to one or more leaf actions in the model (see the comment above each entry in `ACTION_ALLOWED_ROLES`).
 export type PermissionAction =
+  | 'tenant.auth-config.manage'
   | 'tenant.create'
   | 'tenant.workspaces.create'
   | 'tenant.members.manage'
@@ -118,6 +119,7 @@ export const STRUCTURAL_WRITE_ADMIN_ROLES = new Set([
 // Per-action allow-lists beyond the platform bypass. Each maps to leaf actions in
 // authorization-model.json's `permission_matrix.tenant`:
 const ACTION_ALLOWED_ROLES: Record<PermissionAction, Set<string>> = {
+  'tenant.auth-config.manage': new Set(['superadmin', 'tenant_owner', 'tenant_admin']),
   // No tenant-tier role can create a NEW tenant (that is a platform-tier action, absent from
   // `permission_matrix.tenant` entirely) — only the platform bypass applies.
   'tenant.create': new Set(),
@@ -174,6 +176,8 @@ function resolveHighestRole(roles: readonly string[]): RoleCatalogEntry | null {
 }
 
 function isActionAllowed(roles: readonly string[], action: PermissionAction): boolean {
+  // Realm configuration has a narrower server gate than platform/workspace writes.
+  if (action === 'tenant.auth-config.manage') return roles.some((role) => ACTION_ALLOWED_ROLES[action].has(role))
   if (roles.some((role) => PLATFORM_BYPASS_ROLES.has(role))) {
     return true
   }

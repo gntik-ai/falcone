@@ -26,6 +26,10 @@ export interface TenantIdentityProvider {
   providerId: string
   enabled: boolean
   displayName: string | null
+  clientId: string | null
+  defaultScope: string | null
+  clientSecretSet: boolean
+  callbackUrl: string | null
 }
 
 // GET/PUT response shape (`b-handlers.mjs::getAuthConfig`/`setAuthConfig` spread
@@ -72,9 +76,30 @@ export function updateTenantAuthConfig(
   })
 }
 
-// DELETE …/auth-config/identity-providers/{alias} — remove a configured social identity provider.
-// (Create/update of a provider is intentionally NOT exposed by the console yet — see the
-// `add-console-auth-config-management` OpenSpec change's design notes for the deferred follow-up.)
+export const SOCIAL_PROVIDER_TEMPLATES = [
+  { id: 'google', label: 'Google' },
+  { id: 'github', label: 'GitHub' },
+  { id: 'microsoft', label: 'Microsoft' },
+  { id: 'gitlab', label: 'GitLab' },
+  { id: 'facebook', label: 'Facebook' },
+  { id: 'linkedin-openid-connect', label: 'LinkedIn' }
+] as const
+
+export interface TenantIdentityProviderPatch {
+  providerId: string
+  enabled?: boolean
+  displayName?: string
+  config?: { clientId?: string; clientSecret?: string; defaultScope?: string }
+}
+
+// The secret is a write-only request field. Responses contain presence evidence only.
+export function upsertTenantIdentityProvider(tenantId: string, alias: string, patch: TenantIdentityProviderPatch): Promise<{ identityProviders: TenantIdentityProvider[] }> {
+  return requestConsoleSessionJson(identityProviderPath(tenantId, alias), {
+    method: 'PUT', body: patch as unknown as JsonValue
+  })
+}
+
+// DELETE …/auth-config/identity-providers/{alias} — guarded by the console confirmation dialog.
 export function deleteTenantIdentityProvider(tenantId: string, alias: string): Promise<unknown> {
   return requestConsoleSessionJson<unknown>(identityProviderPath(tenantId, alias), {
     method: 'DELETE'

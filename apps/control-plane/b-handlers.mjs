@@ -3,8 +3,9 @@
 // (workflows/wf-con-002.mjs). Each handler: async (ctx) => { statusCode, body }
 // where ctx = { params, query, body, identity, pool, callerContext }.
 import { createHash, randomUUID } from 'node:crypto';
-import { kcAdmin, normalizeKeycloakAttributes, safeKeycloakAdminMessage, TENANT_REALM_ROLES } from './kc-admin.mjs';
+import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, normalizeKeycloakAttributes, safeKeycloakAdminMessage, TENANT_REALM_ROLES } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
+import { socialProviderView, validateSocialProvider } from './social-providers.mjs';
 import { AUTH_HANDLERS } from './auth-handlers.mjs';
 import { startSaga } from './saga.mjs';
 import { provisionWorkspaceDatabase, rotateWorkspaceDatabaseCredential, dropWorkspaceDatabase } from './dataplane.mjs';
@@ -1557,6 +1558,7 @@ async function getAuthConfig(ctx) {
   if (az.error) return az.error;
   try {
     const cfg = await kc.getRealmAuthConfig(az.realm);
+    cfg.identityProviders = (cfg.identityProviders ?? []).map((p) => socialProviderView(p, az.realm));
     return ok(200, { tenantId: az.tenant.id, realm: az.realm, ...cfg });
   } catch (e) {
     return kcBackedErr(e, 'AUTH_CONFIG_READ_FAILED');
@@ -1575,6 +1577,7 @@ async function setAuthConfig(ctx) {
   try {
     await kc.setRealmAuthConfig(az.realm, patch);
     const cfg = await kc.getRealmAuthConfig(az.realm);
+    cfg.identityProviders = (cfg.identityProviders ?? []).map((p) => socialProviderView(p, az.realm));
     return ok(200, { tenantId: az.tenant.id, realm: az.realm, ...cfg });
   } catch (e) {
     return kcBackedErr(e, 'AUTH_CONFIG_WRITE_FAILED');
@@ -1588,16 +1591,26 @@ async function setSocialProvider(ctx) {
   const alias = ctx.params.alias;
   const body = ctx.body ?? {};
   const providerId = body.providerId ?? alias;
-  if (!alias) return err(400, 'VALIDATION_ERROR', 'identity-provider alias is required');
-  if (!providerId) return err(400, 'VALIDATION_ERROR', 'providerId is required');
+  const validation = validateSocialProvider(alias, body);
+  if (validation) return err(400, 'VALIDATION_ERROR', validation);
   try {
+    const current = await kc.getRealmAuthConfig(az.realm);
+    const existing = current.identityProviders?.find((p) => p.alias === alias);
+    if (!existing && (!body.config?.clientId?.trim() || !body.config?.clientSecret?.trim())) {
+      return err(400, 'VALIDATION_ERROR', 'Creating a provider requires clientId and clientSecret');
+    }
+    if (existing && existing.providerId !== providerId) {
+      return err(400, 'VALIDATION_ERROR', 'An existing provider template cannot be changed');
+    }
     await kc.upsertIdentityProvider(az.realm, {
-      alias, providerId, enabled: body.enabled !== false, displayName: body.displayName, config: body.config ?? {},
+      alias, providerId, enabled: body.enabled, displayName: body.displayName, config: body.config ?? {},
     });
     const cfg = await kc.getRealmAuthConfig(az.realm);
-    return ok(200, { tenantId: az.tenant.id, realm: az.realm, alias, providerId, identityProviders: cfg.identityProviders });
+    return ok(200, { tenantId: az.tenant.id, realm: az.realm, alias, providerId,
+      identityProviders: (cfg.identityProviders ?? []).map((p) => socialProviderView(p, az.realm)) });
   } catch (e) {
-    return kcBackedErr(e, 'SOCIAL_PROVIDER_WRITE_FAILED');
+    // Upstream failures can echo credential material, even in an ordinary Error.
+    return err(statusFromError(e), 'SOCIAL_PROVIDER_WRITE_FAILED', KEYCLOAK_ADMIN_SAFE_MESSAGE);
   }
 }
 // DELETE /v1/tenants/{tenantId}/auth-config/identity-providers/{alias} — remove a social IdP.

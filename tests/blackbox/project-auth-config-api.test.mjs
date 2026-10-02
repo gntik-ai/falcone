@@ -34,6 +34,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { LOCAL_HANDLERS as HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
+import { auditEventForRoute } from '../../apps/control-plane/audit-writer.mjs';
 import { kcAdmin, TENANT_REALM_SCOPES } from '../../apps/control-plane/kc-admin.mjs';
 
 const ACME = 'acme-11111111';
@@ -74,8 +75,11 @@ function fakeKc(initial = {}) {
     },
     upsertIdentityProvider: async (r, idp) => {
       calls.push(['upsertIdentityProvider', r, idp]);
+      const existing = providers.find((p) => p.alias === idp.alias);
       providers = providers.filter((p) => p.alias !== idp.alias);
-      providers.push({ alias: idp.alias, providerId: idp.providerId, enabled: idp.enabled !== false });
+      const config = { ...existing?.config, ...idp.config };
+      if (!idp.config?.clientSecret && existing?.config?.clientSecret) config.clientSecret = existing.config.clientSecret;
+      providers.push({ ...existing, ...idp, config, enabled: idp.enabled ?? existing?.enabled ?? true });
     },
     deleteIdentityProvider: async (r, alias) => {
       calls.push(['deleteIdentityProvider', r, alias]);
@@ -108,7 +112,9 @@ test('bbx-568-01: getAuthConfig reflects the realm login options (own tenant)', 
   assert.equal(res.body.realm, ACME_REALM);
   assert.equal(res.body.registrationAllowed, false);
   assert.equal(res.body.loginWithEmailAllowed, true);
-  assert.deepEqual(res.body.identityProviders, [{ alias: 'google', providerId: 'google', enabled: true }]);
+  assert.equal(res.body.identityProviders[0].alias, 'google');
+  assert.ok('callbackUrl' in res.body.identityProviders[0]);
+  assert.equal(res.body.identityProviders[0].clientSecretSet, false);
   assert.deepEqual(kc.calls, [['getRealmAuthConfig', ACME_REALM]]);
 });
 
@@ -136,7 +142,8 @@ test('bbx-568-03: setSocialProvider upserts a social IdP with provider creds', a
   assert.equal(upsert[2].providerId, 'github');
   assert.equal(upsert[2].config.clientId, 'abc');
   // and the read-back lists it
-  assert.ok(res.body.identityProviders.some((p) => p.alias === 'github'));
+  assert.ok(res.body.identityProviders.some((p) => p.alias === 'github' && p.clientSecretSet === true));
+  assert.ok(!JSON.stringify(res).includes('shh'));
 });
 
 test('bbx-568-04: deleteSocialProvider removes a social IdP', async () => {
@@ -195,5 +202,75 @@ test('bbx-568-07: createRealm applies the template required client scopes (no dr
   for (const s of TENANT_REALM_SCOPES) {
     assert.ok(ensured.includes(s), `scope ${s} not ensured`);
     assert.ok(defaulted.includes(`id-${s}`), `scope ${s} not set as realm default`);
+  }
+});
+
+
+test('950: invalid aliases, templates and config keys fail before any Keycloak call', async () => {
+  for (const [alias, body] of [
+    ['../google', { providerId: 'google' }],
+    ['google', { providerId: 'oidc' }],
+    ['google', { providerId: 'google', config: { issuer: 'https://untrusted.invalid' } }],
+    ['google', { config: { clientId: 42 } }],
+    ['google', { config: { clientSecret: '**********' } }],
+    ['google', { enabled: 'true' }],
+  ]) {
+    const kc = fakeKc();
+    const result = await HANDLERS.setSocialProvider(ctx(acmeOwner, { kc, alias, body }));
+    assert.equal(result.statusCode, 400);
+    assert.equal(result.body.code, 'VALIDATION_ERROR');
+    assert.deepEqual(kc.calls, []);
+  }
+});
+
+test('950: create requires both credentials with zero Keycloak writes', async () => {
+  for (const config of [{}, { clientId: 'test' }, { clientSecret: 'test' }, { clientId: 'test', clientSecret: '' }]) {
+    const kc = fakeKc();
+    const result = await HANDLERS.setSocialProvider(ctx(acmeOwner, { kc, alias: 'google', body: { config } }));
+    assert.equal(result.statusCode, 400);
+    assert.equal(result.body.code, 'VALIDATION_ERROR');
+    assert.ok(kc.calls.every(([op]) => op === 'getRealmAuthConfig'));
+  }
+});
+
+test('950: PUT/DELETE role matrix denies with zero Keycloak calls', async () => {
+  for (const actorType of ['tenant_developer', 'tenant_viewer', 'workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_viewer', 'platform_operator']) {
+    for (const fn of ['setSocialProvider', 'deleteSocialProvider']) {
+      const kc = fakeKc();
+      const result = await HANDLERS[fn](ctx({ actorType, tenantId: ACME }, { kc, alias: 'google', body: { config: { clientId: 'test', clientSecret: 'dummy' } } }));
+      assert.equal(result.statusCode, 403, `${actorType} ${fn}`);
+      assert.deepEqual(kc.calls, []);
+    }
+  }
+});
+
+test('950: edits/toggles omit secret and never leak secret through reads, writes, errors or audit', async () => {
+  const secret = 'dummy-social-secret-950';
+  const provider = { alias: 'google', providerId: 'google', enabled: true,
+    config: { clientId: 'test', clientSecret: secret } };
+  const kc = fakeKc({ providers: [provider] });
+  for (const identity of [acmeOwner, { ...acmeOwner, actorType: 'tenant_admin' }]) {
+    for (const config of [{ clientId: 'edited' }, { clientSecret: '' }, { clientSecret: secret }]) {
+      const context = ctx(identity, { kc, alias: 'google', body: { tenantId: GLOBEX, providerId: 'google', enabled: false, displayName: 'Edited', config } });
+      const result = await HANDLERS.setSocialProvider(context);
+      assert.equal(result.statusCode, 200);
+      const audit = auditEventForRoute({ localHandler: 'setSocialProvider', method: 'PUT', path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}' }, context, result);
+      assert.equal(audit.actionType, 'tenant.social-provider.upsert');
+      assert.equal(audit.tenantId, ACME);
+      assert.equal(audit.outcome, 'succeeded');
+      assert.ok(!JSON.stringify([result, audit]).includes(secret));
+    }
+  }
+  const read = await HANDLERS.getAuthConfig(ctx(acmeOwner, { kc: fakeKc({ providers: [provider] }) }));
+  assert.equal(read.body.identityProviders[0].clientSecretSet, true);
+  assert.ok(!JSON.stringify(read).includes(secret));
+  const write = await HANDLERS.setAuthConfig(ctx(acmeOwner, { kc: fakeKc({ providers: [provider] }), body: { rememberMe: false } }));
+  assert.ok(!JSON.stringify(write).includes(secret));
+  for (const [status, outcome] of [[400, 'failed'], [403, 'denied'], [502, 'error']]) {
+    const context = ctx(acmeOwner, { kc: { ...fakeKc(), upsertIdentityProvider: async () => { throw Object.assign(new Error(secret), { statusCode: status }); } }, alias: 'google', body: { config: { clientId: 'test', clientSecret: secret } } });
+    const result = await HANDLERS.setSocialProvider(context);
+    const audit = auditEventForRoute({ localHandler: 'setSocialProvider', method: 'PUT', path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}' }, context, result);
+    assert.equal(audit.outcome, outcome);
+    assert.ok(!JSON.stringify([result, audit]).includes(secret));
   }
 });

@@ -1,14 +1,7 @@
-// Tenant realm auth-config console surface (change: add-console-auth-config-management, #782).
-//
-// The backend (`GET`/`PUT /v1/tenants/{tenantId}/auth-config`) has been owner-authorized and
-// reconciled to Keycloak all along; this page is the first console surface that calls it. A tenant
-// owner/admin (or superadmin) can view the realm's login settings — registration, email login,
-// password reset, remember-me, email verification — toggle any of them, and Save (PUT only the
-// changed booleans, per the server's partial-patch contract). Configured social identity providers
-// are listed read-only, with a guarded delete (create/update of a provider is deferred — see the
-// OpenSpec change's design notes).
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { TenantSocialProviderDialog } from '@/components/console/TenantSocialProviderDialog'
+import { useConsolePermissions } from '@/lib/console-permissions'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
 import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'
@@ -25,6 +18,8 @@ import {
   deleteTenantIdentityProvider,
   getTenantAuthConfig,
   updateTenantAuthConfig,
+  upsertTenantIdentityProvider,
+  type TenantIdentityProvider,
   type TenantAuthConfig,
   type TenantAuthConfigBooleanKey,
   type TenantAuthConfigBooleanPatch
@@ -85,6 +80,10 @@ function draftFromConfig(config: TenantAuthConfig): BooleanDraft {
 
 export function ConsoleAuthConfigPage() {
   const { activeTenantId, activeTenant } = useConsoleContext()
+  const canManage = useConsolePermissions().can('tenant.auth-config.manage')
+  const [providerDialog, setProviderDialog] = useState<{ tenantId: string; provider: TenantIdentityProvider | null } | null>(null)
+  const currentTenantRef = useRef(activeTenantId)
+  currentTenantRef.current = activeTenantId
   const [state, setState] = useState<LoadState>(EMPTY_STATE)
   const [draft, setDraft] = useState<BooleanDraft | null>(null)
   const [saving, setSaving] = useState(false)
@@ -126,6 +125,7 @@ export function ConsoleAuthConfigPage() {
   }, [])
 
   useEffect(() => {
+    setProviderDialog(null)
     setState(EMPTY_STATE)
     setDraft(null)
     setSaveError(null)
@@ -162,7 +162,7 @@ export function ConsoleAuthConfigPage() {
   }
 
   async function handleSave() {
-    if (!activeTenantId || !state.data || !draft) return
+    if (!canManage || !activeTenantId || !state.data || !draft) return
 
     const patch: TenantAuthConfigBooleanPatch = {}
     for (const field of BOOLEAN_FIELDS) {
@@ -190,7 +190,7 @@ export function ConsoleAuthConfigPage() {
 
   function openDeleteIdentityProviderDialog(alias: string, displayName: string) {
     const tenantId = activeTenantId
-    if (!tenantId) return
+    if (!canManage || !tenantId) return
 
     destructiveOp.openDialog({
       level: DESTRUCTIVE_OP_LEVELS['delete-identity-provider'],
@@ -208,6 +208,37 @@ export function ConsoleAuthConfigPage() {
         void load(tenantId)
       }
     })
+  }
+
+  function providersSaved(tenantId: string, providers: TenantIdentityProvider[]) {
+    if (currentTenantRef.current !== tenantId) return
+    setState((current) => ({ ...current, data: current.data ? { ...current.data, identityProviders: providers } : null }))
+    setProviderDialog(null)
+    setSuccessNotice('Proveedor de identidad actualizado.')
+  }
+
+  async function toggleProvider(provider: TenantIdentityProvider) {
+    if (!canManage || !activeTenantId) return
+    const tenantId = activeTenantId
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const result = await upsertTenantIdentityProvider(tenantId, provider.alias, { providerId: provider.providerId, enabled: !provider.enabled })
+      providersSaved(tenantId, result.identityProviders)
+    } catch (error) {
+      if (currentTenantRef.current === tenantId) setSaveError(describeConsoleError(error, 'No se pudo actualizar el proveedor.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function copyCallback(url: string) {
+    try {
+      await navigator.clipboard.writeText(url)
+      setSuccessNotice('URL de callback copiada.')
+    } catch {
+      setSaveError('No se pudo copiar la URL. Selecciona y copia el texto manualmente.')
+    }
   }
 
   if (!activeTenantId) {
@@ -301,7 +332,7 @@ export function ConsoleAuthConfigPage() {
                         aria-describedby={helpId}
                         checked={draft[field.key]}
                         onChange={(event) => toggleField(field.key, event.target.checked)}
-                        disabled={saving}
+                        disabled={saving || !canManage}
                         className="mt-0.5"
                       />
                       <div className="space-y-1">
@@ -312,7 +343,7 @@ export function ConsoleAuthConfigPage() {
                   )
                 })}
               </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-1">
+              {canManage ? <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-1">
                 <Button type="button" onClick={() => void handleSave()} disabled={!isDirty || saving} aria-busy={saving}>
                   {saving ? 'Guardando…' : 'Guardar cambios'}
                 </Button>
@@ -324,7 +355,7 @@ export function ConsoleAuthConfigPage() {
                 {isDirty && !saving ? (
                   <span className="text-xs text-muted-foreground">Tienes cambios sin guardar.</span>
                 ) : null}
-              </div>
+              </div> : null}
             </CardContent>
           </Card>
 
@@ -332,9 +363,10 @@ export function ConsoleAuthConfigPage() {
             <CardHeader>
               <div>
                 <CardTitle>Proveedores de identidad</CardTitle>
-                <CardDescription>Proveedores sociales configurados para este realm (solo lectura).</CardDescription>
+                <CardDescription>{canManage ? 'Crea y administra los proveedores sociales de este realm.' : 'Proveedores sociales configurados para este realm (solo lectura).'}</CardDescription>
               </div>
               <Badge variant="outline">{state.data.identityProviders.length} configurado(s)</Badge>
+              {canManage ? <Button type="button" disabled={saving} onClick={() => setProviderDialog({ tenantId: activeTenantId, provider: null })}>Crear proveedor</Button> : null}
             </CardHeader>
             <CardContent>
               {state.data.identityProviders.length === 0 ? (
@@ -344,7 +376,7 @@ export function ConsoleAuthConfigPage() {
               ) : (
                 <ul className="divide-y divide-border/70 overflow-hidden rounded-2xl border border-border/70 bg-background/40">
                   {state.data.identityProviders.map((provider) => {
-                    const providerName = provider.displayName ?? provider.alias
+                    const providerName = provider.displayName || provider.alias
                     return (
                       <li
                         key={provider.alias}
@@ -357,13 +389,22 @@ export function ConsoleAuthConfigPage() {
                             <span aria-hidden="true" className="px-1.5 text-muted-foreground/60">·</span>
                             tipo <span className="font-mono text-foreground">{provider.providerId}</span>
                           </p>
+                          <p className="mt-2 text-xs text-muted-foreground">{provider.clientSecretSet ? 'Secreto configurado' : 'Sin secreto configurado'}</p>
+                          {provider.callbackUrl ? <div className="mt-2 space-y-1">
+                            <p className="text-xs">URL de callback: <code className="break-all">{provider.callbackUrl}</code></p>
+                            <Button type="button" size="sm" variant="outline" aria-label={`Copiar URL de callback de ${providerName}`} onClick={() => void copyCallback(provider.callbackUrl!)}>Copiar URL</Button>
+                          </div> : <p className="mt-2 text-xs text-muted-foreground">URL pública no configurada. Usa la base pública de Keycloak seguida de <code className="break-all">/realms/{encodeURIComponent(state.data!.realm)}/broker/{encodeURIComponent(provider.alias)}/endpoint</code>.</p>}
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           <Badge variant={provider.enabled ? 'secondary' : 'outline'}>
                             {provider.enabled ? 'Habilitado' : 'Deshabilitado'}
                           </Badge>
+                          {canManage ? <>
+                          <Button type="button" size="sm" variant="outline" disabled={saving} aria-label={`Editar proveedor de identidad ${providerName}`} onClick={() => setProviderDialog({ tenantId: activeTenantId, provider })}>Editar</Button>
+                          <Button type="button" size="sm" variant="outline" disabled={saving} aria-label={`${provider.enabled ? 'Deshabilitar' : 'Habilitar'} proveedor de identidad ${providerName}`} onClick={() => void toggleProvider(provider)}>{provider.enabled ? 'Deshabilitar' : 'Habilitar'}</Button>
                           <Button
                             type="button"
+                            disabled={saving}
                             variant="destructive"
                             size="sm"
                             aria-label={`Eliminar proveedor de identidad ${providerName}`}
@@ -371,6 +412,7 @@ export function ConsoleAuthConfigPage() {
                           >
                             Eliminar
                           </Button>
+                          </> : null}
                         </div>
                       </li>
                     )
@@ -380,6 +422,12 @@ export function ConsoleAuthConfigPage() {
             </CardContent>
           </Card>
         </>
+      ) : null}
+
+      {canManage && providerDialog && providerDialog.tenantId === activeTenantId && state.data ? (
+        <TenantSocialProviderDialog key={`${activeTenantId}:${providerDialog.provider?.alias ?? 'new'}`} tenantId={activeTenantId}
+          provider={providerDialog.provider} aliases={state.data.identityProviders.map((p) => p.alias)}
+          onClose={() => setProviderDialog(null)} onSaved={(providers) => providersSaved(activeTenantId, providers)} />
       ) : null}
 
       <DestructiveConfirmationDialog

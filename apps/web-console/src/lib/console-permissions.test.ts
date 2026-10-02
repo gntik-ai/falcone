@@ -167,3 +167,9 @@ describe('useConsolePermissions', () => {
     expect(useConsolePermissions().isReadOnly).toBe(true)
   })
 })
+
+
+it('auth-config management matches the narrow server gate rather than platform bypass', () => {
+  for (const role of ['superadmin', 'tenant_owner', 'tenant_admin']) expect(getConsolePermissions([role]).can('tenant.auth-config.manage')).toBe(true)
+  for (const role of ['tenant_viewer', 'tenant_developer', 'workspace_admin', 'workspace_owner', 'platform_admin', 'platform_operator']) expect(getConsolePermissions([role]).can('tenant.auth-config.manage')).toBe(false)
+})
