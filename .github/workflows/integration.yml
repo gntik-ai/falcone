@@ -114,6 +114,9 @@ jobs:
           # The pinned chart uses a release digest that is not present in kind.
           # This isolated run instead consumes the local tag loaded above.
           E2E_USE_LOCAL_CONTROL_PLANE_IMAGE: 'true'
+          # The shared kind profile expects pre-existing ESO/OpenBao namespaces.
+          # This fresh cluster needs the chart to create its auxiliary namespaces.
+          E2E_CREATE_AUXILIARY_NAMESPACES: 'true'
           E2E_FERRETDB: 'true'
           E2E_APISIX_STANDALONE_CONFIG_FILE: deploy/kind/apisix/apisix.yaml
           E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: ci-plan-enforcement-admin

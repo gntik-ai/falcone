@@ -29,6 +29,10 @@ printf '%s\t%s\n' "$command_name" "$*" >>"$BBX_COMMAND_LOG"
 case "$command_name" in
   kubectl)
     kubectl_args_lower="\${*,,}"
+    if [[ "$1" == "wait" && -n "\${BBX_FAIL_WAIT:-}" && "\${2:-}" == "$BBX_FAIL_WAIT" ]]; then
+      printf '%s\n' 'injected readiness failure' >&2
+      exit 1
+    fi
     case " $* " in
       *" config current-context "*) printf '%s\n' 'kind-falcone-bbx'; exit 0 ;;
       *" port-forward "*) trap 'exit 0' TERM INT; while sleep 1; do :; done ;;
@@ -229,7 +233,7 @@ case "$command_name" in
     fi
     if [[ " $* " == *" template "* ]]; then
       case "$BBX_SCENARIO" in
-        helm-temporal)
+        helm-temporal|helm-temporal-eso)
           printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-schema'
           ;;
         rendered-namespace-conflict)
@@ -544,6 +548,7 @@ test('E2E installs retain client-side apply with Helm 3 and Helm 4', async (t) =
             assert.match(installs[0].args, /^upgrade --install /)
             assert.equal(installs[0].args.includes('--no-hooks'), mode === 'temporal')
             assert.equal(installs[0].args.includes('--wait'), mode !== 'temporal')
+            assert.ok(!installs[0].args.includes('global.createNamespace=true'), 'ordinary E2E changed auxiliary namespace ownership')
           }
         } finally { invocation.cleanup() }
       })
@@ -558,6 +563,78 @@ test('E2E refuses a Helm apply when subcommand help cannot be inspected', () => 
     assert.match(invocation.output, /Could not inspect Helm's apply capability/)
     assert.equal(mutations(invocation).filter(({ command }) => command === 'helm').length, 0)
   } finally { invocation.cleanup() }
+})
+
+test('isolated CI renders auxiliary namespaces and preserves ESO gates in the phased install', () => {
+  const invocation = invokeHarness('helm-temporal-eso', {
+    E2E_NAMESPACE_MODE: 'ephemeral',
+    E2E_CREATE_AUXILIARY_NAMESPACES: 'true',
+    E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: 'bbx-admin',
+    E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: secretSentinel,
+    E2E_BOOTSTRAP_SUPERADMIN_PASSWORD: secretSentinel,
+  })
+  try {
+    assert.equal(invocation.result.status, 0, invocation.output)
+    const helmCalls = invocation.calls.filter(({ command, args }) => command === 'helm'
+      && /^(?:template|upgrade --install)\s/.test(args))
+    assert.ok(helmCalls.length > 1)
+    for (const { args } of helmCalls) {
+      assert.match(args, /(?:^|\s)--set global\.createNamespace=true(?:\s|$)/)
+    }
+    const indexOf = (command, pattern) => invocation.calls.findIndex((call) => call.command === command && pattern.test(call.args))
+    const install = indexOf('helm', /^upgrade --install /)
+    const preflight = indexOf('kubectl', /wait job\/eso-preflight /)
+    const webhook = indexOf('kubectl', /wait job\/eso-webhook-wait /)
+    const openbao = indexOf('kubectl', /wait job\/openbao-init /)
+    const store = indexOf('kubectl', /wait clustersecretstore\/openbao-backend /)
+    const secrets = indexOf('kubectl', /wait externalsecret --all /)
+    const bootstrap = indexOf('kubectl', /wait job\/falcone-in-falcone-bootstrap /)
+    assert.ok(preflight >= 0 && preflight < install, 'ESO ownership must be checked before installation')
+    assert.ok(install < webhook && webhook < openbao && openbao < store && store < secrets && secrets < bootstrap,
+      'ESO/OpenBao readiness must gate platform bootstrap')
+    for (const name of ['platform-postgresql', 'platform-documentdb', 'platform-kafka', 'platform-s3', 'platform-temporal', 'gateway-apisix', 'iam-keycloak']) {
+      assert.ok(helmCalls.some(({ args }) => args.includes(`-s charts/eso/templates/external-secrets/${name}.yaml`)), `${name} ExternalSecrets were skipped`)
+    }
+    assert.doesNotMatch(invocation.output, new RegExp(secretSentinel))
+  } finally { invocation.cleanup() }
+})
+
+test('auxiliary namespace opt-in cannot escape preserve-existing preflight', () => {
+  const invocation = invokeHarness('preserve-success', {
+    E2E_NAMESPACE_MODE: 'preserve-existing',
+    E2E_EXPECTED_NAMESPACE_UID: namespaceUid,
+    E2E_CREATE_AUXILIARY_NAMESPACES: 'true',
+  })
+  try {
+    assertRejectedBeforeMutation(invocation, 'auxiliary namespace opt-in in preserve-existing mode')
+  } finally { invocation.cleanup() }
+})
+
+test('phased CI fails closed when an ESO ownership or readiness gate fails', async (t) => {
+  for (const [failedWait, nextCommand, nextPattern] of [
+    ['job/eso-preflight', 'helm', /^upgrade --install /],
+    ['job/eso-webhook-wait', 'helm', /-s charts\/openbao\/templates\/openbao-init-job\.yaml/],
+    ['clustersecretstore/openbao-backend', 'helm', /-s charts\/eso\/templates\/external-secrets\//],
+    ['externalsecret', 'helm', /-s templates\/bootstrap-job\.yaml/],
+  ]) {
+    await t.test(failedWait, () => {
+      const invocation = invokeHarness('helm-temporal-eso', {
+        E2E_NAMESPACE_MODE: 'ephemeral',
+        E2E_CREATE_AUXILIARY_NAMESPACES: 'true',
+        E2E_BOOTSTRAP_KEYCLOAK_ADMIN_USERNAME: 'bbx-admin',
+        E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD: secretSentinel,
+        E2E_BOOTSTRAP_SUPERADMIN_PASSWORD: secretSentinel,
+        BBX_FAIL_WAIT: failedWait,
+      })
+      try {
+        assert.notEqual(invocation.result.status, 0, invocation.output)
+        assert.match(invocation.output, /injected readiness failure/)
+        assert.ok(!invocation.calls.some(({ command, args }) => command === nextCommand && nextPattern.test(args)),
+          `continued after ${failedWait} failed`)
+        assert.doesNotMatch(invocation.output, new RegExp(secretSentinel))
+      } finally { invocation.cleanup() }
+    })
+  }
 })
 
 // bbx-933-001 | fn-e2e-preserve-existing-namespace | OpenSpec #### Scenario: Existing namespace E2E execution is explicitly attested and non-destructive
