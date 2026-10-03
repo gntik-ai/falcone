@@ -112,7 +112,7 @@ test('rendered chart and kind route 2006 agree on upstream, auth, and policy',
       assert.ok(value, `${field} missing from kind route`);
       assert.equal(typeof verifier[field], 'string', `${field} missing from chart route`);
       if (field.endsWith('_url')) {
-        const normalizedPath = (url) => new URL(url).pathname.replace(/^\/auth\/?$/, '/').replace(/\/$/, '');
+        const normalizedPath = (url) => new URL(url).pathname.replace(/\/$/, '');
         assert.equal(normalizedPath(verifier[field]), normalizedPath(value[1]), field);
       } else {
         assert.equal(verifier[field], value[1], field);

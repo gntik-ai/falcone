@@ -492,14 +492,14 @@ Keycloak realm `in-falcone-platform` is provisioned (roles, client scopes,
   routes are loaded from a mounted `apisix.yaml` rather than pushed at runtime.
   All 22 chart routes are wired in `deploy/kind/apisix/apisix.yaml` (ConfigMap
   `falcone-apisix-standalone`, mounted via `apisix.extraVolumes` in
-  `values-kind.yaml`): `/` → web-console, `/auth/*` → Keycloak (with a
-  proxy-rewrite that strips `/auth` since KC 26 serves at root), `/control-plane/*`
+  `values-kind.yaml`): `/` → web-console, `/realms/*` → Keycloak (forwarded
+  unchanged since KC 26 serves at root), `/control-plane/*`
   + `/realtime/*` + `/v1/*` → control-plane, `/_native/keycloak/admin/*` → KC.
   **Gateway-enforced auth plugins were intentionally dropped** (`openid-connect`,
   `authz-keycloak`, `client-control`, `request-validation`, `limit-count`,
   `http-logger`) — they need secrets/endpoints/custom plugins that don't resolve
-  in this standalone profile and would break config load; only `cors` and the
-  `/auth` `proxy-rewrite` are kept. So `/v1/*` reaches the backend but the backend
+  in this standalone profile and would break config load; the identity route
+  needs no `proxy-rewrite`. So `/v1/*` reaches the backend but the backend
   is the **control-plane stub** (501). Re-apply after editing routes:
   `deploy/kind/apply-apisix-routes.sh`.
 - **Keycloak issuer behind the gateway**: the OIDC discovery served via the

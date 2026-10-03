@@ -27,7 +27,7 @@ const REQUIRED_CONTRACTS = [
 const REQUIRED_PUBLIC_SURFACES = ['api', 'console', 'identity', 'realtime'];
 const REQUIRED_ROUTE_PREFIXES = {
   control_plane: '/control-plane',
-  identity: '/auth',
+  identity: '/',
   realtime: '/realtime',
   console: '/'
 };

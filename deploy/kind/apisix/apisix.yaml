@@ -8,11 +8,8 @@ routes:
       nodes:
         "falcone-control-plane.falcone.svc.cluster.local:8080": 1
   - id: "1002"
-    uri: "/auth/*"
+    uri: "/realms/*"
     priority: 90
-    plugins:
-      proxy-rewrite:
-        regex_uri: ["^/auth/(.*)", "/$1"]
     upstream:
       type: roundrobin
       scheme: http

@@ -68,7 +68,7 @@ test('bootstrap contract keeps one-shot catalogs and upgrade reconciliation expl
   );
   assert.deepEqual(
     values.bootstrap.reconcile.apisix.routes.slice(0, 5).map((route) => route.uri),
-    ['/control-plane/*', '/auth/*', '/realtime/*', '/*', '/health']
+    ['/control-plane/*', '/realms/*', '/realtime/*', '/*', '/health']
   );
   assert.equal(values.bootstrap.oneShot.keycloak.clientScopes.some((scope) => scope.name === 'tenant-context'), true);
   assert.equal(values.bootstrap.oneShot.keycloak.clients.some((client) => client.clientId === 'in-falcone-gateway'), true);
