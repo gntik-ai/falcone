@@ -14,7 +14,7 @@ overrides:
   react-router: ^6.30.4
   minimatch@9>brace-expansion: ^2.1.6
   minimatch@10>brace-expansion: 5.0.11
-  ip-address: ^10.4.0
+  ip-address: ^10.7.2
   follow-redirects: ^1.16.0
   postcss: ^8.5.18
   vite: ^6.4.3
@@ -2849,8 +2849,8 @@ packages:
     resolution: {integrity: sha512-EdDDZu4A2OyIK7Lr/2zG+w5jmbuk1DVBnEwREQvBzspBJkCEbRa8GxU1lghYcaGJCnRWibjDXlq779X1/y5xwg==}
     engines: {node: '>=8'}
 
-  ip-address@10.4.0:
-    resolution: {integrity: sha512-oSK96Grm3aP6OrS263xVxbNDGVL7rzBtYdpGqlDG8iQdoenDoTs/nkki+DflYbAEE8Xl6o5YxhxlrKvI3nqKXQ==}
+  ip-address@10.7.2:
+    resolution: {integrity: sha512-7H/2gFSIitxc0hG3nOI1glS8QLo/EHBFFLk8vEUjXY/xu0AdL8jZ9U1IzO2PUm0d2D/ofQcAifb0g6OBkt8U7w==}
     engines: {node: '>= 12'}
 
   is-alphabetical@2.0.1:
@@ -7173,7 +7173,7 @@ snapshots:
 
   indent-string@4.0.0: {}
 
-  ip-address@10.4.0:
+  ip-address@10.7.2:
     optional: true
 
   is-alphabetical@2.0.1: {}
@@ -8135,7 +8135,7 @@ snapshots:
 
   socks@2.8.7:
     dependencies:
-      ip-address: 10.4.0
+      ip-address: 10.7.2
       smart-buffer: 4.2.0
     optional: true
 
