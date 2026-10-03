@@ -2845,10 +2845,16 @@ spec:
 
 ### 7.14 Routes (external exposure)
 
-Four Routes expose the platform. Replace `${APPS_DOMAIN}`. `edge` TLS terminates at the
+Six Routes expose the platform on four hosts. The identity host uses three allowlisted
+paths: `/realms`, `/resources` and `/js`. No identity Route matches `/`, `/admin` or
+`/admin/*`. Replace `${APPS_DOMAIN}`. `edge` TLS terminates at the
 router; switch to `reencrypt` if you also serve TLS inside the pods. The upstream chart
 adds a stray `kubernetes.io/ingress.class: nginx` annotation — **removed** here (it is an
 Ingress concept, ignored/harmful on Routes).
+
+When updating an existing plain-manifest install, remove the old `falcone-identity`
+Route before applying these three identity Routes. Keeping a Route with path `/`
+would still expose the admin console on the identity host.
 
 ```yaml
 apiVersion: route.openshift.io/v1
@@ -2882,13 +2888,41 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: falcone-identity
+  name: falcone-identity-realms
   namespace: falcone
   labels: { app.kubernetes.io/part-of: falcone }
   annotations: { haproxy.router.openshift.io/timeout: 30s }
 spec:
   host: iam.${APPS_DOMAIN}
-  path: /
+  path: /realms
+  to: { kind: Service, name: falcone-keycloak }
+  port: { targetPort: http }
+  tls: { termination: edge, insecureEdgeTerminationPolicy: Redirect }
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: falcone-identity-resources
+  namespace: falcone
+  labels: { app.kubernetes.io/part-of: falcone }
+  annotations: { haproxy.router.openshift.io/timeout: 30s }
+spec:
+  host: iam.${APPS_DOMAIN}
+  path: /resources
+  to: { kind: Service, name: falcone-keycloak }
+  port: { targetPort: http }
+  tls: { termination: edge, insecureEdgeTerminationPolicy: Redirect }
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: falcone-identity-js
+  namespace: falcone
+  labels: { app.kubernetes.io/part-of: falcone }
+  annotations: { haproxy.router.openshift.io/timeout: 30s }
+spec:
+  host: iam.${APPS_DOMAIN}
+  path: /js
   to: { kind: Service, name: falcone-keycloak }
   port: { targetPort: http }
   tls: { termination: edge, insecureEdgeTerminationPolicy: Redirect }
@@ -3577,7 +3611,7 @@ oc -n falcone exec sts/falcone-postgresql -- bash -lc 'pg_isready -U $POSTGRESQL
 oc -n falcone exec deploy/falcone-ferretdb -- /bin/sh -c 'wget -qO- http://localhost:8088/debug/readyz' || true
 oc -n falcone exec deploy/falcone-seaweedfs-s3 -- /bin/sh -c 'wget -qO- http://localhost:8333/status'
 
-# Keycloak realm present (via the identity Route):
+# Keycloak realm present (via the identity realms Route):
 curl -fsS https://iam.${APPS_DOMAIN}/realms/in-falcone-platform/.well-known/openid-configuration | head
 
 # Gateway routes pushed (control-plane reachable through APISIX):
@@ -3594,9 +3628,12 @@ curl -fsS http://localhost:9090/api/v1/targets | head
 
 **What "healthy" looks like:** every Deployment shows `AVAILABLE = desired`, every
 StatefulSet `READY = n/n`, the four init/seed Jobs and the bootstrap Job show
-`COMPLETIONS 1/1`, the four Routes resolve over HTTPS, and the OIDC discovery document
-returns. Reach the platform at `https://console.${APPS_DOMAIN}` (UI),
-`https://api.${APPS_DOMAIN}/control-plane` (API), `https://iam.${APPS_DOMAIN}` (IdP).
+`COMPLETIONS 1/1`, the six Routes serve their allowed paths over HTTPS, and the OIDC
+discovery document returns. Reach the platform at `https://console.${APPS_DOMAIN}` (UI),
+`https://api.${APPS_DOMAIN}/control-plane` (API),
+`https://iam.${APPS_DOMAIN}/realms/in-falcone-platform` (IdP issuer). The identity host's
+root and admin paths are not routed; admin access uses the gated APISIX native-admin
+passthrough.
 
 ---
 

@@ -15,7 +15,7 @@
 The current source allowlist contains one native route:
 
 ```text
-/_native/keycloak/admin/* -> /auth/admin/*
+/_native/keycloak/admin/* -> /admin/*
 ```
 
 It is an operator escape hatch for Keycloak administration, not a general reverse proxy. Adding a

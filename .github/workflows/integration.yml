@@ -11,8 +11,8 @@ permissions:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
-  # Publish this paired Keycloak root-path chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '85c4435c73fdb5e21ecc7f4392183fb86670f681'
+  # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
+  FALCONE_CHARTS_REF: '2801bd782c3e24cff70be7f0cd953bc6dd000fe0'
 
 jobs:
   plan-enforcement:
