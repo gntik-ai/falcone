@@ -38,6 +38,38 @@ test('deployment validation rejects a custom tenant audience until all provision
   assert.ok(violations.some((violation) => violation.includes('tenantAudience must remain falcone-data-api')));
 });
 
+test('deployment validation rejects legacy Keycloak route matches and rewrite targets', () => {
+  const values = structuredClone(readRootValues());
+  const routes = values.bootstrap.reconcile.apisix.routes;
+  const identity = routes.find((route) => route.name === 'identity');
+  const admin = routes.find((route) => route.name === 'native-keycloak-admin');
+  identity.uri = '/realms/*';
+  admin.plugins['proxy-rewrite'].regex_uri[1] = '/admin/$1';
+
+  const violations = () => collectDeploymentChartViolations(
+    readRootChart(), values, readDeploymentTopology(), readWrapperChart(), readDomainModel()
+  );
+  const legacyViolations = () => violations().filter((violation) => violation.includes('legacy Keycloak /auth prefix'));
+  assert.deepEqual(legacyViolations(), []);
+  assert.ok(!violations().some((violation) => violation.includes('route identity must use uri')));
+
+  identity.uri = '/auth/*';
+  assert.equal(legacyViolations().length, 1);
+  assert.ok(violations().includes('bootstrap APISIX route identity must use uri /realms/*.'));
+  identity.uri = '/realms/*';
+
+  identity.uris = ['/realms/*', '/auth/realms/*'];
+  assert.equal(legacyViolations().length, 1);
+  delete identity.uris;
+
+  admin.plugins['proxy-rewrite'].regex_uri[1] = '/auth/admin/$1';
+  assert.equal(legacyViolations().length, 1);
+  admin.plugins['proxy-rewrite'].regex_uri[1] = '/admin/$1';
+
+  admin.plugins['proxy-rewrite'].uri = '/auth/admin';
+  assert.equal(legacyViolations().length, 1);
+});
+
 test('deployment chart validation detects missing dependency aliases and values layers', () => {
   const brokenChart = structuredClone(readRootChart());
   brokenChart.dependencies = brokenChart.dependencies.filter((entry) => entry.alias !== 'ferretdb');

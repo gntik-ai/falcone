@@ -62,7 +62,7 @@ const REQUIRED_BOOTSTRAP_ONE_SHOT_RESOURCES = ['superadmin', 'platform_realm', '
 const REQUIRED_BOOTSTRAP_RECONCILE_RESOURCES = ['apisix_routes', 'bootstrap_payload_config'];
 const REQUIRED_APISIX_ROUTE_PREFIXES = {
   'control-plane': '/control-plane/*',
-  identity: '/auth/*',
+  identity: '/realms/*',
   realtime: '/realtime/*',
   console: '/*',
   health: '/health'
@@ -427,6 +427,19 @@ function collectBootstrapValueViolations(values, topology, domainModel, violatio
 
     if (!REQUIRED_COMPONENT_ALIASES.includes(route?.upstream?.component)) {
       violations.push(`bootstrap APISIX route ${route.name} references unknown upstream component ${String(route?.upstream?.component)}.`);
+    }
+
+    if (route?.upstream?.component === 'keycloak') {
+      const rewrite = route.plugins?.['proxy-rewrite'];
+      const paths = [
+        route.uri,
+        ...(route.uris ?? []),
+        rewrite?.uri,
+        ...(rewrite?.regex_uri ?? []).filter((_, index) => index % 2 === 1)
+      ];
+      if (paths.some((path) => /^\/auth(?:\/|$)/.test(path))) {
+        violations.push(`bootstrap APISIX route ${route.name} must not match or rewrite to the legacy Keycloak /auth prefix.`);
+      }
     }
   }
 
