@@ -25,7 +25,8 @@ RUN npm install --omit=dev --no-audit --no-fund \
 COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
      apps/control-plane/runtime-teardown-coordinator.mjs \
      apps/control-plane/jwt-verify.mjs apps/control-plane/sa-revocation.mjs \
-     apps/control-plane/kc-admin.mjs apps/control-plane/tenant-store.mjs \
+     apps/control-plane/kc-admin.mjs apps/control-plane/social-providers.mjs \
+     apps/control-plane/tenant-store.mjs \
      apps/control-plane/b-handlers.mjs apps/control-plane/auth-handlers.mjs \
      apps/control-plane/saga.mjs apps/control-plane/dataplane.mjs \
      apps/control-plane/schema-retry.mjs apps/control-plane/tenant-scope.mjs \
@@ -73,6 +74,7 @@ COPY packages/webhook-engine            /repo/packages/webhook-engine
 COPY packages/workspace-docs-service    /repo/packages/workspace-docs-service
 COPY apps/control-plane-executor                 /repo/apps/control-plane-executor
 COPY apps/control-plane/kc-admin.mjs              /repo/apps/control-plane/kc-admin.mjs
+COPY apps/control-plane/social-providers.mjs      /repo/apps/control-plane/social-providers.mjs
 COPY scripts/backfill-tenant-realm-audience.mjs    /repo/scripts/backfill-tenant-realm-audience.mjs
 
 # Source modules under apps/control-plane use repository-relative ../../packages imports.

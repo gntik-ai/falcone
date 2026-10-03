@@ -34,6 +34,7 @@ COPY apps/control-plane/audit-store.mjs /app/apps/control-plane/audit-store.mjs
 COPY apps/control-plane/audit-hash.mjs /app/apps/control-plane/audit-hash.mjs
 COPY apps/control-plane/runtime-cleanup-repository.mjs /app/apps/control-plane/runtime-cleanup-repository.mjs
 COPY apps/control-plane/kc-admin.mjs /app/apps/control-plane/kc-admin.mjs
+COPY apps/control-plane/social-providers.mjs /app/apps/control-plane/social-providers.mjs
 COPY scripts/backfill-tenant-realm-audience.mjs /app/scripts/backfill-tenant-realm-audience.mjs
 COPY packages/adapters/src /app/packages/adapters/src
 COPY packages/internal-contracts/src /app/packages/internal-contracts/src
