@@ -13,7 +13,8 @@ permissions:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
-  FALCONE_CHARTS_REF: '00bc9de332ac699c422cb90fb00b23b7943f1790'
+  # Publish this paired Keycloak root-path chart commit before source CI runs.
+  FALCONE_CHARTS_REF: '85c4435c73fdb5e21ecc7f4392183fb86670f681'
 
 jobs:
   quality:

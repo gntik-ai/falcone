@@ -492,16 +492,30 @@ Keycloak realm `in-falcone-platform` is provisioned (roles, client scopes,
   routes are loaded from a mounted `apisix.yaml` rather than pushed at runtime.
   All 22 chart routes are wired in `deploy/kind/apisix/apisix.yaml` (ConfigMap
   `falcone-apisix-standalone`, mounted via `apisix.extraVolumes` in
-  `values-kind.yaml`): `/` → web-console, `/auth/*` → Keycloak (with a
-  proxy-rewrite that strips `/auth` since KC 26 serves at root), `/control-plane/*`
+  `values-kind.yaml`): `/` → web-console, `/realms/*` → Keycloak (forwarded
+  unchanged since KC 26 serves at root), `/control-plane/*`
   + `/realtime/*` + `/v1/*` → control-plane, `/_native/keycloak/admin/*` → KC.
   **Gateway-enforced auth plugins were intentionally dropped** (`openid-connect`,
   `authz-keycloak`, `client-control`, `request-validation`, `limit-count`,
   `http-logger`) — they need secrets/endpoints/custom plugins that don't resolve
-  in this standalone profile and would break config load; only `cors` and the
-  `/auth` `proxy-rewrite` are kept. So `/v1/*` reaches the backend but the backend
+  in this standalone profile and would break config load; the identity route
+  needs no `proxy-rewrite`. So `/v1/*` reaches the backend but the backend
   is the **control-plane stub** (501). Re-apply after editing routes:
   `deploy/kind/apply-apisix-routes.sh`.
+  For issue #45, source CI and scheduled integration pin the paired
+  `falcone-charts` commit `85c4435c73fdb5e21ecc7f4392183fb86670f681`.
+  The control-plane must publish that chart commit before running source PR CI,
+  then deliver the chart change before the source change. If chart delivery
+  rewrites the commit SHA, update both workflow pins to the delivered commit
+  and rerun the chart/kind parity and deployment smoke contracts before source
+  delivery. This worktree does not establish that the chart commit is published
+  or merged.
+  Local repair verification passed all six Mongo gateway/parity contracts and
+  30 deployment chart, topology, smoke and social-provider tests. The latter
+  used a temporary sibling-checkout harness and the tooling's YAML 2.9.1 parser
+  because repository dependencies are absent in the sandbox. PR CI must rerun
+  those suites with the frozen lockfile dependencies. Image scans and live
+  public discovery/APISIX bearer checks remain with CI and the release gate.
 - **Keycloak issuer behind the gateway**: the OIDC discovery served via the
   gateway reports `issuer: http://…:9080/realms/…` (APISIX's in-pod port) rather
   than the browser URL, because `KC_HOSTNAME` is unset. Real browser login flows

@@ -41,7 +41,7 @@ test('deployment smoke scaffold keeps bootstrap create-only and reconcile inputs
     assert.equal(values.bootstrap.oneShot.governanceCatalog.plans.length >= 4, true);
     assert.deepEqual(
       values.bootstrap.reconcile.apisix.routes.slice(0, 5).map((route) => route.uri),
-      ['/control-plane/*', '/auth/*', '/realtime/*', '/*', '/health']
+      ['/control-plane/*', '/realms/*', '/realtime/*', '/*', '/health']
     );
     assert.equal(values.bootstrap.reconcile.apisix.routes.some((route) => route.name === 'public-api-platform'), true);
     assert.equal(values.gatewayPolicy.passthrough.mode, topology.environment_profiles.find((profile) => profile.id === environment).operational_profile.passthrough_mode);
