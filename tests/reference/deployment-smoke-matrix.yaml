@@ -11,7 +11,7 @@ shared_expectations:
     - Service
   route_prefixes:
     controlPlane: /control-plane
-    identity: /auth
+    identity: /
     realtime: /realtime
     console: /
   logical_resources:

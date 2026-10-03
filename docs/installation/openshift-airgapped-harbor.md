@@ -865,8 +865,8 @@ data:
   tlsMode: "clusterManaged"
   apiHostname: "api.${APPS_DOMAIN}"
   realtimeHostname: "realtime.${APPS_DOMAIN}"
-  oidcIssuerUrl: "https://iam.${APPS_DOMAIN}/auth/realms/in-falcone-platform"
-  oidcDiscoveryUrl: "https://iam.${APPS_DOMAIN}/auth/realms/in-falcone-platform/.well-known/openid-configuration"
+  oidcIssuerUrl: "https://iam.${APPS_DOMAIN}/realms/in-falcone-platform"
+  oidcDiscoveryUrl: "https://iam.${APPS_DOMAIN}/realms/in-falcone-platform/.well-known/openid-configuration"
   passthroughMode: "enabled"
   propagatedAuthHeaders: "X-Actor-Username,X-Workspace-Id,X-Plan-Id,X-Actor-Roles,X-Auth-Scopes,X-Auth-Subject,X-Tenant-Id"
   correlationHeader: "X-Correlation-Id"
@@ -900,15 +900,6 @@ data:
   limitsProfile: "relaxed"
 ---
 # ---- Keycloak ----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: falcone-keycloak-config
-  namespace: falcone
-  labels: { app.kubernetes.io/part-of: falcone, app.kubernetes.io/name: keycloak }
-data:
-  publicPath: "/auth"
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -2268,27 +2259,23 @@ spec:
             - { name: KC_PROXY_HEADERS, value: xforwarded }
             - { name: KC_HEALTH_ENABLED, value: "true" }
             - { name: KC_DB, value: postgres }
-            # [VERIFY] Keycloak serves under /auth (matches the gateway oidcIssuerUrl and
-            # the identity Route path). KC 26 default base path is "/", so this MUST be set
-            # for the /auth/realms/... URLs to resolve. Keep ALL KC URLs consistent with it.
-            - { name: KC_HTTP_RELATIVE_PATH, value: /auth }
-            - { name: KC_HOSTNAME, value: "https://iam.${APPS_DOMAIN}/auth" }
+            # Keycloak 26 serves at root; match the gateway issuer and identity Route.
+            - { name: KC_HOSTNAME, value: "https://iam.${APPS_DOMAIN}" }
             - { name: KC_DB_USERNAME, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_USERNAME } } }
             - { name: KC_DB_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
             - { name: JAVA_OPTS_KC_HEAP, value: "-Xms512m -Xmx1280m" }
           envFrom:
-            - configMapRef: { name: falcone-keycloak-config }
             - configMapRef: { name: in-falcone-keycloak-db }
             - secretRef: { name: in-falcone-identity-client }
           resources:
             requests: { cpu: 250m, memory: 1Gi }
             limits:   { cpu: "1", memory: 2Gi }
           startupProbe:
-            httpGet: { path: /auth/health/started, port: 9000 }
+            httpGet: { path: /health/started, port: 9000 }
             failureThreshold: 60
             periodSeconds: 5
           readinessProbe:
-            httpGet: { path: /auth/health/ready, port: 9000 }
+            httpGet: { path: /health/ready, port: 9000 }
             periodSeconds: 10
           securityContext:
             allowPrivilegeEscalation: false
@@ -2309,7 +2296,8 @@ spec:
 
 > **[VERIFY] Health port.** Keycloak 26 serves health on the **management interface
 > (port 9000)** when `KC_HEALTH_ENABLED=true` — the probes above target `9000` at the
-> `/auth` relative path. If your image exposes health on `8080`, adjust the probe port.
+> root paths `/health/started` and `/health/ready`. If your image exposes health on
+> `8080`, adjust the probe port.
 
 ### 7.7 Control‑plane (Product/Management API) — Deployment + Service
 
@@ -2356,8 +2344,8 @@ spec:
             - { name: PGUSER, value: falcone }
             - { name: PGDATABASE, value: in_falcone }
             - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-postgresql, key: POSTGRESQL_PASSWORD } } }
-            - { name: KEYCLOAK_JWKS_URL, value: "http://falcone-keycloak:8080/auth/realms/in-falcone-platform/protocol/openid-connect/certs" }
-            - { name: KEYCLOAK_BASE_URL, value: "http://falcone-keycloak:8080/auth" }
+            - { name: KEYCLOAK_JWKS_URL, value: "http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs" }
+            - { name: KEYCLOAK_BASE_URL, value: "http://falcone-keycloak:8080" }
             - { name: KEYCLOAK_ADMIN_USERNAME, valueFrom: { secretKeyRef: { name: in-falcone-keycloak-admin, key: username } } }
             - { name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: in-falcone-keycloak-admin, key: password } } }
             - { name: STORAGE_S3_ENDPOINT, value: "http://falcone-seaweedfs-s3:8333" }
@@ -2807,7 +2795,7 @@ spec:
             - /bin/bash
             - -ec
             - |
-              KC="http://falcone-keycloak.falcone.svc.cluster.local:8080/auth"
+              KC="http://falcone-keycloak.falcone.svc.cluster.local:8080"
               DEADLINE=$(( $(date +%s) + 600 ))
               until [ "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 3 "$KC/realms/master")" = "200" ]; do
                 [ "$(date +%s)" -ge "$DEADLINE" ] && { echo "keycloak not ready"; exit 1; }
@@ -2851,8 +2839,8 @@ spec:
 
 > **[VERIFY] bootstrap.sh DNS + KC path.** The bootstrap script (large ConfigMap) builds
 > internal URLs from `RELEASE_NAME`/`RELEASE_NAMESPACE`. Confirm it targets
-> `falcone-keycloak.falcone.svc:8080/auth` and `falcone-in-falcone-apisix-admin.falcone.svc:9180`
-> for this namespace and the `/auth` Keycloak relative path. If the script hard‑codes a
+> `falcone-keycloak.falcone.svc:8080` and `falcone-in-falcone-apisix-admin.falcone.svc:9180`
+> for this namespace and the Keycloak root path. If the script hard‑codes a
 > different namespace/path, regenerate it with matching values before applying.
 
 ### 7.14 Routes (external exposure)
@@ -2900,7 +2888,7 @@ metadata:
   annotations: { haproxy.router.openshift.io/timeout: 30s }
 spec:
   host: iam.${APPS_DOMAIN}
-  path: /auth
+  path: /
   to: { kind: Service, name: falcone-keycloak }
   port: { targetPort: http }
   tls: { termination: edge, insecureEdgeTerminationPolicy: Redirect }
@@ -3590,7 +3578,7 @@ oc -n falcone exec deploy/falcone-ferretdb -- /bin/sh -c 'wget -qO- http://local
 oc -n falcone exec deploy/falcone-seaweedfs-s3 -- /bin/sh -c 'wget -qO- http://localhost:8333/status'
 
 # Keycloak realm present (via the identity Route):
-curl -fsS https://iam.${APPS_DOMAIN}/auth/realms/in-falcone-platform/.well-known/openid-configuration | head
+curl -fsS https://iam.${APPS_DOMAIN}/realms/in-falcone-platform/.well-known/openid-configuration | head
 
 # Gateway routes pushed (control-plane reachable through APISIX):
 curl -fsS https://api.${APPS_DOMAIN}/control-plane/healthz || \
@@ -3608,7 +3596,7 @@ curl -fsS http://localhost:9090/api/v1/targets | head
 StatefulSet `READY = n/n`, the four init/seed Jobs and the bootstrap Job show
 `COMPLETIONS 1/1`, the four Routes resolve over HTTPS, and the OIDC discovery document
 returns. Reach the platform at `https://console.${APPS_DOMAIN}` (UI),
-`https://api.${APPS_DOMAIN}/control-plane` (API), `https://iam.${APPS_DOMAIN}/auth` (IdP).
+`https://api.${APPS_DOMAIN}/control-plane` (API), `https://iam.${APPS_DOMAIN}` (IdP).
 
 ---
 
@@ -3625,9 +3613,9 @@ returns. Reach the platform at `https://console.${APPS_DOMAIN}` (UI),
 | Build base image not found (BuildConfig) | `FROM` points at a public registry / base not mirrored | Mirror `node:22-alpine` and `node:22-slim` to Harbor and set the BuildConfig `strategy.dockerStrategy.from` to the Harbor path (Appendix B). |
 | `documentdb-init` fails `documentdb absent from pg_available_extensions` | Wrong/mismatched DocumentDB image mirrored | Mirror the **digest‑pinned** `ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0`. |
 | FerretDB CrashLoop / `logical decoding requires wal_level >= logical` | DocumentDB started without `wal_level=logical` | Ensure the `args` (command‑line `-c wal_level=logical`) in §7.2 are present (a `conf.d` GUC is ignored by this image). |
-| Keycloak 404 on `/auth/...` or OIDC issuer mismatch | `KC_HTTP_RELATIVE_PATH`/`KC_HOSTNAME` inconsistent with the Route + gateway config | Keep `/auth` consistent across Keycloak env, `in-falcone-gateway-config`, and the identity Route (§7.6 [VERIFY]). |
+| Keycloak discovery 404 or OIDC issuer mismatch | A legacy prefix or `KC_HOSTNAME` inconsistent with the Route + gateway config | Serve Keycloak at root without a relative path; keep `KC_HOSTNAME`, gateway issuer/discovery URLs and the identity Route consistent (§7.6). |
 | Kafka CrashLoop / quorum errors | Multi‑broker on one StatefulSet with shared config/PVC | Use the single‑node config in §7.4, or deploy Strimzi for HA. |
-| Bootstrap Job times out at `wait-for-keycloak` | Keycloak not serving, or wrong internal URL/path | Confirm `falcone-keycloak` Ready and the script targets `…:8080/auth`; check the bootstrap script's namespace/DNS (§7.13 [VERIFY]). |
+| Bootstrap Job times out at `wait-for-keycloak` | Keycloak not serving, or wrong internal URL/path | Confirm `falcone-keycloak` Ready and the script targets `…:8080`; check the bootstrap script's namespace/DNS (§7.13 [VERIFY]). |
 | SeaweedFS install hangs at the bucket Job | NetworkPolicy dropped the Job's traffic to master/filer | Ensure the §4.2 SeaweedFS policy admits `batch.kubernetes.io/job-name: falcone-seaweedfs-bucket`. |
 | Functions/MCP fail to deploy | OpenShift Serverless (Knative) absent | Install the Serverless Operator + `KnativeServing`, then retry the runtime-created workload. |
 | ImageStream trigger didn't roll out a Deployment | Deployments don't auto‑follow ImageStreams | Use direct Harbor image refs (default here), or add the `image.openshift.io/triggers` annotation (Appendix B). |
@@ -3751,8 +3739,8 @@ Repeat the ImageStream/BuildConfig per build‑from‑source image
 6. **Executor backend env** (`PG*/MONGO*/STORAGE_S3*/KAFKA_BROKERS`,
    `CONTROL_PLANE_UPSTREAM`) and the **control‑plane `/healthz`** probe path are marked
    `[VERIFY]` — confirm against your build before go‑live. *(§7.7, §7.8)*
-7. **Keycloak `/auth` consistency** across `KC_HTTP_RELATIVE_PATH`, `KC_HOSTNAME`, the
-   gateway config, the JWKS URLs and the identity Route. *(§7.6)*
+7. **Keycloak root-path consistency** across `KC_HOSTNAME`, the gateway config,
+   the JWKS URLs and the identity Route, without a relative path. *(§7.6)*
 8. **APISIX standalone‑vs‑Admin‑API** decision (this guide uses Admin‑API). *(§7.9)*
 9. **Kafka HA** — single‑node baseline here; use Strimzi or a per‑broker StatefulSet for
    production HA. *(§7.4)*

@@ -87,10 +87,12 @@ test('collectDeploymentTopologyViolations flags route-prefix drift and missing s
   const topology = readDeploymentTopology();
   const brokenTopology = structuredClone(topology);
   brokenTopology.public_surface.route_prefixes.control_plane = '/api';
+  brokenTopology.public_surface.route_prefixes.identity = '/auth';
   brokenTopology.exposure_matrix.kubernetes.loadBalancer_tls_mode = 'clusterManaged';
 
   const smokeMatrix = readDeploymentSmokeMatrix();
   const brokenSmokeMatrix = structuredClone(smokeMatrix);
+  brokenSmokeMatrix.shared_expectations.route_prefixes.identity = '/auth';
   brokenSmokeMatrix.smoke_scenarios = brokenSmokeMatrix.smoke_scenarios.filter(
     (scenario) => !(scenario.environment === 'prod' && scenario.platform === 'openshift')
   );
@@ -102,6 +104,8 @@ test('collectDeploymentTopologyViolations flags route-prefix drift and missing s
   );
 
   assert.ok(violations.some((violation) => violation.includes('route prefix control_plane')));
+  assert.ok(violations.includes('Deployment topology route prefix identity must be /.'));
+  assert.ok(violations.includes('Smoke matrix shared route prefix identity must equal /.'));
   assert.ok(violations.some((violation) => violation.includes('loadBalancer_tls_mode')));
   assert.ok(violations.some((violation) => violation.includes('must cover prod/openshift')));
 });

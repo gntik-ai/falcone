@@ -71,7 +71,7 @@
     "root_domain": "in-falcone.example.com",
     "route_prefixes": {
       "control_plane": "/control-plane",
-      "identity": "/auth",
+      "identity": "/",
       "realtime": "/realtime",
       "console": "/"
     },

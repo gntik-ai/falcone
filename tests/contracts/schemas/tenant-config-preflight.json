@@ -65,7 +65,7 @@
     "securitySchemes": {
       "keycloak": {
         "type": "openIdConnect",
-        "openIdConnectUrl": "/auth/realms/platform/.well-known/openid-configuration",
+        "openIdConnectUrl": "/realms/platform/.well-known/openid-configuration",
         "description": "Keycloak JWT with scope platform:admin:config:reprovision"
       }
     },

@@ -27,14 +27,16 @@ test('masked admin reads retain the Keycloak preservation sentinel unless replac
 });
 
 test('provider projection exposes presence, safe config and configured callback only', () => {
-  for (const clientSecret of [secret, '**********']) {
-    const view = socialProviderView({ ...current, config: { ...current.config, clientSecret } }, 'realm name', { KEYCLOAK_ISSUER: 'https://id.example/auth/realms/platform' });
-    assert.equal(view.clientSecretSet, true);
-    assert.equal(view.clientId, 'old-id');
-    assert.equal(view.callbackUrl, 'https://id.example/auth/realms/realm%20name/broker/google/endpoint');
-    assert.equal('config' in view, false);
-    assert.equal('clientSecret' in view, false);
-    assert.ok(!JSON.stringify(view).includes(clientSecret));
+  for (const baseUrl of ['https://id.example', 'https://id.example/auth']) {
+    for (const clientSecret of [secret, '**********']) {
+      const view = socialProviderView({ ...current, config: { ...current.config, clientSecret } }, 'realm name', { KEYCLOAK_ISSUER: `${baseUrl}/realms/platform` });
+      assert.equal(view.clientSecretSet, true);
+      assert.equal(view.clientId, 'old-id');
+      assert.equal(view.callbackUrl, `${baseUrl}/realms/realm%20name/broker/google/endpoint`);
+      assert.equal('config' in view, false);
+      assert.equal('clientSecret' in view, false);
+      assert.ok(!JSON.stringify(view).includes(clientSecret));
+    }
   }
   for (const env of [{}, { KEYCLOAK_ISSUER: 'not-a-url' }, { KEYCLOAK_ISSUER: 'http://user:password@id.example/realms/platform' }]) {
     assert.equal(socialProviderView(current, 'tenant', env).callbackUrl, null);
