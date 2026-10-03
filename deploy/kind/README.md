@@ -502,20 +502,6 @@ Keycloak realm `in-falcone-platform` is provisioned (roles, client scopes,
   needs no `proxy-rewrite`. So `/v1/*` reaches the backend but the backend
   is the **control-plane stub** (501). Re-apply after editing routes:
   `deploy/kind/apply-apisix-routes.sh`.
-  For issue #45, source CI and scheduled integration pin the paired
-  `falcone-charts` commit `85c4435c73fdb5e21ecc7f4392183fb86670f681`.
-  The control-plane must publish that chart commit before running source PR CI,
-  then deliver the chart change before the source change. If chart delivery
-  rewrites the commit SHA, update both workflow pins to the delivered commit
-  and rerun the chart/kind parity and deployment smoke contracts before source
-  delivery. This worktree does not establish that the chart commit is published
-  or merged.
-  Local repair verification passed all six Mongo gateway/parity contracts and
-  30 deployment chart, topology, smoke and social-provider tests. The latter
-  used a temporary sibling-checkout harness and the tooling's YAML 2.9.1 parser
-  because repository dependencies are absent in the sandbox. PR CI must rerun
-  those suites with the frozen lockfile dependencies. Image scans and live
-  public discovery/APISIX bearer checks remain with CI and the release gate.
 - **Keycloak issuer behind the gateway**: the OIDC discovery served via the
   gateway reports `issuer: http://…:9080/realms/…` (APISIX's in-pod port) rather
   than the browser URL, because `KC_HOSTNAME` is unset. Real browser login flows
