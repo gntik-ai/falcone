@@ -29,6 +29,59 @@ test('deployment chart stays internally consistent with packaging guidance', () 
   assert.deepEqual(violations, []);
 });
 
+test('deployment validation accepts supported Temporal UI exposure configurations', () => {
+  for (const [enabled, disableWriteActions, networkPolicyEnabled] of [
+    [true, true, true],
+    [false, true, true],
+    [true, false, true],
+    [true, true, false],
+    [false, false, false]
+  ]) {
+    const values = structuredClone(readRootValues());
+    values.temporal.ui.enabled = enabled;
+    values.temporal.ui.disableWriteActions = disableWriteActions;
+    values.temporal.networkPolicy.enabled = networkPolicyEnabled;
+
+    assert.deepEqual(collectDeploymentChartViolations(
+      readRootChart(), values, readDeploymentTopology(), readWrapperChart(), readDomainModel()
+    ), []);
+  }
+});
+
+test('deployment validation rejects malformed Temporal UI blocks and non-boolean exposure settings', () => {
+  for (const ui of [undefined, null, 'yes', false, []]) {
+    const values = structuredClone(readRootValues());
+    values.temporal.ui = ui;
+    const violations = collectDeploymentChartViolations(
+      readRootChart(), values, readDeploymentTopology(), readWrapperChart(), readDomainModel()
+    );
+    assert.ok(violations.includes('temporal.ui must be an object with boolean enabled and disableWriteActions settings.'));
+  }
+
+  for (const [block, key] of [['ui', 'enabled'], ['ui', 'disableWriteActions'], ['networkPolicy', 'enabled']]) {
+    for (const invalid of [undefined, null, 'yes', 'false', 0, 1, {}, []]) {
+      const values = structuredClone(readRootValues());
+      values.temporal[block][key] = invalid;
+      const violations = collectDeploymentChartViolations(
+        readRootChart(), values, readDeploymentTopology(), readWrapperChart(), readDomainModel()
+      );
+      assert.ok(violations.includes(`temporal.${block}.${key} must be a boolean (true or false).`));
+    }
+  }
+});
+
+test('deployment validation rejects write-enabled Temporal UI without NetworkPolicy protection', () => {
+  const values = structuredClone(readRootValues());
+  values.temporal.ui.enabled = true;
+  values.temporal.ui.disableWriteActions = false;
+  values.temporal.networkPolicy.enabled = false;
+
+  const violations = collectDeploymentChartViolations(
+    readRootChart(), values, readDeploymentTopology(), readWrapperChart(), readDomainModel()
+  );
+  assert.ok(violations.includes('Temporal UI write actions require the UI to be NetworkPolicy-restricted: set temporal.networkPolicy.enabled=true or temporal.ui.disableWriteActions=true.'));
+});
+
 test('deployment validation rejects a custom tenant audience until all provisioners and kind routes are wired', () => {
   const values = structuredClone(readRootValues());
   values.gateway.mongoBearer.tenantAudience = 'custom-data-api';

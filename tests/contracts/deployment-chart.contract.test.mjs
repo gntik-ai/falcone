@@ -46,6 +46,15 @@ test('deployment contract carries profile, exposure, and upgrade defaults', () =
   assert.deepEqual(values.deployment.upgrade.supportedPreviousVersions, ['0.2.0', '0.3.0', '0.3.1']);
 });
 
+test('Temporal UI defaults to read-only operator access with no allowed ingress peers', () => {
+  const values = readRootValues();
+
+  assert.equal(values.temporal.ui.enabled, true);
+  assert.equal(values.temporal.ui.disableWriteActions, true);
+  assert.equal(values.temporal.networkPolicy.enabled, true);
+  assert.deepEqual(values.temporal.ui.networkPolicy.allowedFrom, []);
+});
+
 test('bootstrap contract keeps one-shot catalogs and upgrade reconciliation explicit', () => {
   const values = readRootValues();
   const topology = readDeploymentTopology();

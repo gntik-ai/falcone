@@ -600,8 +600,27 @@ export function collectDeploymentChartViolations(
     violations.push('controlPlane.functionExecutor.enabled must not be present; function executor RBAC is core.');
   }
 
-  if (values?.temporal?.ui && Object.prototype.hasOwnProperty.call(values.temporal.ui, 'enabled')) {
-    violations.push('temporal.ui.enabled must not be present; Temporal web is core.');
+  const temporalUI = values?.temporal?.ui;
+  if (!temporalUI || typeof temporalUI !== 'object' || Array.isArray(temporalUI)) {
+    violations.push('temporal.ui must be an object with boolean enabled and disableWriteActions settings.');
+  } else {
+    for (const key of ['enabled', 'disableWriteActions']) {
+      if (typeof temporalUI[key] !== 'boolean') {
+        violations.push(`temporal.ui.${key} must be a boolean (true or false).`);
+      }
+    }
+  }
+
+  if (typeof values?.temporal?.networkPolicy?.enabled !== 'boolean') {
+    violations.push('temporal.networkPolicy.enabled must be a boolean (true or false).');
+  }
+
+  if (
+    temporalUI?.enabled === true &&
+    temporalUI.disableWriteActions === false &&
+    values?.temporal?.networkPolicy?.enabled === false
+  ) {
+    violations.push('Temporal UI write actions require the UI to be NetworkPolicy-restricted: set temporal.networkPolicy.enabled=true or temporal.ui.disableWriteActions=true.');
   }
 
   for (const alias of REQUIRED_COMPONENT_ALIASES) {
