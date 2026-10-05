@@ -2,114 +2,93 @@
 
 ## Source scope
 
-- [x] Verify clean assigned source worktree on
-  `agent/falcone/1053/98345e77-680f-56ce-bbb1-390a72484290`, starting at
-  `baeec03855e44d83164343daa9b939fa03d8efa8`.
-- [x] Add proposal, tasks and deployment-packaging spec delta for #1053.
-- [x] Preserve source runtime, workflows, dependencies, lockfiles and fixtures.
-- [x] Validate this change with OpenSpec strict mode and run the existing
-  `tests/blackbox/mongo-gateway-route.test.mjs`; record bounded results below.
-- [x] Review existing source HEAD
-  `39bf53486a541ddd423ef16051687863ab7f68a9` on the same clean assigned branch;
-  retain the previous implementation and Hermes pin commit.
-- [x] Clarify the TLS semantics contract and hand off the deployment checker
-  findings without modifying the separately assigned deployment worktree.
-- [x] Review the clean assigned source HEAD
-  `d5f5e67abd35aac6a94baecefc0abd0c45571b0f`, retain the previous commits,
-  and add the checker-confirmed reused-values regression to this contract.
+- [x] Verify the clean assigned worktree and branch
+  `agent/falcone/1053/98345e77-680f-56ce-bbb1-390a72484290` at expected HEAD
+  `6d21b9de062b08e5e9c4b2bbff58bea6cbfbd928`, retaining all previous commits
+  on base `baeec03855e44d83164343daa9b939fa03d8efa8`.
+- [x] Review the previous proposal, tasks and deployment-packaging spec delta.
+- [x] Add the checker findings to the bounded deployment contract: Helm 4
+  retry ownership, existing #980 TLS duplicate upgrades, actual path evidence,
+  helper prerequisites and shipping-version review.
+- [x] Preserve source runtime, dependencies, lockfiles and fixtures; leave
+  Hermes-managed workflow pins untouched.
+- [x] Run strict OpenSpec validation and the source Mongo route parity gate.
+- [x] Persist the remaining deployment obligations below in this source handoff.
 
 ## Deployment maker and platform scope
 
-- [ ] Choose one mechanism with evidence for Helm 3 client-side upgrade,
-  Argo-style client-side apply of a Helm-created object without a last-applied
-  record, and Helm 4 server-side apply as used by the harness. Record which
-  paths fail and succeed; justify the choice from those results.
-- [ ] Test renders at `433be51` and the target revision for default, staging,
-  prod, prod-TLS and kind-TLS layers. Require exactly one entry per JWT env name,
-  `valueFrom` only, and reject any env entry carrying both fields. Fix the
-  prod-TLS duplicate if the check fails without changing JWT config semantics.
-- [ ] Repair the checker-confirmed TLS regression in the deployment worktree:
-  preserve the previous effective HTTPS JWKS endpoint through the executor
-  ConfigMap source without changing the gateway verifier. Add resolved URL
-  assertions for scheme, host, port and path against deployment base
-  `93ee9371fdbd029ff49909ff1fb5c03eeff0ddae` for prod-TLS and kind-TLS.
-  Uniqueness and CA env checks alone do not cover this regression.
-- [ ] Fix the unconditional shared TLS JWT env filter at
-  `charts/in-falcone/charts/component-wrapper/templates/workload.yaml:45`.
-  Suppress a shared JWT entry only when the component env has a same-name
-  `valueFrom` entry, or preserve inherited config through an equivalent repair.
-  Add regression cases coalescing `433be51` base + prod/kind + TLS values to
-  model `helm upgrade --reuse-values`, including historical env arrays without
-  #980 references. Assert inherited JWT entries and effective values survive;
-  a ConfigMap containing those values without env references is insufficient.
-  Keep strict five-reference checks for the fully reviewed target render.
-- [ ] Correct TLS overlay guidance and unpublished release notes that claim
-  the repair changes no ConfigMap values. Document preservation of the
-  effective TLS endpoint and verify it in the prod checklist.
-- [ ] Document the tested reused-values path in unpublished release notes;
-  advice to avoid `--reuse-values` does not satisfy the standing compatibility
-  rule. Clarify that preparing a literal-env release requires the target
-  executor JWT ConfigMap to exist first through the normal gated Helm adapter.
+The paired deployment checkout is clean at
+`f929e895851c1c689017d0eaf15ae83670e13a7a`. The source maker has read only the
+bounded test context needed to assess the supplied checker finding. No files
+in that separately assigned deployment worktree are modified here.
+
+- [ ] Fix the blocking Helm 4 retry in
+  `tests/blackbox/deployment-packaging/executor-env-upgrade.py:333` and `:412`.
+  The probe declares one replica, while the external kubectl patch at `:388`
+  sets two; retrying server-side delivery can conflict on `spec.replicas`.
+  Exclude externally managed replicas from the applied probe manifest or use
+  another tested ownership-preserving procedure. Keep the external-manager
+  preservation assertions, and separately test/document handling HPA replica
+  conflicts. Do not force conflicts across the release. An expected conflict
+  alone cannot satisfy successful delivery after the env migration.
+- [ ] Run the mandatory disposable-kind Helm 3 / Argo-client / Helm 4 matrix
+  in deployment CI. Record untreated, atomic-step and retry outcomes separately,
+  including at least one actual nonempty-value/valueFrom rejection. Prove
+  rollout Available, pod reference resolution, ConfigMap-before-pod ordering,
+  atomicity, preserved replicas/annotations and idempotency. Distinguish field
+  ownership conflicts from the reported env validation failure.
+- [ ] Before release, record all three paths' actual outcomes in the unpublished
+  release notes and #980 prod handoff, cite the redacted evidence artifact ID
+  and SHA256, and justify the chosen mechanism from those results. Do not
+  substitute a pointer to a future CI artifact or invent outcomes locally.
+- [ ] Test/document upgrading existing #980 prod-TLS and kind-TLS releases
+  from `93ee9371` plus `deploy/kind/values-production.yaml`, whose executor
+  has duplicate JWKS names. Prove the atomic step retains exactly one of each
+  of the five references and the effective HTTPS endpoint, reaches Available,
+  and is repeatable. Do not assume a merge removes only one duplicate.
+- [ ] List Python 3 with PyYAML, Helm and kubectl in the operator prerequisites
+  for `charts/in-falcone/migrations/executor-jwt-env-upgrade.py`.
 - [ ] Obtain release-review acknowledgement of the stored TLS JWKS ConfigMap
-  representation change that preserves the effective runtime endpoint, and
-  confirm whether chart 0.4.20 will ship #980 while Chart.yaml remains 0.4.19.
-- [ ] Reproduce the API server's nonempty-value/valueFrom rejection on at
-  least one untreated path, then prove the chosen migration succeeds, rolls
-  out Available, and is idempotent on an already-migrated Deployment.
-- [ ] Prove the ConfigMap exists before new pods start and the migration
-  atomically supplies references for all five vars without a pod missing
-  JWKS URL, issuer or audience. Verify live replicas and managed annotations.
-- [ ] Use disposable kind or a live server-side dry-run for API validation;
-  live cases may self-skip locally but must run in deployment CI. Never use
-  shared clusters, kubeconfigs or Secret values; retain redacted evidence.
-- [ ] Add notes to the next unpublished chart version and the prod checklist
-  in `charts/in-falcone/docs/mongo-bearer-route-980-handoff.md`. Put audience
-  reconciliation before enforcement and confirm real prod issuer/JWKS hosts
-  before migration; include target revision/values, verification and rollback.
-- [ ] If choosing an Argo sync-option, limit it to the executor Deployment,
-  update and pass `deploy/argocd/README.md` equivalence, and document/test the
-  Helm equivalent. Never force the whole Helm release.
-- [ ] Run deployment upgrade regression, strict Helm lint for default,
-  staging, prod and kind, and
-  `tests/blackbox/staging-infrastructure/mongo-bearer-route-chart.test.mjs`.
-  Preserve render baselines unless the mechanism requires an explained change.
-- [ ] Hermes synchronizes both `FALCONE_CHARTS_REF` pins to the final deployment
-  HEAD; rerun source Mongo route parity after synchronization.
+  representation change that preserves the effective HTTPS 8443 endpoint,
+  without changing gateway verification. Confirm which unpublished chart
+  version ships #980: notes currently name 0.4.20 while Chart.yaml is 0.4.19.
+  Do not edit published notes/packages.
+- [ ] Retain the prior TLS endpoint and reused-values regression contracts.
+  The supplied independent checker reports those earlier repairs implemented
+  and offline gates passing at the paired HEAD; they are no longer recorded
+  here as current failures. Preserve effective JWT config from deployment
+  base `93ee9371fdbd029ff49909ff1fb5c03eeff0ddae` and inherited `433be51` values.
+- [ ] Retain release prerequisites: audience reconciliation before enforcement,
+  real prod issuer/JWKS hosts, exact target revision/ordered values, target JWT
+  ConfigMap readiness, bounded verification and executor-only rollback.
+- [ ] Run the deployment upgrade regression, required strict Helm lint profiles,
+  Mongo bearer chart regression and Argo README equivalence check. Preserve
+  all migration, backup, evidence, immutable-image and External Secrets gates.
+- [ ] Hermes synchronizes both source workflow pins after the deployment repair
+  and reruns source Mongo route parity against the final deployment HEAD.
 
 ## Bounded source validation (current follow-up review)
 
-The paired checkout on this review is
-`f6a3d92cfd7ade97149165062268bc745e2c0fcc`; both managed workflow pins
-match it after the existing Hermes commit. A subsequent deployment
-repair will require Hermes to converge both pins again. No deployment files
-are modified by this source maker. Deployment tasks above remain handoff
-obligations, not completed source work or claims of live-cluster evidence.
+The paired checkout and both existing source pins match
+`f929e895851c1c689017d0eaf15ae83670e13a7a`. A subsequent deployment repair
+requires Hermes to converge them again. Deployment obligations above remain
+handoff items; this source commit does not establish live upgrade evidence.
 
 - PASS: `timeout 45s openspec validate fix-1053-executor-env-upgrade-path
-  --strict --no-interactive --json` validates the change with no findings.
-- PASS: with `FALCONE_CHART_PATH` pointing to the
-  assigned deployment chart, `timeout 60s node --test
-  --experimental-test-isolation=none tests/blackbox/mongo-gateway-route.test.mjs`
-  passes 6/6 tests, including both Helm renders and workflow pin parity against
-  the paired checkout's HEAD above. Preserve that assertion; Hermes must
-  synchronize the final repaired deployment pins and rerun it.
-- PASS: `git diff --check` for the staged source change.
-- FAIL (deployment handoff): a bounded Helm render of the current paired chart
-  using `433be51:charts/in-falcone/values.yaml`,
-  `433be51:charts/in-falcone/values/prod.yaml`, and
-  `433be51:deploy/kind/values-production.yaml` in that order produces zero
-  executor `KEYCLOAK_*` env entries. This reproduces the checker finding using
-  temporary files and boolean/count-only evidence without shared-cluster access
-  or payload logging. The deployment maker must repair it and add the regression
-  test; ordinary target-value renders and source route parity do not cover it.
-- SKIPPED: live deployment upgrade matrix and availability/idempotency checks
-  belong to deployment CI. This source sandbox has no kind executable and
-  permits no shared-cluster access; no live-cluster success is claimed here.
-- SKIPPED: `bbx-temporal-bootstrap-048` remains required in PR CI; the checker
-  reported sandbox tar failing with `Function not implemented`. This source
-  documentation change does not establish deployment bootstrap evidence.
+  --strict --no-interactive --json` validates with no findings.
+- PASS: with `FALCONE_CHART_PATH` pointing to the assigned deployment chart,
+  `timeout 60s node --test --experimental-test-isolation=none
+  tests/blackbox/mongo-gateway-route.test.mjs` passes 6/6, including Helm renders
+  and both pins matching the paired HEAD.
+- PASS: `git diff --cached --check` for the source changes.
+- SKIPPED: the live deployment matrix, rollout, pod resolution, existing #980
+  TLS upgrade and Helm 4 ownership recovery require disposable kind and
+  deployment CI. Kind is absent here; no live-cluster success is claimed.
+- SKIPPED: deployment lint, equivalence and bootstrap checks are left to the
+  separately assigned deployment maker and PR CI. The supplied checker reports
+  them passing at this paired HEAD; they must remain passing after its repair.
 
 No dependency updates are needed. The repository ignores `/openspec/`; add
-only these three explicitly requested files with `git add -f`, retaining
-the ignore policy and all unrelated files. This handoff is committed locally
-on the assigned branch without push, merge, deployment or credential access.
+only these three explicitly requested files with `git add -f`, retaining the
+ignore policy. Commit the source follow-up locally on the assigned branch
+without push, merge, deployment, shared-cluster access or credential access.

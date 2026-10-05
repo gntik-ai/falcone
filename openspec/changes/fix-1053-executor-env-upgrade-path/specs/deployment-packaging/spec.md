@@ -8,6 +8,11 @@ server. It SHALL record independent outcomes for Helm 3 client-side upgrade,
 Argo-style client-side apply of a Helm-created Deployment without a
 last-applied record, and Helm 4 server-side apply as used by the harness.
 The chosen migration mechanism SHALL cite those results as its justification.
+Before release, the unpublished release notes and prod handoff SHALL record
+the actual untreated, migration and retry outcomes for all three paths and
+reference the redacted evidence artifact ID and SHA256. Field-ownership
+conflicts SHALL be distinguished from env validation failures; a conflict
+alone SHALL NOT count as reproduction of the reported env defect.
 
 #### Scenario: Untreated upgrade reproduces the defect
 
@@ -25,6 +30,20 @@ The chosen migration mechanism SHALL cite those results as its justification.
 - **THEN** the live API server accepts the target Deployment
 - **AND** its rollout reaches Available and its pod env resolves all five
   JWT configuration variables from the executor JWT ConfigMap
+
+#### Scenario: Helm 4 retry respects externally managed replicas
+
+- **GIVEN** a migrated executor whose live replica count is owned by another
+  field manager, as with an HPA
+- **WHEN** the harness retries Helm 4 server-side delivery
+- **THEN** the env upgrade matrix avoids an incidental replica conflict by
+  excluding externally managed replicas from the applied probe manifest or
+  using another tested ownership-preserving procedure
+- **AND** a separate contention case records any expected ownership conflict
+  and proves the documented recovery permits delivery without taking over
+  externally managed replicas or forcing conflicts across the whole release
+- **AND** a handled conflict is not reported as a successful retry until the
+  delivery succeeds and the executor remains Available
 
 ### Requirement: Executor JWT env entries are unambiguous in every tested profile
 
@@ -74,6 +93,17 @@ Evidence SHALL report assertions without printing ConfigMap payloads.
 - **AND** the existing gateway verifier configuration remains unchanged
 - **AND** a regression to HTTP on port 8080 fails the check even when env
   uniqueness and `NODE_EXTRA_CA_CERTS` checks pass
+
+#### Scenario: An existing #980 TLS release contains duplicate JWKS names
+
+- **GIVEN** a live executor created from `93ee9371` with the prod-TLS or
+  kind-TLS values layers and two `KEYCLOAK_JWKS_URL` env entries
+- **WHEN** it upgrades to the target render using the documented atomic step
+- **THEN** exactly one reference-only entry for each of the five JWT names
+  remains and the effective HTTPS JWKS endpoint is preserved
+- **AND** rollout reaches Available and repeating the step is a no-op
+- **AND** guidance covers this starting state separately from pre-#980
+  literal-env releases, without assuming same-name merge entries are safe
 
 ### Requirement: Reused historical values retain executor JWT configuration
 
@@ -142,6 +172,9 @@ the next unpublished chart version's release notes and in
 `charts/in-falcone/docs/mongo-bearer-route-980-handoff.md`'s prod checklist.
 It SHALL preserve published release notes/packages and existing migration,
 backup, parity, immutable-image and External Secrets/OpenBao gates.
+Guidance SHALL list Python 3 with PyYAML, Helm and kubectl as prerequisites
+when using the Python helper. Release review SHALL confirm which unpublished
+chart version ships #980 and align the release notes with that version.
 
 #### Scenario: Operator prepares a production rollout
 

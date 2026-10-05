@@ -18,6 +18,15 @@ must each be tested from pre-#980 chart revision `433be51`.
   results. Prefer a documented one-time replacement of the target rendered
   Deployment, subject to the live regression evidence. Record successes and
   failures separately; do not assume Helm needs the same recovery as Argo.
+- Exercise delivery retries without an accidental conflict between the probe's
+  declared replicas and an external manager's replica update. Separately test
+  and document Helm 4 retries when replicas are managed externally, preserving
+  that ownership without forcing conflicts across the release. A replicas
+  ownership conflict is distinct from the reported env validation rejection.
+- Cover existing #980 prod-TLS and kind-TLS releases at `93ee9371` whose env
+  list contains duplicate JWKS names, as well as pre-#980 literal-env releases.
+  Prove the atomic migration retains one reference and the effective endpoint
+  when ordinary merge behavior might otherwise remove both entries.
 - Test default, staging, prod, prod-TLS and kind-TLS using the overlay
   `deploy/kind/values-production.yaml`, including duplicate names, dual-field
   env entries, rollout availability, ConfigMap readiness and repeat execution.
@@ -38,6 +47,10 @@ must each be tested from pre-#980 chart revision `433be51`.
   document how an inherited literal-env release reaches that target safely.
 - Document the mechanism, preconditions, verification and rollback in the next
   unpublished chart version's release notes and the #980 prod checklist.
+  Record the actual three-path outcomes and cite the redacted CI artifact ID
+  and SHA256 before release; a pointer to future results is insufficient.
+  List Python 3 with PyYAML, Helm and kubectl as helper prerequisites, and
+  confirm the shipping chart version through release review.
 - Hermes updates both source workflow `FALCONE_CHARTS_REF` pins to the final
   deployment HEAD after the deployment maker finishes. The source maker leaves
   those managed pins untouched and reruns the existing Mongo route parity gate
