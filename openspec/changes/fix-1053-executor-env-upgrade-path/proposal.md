@@ -29,11 +29,16 @@ must each be tested from pre-#980 chart revision `433be51`.
   list contains duplicate JWKS names, as well as pre-#980 literal-env releases.
   Prove the atomic migration retains one reference and the effective endpoint
   when ordinary merge behavior might otherwise remove both entries.
-- Require a preparation phase through the existing gated Helm adapter that
-  reconciles the exact target JWT ConfigMap without delivering the target
-  executor Deployment. Run the atomic env step before executor delivery for
-  existing literal-env and duplicate-env releases. Repair after a successful
-  but invalid delivery cannot satisfy the no-intermediate-pod requirement.
+- Require an executable operator sequence for both Helm and Argo: pause only
+  the executor Deployment, run normal gated target delivery while retaining
+  the pause, verify the exact target JWT ConfigMap, dry-run and apply the atomic
+  env repair, retry a rejected delivery while still paused, reverify/repair,
+  then resume only after all five references are valid. A paused template may
+  need repair, but no invalid template may create a ReplicaSet or pod. Preserve
+  every existing delivery gate and test how a rejected delivery makes the
+  target ConfigMap available without bypassing rollback or migration gates.
+  A synthetic probe chart's ConfigMap-only preparation is insufficient evidence
+  that operators can execute the procedure with the real target chart.
 - Compare the live ConfigMap data in-process with the same exact target render
   used for the Deployment. Nonempty keys alone are insufficient: an existing
   #980 TLS ConfigMap can still contain the stale HTTP verifier default. Refuse
@@ -70,6 +75,10 @@ must each be tested from pre-#980 chart revision `433be51`.
   and SHA256 before release; a pointer to future results is insufficient.
   List Python 3 with PyYAML, Helm and kubectl as helper prerequisites, and
   confirm the shipping chart version through release review.
+- Fix the deployment live matrix's evidence serialization: resolve the Helm 3
+  executable from `HELM3_BIN` in the scope that records its version, and cover
+  evidence generation offline so a successful matrix cannot end in `NameError`.
+  The mandatory CI job must write and upload all six outcomes and their digest.
 - Hermes updates both source workflow `FALCONE_CHARTS_REF` pins to the final
   deployment HEAD after the deployment maker finishes. The source maker leaves
   those managed pins untouched and reruns the existing Mongo route parity gate
@@ -100,12 +109,15 @@ remain deferred to #1051.
 
 Operators reconcile tenant-app and service-account audiences before enabling
 enforcement, confirm the real prod hosts in the exact ordered values layers,
-and ensure the target executor JWT ConfigMap exists before migrating the
-Deployment. Its live data must match the exact target render before either
-dry-run or apply. Migrate the env atomically before delivering the target
-executor Deployment; no intermediate pod may lack the required JWT
-configuration. Check all newly created ReplicaSet templates, rather than only
-the final Deployment. The step must account for live replicas and annotations
+and pause only the executor Deployment before gated target delivery. Verify
+that delivery retained the pause and that the target executor JWT ConfigMap
+exists with live data matching the exact target render before either dry-run
+or apply. Migrate or repair the env atomically while paused; retry a rejected
+delivery and reverify/repair while retaining the pause. Resume only after the
+target delivery succeeds and all five references are valid. No intermediate
+pod may lack required JWT configuration. Check all newly created ReplicaSet
+templates, rather than only the final Deployment. The step must account for
+live replicas and annotations
 owned by other actors, preserve the Service and ConfigMap, and be safe to repeat
 on migrated staging. Document or tolerate HPA scaling during rollout without
 claiming that a post-patch verification failure reverted the applied patch.

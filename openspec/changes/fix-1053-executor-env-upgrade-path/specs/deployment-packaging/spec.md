@@ -14,6 +14,15 @@ reference the redacted evidence artifact ID and SHA256. Field-ownership
 conflicts SHALL be distinguished from env validation failures; a conflict
 alone SHALL NOT count as reproduction of the reported env defect.
 
+#### Scenario: Completed matrix persists usable evidence
+
+- **GIVEN** all six starting-state/path cases have completed
+- **WHEN** the harness records client versions and serializes the outcomes
+- **THEN** Helm 3 is resolved from `HELM3_BIN` in the evidence-writing scope
+  and the evidence JSON is written with every outcome and its SHA256 reported
+- **AND** an offline regression exercises evidence generation without a live
+  cluster so a scope error cannot break the required upload after the matrix
+
 #### Scenario: Untreated upgrade reproduces the defect
 
 - **GIVEN** an executor Deployment created from the `433be51` render
@@ -101,8 +110,9 @@ Evidence SHALL report assertions without printing ConfigMap payloads.
 - **WHEN** it upgrades to the target render using the documented atomic step
 - **THEN** exactly one reference-only entry for each of the five JWT names
   remains and the effective HTTPS JWKS endpoint is preserved
-- **AND** the target ConfigMap is reconciled and verified before the atomic
-  step, and the step completes before the target executor Deployment is delivered
+- **AND** target delivery and atomic repair retain the executor rollout pause,
+  the target ConfigMap is verified before repair, and all five references are
+  verified after delivery before the executor resumes
 - **AND** rollout reaches Available and repeating the step is a no-op
 - **AND** guidance covers this starting state separately from pre-#980
   literal-env releases, without assuming same-name merge entries are safe
@@ -151,10 +161,19 @@ data matching the ConfigMap from that same exact target render before any
 dry-run or apply of the env step. The helper SHALL compare the data in-process
 without printing payloads and SHALL fail before patch or rollout on missing,
 empty or mismatched data, including when the env patch would be a no-op.
-Target ConfigMap reconciliation through the gated Helm adapter SHALL precede
-the atomic env step without delivering the target executor Deployment first.
-The step SHALL complete before target executor Deployment delivery for both
-pre-#980 literal-env and existing #980 duplicate-env releases.
+For both pre-#980 literal-env and existing #980 duplicate-env releases, the
+operator SHALL pause only the executor Deployment before normal gated target
+delivery. Delivery SHALL retain the pause. Target ConfigMap reconciliation
+through the gated Helm adapter SHALL precede the atomic env step. While paused,
+the step SHALL migrate or repair the env, including an accepted target template
+with a missing JWT name. Rejected target delivery SHALL be retried while paused,
+followed by another env verification/repair before resume. The procedure SHALL
+provide executable, tested Helm and Argo paths using the real target chart and
+exact ordered values, including handling of delivery rejection and the
+ConfigMap prerequisite without bypassing existing gates. Synthetic probe-only
+ConfigMap preparation SHALL NOT establish operator procedure coverage.
+The executor SHALL resume only after target delivery succeeds, the ConfigMap
+matches the target, and all five reference-only env entries are verified.
 Removing an old literal value and adding its reference SHALL occur
 in the same atomic operation. It SHALL preserve the executor Service and
 ConfigMap and SHALL never use Helm `--force` for the whole release.
@@ -180,12 +199,27 @@ ConfigMap and SHALL never use Helm `--force` for the whole release.
 - **AND** a fake-client negative test verifies that no mutation is attempted
 - **AND** comparison results expose only status or hashes, never the data
 
+#### Scenario: Gated target delivery is attempted while the executor is paused
+
+- **GIVEN** a serving historical executor paused before target delivery
+- **WHEN** gated Helm or Argo delivery accepts an incomplete executor template
+  or rejects its env patch
+- **THEN** the Deployment remains paused and no new executor ReplicaSet or pod
+  is created from the incomplete template
+- **AND** the documented real-chart procedure establishes matching target
+  ConfigMap data, runs the helper dry-run and atomic apply, and retries rejected
+  delivery while paused without bypassing migration, rollback or evidence gates
+- **AND** after delivery the helper rechecks/repairs all five references before
+  an explicit executor-only resume and successful rollout
+- **AND** a missing or stale ConfigMap or lost pause prevents further repair or
+  resume; a successful delivery status alone does not authorize resume
+
 #### Scenario: Every new ReplicaSet retains valid JWT configuration
 
 - **GIVEN** a serving historical Deployment and its existing ReplicaSets,
   captured before the documented positive migration sequence starts
-- **WHEN** target ConfigMap preparation, atomic migration and executor delivery
-  run against a disposable live API server
+- **WHEN** pause, gated target delivery, atomic repair, any delivery retry and
+  verified resume run against a disposable live API server
 - **THEN** the test examines every executor ReplicaSet template created during
   that sequence, including superseded ReplicaSets rather than just the latest
 - **AND** it fails if any new template lacks JWKS URL, issuer or audience,
@@ -230,11 +264,12 @@ chart version ships #980 and align the release notes with that version.
 - **THEN** tenant-app and service-account audience reconciliation completes
   before enforcement, and real prod issuer/JWKS hosts are confirmed in the
   exact values layers before migrating the executor
-- **AND** the checklist orders gated target ConfigMap reconciliation and
-  in-process target-data verification before the atomic env step, followed by
-  target executor Deployment delivery
-- **AND** it never advises delivering a missing or duplicate JWT env template
-  and repairing it afterwards, even if the delivery operation returns success
+- **AND** the checklist orders executor-only pause, gated target delivery,
+  target ConfigMap verification, helper dry-run and atomic apply, any rejected
+  delivery retry, and final reference verification/repair before explicit resume
+- **AND** the Helm and Argo procedures are executable with the real target chart,
+  retain the pause throughout delivery and repair, and never allow an invalid
+  template to create executor pods even if delivery returns success
 - **AND** verification checks availability, unique reference-only env entries,
   replicas and annotations without emitting ConfigMap or Secret payloads
 - **AND** rollback covers reapplying the `433be51` executor Deployment render
@@ -258,11 +293,11 @@ chart version ships #980 and align the release notes with that version.
 - **WHEN** the operator follows the release notes for a reused-values upgrade
 - **THEN** guidance explains the tested inherited-values behavior and the exact
   reviewed target layers required to reach all five ConfigMap references
-- **AND** preparation is conditional on the target ConfigMap already existing
-  with every required key and data matching the exact target render, established
-  through the normal gated Helm adapter before target executor delivery
-- **AND** guidance does not claim the helper can prepare a release before
-  that prerequisite is satisfied
+- **AND** the executor is paused before gated target delivery establishes the
+  target ConfigMap with every required key and matching data
+- **AND** guidance covers a rejected first delivery while retaining the pause
+  and never claims the helper can repair env before its ConfigMap prerequisite
+  is satisfied or that a probe-only preparation is an executable operator step
 
 #### Scenario: An Argo sync-option is selected
 
