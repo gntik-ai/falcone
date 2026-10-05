@@ -101,6 +101,8 @@ Evidence SHALL report assertions without printing ConfigMap payloads.
 - **WHEN** it upgrades to the target render using the documented atomic step
 - **THEN** exactly one reference-only entry for each of the five JWT names
   remains and the effective HTTPS JWKS endpoint is preserved
+- **AND** the target ConfigMap is reconciled and verified before the atomic
+  step, and the step completes before the target executor Deployment is delivered
 - **AND** rollout reaches Available and repeating the step is a no-op
 - **AND** guidance covers this starting state separately from pre-#980
   literal-env releases, without assuming same-name merge entries are safe
@@ -144,8 +146,16 @@ above. Advising operators to avoid `--reuse-values` SHALL NOT replace this test.
 The chosen mechanism SHALL target only
 `{release}-control-plane-executor` in the release namespace using the exact
 target chart revision and ordered values layers. It SHALL ensure
-`{release}-executor-jwt-config` exists with the required keys before new pods
-start. Removing an old literal value and adding its reference SHALL occur
+`{release}-executor-jwt-config` exists with every required nonempty key and
+data matching the ConfigMap from that same exact target render before any
+dry-run or apply of the env step. The helper SHALL compare the data in-process
+without printing payloads and SHALL fail before patch or rollout on missing,
+empty or mismatched data, including when the env patch would be a no-op.
+Target ConfigMap reconciliation through the gated Helm adapter SHALL precede
+the atomic env step without delivering the target executor Deployment first.
+The step SHALL complete before target executor Deployment delivery for both
+pre-#980 literal-env and existing #980 duplicate-env releases.
+Removing an old literal value and adding its reference SHALL occur
 in the same atomic operation. It SHALL preserve the executor Service and
 ConfigMap and SHALL never use Helm `--force` for the whole release.
 
@@ -154,15 +164,52 @@ ConfigMap and SHALL never use Helm `--force` for the whole release.
 - **GIVEN** a serving old Deployment and an available target JWT ConfigMap
 - **WHEN** the migration updates only the executor Deployment
 - **THEN** no intermediate executor pod runs without JWKS URL, issuer or audience
+- **AND** the effective TLS JWKS endpoint is preserved throughout preparation,
+  migration and target delivery, not only in the final render
 - **AND** live replicas and annotations managed by other actors are checked
   and preserved or explicitly reconciled by the tested step
 - **AND** the Service and ConfigMap are not deleted
 
+#### Scenario: Existing TLS ConfigMap has nonempty but stale data
+
+- **GIVEN** an existing #980 TLS executor whose ConfigMap has all five nonempty
+  keys but whose stored JWKS URL differs from the exact target render
+- **WHEN** the helper is invoked with dry-run or apply, even on an already
+  reference-only Deployment
+- **THEN** it fails before patching the Deployment or waiting for rollout
+- **AND** a fake-client negative test verifies that no mutation is attempted
+- **AND** comparison results expose only status or hashes, never the data
+
+#### Scenario: Every new ReplicaSet retains valid JWT configuration
+
+- **GIVEN** a serving historical Deployment and its existing ReplicaSets,
+  captured before the documented positive migration sequence starts
+- **WHEN** target ConfigMap preparation, atomic migration and executor delivery
+  run against a disposable live API server
+- **THEN** the test examines every executor ReplicaSet template created during
+  that sequence, including superseded ReplicaSets rather than just the latest
+- **AND** it fails if any new template lacks JWKS URL, issuer or audience,
+  duplicates a JWT env name, or has any env entry with both value and valueFrom
+- **AND** templates created after the atomic step retain all five unique
+  reference-only JWT entries and rollout reaches Available
+- **AND** untreated negative-path experiments run separately and cannot waive
+  a safety failure in the positive sequence as an accepted invalid outcome
+
 #### Scenario: Migration is repeated on an already migrated release
 
-- **GIVEN** a Deployment already using the target ConfigMap references
+- **GIVEN** a Deployment already using the target ConfigMap references and
+  live ConfigMap data matching the exact target render
 - **WHEN** the same migration is rerun
 - **THEN** it is a no-op and retains valid env entries and availability
+
+#### Scenario: HPA scales the executor during migration rollout
+
+- **GIVEN** executor replicas owned by an HPA and a patch that does not touch
+  spec.replicas
+- **WHEN** the HPA changes the replica count while the helper waits for rollout
+- **THEN** the helper tolerates that independently managed change or guidance
+  documents the possible post-patch verification failure and bounded recovery
+- **AND** it does not reset HPA-owned replicas or imply the env patch was reverted
 
 ### Requirement: Release guidance orders migration with existing audience gates
 
@@ -183,6 +230,11 @@ chart version ships #980 and align the release notes with that version.
 - **THEN** tenant-app and service-account audience reconciliation completes
   before enforcement, and real prod issuer/JWKS hosts are confirmed in the
   exact values layers before migrating the executor
+- **AND** the checklist orders gated target ConfigMap reconciliation and
+  in-process target-data verification before the atomic env step, followed by
+  target executor Deployment delivery
+- **AND** it never advises delivering a missing or duplicate JWT env template
+  and repairing it afterwards, even if the delivery operation returns success
 - **AND** verification checks availability, unique reference-only env entries,
   replicas and annotations without emitting ConfigMap or Secret payloads
 - **AND** rollback covers reapplying the `433be51` executor Deployment render
@@ -207,7 +259,8 @@ chart version ships #980 and align the release notes with that version.
 - **THEN** guidance explains the tested inherited-values behavior and the exact
   reviewed target layers required to reach all five ConfigMap references
 - **AND** preparation is conditional on the target ConfigMap already existing
-  with every required key, established through the normal gated Helm adapter
+  with every required key and data matching the exact target render, established
+  through the normal gated Helm adapter before target executor delivery
 - **AND** guidance does not claim the helper can prepare a release before
   that prerequisite is satisfied
 

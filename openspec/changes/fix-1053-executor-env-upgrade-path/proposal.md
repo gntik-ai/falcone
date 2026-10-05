@@ -15,9 +15,11 @@ must each be tested from pre-#980 chart revision `433be51`.
 - Add the deployment-packaging contract for a tested, atomic migration of only
   `{release}-control-plane-executor` in the release namespace.
 - In the deployment repository, choose one mechanism using the upgrade-path
-  results. Prefer a documented one-time replacement of the target rendered
-  Deployment, subject to the live regression evidence. Record successes and
-  failures separately; do not assume Helm needs the same recovery as Argo.
+  results. The current implementation uses a resourceVersion-fenced JSON Patch
+  of only the executor JWT env, preserving other live fields. Retain its atomic
+  scope and require live regression evidence for its justification. Record
+  successes and failures separately; do not assume Helm needs the same
+  recovery as Argo.
 - Exercise delivery retries without an accidental conflict between the probe's
   declared replicas and an external manager's replica update. Separately test
   and document Helm 4 retries when replicas are managed externally, preserving
@@ -27,6 +29,23 @@ must each be tested from pre-#980 chart revision `433be51`.
   list contains duplicate JWKS names, as well as pre-#980 literal-env releases.
   Prove the atomic migration retains one reference and the effective endpoint
   when ordinary merge behavior might otherwise remove both entries.
+- Require a preparation phase through the existing gated Helm adapter that
+  reconciles the exact target JWT ConfigMap without delivering the target
+  executor Deployment. Run the atomic env step before executor delivery for
+  existing literal-env and duplicate-env releases. Repair after a successful
+  but invalid delivery cannot satisfy the no-intermediate-pod requirement.
+- Compare the live ConfigMap data in-process with the same exact target render
+  used for the Deployment. Nonempty keys alone are insufficient: an existing
+  #980 TLS ConfigMap can still contain the stale HTTP verifier default. Refuse
+  both dry-run and apply on missing or mismatched data, including an otherwise
+  unchanged Deployment, without printing values. Add a fake-client negative
+  test proving that mismatch causes no patch or rollout.
+- Isolate untreated negative-path experiments from the positive migration
+  sequence. Check every ReplicaSet template created during preparation,
+  migration and target delivery for required JWKS, issuer and audience env,
+  duplicate JWT names and dual-field entries. A final repaired Deployment alone
+  cannot prove the sequence was safe; preserve the effective TLS endpoint
+  throughout the sequence and retain idempotency coverage.
 - Test default, staging, prod, prod-TLS and kind-TLS using the overlay
   `deploy/kind/values-production.yaml`, including duplicate names, dual-field
   env entries, rollout availability, ConfigMap readiness and repeat execution.
@@ -82,9 +101,14 @@ remain deferred to #1051.
 Operators reconcile tenant-app and service-account audiences before enabling
 enforcement, confirm the real prod hosts in the exact ordered values layers,
 and ensure the target executor JWT ConfigMap exists before migrating the
-Deployment. No intermediate pod may lack the required JWT configuration.
-Replacement must account for live replicas and annotations owned by other
-actors, preserve the Service and ConfigMap, and be safe to repeat on migrated
-staging. Rollback is limited to the executor Deployment rendered from `433be51`
+Deployment. Its live data must match the exact target render before either
+dry-run or apply. Migrate the env atomically before delivering the target
+executor Deployment; no intermediate pod may lack the required JWT
+configuration. Check all newly created ReplicaSet templates, rather than only
+the final Deployment. The step must account for live replicas and annotations
+owned by other actors, preserve the Service and ConfigMap, and be safe to repeat
+on migrated staging. Document or tolerate HPA scaling during rollout without
+claiming that a post-patch verification failure reverted the applied patch.
+Rollback is limited to the executor Deployment rendered from `433be51`
 or a retry forward, as documented and tested in the deployment repository.
 No shared-cluster operation is performed by this source change.
