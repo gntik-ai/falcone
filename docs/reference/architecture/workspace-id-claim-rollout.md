@@ -132,7 +132,17 @@ is a clean no-op.
 ## 6. Re-stamp existing principals
 
 The back-fill's `usersWithoutStoredWorkspaceId` is the remaining work: principals created while the
-attributes were undeclared hold no stored `workspace_id`, and no realm-level change can supply one.
+attributes were undeclared, or through the admin route before #1016, hold no stored `workspace_id`,
+and no realm-level change can supply one. Fix #961 repaired realm declarations and signup; #1016
+also makes `POST /v1/tenants/{tenantId}/users` stamp `tenant_id` from the resolved tenant and, when
+`workspaceId` is supplied, a validated canonical `workspace_id`. Older principals still need the
+manual procedure below.
+
+The admin route accepts a workspace id or slug within the tenant. Without `workspaceId`, it stamps
+only `tenant_id` and deliberately creates a tenant-level principal. Its 201 response makes this
+explicit with `workspaceId: null` and `principalScope: 'tenant'`; a bound principal instead returns
+the canonical `workspaceId` and `principalScope: 'workspace'`. Console-created users remain
+tenant-level until the console adds a workspace picker.
 
 Each needs its binding written through the admin path, which requires deciding **which** workspace
 each principal belongs to — the platform did not record it anywhere else, so this is not mechanical.
@@ -140,7 +150,8 @@ Options, in order of preference:
 
 1. Derive the binding from an authoritative source (an invitation record, a workspace membership
    list, the tenant's own provisioning request) and write it per user.
-2. Re-create the principal through the normal signup path, which now stamps a validated binding.
+2. Re-create the principal through signup or the admin route with an explicit `workspaceId`; both
+   now stamp a validated binding.
 3. Leave tenant-level principals alone: they legitimately have no `workspace_id`, and the absence is
    correct rather than a gap to fill.
 
@@ -188,7 +199,7 @@ reads nor removes it.
   is absent. A workspace-bound principal now carries it, so those checks bind for that population —
   but a tenant-level principal legitimately has no claim, so closing them properly requires workspace
   *membership*. That is #973, and this rollout does not discharge it.
-- **The unscoped `getWorkspace`.** `getWorkspaceInTenant` was added for the signup binding only; the
+- **The unscoped `getWorkspace`.** Signup and the admin user route use `getWorkspaceInTenant`; the
   unscoped lookup and its other callers still resolve `id = $1 OR slug = $1` with no tenant predicate
   and no ordering.
 - **Workspace `status`.** Neither lookup consults it, so an archived workspace still yields a binding.

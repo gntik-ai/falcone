@@ -19,6 +19,7 @@
 // Run via tests/env/keycloak/run.sh (brings up the tests/env Keycloak 26 on :8081).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 
 const KC = process.env.KC_BASE_URL ?? 'http://localhost:8081';
 const ADMIN_USER = process.env.KC_ADMIN ?? 'admin';
@@ -36,6 +37,7 @@ let token;
 let kcAdmin;
 let TENANT_REALM_SCOPES;
 let runBackfill;
+let LOCAL_HANDLERS;
 
 async function adminToken() {
   const res = await fetch(`${KC}/realms/master/protocol/openid-connect/token`, {
@@ -119,16 +121,16 @@ async function createProbeUser(realm, attributes) {
 }
 
 /** ROPC against the tenant realm — the #953 workaround the issue's evidence used. */
-async function accessTokenClaims(realm) {
+async function accessTokenClaims(realm, username = USERNAME, password = PW) {
   const res = await fetch(`${KC}/realms/${realm}/protocol/openid-connect/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'password', client_id: 'probe-app', scope: 'openid', username: USERNAME, password: PW,
+      grant_type: 'password', client_id: 'probe-app', scope: 'openid', username, password,
     }),
   });
   const j = await res.json();
-  assert.ok(j.access_token, `ROPC must succeed; got ${JSON.stringify(j)}`);
+  assert.ok(j.access_token, `ROPC must succeed (HTTP ${res.status})`);
   return JSON.parse(Buffer.from(j.access_token.split('.')[1], 'base64url').toString('utf8'));
 }
 
@@ -141,6 +143,7 @@ before(async () => {
   process.env.TENANT_APP_REDIRECT_URIS = 'https://app.example.test/*';
   ({ kcAdmin, TENANT_REALM_SCOPES } = await import('../../../apps/control-plane/kc-admin.mjs'));
   ({ runBackfill } = await import('../../../scripts/backfill-tenant-realm-identity-claims.mjs'));
+  ({ LOCAL_HANDLERS } = await import('../../../apps/control-plane/b-handlers.mjs'));
 
   await dropRealm(RED_REALM);
   await dropRealm(GREEN_REALM);
@@ -199,6 +202,65 @@ test('kcw-961-02 GREEN: kcAdmin.createRealm persists the attribute and the claim
     `the access token MUST carry workspace_id; claims: ${JSON.stringify(claims)}`);
   assert.equal(claims.tenant_id, GREEN_REALM,
     'tenant_id still comes from the hardcoded mapper (single, un-forgeable source)');
+});
+
+// #1016: exercise the admin handler in a post-#961 realm, not just kcAdmin.createUser.
+
+test('kcw-1016-01: admin-created workspace and tenant principals persist attributes and mint the intended claims', async () => {
+  const tenant = { id: GREEN_REALM, slug: 'fixed-tenant', iam_realm: GREEN_REALM };
+  const workspaces = [
+    { id: OTHER_WORKSPACE_ID, slug: 'foreign', tenant_id: RED_REALM },
+    { id: WORKSPACE_ID, slug: 'default', tenant_id: GREEN_REALM },
+  ];
+  const pool = {
+    async query(sql, params) {
+      if (/FROM tenants\b/.test(sql)) return { rows: [tenant] };
+      if (/FROM workspaces\b/.test(sql)) {
+        assert.match(sql, /tenant_id = \$2/);
+        assert.match(sql, /ORDER BY \(id = \$1\) DESC/);
+        const matches = workspaces.filter((w) => w.tenant_id === params[1]
+          && (w.id === params[0] || w.slug === params[0]));
+        matches.sort((a, b) => (b.id === params[0]) - (a.id === params[0]));
+        return { rows: matches.slice(0, 1) };
+      }
+      throw new Error('unexpected store query');
+    },
+  };
+  const ctx = (body) => ({
+    params: { tenantId: tenant.slug }, body, pool, kcAdmin,
+    identity: { actorType: 'tenant_owner', tenantId: tenant.id },
+  });
+  // Generate an ephemeral password; never persist credentials or token payloads as evidence.
+  const password = randomBytes(24).toString('base64url');
+  for (const bound of [true, false]) {
+    const username = `${USERNAME}-admin-${bound ? 'workspace' : 'tenant'}`;
+    const result = await LOCAL_HANDLERS.createTenantUser(ctx({
+      username, email: `${username}@example.test`, firstName: 'Probe', lastName: 'User', password,
+      ...(bound ? { workspaceId: 'default' } : {}),
+    }));
+    assert.equal(result.statusCode, 201, 'admin handler must create the user');
+    assert.equal(result.body.workspaceId, bound ? WORKSPACE_ID : null);
+    assert.equal(result.body.principalScope, bound ? 'workspace' : 'tenant');
+
+    const read = await api('GET', `/admin/realms/${GREEN_REALM}/users/${result.body.userId}`);
+    assert.equal(read.status, 200, 'created user must be readable through the admin API');
+    const user = await read.json();
+    assert.deepEqual(user.attributes?.tenant_id, [tenant.id]);
+    assert.deepEqual(user.attributes?.workspace_id, bound ? [WORKSPACE_ID] : undefined);
+    const claims = await accessTokenClaims(GREEN_REALM, username, password);
+    assert.equal(claims.workspace_id, bound ? WORKSPACE_ID : undefined);
+    assert.equal(claims.tenant_id, GREEN_REALM, 'tenant_id still equals the realm name');
+  }
+
+  const rejectedUsername = `${USERNAME}-admin-rejected`;
+  const rejected = await LOCAL_HANDLERS.createTenantUser(ctx({
+    username: rejectedUsername, password, workspaceId: OTHER_WORKSPACE_ID,
+  }));
+  assert.equal(rejected.statusCode, 400);
+  assert.equal(rejected.body.code, 'WORKSPACE_NOT_IN_TENANT');
+  const lookup = await api('GET', `/admin/realms/${GREEN_REALM}/users?username=${rejectedUsername}&exact=true`);
+  assert.equal(lookup.status, 200, 'rejected username lookup must succeed');
+  assert.deepEqual(await lookup.json(), [], 'a rejected foreign binding must leave no user in the realm');
 });
 
 // ─── retrofit ─────────────────────────────────────────────────────────────────
