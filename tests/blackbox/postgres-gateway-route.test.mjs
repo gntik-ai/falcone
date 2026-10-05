@@ -83,9 +83,15 @@ test('Postgres API keys keep route 2005-key and its per-key limit policy', () =>
 test('Postgres data regex leaves introspection, exports, imports, and unsupported suffixes on 2005', () => {
   const paths = [
     ['POST', `${tablePath}/exports`], ['POST', `${tablePath}/imports`],
+    ['GET', '/v1/postgres/databases'],
     ['GET', '/v1/postgres/databases/database-example/schemas'],
     ['GET', '/v1/postgres/databases/database-example/schemas/public/tables'],
     ['GET', '/v1/postgres/databases/database-example/schemas/public/tables/table-example/columns'],
+    ['GET', '/v1/postgres/databases/database-example/schemas/public/tables/table-example/indexes'],
+    ['GET', '/v1/postgres/databases/database-example/schemas/public/tables/table-example/policies'],
+    ['GET', '/v1/postgres/databases/database-example/schemas/public/tables/table-example/security'],
+    ['GET', '/v1/postgres/databases/database-example/schemas/public/views'],
+    ['GET', '/v1/postgres/databases/database-example/schemas/public/materialized-views'],
   ];
   const unsupportedPaths = [
     `${tablePath}/rows/extra`, `${tablePath}/rows/by-primary-key/extra`,
