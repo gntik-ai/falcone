@@ -959,8 +959,8 @@ case "${1:-up}" in
           kubectl wait externalsecret --all -n "$NS" --for=condition=Ready --timeout=5m
         fi
 
-        # Require ESO reconciliation explicitly, including for local phased
-        # runs whose store is already managed outside the CI bootstrap path.
+        # Require ESO reconciliation explicitly. Without CI bootstrap, the
+        # caller must provision this ExternalSecret; --no-hooks skips its hook.
         kubectl wait externalsecret/platform-temporal-credentials -n "$NS" --for=condition=Ready --timeout=5m
         # Read only existence, never Secret data. ESO Ready alone is not enough
         # if its target was removed between reconciliation and Job creation.
