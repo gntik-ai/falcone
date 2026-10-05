@@ -64,6 +64,7 @@ const snapshots = [...new Set([process.argv[2], 'eso-system', 'secret-store'])]
     pods: parseJson(kubectl(['get', 'pods', '-n', namespace, '-o', "jsonpath-as-json={.items[*]['metadata.name','status']}"], 5)),
     events: parseJson(kubectl(['get', 'events', '-n', namespace, '-o', 'jsonpath-as-json={.items[*]}'], 5)),
   }))
+const logCandidates = []
 for (const { namespace, pods, events } of snapshots) {
   sectionBytes = Infinity
   sectionLines = Infinity
@@ -95,7 +96,35 @@ for (const { namespace, pods, events } of snapshots) {
       }
     }
     if (containers.length > 8) podBudget -= emit('Additional container states omitted.', podBudget)
-    // Report every container state before logs can consume the pod budget.
+    logCandidates.push({ namespace, name, containers, podBudget })
+  }
+  if (!Array.isArray(pods)) emit('Pod status unavailable (bounded API/client read failed).')
+  sectionBytes = Infinity
+  sectionLines = Infinity
+  emit(`>> Namespace ${namespace}: last 40 events sorted by time`)
+  sectionBytes = 6 * 1024
+  sectionLines = 40
+  // Events contain no specs or Secret data; only select these safe fields for
+  // output, even if an event references a Secret.
+  if (!Array.isArray(events)) { emit('Events unavailable.'); continue }
+  const time = (event) => event.lastTimestamp ?? event.series?.lastObservedTime ?? event.eventTime ?? event.metadata?.creationTimestamp ?? ''
+  events.sort((a, b) => time(a).localeCompare(time(b)))
+  for (const event of events.slice(-40)) {
+    emit(`${time(event)} ${event.type ?? ''} ${event.involvedObject?.kind ?? ''}/${event.involvedObject?.name ?? ''} ${event.reason ?? ''}: ${event.message ?? ''}`, 150)
+  }
+}
+// Emit every namespace's bounded status/event summary before logs. A verbose
+// first pod must not hide another pod's scheduling or missing-Secret evidence.
+for (const { namespace } of snapshots) {
+  sectionBytes = Infinity
+  sectionLines = Infinity
+  emit(`>> Namespace ${namespace}: failing or restarting container logs`)
+  sectionBytes = 12 * 1024
+  sectionLines = 120
+  for (const candidate of logCandidates.filter((pod) => pod.namespace === namespace)) {
+    const { name, containers } = candidate
+    let { podBudget } = candidate
+    podBudget -= emit(`Pod ${name}: logs (shared 8 KiB status/log budget)`, podBudget)
     for (const container of containers.slice(0, 8)) {
       if (!/^[a-z0-9.-]+$/.test(container.name)) continue
       const failing = !container.ready || container.restartCount > 0 || container.state?.waiting || container.state?.terminated?.exitCode
@@ -118,19 +147,5 @@ for (const { namespace, pods, events } of snapshots) {
         }
       }
     }
-  }
-  if (!Array.isArray(pods)) emit('Pod status unavailable (bounded API/client read failed).')
-  sectionBytes = Infinity
-  sectionLines = Infinity
-  emit(`>> Namespace ${namespace}: last 40 events sorted by time`)
-  sectionBytes = 6 * 1024
-  sectionLines = 40
-  // Events contain no specs or Secret data; only select these safe fields for
-  // output, even if an event references a Secret.
-  if (!Array.isArray(events)) { emit('Events unavailable.'); continue }
-  const time = (event) => event.lastTimestamp ?? event.series?.lastObservedTime ?? event.eventTime ?? event.metadata?.creationTimestamp ?? ''
-  events.sort((a, b) => time(a).localeCompare(time(b)))
-  for (const event of events.slice(-40)) {
-    emit(`${time(event)} ${event.type ?? ''} ${event.involvedObject?.kind ?? ''}/${event.involvedObject?.name ?? ''} ${event.reason ?? ''}: ${event.message ?? ''}`, 150)
   }
 }

@@ -239,6 +239,25 @@ test('busy API client still reports pod states and collects every namespace befo
   } finally { f.cleanup() }
 })
 
+test('verbose first-pod logs cannot hide later pod states or namespace events', () => {
+  const f = fixture()
+  try {
+    const result = f.run(collector)
+    assert.equal(result.status, 0, result.output)
+    const summaries = result.stderr.split('>> Namespace diagnostic-test: failing or restarting container logs')[0]
+    assert.doesNotMatch(summaries, /Logs temporal-stuck\//)
+    for (const namespace of ['diagnostic-test', 'eso-system', 'secret-store']) {
+      const summary = summaries.split(`>> Namespace ${namespace}: pods`)[1]?.split('>> Namespace')[0]
+      assert.ok(summary, `missing ${namespace} summary`)
+      assert.match(summary, /Pod credential-bootstrap-failed:/)
+      assert.match(summary, /Pod unscheduled-pod:/)
+      assert.match(summary, /reason=Unschedulable; message=Insufficient cpu/)
+      assert.ok(summaries.includes(`>> Namespace ${namespace}: last 40 events sorted by time`))
+    }
+    assert.match(result.stderr, /Logs temporal-stuck\/init-db --previous/)
+  } finally { f.cleanup() }
+})
+
 test('diagnostic collection failure never changes the original exit code', () => {
   const f = fixture({ BBX_FAIL_WAIT: 'job/falcone-temporal-schema', BBX_DIAGNOSTICS_FAIL: 'true' })
   try {
@@ -259,10 +278,22 @@ test('diagnostics bound pod, container, event, log and total output', () => {
     assert.ok(f.calls().filter(({ args }) => args[0] === 'logs').length <= 18)
     assert.doesNotMatch(result.output, /event-19 /)
     assert.ok(result.output.indexOf('event-20 ') < result.output.indexOf('event-59 '))
-    const podSections = result.stderr.split(/(?=Pod [a-z0-9.-]+:)/).slice(1)
-    for (const section of podSections) {
-      const beforeEvents = section.split('>> Namespace')[0]
-      assert.ok(Buffer.byteLength(beforeEvents) <= 8 * 1024 + 100)
+    // Status and logs print in separate sections but share the same pod budget.
+    const podBytes = new Map()
+    let namespace
+    let pod
+    for (const line of result.stderr.trimEnd().split('\n')) {
+      const heading = line.match(/^>> Namespace ([a-z0-9.-]+):/)
+      if (heading) { namespace = heading[1]; pod = null }
+      const name = line.match(/^Pod ([a-z0-9.-]+):/)
+      if (name) pod = `${namespace}/${name[1]}`
+      if (pod && !line.startsWith('Additional unhealthy pods omitted.')) {
+        podBytes.set(pod, (podBytes.get(pod) ?? 0) + Buffer.byteLength(line) + 1)
+      }
+    }
+    assert.ok(podBytes.size > 0)
+    for (const [name, bytes] of podBytes) {
+      assert.ok(bytes <= 8 * 1024, `${name} emitted ${bytes} bytes across status and logs`)
     }
   } finally { f.cleanup() }
 })
