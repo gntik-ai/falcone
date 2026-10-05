@@ -33,12 +33,12 @@ if (command === 'helm') {
   if (args[0] === 'template') {
     const index = args.indexOf('-s')
     if (index < 0) {
-      out(manifest('Job', 'falcone-temporal-schema') + manifest('Job', 'falcone-temporal-db-bootstrap') + manifest('ConfigMap', 'retained'))
+      out(manifest('Job', 'falcone-temporal-schema') + manifest('Job', 'falcone-temporal-db-bootstrap') + manifest('Job', 'falcone-temporal-r1-temporal-bootstrap') + manifest('ConfigMap', 'retained'))
     } else {
       const template = args[index + 1]
       const name = template.includes('db-bootstrap') ? 'falcone-temporal-db-bootstrap'
         : template.includes('schema-job') ? 'falcone-temporal-schema'
-        : template.includes('temporal/bootstrap') ? 'falcone-temporal-bootstrap'
+        : template.includes('temporal/bootstrap') ? 'falcone-temporal-r1-temporal-bootstrap'
         : path.basename(template, '.yaml')
       out(manifest(template.includes('external-secrets/') ? 'ExternalSecret' : 'Job', name))
     }
@@ -46,7 +46,7 @@ if (command === 'helm') {
   if (args[0] === 'upgrade') {
     const renderer = args[args.indexOf('--post-renderer') + 1]
     const input = path.join(dir, 'render-input')
-    fs.writeFileSync(input, manifest('Job', 'falcone-temporal-schema') + manifest('Job', 'falcone-temporal-db-bootstrap') + manifest('ConfigMap', 'retained'))
+    fs.writeFileSync(input, manifest('Job', 'falcone-temporal-schema') + manifest('Job', 'falcone-temporal-db-bootstrap') + manifest('Job', 'falcone-temporal-r1-temporal-bootstrap') + manifest('ConfigMap', 'retained'))
     const fd = fs.openSync(input, 'r')
     const result = spawnSync(renderer, { encoding: 'utf8', env: process.env, timeout: 5000, stdio: [fd, 'pipe', 'pipe'] })
     fs.closeSync(fd)
@@ -67,6 +67,7 @@ if (command === 'kubectl') {
       fs.appendFileSync(path.join(dir, 'job-applies'), data)
     }
     if (data.includes('name: platform-temporal')) fs.writeFileSync(path.join(dir, 'external-applied'), 'yes')
+    if (args.includes('name')) out('job.batch/falcone-temporal-r1-temporal-bootstrap')
     process.exit(0)
   }
   if (args[0] === 'delete' && args[1] === 'job') {
@@ -88,16 +89,20 @@ if (command === 'kubectl') {
   if (args[0] === 'get' && args[1] === 'deployment' && args.includes('name')) { out('deployment/test'); process.exit(0) }
   if (args[0] === 'get' && args[1] === 'pods') {
     if (process.env.BBX_DIAGNOSTICS_FAIL === 'true') process.exit(40)
-    if (text.includes('jsonpath=')) {
+    if (text.includes('jsonpath-as-json=')) {
+      if (!args.includes("jsonpath-as-json={.items[*]['metadata.name','status']}")) process.exit(41)
+      if (process.env.BBX_SLOW_STATUS === 'true' && text.includes('diagnostic-test')) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3200)
       const status = { phase: 'Pending', containerStatuses: [
         { name: 'app', ready: false, restartCount: 2, state: { waiting: { reason: 'CreateContainerConfigError', message: 'secret "in-falcone-temporal" not found' } }, lastState: { terminated: { reason: 'Error', message: process.env.E2E_BOOTSTRAP_SUPERADMIN_PASSWORD, exitCode: 1 } } },
         { name: 'sidecar', ready: false, state: { terminated: { reason: 'Error', exitCode: 2 } } },
       ], initContainerStatuses: [{ name: 'init-db', ready: false, state: { waiting: { reason: 'ImagePullBackOff', message: 'image unavailable' } } }] }
-      out('temporal-stuck\\t' + JSON.stringify(status))
-      out('credential-bootstrap-failed\\t' + JSON.stringify({ phase: 'Failed', containerStatuses: [{ name: 'credential-loader', ready: false, state: { terminated: { reason: 'Error', exitCode: 1 } } }] }))
-      out('completed-job\\t' + JSON.stringify({ phase: 'Succeeded' }))
-      out('ready-pod\\t' + JSON.stringify({ phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }], containerStatuses: [{ name: 'app', ready: true }] }))
-      if (process.env.BBX_MANY_PODS === 'true') for (let i = 0; i < 100; i++) out('stuck-' + i + '\\t' + JSON.stringify(status))
+      const pods = ['temporal-stuck', status,
+        'credential-bootstrap-failed', { phase: 'Failed', containerStatuses: [{ name: 'credential-loader', ready: false, state: { terminated: { reason: 'Error', exitCode: 1 } } }] },
+        'completed-job', { phase: 'Succeeded' },
+        'ready-pod', { phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }], containerStatuses: [{ name: 'app', ready: true }] },
+        'unscheduled-pod', { phase: 'Pending', conditions: [{ type: 'PodScheduled', status: 'False', reason: 'Unschedulable', message: 'Insufficient cpu' }] }]
+      if (process.env.BBX_MANY_PODS === 'true') for (let i = 0; i < 100; i++) pods.push('stuck-' + i, status)
+      out(JSON.stringify(pods))
     } else {
       out(process.env.BBX_FAIL_HEALTH === 'true' ? 'temporal-stuck 0/1 Pending 0 1m' : 'app 1/1 Running 0 1m')
     }
@@ -159,13 +164,19 @@ process.exit(0)
 }
 
 test('Temporal jobs are deferred, recreated and completed after ESO reconciliation', () => {
-  const f = fixture()
+  const f = fixture({ E2E_HELM_VALUES: 'fake-base.yaml', E2E_HELM_VALUES_OVERLAY: 'tests/e2e/values-integration.yaml' })
   try {
     const result = f.run()
     assert.equal(result.status, 0, result.output)
     const manifests = readFileSync(join(f.directory, 'job-applies'), 'utf8')
     assert.ok(manifests.indexOf('falcone-temporal-db-bootstrap') < manifests.indexOf('falcone-temporal-schema'))
     assert.match(readFileSync(join(f.directory, 'rendered'), 'utf8'), /name: retained/)
+    for (const { command, args } of f.calls()) {
+      if (command !== 'helm' || !['template', 'upgrade'].includes(args[0]) || args.includes('--help')) continue
+      assert.ok(args.indexOf('fake-base.yaml') < args.indexOf('tests/e2e/values-integration.yaml'))
+      assert.ok(args.includes('tests/e2e/values-integration.yaml'))
+    }
+    assert.ok(f.calls().some(({ command, args }) => command === 'kubectl' && args[0] === 'wait' && args[1] === 'job.batch/falcone-temporal-r1-temporal-bootstrap'))
     assert.doesNotMatch(result.output, /failure diagnostics/)
   } finally { f.cleanup() }
 })
@@ -174,7 +185,7 @@ test('ephemeral failures preserve status and emit safe diagnostics for all names
   for (const [name, overrides, expected] of [
     ['DB bootstrap Failed', { BBX_FAIL_WAIT: 'job/falcone-temporal-db-bootstrap' }, 37],
     ['schema incomplete', { BBX_FAIL_WAIT: 'job/falcone-temporal-schema' }, 37],
-    ['namespace bootstrap Failed', { BBX_FAIL_WAIT: 'job/falcone-temporal-bootstrap' }, 37],
+    ['namespace bootstrap Failed', { BBX_FAIL_WAIT: 'job.batch/falcone-temporal-r1-temporal-bootstrap' }, 37],
     ['ESO timeout', { BBX_FAIL_WAIT: 'externalsecret/platform-temporal-credentials' }, 37],
     ['target Secret missing', { BBX_MISSING_SECRET: 'true' }, 39],
     ['rollout failure', { BBX_FAIL_ROLLOUT: 'true' }, 38],
@@ -195,6 +206,7 @@ test('ephemeral failures preserve status and emit safe diagnostics for all names
         assert.match(result.output, /init-db/)
         assert.match(result.output, /ImagePullBackOff/)
         assert.match(result.output, /previous terminated: reason=Error/)
+        assert.match(result.output, /PodScheduled: False; reason=Unschedulable; message=Insufficient cpu/)
         assert.match(result.output, /Logs .* --previous/)
         assert.doesNotMatch(result.output, /completed-job|ready-pod/)
         for (const value of [seeded, f.randomCredential, f.unknownCredential]) assert.ok(!result.output.includes(value))
@@ -207,6 +219,24 @@ test('ephemeral failures preserve status and emit safe diagnostics for all names
       } finally { f.cleanup() }
     })
   }
+})
+
+test('busy API client still reports pod states and collects every namespace before logs', () => {
+  const f = fixture({ BBX_SLOW_STATUS: 'true' })
+  try {
+    const result = f.run(collector)
+    assert.equal(result.status, 0, result.output)
+    assert.match(result.output, /Pod temporal-stuck/)
+    assert.doesNotMatch(result.output, /Pod status unavailable/)
+    const calls = f.calls()
+    const firstLogs = calls.findIndex(({ args }) => args[0] === 'logs')
+    for (const namespace of ['diagnostic-test', 'eso-system', 'secret-store']) {
+      for (const resource of ['pods', 'events']) {
+        const index = calls.findIndex(({ args }) => args[0] === 'get' && args[1] === resource && args.includes(namespace))
+        assert.ok(index >= 0 && index < firstLogs)
+      }
+    }
+  } finally { f.cleanup() }
 })
 
 test('diagnostic collection failure never changes the original exit code', () => {
@@ -238,7 +268,7 @@ test('diagnostics bound pod, container, event, log and total output', () => {
 })
 
 test('post-renderer retains unrelated Jobs and works with custom release names', () => {
-  const manifest = ['schema', 'db-bootstrap', 'bootstrap'].map((suffix) => `---\n# Source: chart\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: "custom-temporal-${suffix}"\nspec:\n  template:\n    metadata:\n      name: nested\n`).join('')
+  const manifest = ['schema', 'db-bootstrap', 'r7-temporal-bootstrap', 'bootstrap'].map((suffix) => `---\n# Source: chart\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: "custom-temporal-${suffix}"\nspec:\n  template:\n    metadata:\n      name: nested\n`).join('')
   const directory = mkdtempSync(join(tmpdir(), 'falcone-renderer-'))
   const input = join(directory, 'manifest')
   writeFileSync(input, manifest)
@@ -246,7 +276,7 @@ test('post-renderer retains unrelated Jobs and works with custom release names',
   try {
     const result = spawnSync('bash', [postRenderer], { env: { ...process.env, E2E_TEMPORAL_RELEASE: 'custom' }, stdio: [fd, 'pipe', 'pipe'], encoding: 'utf8', timeout: 5000 })
     assert.equal(result.status, 0, result.stderr)
-    assert.doesNotMatch(result.stdout, /custom-temporal-(schema|db-bootstrap)/)
+    assert.doesNotMatch(result.stdout, /custom-temporal-(schema|db-bootstrap|r7-temporal-bootstrap)/)
     assert.match(result.stdout, /custom-temporal-bootstrap/)
   } finally { closeSync(fd); rmSync(directory, { recursive: true, force: true }) }
 })

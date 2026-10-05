@@ -114,6 +114,7 @@ jobs:
           E2E_HELM_RELEASE: falcone
           E2E_HELM_CHART: ${{ github.workspace }}/falcone-charts/charts/in-falcone
           E2E_HELM_VALUES: ${{ github.workspace }}/falcone-charts/deploy/kind/values-kind.yaml
+          E2E_HELM_VALUES_OVERLAY: ${{ github.workspace }}/tests/e2e/values-integration.yaml
           # The pinned chart uses a release digest that is not present in kind.
           # This isolated run instead consumes the local tag loaded above.
           E2E_USE_LOCAL_CONTROL_PLANE_IMAGE: 'true'

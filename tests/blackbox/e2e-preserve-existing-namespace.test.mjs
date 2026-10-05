@@ -36,7 +36,12 @@ case "$command_name" in
     case " $* " in
       *" config current-context "*) printf '%s\n' 'kind-falcone-bbx'; exit 0 ;;
       *" port-forward "*) trap 'exit 0' TERM INT; while sleep 1; do :; done ;;
-      *" apply "*) cat >/dev/null; exit 0 ;;
+      *" apply "*)
+        applied_manifest="$(cat)"
+        if [[ " $* " == *" -o name "* ]]; then
+          printf '%s\n' "$applied_manifest" | awk '/^  name:/ { print "job.batch/" $2; exit }'
+        fi
+        exit 0 ;;
     esac
     if [[ " $* " == *" get --raw "* ]]; then
       discovery_path="\${*: -1}"
@@ -234,7 +239,11 @@ case "$command_name" in
     if [[ " $* " == *" template "* ]]; then
       case "$BBX_SCENARIO" in
         helm-temporal|helm-temporal-eso|helm-temporal-large)
-          printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-schema'
+          if [[ " $* " == *" -s templates/temporal/bootstrap-job.yaml "* ]]; then
+            printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-r1-temporal-bootstrap'
+          else
+            printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-schema'
+          fi
           if [[ "$BBX_SCENARIO" == "helm-temporal-large" && " $* " != *" -s "* ]]; then
             # Exceed the pipe buffer after the marker: an early-exiting reader
             # must not turn the renderer's SIGPIPE into a non-Temporal install.
@@ -592,7 +601,7 @@ test('large Temporal renders retain the phased install with Helm 3 and Helm 4', 
         assert.match(installs[0].args, /--no-hooks/)
         assert.doesNotMatch(installs[0].args, /--wait(?:\s|$)/)
         assert.ok(invocation.calls.some(({ command, args }) => command === 'kubectl'
-          && /wait job\/falcone-temporal-bootstrap /.test(args)), 'Temporal bootstrap was skipped')
+          && /wait job.batch\/falcone-temporal-r1-temporal-bootstrap /.test(args)), 'Temporal bootstrap was skipped')
       } finally { invocation.cleanup() }
     })
   }
@@ -675,7 +684,7 @@ test('phased CI fails closed when an ESO ownership or readiness gate fails', asy
     ['externalsecret/platform-temporal-credentials', 'helm', /-s templates\/temporal\/db-bootstrap-job\.yaml/],
     ['job/falcone-temporal-db-bootstrap', 'helm', /-s templates\/temporal\/schema-job\.yaml/],
     ['job/falcone-temporal-schema', 'kubectl', /rollout status deployment\/falcone-temporal-frontend /],
-    ['job/falcone-temporal-bootstrap', 'helm', /-s templates\/bootstrap-job\.yaml/],
+    ['job.batch/falcone-temporal-r1-temporal-bootstrap', 'helm', /-s templates\/bootstrap-job\.yaml/],
   ]) {
     await t.test(failedWait, () => {
       const invocation = invokeHarness('helm-temporal-eso', {

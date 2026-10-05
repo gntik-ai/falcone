@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process'
 import { writeSync } from 'node:fs'
 
-const deadline = Date.now() + 25_000
+const deadline = Date.now() + 60_000
 let remainingBytes = 64 * 1024
 let remainingLines = 600
 let remainingLogs = 18
@@ -37,10 +37,12 @@ function emit(value, budget = Infinity) {
   return Buffer.byteLength(text) + 1
 }
 
-function kubectl(args) {
-  const timeout = Math.min(3000, deadline - Date.now())
+function kubectl(args, readTimeout = 3) {
+  // Allow client startup/discovery in addition to the API request deadline.
+  // A busy kind node must not lose status evidence to a 3s process timeout.
+  const timeout = Math.min((readTimeout + 3) * 1000, deadline - Date.now())
   if (timeout <= 0) return null
-  const result = spawnSync('kubectl', [...args, '--request-timeout=3s'], {
+  const result = spawnSync('kubectl', [...args, `--request-timeout=${readTimeout}s`], {
     encoding: 'utf8', timeout, maxBuffer: 2 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -53,22 +55,26 @@ function parseJson(text) {
 }
 
 emit('>> Ephemeral up failure diagnostics (64 KiB / 600 lines total; 8 KiB per pod)')
-for (const namespace of new Set([process.argv[2], 'eso-system', 'secret-store'])) {
-  if (!namespace || !/^[a-z0-9.-]+$/.test(namespace)) continue
+// Fetch all namespace summaries before potentially slow log reads consume the
+// deadline. Project just names/status, using kubectl's explicit JSON serializer.
+const snapshots = [...new Set([process.argv[2], 'eso-system', 'secret-store'])]
+  .filter((namespace) => namespace && /^[a-z0-9.-]+$/.test(namespace))
+  .map((namespace) => ({
+    namespace,
+    pods: parseJson(kubectl(['get', 'pods', '-n', namespace, '-o', "jsonpath-as-json={.items[*]['metadata.name','status']}"], 5)),
+    events: parseJson(kubectl(['get', 'events', '-n', namespace, '-o', 'jsonpath-as-json={.items[*]}'], 5)),
+  }))
+for (const { namespace, pods, events } of snapshots) {
   sectionBytes = Infinity
   sectionLines = Infinity
   emit(`>> Namespace ${namespace}: pods not Ready or not Completed (maximum 12)`)
   // Reserve space for every namespace and its events even during a large crash.
   sectionBytes = 12 * 1024
   sectionLines = 120
-  const projection = 'jsonpath={range .items[*]}{.metadata.name}{"\t"}{.status}{"\n"}{end}'
-  const pods = kubectl(['get', 'pods', '-n', namespace, '-o', projection])
   let shown = 0
-  for (const row of (pods ?? '').trim().split('\n')) {
-    const tab = row.indexOf('\t')
-    if (tab < 0) continue
-    const name = row.slice(0, tab)
-    const status = parseJson(row.slice(tab + 1))
+  for (let index = 0; Array.isArray(pods) && index < pods.length; index += 2) {
+    const name = pods[index]
+    const status = pods[index + 1]
     if (!/^[a-z0-9.-]+$/.test(name) || !status || status.phase === 'Succeeded') continue
     const containers = [...(status.initContainerStatuses ?? []), ...(status.containerStatuses ?? []), ...(status.ephemeralContainerStatuses ?? [])]
     const ready = status.conditions?.some((condition) => condition.type === 'Ready' && condition.status === 'True')
@@ -76,6 +82,9 @@ for (const namespace of new Set([process.argv[2], 'eso-system', 'secret-store'])
     if (++shown > 12 || sectionBytes < 150 || sectionLines < 3) { emit('Additional unhealthy pods omitted.'); break }
     let podBudget = 8 * 1024
     podBudget -= emit(`Pod ${name}: phase=${status.phase}, Ready=${Boolean(ready)}; reason=${status.reason ?? ''}; message=${status.message ?? ''}`, podBudget)
+    for (const condition of (status.conditions ?? []).filter((condition) => condition.status !== 'True').slice(0, 8)) {
+      podBudget -= emit(`  Condition ${condition.type}: ${condition.status}; reason=${condition.reason ?? ''}; message=${condition.message ?? ''}`, podBudget)
+    }
     for (const container of containers.slice(0, 8)) {
       if (!/^[a-z0-9.-]+$/.test(container.name)) continue
       podBudget -= emit(`  Container ${container.name}: ready=${container.ready}, restarts=${container.restartCount ?? 0}`, podBudget)
@@ -110,7 +119,7 @@ for (const namespace of new Set([process.argv[2], 'eso-system', 'secret-store'])
       }
     }
   }
-  if (pods === null) emit('Pod status unavailable.')
+  if (!Array.isArray(pods)) emit('Pod status unavailable (bounded API/client read failed).')
   sectionBytes = Infinity
   sectionLines = Infinity
   emit(`>> Namespace ${namespace}: last 40 events sorted by time`)
@@ -118,7 +127,6 @@ for (const namespace of new Set([process.argv[2], 'eso-system', 'secret-store'])
   sectionLines = 40
   // Events contain no specs or Secret data; only select these safe fields for
   // output, even if an event references a Secret.
-  const events = parseJson(kubectl(['get', 'events', '-n', namespace, '-o', 'jsonpath={.items}']))
   if (!Array.isArray(events)) { emit('Events unavailable.'); continue }
   const time = (event) => event.lastTimestamp ?? event.series?.lastObservedTime ?? event.eventTime ?? event.metadata?.creationTimestamp ?? ''
   events.sort((a, b) => time(a).localeCompare(time(b)))

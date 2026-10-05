@@ -828,6 +828,11 @@ case "${1:-up}" in
       if [ -n "${E2E_HELM_VALUES:-}" ]; then
         HELM_VALUES_ARGS=(-f "$E2E_HELM_VALUES")
       fi
+      # Isolated CI can tune scheduling without changing the shared kind or
+      # production profiles. Every render and install consumes the same overlay.
+      if [ -n "${E2E_HELM_VALUES_OVERLAY:-}" ]; then
+        HELM_VALUES_ARGS+=(-f "$E2E_HELM_VALUES_OVERLAY")
+      fi
       # The release profile pins the production control-plane image by digest.
       # An isolated kind run cannot resolve that registry reference after
       # `kind load docker-image`, so this explicit CI-only opt-in removes the
@@ -894,7 +899,7 @@ case "${1:-up}" in
       # (post-install hook) needs the Temporal frontend running BEFORE the workflow-worker
       # starts (otherwise the worker crashes on missing namespace and helm --wait never
       # finishes).  Strategy:
-      #   1. Deploy non-hook resources, deferring the ordinary Temporal DB Jobs.
+      #   1. Deploy non-hook resources, deferring ordinary Temporal Jobs.
       #   2. Reconcile OpenBao/ESO, then run DB-bootstrap and schema in order.
       #   3. Wait for Temporal frontend then run the Temporal and platform
       #      Keycloak bootstrap Jobs out-of-band.
@@ -923,9 +928,9 @@ case "${1:-up}" in
           HELM_POST_RENDERER=falcone-temporal-defer-jobs
         fi
         # Phase 1 — no --wait so workloads can retry while bootstrap converges.
-        # On this pinned chart the fresh-install schema/DB-bootstrap Jobs are
-        # ordinary resources, not hooks. A post-renderer prevents them starting
-        # before ESO readiness (even if the credential hook seeded their Secret).
+        # On this pinned chart the fresh-install Temporal Jobs are ordinary
+        # resources, not hooks. Defer DB work until ESO readiness and namespace
+        # bootstrap until the frontend is ready, giving each a fresh deadline.
         E2E_TEMPORAL_RELEASE="$REL" helm_client_apply upgrade --install --skip-schema-validation --no-hooks \
           "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}" "${HELM_NAMESPACE_ARGS[@]}" \
           --post-renderer "$HELM_POST_RENDERER"
@@ -975,10 +980,19 @@ case "${1:-up}" in
         echo ">> Waiting for Temporal frontend ..."
         kubectl rollout status deployment/"$REL"-temporal-frontend -n "$NS" --timeout=5m
         echo ">> Running Temporal namespace bootstrap ..."
-        helm_render \
+        temporal_bootstrap_resource="$(helm_render \
           -s templates/temporal/bootstrap-job.yaml 2>/dev/null \
-          | kubectl apply -n "$NS" -f -
-        kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=complete --timeout=5m
+          | kubectl apply -n "$NS" -f - -o name)"
+        # The pinned chart uses a revision-scoped Job name. Wait for the
+        # applied resource rather than an obsolete, hard-coded name.
+        case "$temporal_bootstrap_resource" in
+          job.batch/*|job/*) : ;;
+          *) echo "Temporal bootstrap did not apply exactly one Job." >&2; exit 2 ;;
+        esac
+        case "$temporal_bootstrap_resource" in
+          *[!a-zA-Z0-9./-]*) echo "Invalid Temporal bootstrap resource identity." >&2; exit 2 ;;
+        esac
+        kubectl wait "$temporal_bootstrap_resource" -n "$NS" --for=condition=complete --timeout=5m
         # The platform bootstrap needs Secrets normally made by the skipped
         # pre-install hook. Keep it opt-in for the scheduled CI environment,
         # which supplies all three disposable credentials above; ordinary

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Helm post-renderer: defer the two ordinary fresh-install Temporal Jobs until
-# OpenBao/ESO reconciliation. Keep every other rendered document unchanged.
+# Helm post-renderer: defer ordinary fresh-install Temporal Jobs until their
+# dependencies converge. Keep every other rendered document unchanged.
 set -euo pipefail
 awk -v release="${E2E_TEMPORAL_RELEASE:?}" '
   function flush() {
-    if (!(kind == "Job" && (name == release "-temporal-schema" || name == release "-temporal-db-bootstrap"))) {
+    bootstrap = index(name, release "-temporal-r") == 1 && name ~ /-r[0-9]+(-upgrade)?-temporal-bootstrap$/
+    if (!(kind == "Job" && (name == release "-temporal-schema" || name == release "-temporal-db-bootstrap" || bootstrap))) {
       printf "%s", document
     }
     document = ""; kind = ""; name = ""; metadata = 0
