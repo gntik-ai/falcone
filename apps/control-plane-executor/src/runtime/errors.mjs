@@ -5,6 +5,15 @@ export function clientError(message, statusCode, code) {
   return Object.assign(new Error(message), { statusCode, code });
 }
 
+// Only classified platform errors may supply a public code. Raw driver/library
+// errors fall back to the handler's stable code; the original error stays in logs.
+export function publicErrorCode(error, fallback) {
+  return Number.isInteger(error?.statusCode)
+    && typeof error?.code === 'string'
+    && /^[A-Z][A-Z0-9_]*$/.test(error.code)
+    ? error.code : fallback;
+}
+
 // Map a raw Postgres driver error to a sanitized client error. Never surfaces the
 // pg message/detail/hint or the SQL text — only a stable code + a generic message.
 // Codes: https://www.postgresql.org/docs/current/errcodes-appendix.html
