@@ -123,6 +123,64 @@ routes:
       scheme: http
       nodes:
         "falcone-control-plane.falcone.svc.cluster.local:8080": 1
+  - id: "2005-data"
+    uri: "/v1/postgres/*"
+    priority: 285
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    vars:
+      - ["uri", "~~", "^/v1/postgres/workspaces/[^/]+/data/[^/]+/schemas/[^/]+/tables/[^/]+/(rows(/by-primary-key)?|(rows/)?bulk/insert|search|embedding-mapping)$"]
+    plugins:
+      cors: {}
+      # Only realm names beneath the configured Keycloak base may select JWKS endpoints.
+      issuer-jwks-auth:
+        issuer_base_url: "http://falcone-keycloak:8080"
+        jwks_base_url: "http://falcone-keycloak:8080"
+        platform_realm: "in-falcone-platform"
+        audience: "in-falcone"
+        tenant_audience: "falcone-data-api"
+        enforce_tenant_audience: true
+        cache_ttl: 300
+        cache_max_entries: 128
+        timeout: 3
+      limit-count:
+        count: 120
+        time_window: 60
+        rejected_code: 429
+        key_type: var_combination
+        key: $http_x_tenant_id $http_x_workspace_id
+        allow_degradation: false
+      client-control:
+        max_body_size: 1048576
+      request-validation:
+        header_schema:
+          type: object
+          required: ["X-API-Version", "X-Correlation-Id"]
+          properties:
+            X-API-Version: { type: string }
+            X-Correlation-Id: { type: string }
+            X-Auth-Subject: { type: string, maxLength: 0 }
+            X-Tenant-Id: { type: string, maxLength: 0 }
+            X-Workspace-Id: { type: string, maxLength: 0 }
+            X-Actor-Roles: { type: string, maxLength: 0 }
+      proxy-rewrite:
+        headers:
+          set:
+            X-Correlation-Id: $http_x_correlation_id
+            X-Request-Id: $request_id
+            x-gateway-auth: "${{GATEWAY_SHARED_SECRET}}"
+          remove:
+            # API-key credentials must use 2005-key and its per-key bucket.
+            - apikey
+            - x-api-key
+            - x-tenant-id
+            - x-workspace-id
+            - x-auth-subject
+            - x-actor-roles
+    upstream:
+      type: roundrobin
+      scheme: http
+      nodes:
+        "falcone-control-plane-executor.falcone.svc.cluster.local:8080": 1
   - id: "2006"
     uri: "/v1/mongo/*"
     priority: 234
