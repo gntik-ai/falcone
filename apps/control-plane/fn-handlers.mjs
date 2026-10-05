@@ -441,6 +441,7 @@ async function fnDeploy(ctx) {
   try {
     await (ctx.deployKnativeService ?? deployKnativeService)(name, code, {
       tenantId: ws.tenant_id,
+      workspaceId: ws.id,
       functionResourceId: resourceId,
       memoryMb,
       timeoutMs,
@@ -595,7 +596,7 @@ async function fnInvoke(ctx) {
     // Verified caller context (#639): tenant/principal/roles from the JWT-verified
     // ctx.identity; workspace from the resolved function row (the resource being
     // invoked), falling back to the caller's ambient workspace. Delivered to the
-    // function as X-Falcone-* headers — never from the user-controlled body.
+    // function in signed invocation claims — never from the user-controlled body.
     const caller = {
       tenantId: ctx.identity?.tenantId ?? null,
       workspaceId: r.workspace_id ?? ctx.identity?.workspaceId ?? null,
@@ -606,7 +607,10 @@ async function fnInvoke(ctx) {
     // Cold start: the cluster-local DNS only resolves once the ksvc is Ready.
     const ready = await (ctx.waitKsvcReady ?? waitKsvcReady)(r.ksvc_name, 90000);
     run = ready
-      ? await (ctx.invokeKnative ?? invokeKnative)(ksvcHost(r.ksvc_name), params, { timeoutMs: (r.timeout_ms || 60000) + 30000, caller })
+      ? await (ctx.invokeKnative ?? invokeKnative)(ksvcHost(r.ksvc_name), params, {
+        timeoutMs: (r.timeout_ms || 60000) + 30000, caller,
+        audience: r.ksvc_name, tenantId: r.tenant_id, workspaceId: r.workspace_id,
+      })
       : { status: 'failure', result: { error: 'function (Knative service) is not ready' }, logs: [], durationMs: 0, statusCode: 503 };
   }
   const activationId = `act_${randomUUID().slice(0, 12)}`;
@@ -709,6 +713,7 @@ async function fnRollback(ctx) {
     try {
       await (ctx.deployKnativeService ?? deployKnativeService)(deployName, target.source_code, {
         tenantId: r.tenant_id,
+        workspaceId: r.workspace_id,
         functionResourceId: r.resource_id,
         memoryMb: target.memory_mb,
         timeoutMs: target.timeout_ms,

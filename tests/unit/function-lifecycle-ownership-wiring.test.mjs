@@ -59,6 +59,7 @@ test('fn-lifecycle-own-01: fnRollback re-deploys the retained revision under the
   const result = await FN_HANDLERS.fnRollback(ctx);
   assert.equal(result.statusCode, 202);
   assert.equal(deploys.length, 1);
+  assert.equal(deploys[0].workspaceId, 'ws-a');
   assert.deepEqual(
     { tenantId: deploys[0].tenantId, functionResourceId: deploys[0].functionResourceId },
     { tenantId: 'tenant-a', functionResourceId: 'fn-a' },
@@ -81,6 +82,7 @@ test('fn-lifecycle-own-02: fnDeploy UPDATE reuses the STABLE resource id so the 
   const result = await FN_HANDLERS.fnDeploy(ctx);
   assert.equal(result.statusCode, 202);
   assert.equal(deploys.length, 1);
+  assert.equal(deploys[0].workspaceId, 'ws-a');
   assert.equal(deploys[0].tenantId, 'tenant-a');
   assert.equal(deploys[0].functionResourceId, 'fn_known01', 'an update must reuse the stable function id');
 });

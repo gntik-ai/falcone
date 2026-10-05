@@ -78,10 +78,10 @@ function assertRootContextFile(relativePath) {
 function validateFnRootContext(source) {
   const instructions = parseDockerfile(source);
   const copy = oneInstruction(instructions, 'COPY');
-  const match = copy.args.match(/^(\S+)\s+\.\/$/);
-  assert.ok(match, 'fn-runtime must COPY one server file into its WORKDIR');
-  assert.equal(match[1], 'apps/fn-runtime/server.mjs');
-  assertRootContextFile(match[1]);
+  const sources = copy.args.trim().split(/\s+/);
+  assert.equal(sources.pop(), './');
+  assert.deepEqual(sources, ['apps/fn-runtime/server.mjs', 'apps/fn-runtime/invocation-auth.mjs']);
+  for (const source of sources) assertRootContextFile(source);
   return instructions;
 }
 
@@ -160,7 +160,7 @@ test('web-console final stage retains numeric non-root user, port, static server
 
 // bbx-922-004 | fn-openshift-build-from-source | #### Scenario: Previous root-context Dockerfiles are rejected
 test('contract validators are sensitive to both pre-fix Dockerfile regressions', () => {
-  const oldFnDockerfile = fnDockerfile.replace('COPY apps/fn-runtime/server.mjs ./', 'COPY server.mjs ./');
+  const oldFnDockerfile = fnDockerfile.replace('apps/fn-runtime/server.mjs', 'server.mjs');
   assert.notEqual(oldFnDockerfile, fnDockerfile);
   assert.throws(() => validateFnRootContext(oldFnDockerfile), /apps\/fn-runtime\/server\.mjs/);
 

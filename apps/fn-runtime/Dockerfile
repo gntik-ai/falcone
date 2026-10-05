@@ -9,7 +9,7 @@
 ARG NODE_BASE_IMAGE=node:22-alpine
 FROM ${NODE_BASE_IMAGE}
 WORKDIR /app
-COPY apps/fn-runtime/server.mjs ./
+COPY apps/fn-runtime/server.mjs apps/fn-runtime/invocation-auth.mjs ./
 ENV NODE_ENV=production PORT=8080
 USER 1000
 EXPOSE 8080

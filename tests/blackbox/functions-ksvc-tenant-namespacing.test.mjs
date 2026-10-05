@@ -22,7 +22,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ksvcNameForWorkspace } from '../../apps/control-plane/function-executor.mjs';
+import { buildInvokeHeaders, ksvcNameForWorkspace } from '../../apps/control-plane/function-executor.mjs';
+
+import { createInvocationVerifier } from '../../apps/fn-runtime/invocation-auth.mjs';
+import { invocationFixture, installInvocationFixture } from '../helpers/function-invocation-fixture.mjs';
 
 const DNS1035 = /^[a-z]([-a-z0-9]*[a-z0-9])?$/;
 
@@ -61,4 +64,21 @@ test('bbx-fn-ns-05: distinct even when the workspace slug is absent', () => {
   const b = ksvcNameForWorkspace({ id: WS_B.id, tenant_id: 'tenant-b' }, 'x');
   assert.notEqual(a, b, `id-only collision: ${a}`);
   assert.ok(DNS1035.test(a) && DNS1035.test(b), `invalid: ${a} / ${b}`);
+});
+
+// Names remain stable; authentication supplies the security boundary.
+test('bbx-fn-ns-06: a credential for tenant A cannot invoke tenant B with identical slug/action', (t) => {
+  const fixture = invocationFixture();
+  installInvocationFixture(t, fixture);
+  const a = ksvcNameForWorkspace(WS_A, 'x');
+  const b = ksvcNameForWorkspace(WS_B, 'x');
+  const caller = { tenantId: WS_A.tenant_id, workspaceId: WS_A.id, principal: 'user-a', actorType: 'tenant_owner', roles: [] };
+  const headers = buildInvokeHeaders('{}', caller, { audience: a, tenantId: WS_A.tenant_id, workspaceId: WS_A.id });
+  const verifier = (ws, name) => createInvocationVerifier({
+    FN_INVOCATION_JWKS: fixture.env.FN_INVOCATION_JWKS,
+    K_SERVICE: name, FN_TENANT_ID: ws.tenant_id, FN_WORKSPACE_ID: ws.id,
+  });
+  assert.deepEqual(verifier(WS_A, a)(headers.authorization, '{}'), caller);
+  assert.equal(verifier(WS_B, b)(headers.authorization, '{}'), null);
+  assert.equal(a, 'fn-app-staging-x-0521a3ba02');
 });
