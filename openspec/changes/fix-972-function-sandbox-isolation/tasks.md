@@ -13,7 +13,8 @@
 
 ## Companion deployment repository and release gates
 
-- [ ] Provision control-plane-only private signing material through External Secrets/OpenBao idempotently on fresh install and upgrade, without a Helm readiness deadlock.
+- [x] Seed control-plane-only signing material in OpenBao idempotently on fresh install and upgrade, preserving existing keys.
+- [ ] Preserve the ESO signer Secret across managed-ESO Helm upgrades and prove the lifecycle with a render test, without a Helm readiness deadlock.
 - [x] Wire all three invocation env vars in the control-plane chart, with reuse-values-safe defaults and render tests excluding signing material from function workloads.
 - [x] Add default-enabled function ingress/egress NetworkPolicy and configurable allow-list.
 - [x] Prove selectors against rendered/fixture function pods in every shipped values profile.
@@ -24,21 +25,21 @@
 - [ ] Prove cold-start invocation through the public API succeeds with exactly one activation.
 - [ ] Independently verify the ChangeSet before release; kindnet alone is insufficient evidence.
 
-Completed chart wiring, policy and selector tasks reflect the supplied independent checker
-evidence for falcone-charts commit `ef47547ec77ef0f902d584f7bafe928627b6954a` (passing delivery and
-selector tests, reuse-values render and Helm lint). That review found that the OpenBao signer
-record is not seeded, so ESO cannot create its target Secret on a fresh install. Both blocking
-findings require the companion OpenBao init Job to generate the absent record idempotently and
-preserve existing signing material. The operations guide records the exact properties and
-required companion tests. The source CI ExternalSecret readiness wait remains mandatory;
-this source follow-up fixes the isolated test harness's Node lookup and does not claim chart
-key provisioning or cluster acceptance.
+Completed chart seeding, wiring, policy and selector tasks reflect the supplied independent
+checker evidence for falcone-charts commit `c1bad265f62236cc24d20c418d40875c729c9e51`
+(passing bootstrap and secret-delivery tests, selector tests, reuse-values render and Helm lint).
+OpenBao now seeds the absent signer record and preserves existing signing material. The remaining
+blocking deployment finding is the managed-ESO ExternalSecret's hook lifecycle: Helm recreates
+the hook on upgrade, and `creationPolicy: Owner` lets garbage collection delete the signer Secret.
+Optional env references can then leave a starting control-plane pod without signing configuration
+until restarted. The companion chart must preserve the Secret across upgrades and add a render
+test for the chosen lifecycle. The source CI ExternalSecret readiness wait remains mandatory;
+this source follow-up reconciles the documentation and does not claim the deployment fix or
+cluster acceptance.
 
-Source follow-up validation: the 25 invocation-auth and lifecycle/ownership unit tests pass,
-as do the caller-header tests, six signed namespacing cases and runtime Dockerfile COPY check.
-Scoped harness tests pass for Helm 3/4 phased install, signer ESO ordering, eight readiness
-failure gates and namespace preservation/cleanup. Three HTTP runtime blackbox cases require
-local sockets unavailable here. The service-catalog validator needs the already-declared
-`yaml` package installed in CI; the initial full namespace suite exceeded its 90-second
-budget, so only the scoped harness cases are claimed. Image builds/scans and policy-enforcing
-cluster acceptance remain CI/release gates.
+Current source follow-up validation: the invocation-auth, lifecycle-ownership, cleanup-ownership,
+caller-context and signed namespacing test files pass under a 60-second bound. This follow-up
+changes only the task record and operations guide; no dependency or workflow pin changes are
+needed. Image builds/scans, the full phased-install namespace suite, the service-catalog validator
+(missing installed dependencies) and policy-enforcing cluster acceptance remain PR CI/release
+checks. Companion chart lifecycle validation remains the deployment maker's responsibility.

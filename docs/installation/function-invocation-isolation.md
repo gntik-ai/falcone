@@ -42,20 +42,27 @@ plane to start while function operations remain fail-closed. The source phased C
 store are ready, and waits for ESO reconciliation before subsequent bootstrap and rollout gates.
 That reconciliation still requires the companion chart to provision the OpenBao record.
 
-The outstanding provisioning fix belongs in the companion chart's
-`charts/in-falcone/charts/openbao/templates/openbao-init-job.yaml`. When the record is absent,
-the existing bootstrap must generate an Ed25519 PKCS#8 private key, a nonempty key ID and a
-matching public-only JWKS, stored together under `secret/platform/functions/invocation` with
-properties `private-key`, `key-id` and `jwks`. Re-running bootstrap on install or upgrade must
-preserve the existing record, including the active signing key and overlapping verification
-keys. Keep generation inside the OpenBao bootstrap; do not generate keys in source CI, inline
-them in Helm values, log them or fall back to unsigned invocations.
+The supplied independent checker evidence for falcone-charts commit
+`c1bad265f62236cc24d20c418d40875c729c9e51` confirms idempotent signer seeding and passing bootstrap
+and secret-delivery tests. When the record is absent, the OpenBao bootstrap generates an Ed25519
+PKCS#8 private key, a nonempty key ID and a matching public-only JWKS, stored together under
+`secret/platform/functions/invocation` with properties `private-key`, `key-id` and `jwks`.
+Re-running bootstrap on install or upgrade preserves the existing record, including the active
+signing key and overlapping verification keys. Keep generation inside the OpenBao bootstrap;
+do not generate keys in source CI, inline them in Helm values, log them or fall back to unsigned
+invocations.
 
-Companion tests must prove absent-record creation and existing-record preservation, ESO property
-mapping and private-key delivery only to the control-plane container. Until that fix lands,
-`platform-function-invocation` cannot become Ready on a fresh install and the phased CI install
-must stop at its existing ExternalSecret readiness wait. Removing or skipping that wait would
-hide missing provisioning and leave function deploys and invocations unavailable.
+The outstanding companion fix is in
+`charts/in-falcone/charts/eso/templates/external-secrets/platform-function-invocation.yaml`.
+In managed-ESO mode Helm deletes and recreates this hook on upgrade. With `creationPolicy: Owner`,
+deleting the ExternalSecret lets Kubernetes garbage-collect its target Secret.
+`deletionPolicy: Retain` does not prevent that owner-reference deletion. A control-plane pod starting before ESO
+recreates the Secret can receive no signing env through the optional references and fail every
+invocation with `503` until restarted. Preserve the signer Secret through upgrades using the
+existing precreated Secret/ESO Merge lifecycle or an equivalent lifecycle that avoids this gap,
+and add a render test proving the chosen lifecycle. The phased CI install must still stop at its
+existing ExternalSecret readiness wait on reconciliation failure. Bootstrap test success does not
+clear this upgrade gate or establish live cluster acceptance.
 
 Signing configuration errors fail before the control plane opens an invocation socket and record a
 failed activation. Missing or malformed runtime public-key/target configuration denies all POSTs
