@@ -243,14 +243,27 @@ async function createTenantUser(ctx) {
   const roles = Array.isArray(body.roles) && body.roles.length ? body.roles : ['tenant_developer'];
   const bad = roles.filter((r) => !TENANT_REALM_ROLES.includes(r));
   if (bad.length) return err(400, 'INVALID_ROLE', `unknown realm roles: ${bad.join(', ')}`);
+  // Stamp only server-resolved identity bindings (#1016/#961); no binding means a tenant principal.
+  const attributes = { tenant_id: t.id };
+  let workspaceId = null;
+  if (body.workspaceId !== undefined) {
+    if (typeof body.workspaceId !== 'string' || !body.workspaceId.trim())
+      return err(400, 'VALIDATION_ERROR', 'workspaceId must be a non-empty string');
+    const workspace = await store.getWorkspaceInTenant(pool, t.id, body.workspaceId);
+    if (!workspace || workspace.tenant_id !== t.id)
+      return err(400, 'WORKSPACE_NOT_IN_TENANT', 'workspaceId does not identify a workspace of this tenant');
+    workspaceId = workspace.id;
+    attributes.workspace_id = workspace.id;
+  }
   const kc = ctx.kcAdmin ?? kcAdmin;
   try {
     const userId = await kc.createUser(t.iam_realm, {
       username, email: body.email ?? null, firstName: body.firstName ?? null, lastName: body.lastName ?? null,
-      password: body.password ?? null, temporary: !body.password
+      password: body.password ?? null, temporary: !body.password, attributes
     });
     await kc.assignRealmRoles(t.iam_realm, userId, roles);
-    return ok(201, { userId, username, realm: t.iam_realm, roles });
+    return ok(201, { userId, username, realm: t.iam_realm, roles,
+      workspaceId, principalScope: workspaceId ? 'workspace' : 'tenant' });
   } catch (e) {
     return kcBackedErr(e, 'CREATE_USER_FAILED');
   }
