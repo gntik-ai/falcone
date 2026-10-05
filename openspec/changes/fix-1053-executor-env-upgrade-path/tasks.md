@@ -1,6 +1,41 @@
 # Source implementation and paired deployment handoff
 
-## Source scope
+## Current source follow-up review (2026-10-05)
+
+- [x] Verify the clean assigned worktree and branch
+  `agent/falcone/1053/98345e77-680f-56ce-bbb1-390a72484290` at supplied starting
+  HEAD `b7ce107133a8b15196cc58900aa4876dc0ba81d4`, retaining the existing
+  ChangeSet commits on base `baeec03855e44d83164343daa9b939fa03d8efa8`.
+- [x] Review the existing proposal, tasks and deployment-packaging spec delta.
+  The source requirements are already implemented; no runtime, dependency,
+  fixture or spec correction is needed for this follow-up.
+- [x] Verify both Hermes-managed workflow pins match the clean paired deployment
+  checkout at `75fef8f41b5542ca82380532af68058c13cbb0b9`; leave the pins untouched.
+- [x] Run `timeout 45s openspec validate fix-1053-executor-env-upgrade-path
+  --strict --no-interactive --json`: PASS, with no findings.
+- [x] Run `FALCONE_CHART_PATH` set to the assigned deployment chart with
+  `timeout 60s node --test --experimental-test-isolation=none
+  tests/blackbox/mongo-gateway-route.test.mjs`: PASS, 6/6 with no skips,
+  including both workflow pins and Helm render parity.
+- [x] Refresh this source handoff without modifying the deployment worktree.
+
+The supplied platform validation reports new findings only in the deployment
+repository; those fixes belong to its assigned maker. The older review below
+records the findings and evidence at `bc53eca`, not the current deployment
+status. The paired checkout now contains follow-up evidence-serialization and
+operator-procedure changes. This source review does not independently verify
+those repairs or claim live upgrade success. Preserve all outstanding deployment
+CI and release gates below. If the deployment maker produces another commit,
+Hermes must reconverge both source pins and rerun Mongo route parity.
+
+SKIPPED locally: the disposable-kind live upgrade matrix and its rollout,
+pod-resolution and intermediate-ReplicaSet checks require kind, Helm 3 and
+container images unavailable in this network-free sandbox. Deployment lint,
+Argo equivalence and bootstrap regression checks remain with the deployment
+maker and PR CI. These limitations do not block the completed source scope.
+No dependency resolution is required.
+
+## Previous source scope (historical review)
 
 - [x] Verify the clean assigned worktree and branch
   `agent/falcone/1053/98345e77-680f-56ce-bbb1-390a72484290` at expected HEAD
@@ -20,7 +55,7 @@
 - [x] Run strict OpenSpec validation and the source Mongo route parity gate.
 - [x] Persist the remaining deployment obligations below in this source handoff.
 
-## Deployment maker and platform scope
+## Previous deployment maker and platform scope (historical review)
 
 The paired deployment checkout is clean at
 `bc53eca0e0f99000a60646ebd5893640c728d7bf`. The source maker has read only the
@@ -94,7 +129,7 @@ in that separately assigned deployment worktree are modified here.
 - [ ] Hermes synchronizes both pins again after the pending deployment repair
   and reruns source Mongo route parity against its final HEAD.
 
-## Bounded source validation (current follow-up review)
+## Previous bounded source validation (historical review)
 
 The paired checkout and both existing source pins match
 `bc53eca0e0f99000a60646ebd5893640c728d7bf`. A subsequent deployment repair
