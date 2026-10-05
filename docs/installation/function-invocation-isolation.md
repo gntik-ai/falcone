@@ -22,13 +22,25 @@ The executor copies only the public key ring to each function revision as `FN_IN
 with `FN_KSVC_NAME`, `FN_TENANT_ID` and `FN_WORKSPACE_ID`. Knative's `K_SERVICE` is the authoritative
 audience when present. No signing implementation or private key is copied into the runtime image.
 The runtime captures this configuration at startup. Workspace-secret mappings cannot override
-`FN_*`, `K_SERVICE`, `NODE_OPTIONS` or `NODE_PATH`.
+`FN_SRC`, `FN_KSVC_NAME`, `FN_TENANT_ID`, `FN_WORKSPACE_ID`, `FN_INVOCATION_JWKS`,
+`FN_INVOCATION_PRIVATE_KEY`, `FN_INVOCATION_KEY_ID`, `K_SERVICE`, `NODE_OPTIONS` or `NODE_PATH`.
 
 Create and PATCH requests using reserved secret env names return `400 VALIDATION_ERROR` before
-secret resolution or workload mutation. This also affects existing references such as `fn-token`,
-whose default env name is `FN_TOKEN`. To re-roll those functions, keep the workspace secret and use
-an explicit safe mapping such as `{ "name": "fn-token", "env": "APP_TOKEN" }`, then update the code
-to read that name. The manifest builder independently rejects reserved env names with `400`.
+secret resolution or workload mutation. Other `FN_*` names remain available: existing references
+such as `fn-token` retain their default `FN_TOKEN` mapping on re-roll. A secret whose default name
+is reserved needs an explicit safe mapping such as `{ "name": "fn-src", "env": "APP_SOURCE" }`,
+with code updated to read that name. The manifest builder independently rejects reserved env names
+with `400`.
+
+Key delivery must also converge on fresh installs and upgrades without manual provisioning. The
+companion chart must seed `platform/functions/invocation` idempotently through its existing
+OpenBao bootstrap and preserve existing signing keys. Required Secret references cannot depend
+on a Secret created only by a post-install hook after Helm's workload readiness wait. Use the
+existing precreated Secret/ESO Merge lifecycle, or optional references that allow the control
+plane to start while function operations remain fail-closed. The source phased CI install applies
+`platform-function-invocation` alongside the other chart ExternalSecrets after OpenBao and the
+store are ready, and waits for ESO reconciliation before subsequent bootstrap and rollout gates.
+That reconciliation still requires the companion chart to provision the OpenBao record.
 
 Signing configuration errors fail before the control plane opens an invocation socket and record a
 failed activation. Missing or malformed runtime public-key/target configuration denies all POSTs

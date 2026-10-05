@@ -30,8 +30,12 @@ export const FUNCTION_OWNERSHIP_LABELS = Object.freeze({
 
 const KUBERNETES_LABEL_VALUE = /^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$/;
 const KUBERNETES_SERVICE_NAME = /^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$/;
-const RESERVED_FUNCTION_ENV_NAME = /^(FN_|K_SERVICE$|NODE_OPTIONS$|NODE_PATH$)/;
-export const isReservedFunctionEnvName = (name) => typeof name === 'string' && RESERVED_FUNCTION_ENV_NAME.test(name);
+const RESERVED_FUNCTION_ENV_NAMES = new Set([
+  'FN_SRC', 'FN_KSVC_NAME', 'FN_TENANT_ID', 'FN_WORKSPACE_ID',
+  'FN_INVOCATION_JWKS', 'FN_INVOCATION_PRIVATE_KEY', 'FN_INVOCATION_KEY_ID',
+  'K_SERVICE', 'NODE_OPTIONS', 'NODE_PATH',
+]);
+export const isReservedFunctionEnvName = (name) => RESERVED_FUNCTION_ENV_NAMES.has(name);
 
 function k8s(method, path, body, { contentType = 'application/json' } = {}) {
   return new Promise((resolve, reject) => {

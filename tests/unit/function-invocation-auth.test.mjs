@@ -129,16 +129,17 @@ test('manifest labels actual function pods and injects public-only verification 
   assert.ok(!values.FN_INVOCATION_PRIVATE_KEY);
   // Avoid assertion diagnostics containing ephemeral key material.
   assert.equal(JSON.stringify(manifest).includes(active.env.FN_INVOCATION_PRIVATE_KEY), false);
-  for (const name of ['FN_INVOCATION_PRIVATE_KEY', 'FN_INVOCATION_JWKS', 'FN_KSVC_NAME', 'FN_SRC', 'K_SERVICE', 'NODE_OPTIONS', 'NODE_PATH']) {
+  for (const name of ['FN_INVOCATION_PRIVATE_KEY', 'FN_INVOCATION_KEY_ID', 'FN_INVOCATION_JWKS', 'FN_KSVC_NAME', 'FN_TENANT_ID', 'FN_WORKSPACE_ID', 'FN_SRC', 'K_SERVICE', 'NODE_OPTIONS', 'NODE_PATH']) {
     assert.throws(() => buildFunctionKsvcManifest(target.audience, '', { ...opts, secretEnv: [{ name, value: 'unsafe' }] }),
       (error) => error.statusCode === 400 && /reserved/.test(error.message));
   }
 });
 
-test('an existing fn-prefixed workspace secret can use an explicit safe env mapping', async (t) => {
+test('fn-prefixed workspace secrets retain their default env names and support explicit mappings', async (t) => {
   installInvocationFixture(t, active);
   const secretStore = createWorkspaceSecretStore({ readSecret: async () => ({ data: { value: 'test-placeholder' } }) });
   const secretEnv = await secretStore.resolveEnv(target.tenantId, target.workspaceId, [
+    'fn-token',
     { name: 'fn-token', env: 'APP_TOKEN' },
   ]);
   const manifest = buildFunctionKsvcManifest(target.audience, 'function main(){}', {
@@ -146,7 +147,7 @@ test('an existing fn-prefixed workspace secret can use an explicit safe env mapp
   });
   const entries = manifest.spec.template.spec.containers[0].env;
   assert.ok(entries.some(({ name, value }) => name === 'APP_TOKEN' && value === 'test-placeholder'));
-  assert.ok(!entries.some(({ name }) => name === 'FN_TOKEN'));
+  assert.ok(entries.some(({ name, value }) => name === 'FN_TOKEN' && value === 'test-placeholder'));
 });
 
 test('ownership-checked PATCH idempotently re-rolls labels/public key ring without renaming', async (t) => {

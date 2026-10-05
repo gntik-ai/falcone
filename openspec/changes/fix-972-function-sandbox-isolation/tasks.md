@@ -7,11 +7,13 @@
 - [x] Add scoped signer/verifier, runtime listener, manifest, lifecycle and naming tests.
 - [x] Allow three seconds of issuance-time clock skew without extending expiry or credential lifetime.
 - [x] Return a clear 400 for reserved workspace-secret env mappings and document existing-function migration.
+- [x] Reserve only runtime, invocation and Node configuration names; preserve unrelated FN_* secret mappings.
+- [x] Apply the function signer ExternalSecret in phased CI through the existing OpenBao/ESO readiness gates.
 
 ## Companion deployment repository and release gates
 
-- [ ] Provision control-plane-only private signing material through External Secrets/OpenBao.
-- [ ] Wire all three invocation env vars in the control-plane chart, with reuse-values-safe defaults and render tests excluding signing material from function workloads.
+- [ ] Provision control-plane-only private signing material through External Secrets/OpenBao idempotently on fresh install and upgrade, without a Helm readiness deadlock.
+- [x] Wire all three invocation env vars in the control-plane chart, with reuse-values-safe defaults and render tests excluding signing material from function workloads.
 - [x] Add default-enabled function ingress/egress NetworkPolicy and configurable allow-list.
 - [x] Prove selectors against rendered/fixture function pods in every shipped values profile.
 - [ ] Run HTTP blackbox tests, image builds/scans and chart validation in PR CI.
@@ -21,7 +23,9 @@
 - [ ] Prove cold-start invocation through the public API succeeds with exactly one activation.
 - [ ] Independently verify the ChangeSet before release; kindnet alone is insufficient evidence.
 
-Completed chart policy and selector tasks reflect the supplied independent checker evidence for
-falcone-charts commit `1f6338cd66b6` (16/16 selector tests across profiles and passing Helm lint).
-Control-plane key delivery remains a required companion deployment fix, not a deferred optional
-review item. This source follow-up does not claim chart key delivery or cluster acceptance.
+Completed chart wiring, policy and selector tasks reflect the supplied independent checker
+evidence for falcone-charts commit `1f259abf0de70a77a01a73a40c5c0d1bb707b8f0` (passing delivery and
+selector tests, reuse-values render and Helm lint). The same review found that neither the target
+Secret nor the OpenBao signer record is bootstrapped. Fresh-install/upgrade key provisioning and
+readiness remain a required companion deployment fix. This source follow-up restores the skipped
+CI ExternalSecret but does not claim chart key provisioning or cluster acceptance.

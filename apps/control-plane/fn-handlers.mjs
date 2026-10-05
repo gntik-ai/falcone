@@ -420,7 +420,7 @@ async function fnDeploy(ctx) {
     const envName = ref && typeof ref === 'object' && ref.env ? ref.env : secretEnvVarName(name);
     return isReservedFunctionEnvName(envName);
   })) {
-    return err(400, 'VALIDATION_ERROR', 'Workspace secret env names cannot use FN_*, K_SERVICE, NODE_OPTIONS or NODE_PATH; use a different env mapping');
+    return err(400, 'VALIDATION_ERROR', 'Workspace secret env name is reserved for Function runtime configuration; use a different env mapping');
   }
   // Ownership and validation precede dependency status, but the gate precedes secret resolution,
   // registry writes, and every Kubernetes call. An adjacent tenant therefore gets no status oracle.

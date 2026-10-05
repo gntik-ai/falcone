@@ -90,8 +90,10 @@ test('fn-lifecycle-own-02: fnDeploy UPDATE reuses the STABLE resource id so the 
 test('fnDeploy create/PATCH reject reserved secret env mappings with 400 before resolution or mutations', async () => {
   const existing = { resource_id: 'fn_known01', tenant_id: WS.tenant_id, workspace_id: WS.id };
   const reservedRefs = [
-    'fn-token', 'fn_custom', 'k-service', 'node-options', 'node-path',
-    { name: 'fn-token' }, { secretName: 'fn-token' },
+    'fn-src', 'fn-ksvc-name', 'fn-tenant-id', 'fn-workspace-id',
+    'fn-invocation-private-key', 'fn-invocation-key-id', 'fn-invocation-jwks',
+    'k-service', 'node-options', 'node-path',
+    { name: 'fn-src' }, { secretName: 'fn-src' },
     { name: 'api-token', env: 'FN_INVOCATION_PRIVATE_KEY' },
     { secretName: 'api-token', env: 'FN_INVOCATION_JWKS' },
     { name: 'api-token', env: 'K_SERVICE' },
@@ -123,7 +125,7 @@ test('fnDeploy create/PATCH reject reserved secret env mappings with 400 before 
 
 test('fnDeploy preserves workspace authorization before reserved secret validation', async () => {
   const result = await FN_HANDLERS.fnDeploy(baseCtx({
-    body: { workspaceId: 'ws-foreign', actionName: 'hello', source: { inlineCode: 'function main(){}' }, secrets: ['fn-token'] },
+    body: { workspaceId: 'ws-foreign', actionName: 'hello', source: { inlineCode: 'function main(){}' }, secrets: ['fn-src'] },
     store: { getWorkspace: async () => ({ id: 'ws-foreign', tenant_id: 'tenant-b' }) },
   }));
   assert.equal(result.statusCode, 403);

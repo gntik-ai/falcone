@@ -643,6 +643,7 @@ test('isolated CI renders auxiliary namespaces and preserves ESO gates in the ph
     const webhook = indexOf('kubectl', /wait job\/eso-webhook-wait /)
     const openbao = indexOf('kubectl', /wait job\/openbao-init /)
     const store = indexOf('kubectl', /wait clustersecretstore\/openbao-backend /)
+    const functionSigner = indexOf('helm', /-s charts\/eso\/templates\/external-secrets\/platform-function-invocation\.yaml/)
     const secrets = indexOf('kubectl', /wait externalsecret --all /)
     const bootstrap = indexOf('kubectl', /wait job\/falcone-in-falcone-bootstrap /)
     const discard = indexOf('kubectl', /delete job falcone-temporal-schema falcone-temporal-db-bootstrap /)
@@ -657,7 +658,9 @@ test('isolated CI renders auxiliary namespaces and preserves ESO gates in the ph
     assert.ok(preflight >= 0 && preflight < install, 'ESO ownership must be checked before installation')
     assert.ok(install < webhook && webhook < openbao && openbao < store && store < secrets && secrets < bootstrap,
       'ESO/OpenBao readiness must gate platform bootstrap')
-    for (const name of ['platform-postgresql', 'platform-documentdb', 'platform-kafka', 'platform-s3', 'platform-temporal', 'gateway-apisix', 'iam-keycloak']) {
+    assert.ok(store < functionSigner && functionSigner < secrets,
+      'function signer delivery must reconcile through ESO before workload readiness')
+    for (const name of ['platform-postgresql', 'platform-documentdb', 'platform-kafka', 'platform-s3', 'platform-temporal', 'platform-function-invocation', 'gateway-apisix', 'iam-keycloak']) {
       assert.ok(helmCalls.some(({ args }) => args.includes(`-s charts/eso/templates/external-secrets/${name}.yaml`)), `${name} ExternalSecrets were skipped`)
     }
     assert.doesNotMatch(invocation.output, new RegExp(secretSentinel))
