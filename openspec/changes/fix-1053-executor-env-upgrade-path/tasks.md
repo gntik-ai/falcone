@@ -14,6 +14,9 @@
   retain the previous implementation and Hermes pin commit.
 - [x] Clarify the TLS semantics contract and hand off the deployment checker
   findings without modifying the separately assigned deployment worktree.
+- [x] Review the clean assigned source HEAD
+  `d5f5e67abd35aac6a94baecefc0abd0c45571b0f`, retain the previous commits,
+  and add the checker-confirmed reused-values regression to this contract.
 
 ## Deployment maker and platform scope
 
@@ -31,9 +34,25 @@
   assertions for scheme, host, port and path against deployment base
   `93ee9371fdbd029ff49909ff1fb5c03eeff0ddae` for prod-TLS and kind-TLS.
   Uniqueness and CA env checks alone do not cover this regression.
+- [ ] Fix the unconditional shared TLS JWT env filter at
+  `charts/in-falcone/charts/component-wrapper/templates/workload.yaml:45`.
+  Suppress a shared JWT entry only when the component env has a same-name
+  `valueFrom` entry, or preserve inherited config through an equivalent repair.
+  Add regression cases coalescing `433be51` base + prod/kind + TLS values to
+  model `helm upgrade --reuse-values`, including historical env arrays without
+  #980 references. Assert inherited JWT entries and effective values survive;
+  a ConfigMap containing those values without env references is insufficient.
+  Keep strict five-reference checks for the fully reviewed target render.
 - [ ] Correct TLS overlay guidance and unpublished release notes that claim
   the repair changes no ConfigMap values. Document preservation of the
   effective TLS endpoint and verify it in the prod checklist.
+- [ ] Document the tested reused-values path in unpublished release notes;
+  advice to avoid `--reuse-values` does not satisfy the standing compatibility
+  rule. Clarify that preparing a literal-env release requires the target
+  executor JWT ConfigMap to exist first through the normal gated Helm adapter.
+- [ ] Obtain release-review acknowledgement of the stored TLS JWKS ConfigMap
+  representation change that preserves the effective runtime endpoint, and
+  confirm whether chart 0.4.20 will ship #980 while Chart.yaml remains 0.4.19.
 - [ ] Reproduce the API server's nonempty-value/valueFrom rejection on at
   least one untreated path, then prove the chosen migration succeeds, rolls
   out Available, and is idempotent on an already-migrated Deployment.
@@ -57,12 +76,11 @@
 - [ ] Hermes synchronizes both `FALCONE_CHARTS_REF` pins to the final deployment
   HEAD; rerun source Mongo route parity after synchronization.
 
-## Bounded source validation (follow-up review)
+## Bounded source validation (current follow-up review)
 
 The paired checkout on this review is
-`700bc42123d02ae1fc558275ab47b630136d8dde`; both managed workflow pins now
-match it after the existing Hermes commit. The earlier 5/6 parity failure
-against the initial deployment checkout is resolved. A subsequent deployment
+`f6a3d92cfd7ade97149165062268bc745e2c0fcc`; both managed workflow pins
+match it after the existing Hermes commit. A subsequent deployment
 repair will require Hermes to converge both pins again. No deployment files
 are modified by this source maker. Deployment tasks above remain handoff
 obligations, not completed source work or claims of live-cluster evidence.
@@ -76,9 +94,20 @@ obligations, not completed source work or claims of live-cluster evidence.
   the paired checkout's HEAD above. Preserve that assertion; Hermes must
   synchronize the final repaired deployment pins and rerun it.
 - PASS: `git diff --check` for the staged source change.
+- FAIL (deployment handoff): a bounded Helm render of the current paired chart
+  using `433be51:charts/in-falcone/values.yaml`,
+  `433be51:charts/in-falcone/values/prod.yaml`, and
+  `433be51:deploy/kind/values-production.yaml` in that order produces zero
+  executor `KEYCLOAK_*` env entries. This reproduces the checker finding using
+  temporary files and boolean/count-only evidence without shared-cluster access
+  or payload logging. The deployment maker must repair it and add the regression
+  test; ordinary target-value renders and source route parity do not cover it.
 - SKIPPED: live deployment upgrade matrix and availability/idempotency checks
   belong to deployment CI. This source sandbox has no kind executable and
   permits no shared-cluster access; no live-cluster success is claimed here.
+- SKIPPED: `bbx-temporal-bootstrap-048` remains required in PR CI; the checker
+  reported sandbox tar failing with `Function not implemented`. This source
+  documentation change does not establish deployment bootstrap evidence.
 
 No dependency updates are needed. The repository ignores `/openspec/`; add
 only these three explicitly requested files with `git add -f`, retaining

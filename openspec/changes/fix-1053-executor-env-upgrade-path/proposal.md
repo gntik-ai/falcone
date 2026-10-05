@@ -29,6 +29,13 @@ must each be tested from pre-#980 chart revision `433be51`.
   without changing the gateway verifier. Silently dropping a colliding TLS
   literal is not a semantics-preserving repair; rejecting a collision must
   also have a documented, tested way to render each supported TLS profile.
+- Cover Helm `--reuse-values` from `433be51`, including historical prod-TLS
+  and kind-TLS values. A shared TLS JWT literal may be filtered only when the
+  component env already supplies a `valueFrom` entry of the same name, or an
+  equivalent repair preserves the inherited configuration. Historical env
+  arrays can lack the new references; never silently remove their JWT config.
+  Keep the five-reference contract for the fully reviewed target render and
+  document how an inherited literal-env release reaches that target safely.
 - Document the mechanism, preconditions, verification and rollback in the next
   unpublished chart version's release notes and the #980 prod checklist.
 - Hermes updates both source workflow `FALCONE_CHARTS_REF` pins to the final
@@ -50,7 +57,9 @@ Secrets/OpenBao sourcing, and all migration, backup, parity and evidence gates.
 Do not change executor runtime behavior, effective JWT/audience configuration,
 env names, ConfigMap keys, reconciliation code, or prod host values. Moving
 the previously effective TLS env value into the executor ConfigMap source is
-allowed to preserve behavior; changing the effective endpoint is not. Audience
+allowed to preserve behavior; changing the effective endpoint is not.
+The stored TLS ConfigMap representation change requires explicit release-review
+acknowledgement of this preservation rationale before delivery. Audience
 reconciliation and real operator-supplied prod issuer/JWKS hosts remain #980
 release prerequisites. Kind bearer round trips and the integration PR trigger
 remain deferred to #1051.

@@ -75,6 +75,40 @@ Evidence SHALL report assertions without printing ConfigMap payloads.
 - **AND** a regression to HTTP on port 8080 fails the check even when env
   uniqueness and `NODE_EXTRA_CA_CERTS` checks pass
 
+### Requirement: Reused historical values retain executor JWT configuration
+
+The chart SHALL preserve previously configured executor JWT env when rendering
+with Helm `--reuse-values` from `433be51`. Regression tests SHALL coalesce that
+revision's `values.yaml` with its prod or kind values and
+`deploy/kind/values-production.yaml`, then render the target chart with those
+inherited values. A shared TLS JWT entry SHALL be suppressed only when the
+component env already supplies a `valueFrom` entry of the same name, or an
+equivalent repair preserves the inherited configuration. The chart SHALL NOT
+silently unset JWKS URL, issuer or audience previously configured by the release.
+Inherited literal-env renders SHALL be tested separately from the fully reviewed
+target render, which SHALL retain the five unique ConfigMap references required
+above. Advising operators to avoid `--reuse-values` SHALL NOT replace this test.
+
+#### Scenario: Historical prod-TLS or kind-TLS values lack new references
+
+- **GIVEN** coalesced `433be51` values with the TLS overlay and a component env
+  array lacking the new JWT ConfigMap references
+- **WHEN** the target chart renders with those reused values
+- **THEN** the inherited TLS JWKS entry remains present with its effective value
+- **AND** any previously configured issuer and audience remain present
+- **AND** no executor env entry has both `value` and `valueFrom`, and no JWT
+  name is duplicated
+- **AND** the test fails if JWT configuration disappears, even if the render
+  succeeds and the JWT ConfigMap contains the corresponding keys
+
+#### Scenario: Component env already references the target JWT ConfigMap
+
+- **GIVEN** the fully reviewed target values and a shared TLS JWT literal
+- **WHEN** the duplicate repair filters that literal
+- **THEN** the component's same-name ConfigMap reference remains present
+- **AND** the target retains all five unique reference-only JWT env entries
+- **AND** rerendering the already-migrated configuration preserves those entries
+
 ### Requirement: Executor migration is atomic, bounded and repeatable
 
 The chosen mechanism SHALL target only
@@ -130,6 +164,19 @@ backup, parity, immutable-image and External Secrets/OpenBao gates.
   require its verification for the exact ordered values layers
 - **AND** they do not claim ConfigMap values are unchanged when the repair
   changes the stored representation to preserve the effective env value
+- **AND** release review explicitly acknowledges that stored representation
+  change and the evidence preserving the effective executor configuration
+
+#### Scenario: An inherited literal-env release is prepared for migration
+
+- **GIVEN** a pre-#980 release that may not yet have the executor JWT ConfigMap
+- **WHEN** the operator follows the release notes for a reused-values upgrade
+- **THEN** guidance explains the tested inherited-values behavior and the exact
+  reviewed target layers required to reach all five ConfigMap references
+- **AND** preparation is conditional on the target ConfigMap already existing
+  with every required key, established through the normal gated Helm adapter
+- **AND** guidance does not claim the helper can prepare a release before
+  that prerequisite is satisfied
 
 #### Scenario: An Argo sync-option is selected
 
