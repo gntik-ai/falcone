@@ -52,17 +52,19 @@ signing key and overlapping verification keys. Keep generation inside the OpenBa
 do not generate keys in source CI, inline them in Helm values, log them or fall back to unsigned
 invocations.
 
-The outstanding companion fix is in
+The pinned companion chart at `7c9b5f276fe2ed7ced1e6f06eb37fe18d82f5c62` uses
+`creationPolicy: Orphan` with `deletionPolicy: Retain` in
 `charts/in-falcone/charts/eso/templates/external-secrets/platform-function-invocation.yaml`.
-In managed-ESO mode Helm deletes and recreates this hook on upgrade. With `creationPolicy: Owner`,
-deleting the ExternalSecret lets Kubernetes garbage-collect its target Secret.
-`deletionPolicy: Retain` does not prevent that owner-reference deletion. A control-plane pod starting before ESO
-recreates the Secret can receive no signing env through the optional references and fail every
-invocation with `503` until restarted. Preserve the signer Secret through upgrades using the
-existing precreated Secret/ESO Merge lifecycle or an equivalent lifecycle that avoids this gap,
-and add a render test proving the chosen lifecycle. The phased CI install must still stop at its
-existing ExternalSecret readiness wait on reconciliation failure. Bootstrap test success does not
-clear this upgrade gate or establish live cluster acceptance.
+ESO therefore creates the target without an owner reference, so replacing the managed-ESO hook
+on upgrade does not garbage-collect the signer Secret. `deletionPolicy: Retain` alone would not
+protect a target created with `creationPolicy: Owner`. The companion
+`tests/function-invocation-secret-delivery.test.mjs` includes a managed-ESO upgrade render test
+asserting the Orphan lifecycle. This source review confirms the template and test contents; PR CI
+must run that test, and live upgrade validation remains required. The phased CI install must still
+stop at its existing ExternalSecret readiness wait on reconciliation failure. A fresh control-plane
+pod starting before initial signer reconciliation can receive no signing env through the optional
+references and fail invocations with `503` until restarted. Keep ESO readiness before rollout;
+static lifecycle review does not establish live cluster acceptance.
 
 Signing configuration errors fail before the control plane opens an invocation socket and record a
 failed activation. Missing or malformed runtime public-key/target configuration denies all POSTs
@@ -128,3 +130,32 @@ connection refusal/timeout with A's activations unchanged at zero. A direct unau
 one's own ksvc must return `401` or be network-blocked. A legitimate public-API cold-start invocation
 must succeed and write exactly one activation. Kindnet does not enforce NetworkPolicy and cannot
 supply this network-isolation evidence. No cluster acceptance is claimed by this source ChangeSet.
+
+## Source follow-up validation limits
+
+The review of source HEAD `ee6bd791a6f10d39d4a76f7f7a1533c2a00a70b3` reproduced passing signer,
+runtime authentication, caller-context, ownership, naming and Function lifecycle tests. The
+namespace-preservation harness also passed. No additional authentication defect was reproduced.
+Caller-context header tests passed; its three HTTP cases skipped because localhost listeners
+are forbidden here. The runtime request-listener unit tests exercised authentication without
+opening sockets.
+
+The reported PR failures still require CI results with logs: `Analyze (javascript-typescript)`,
+`Analyze (python)`, `quality`, `real-stack` and `web-console`. The source diff does not change Python,
+CodeQL configuration, web-console source or the real-stack runners. Their failure causes cannot be
+determined from job names alone. Local validation has these limits:
+
+- `pnpm lint` cannot launch its existing `npm` commands because `npm` is absent.
+- `pnpm test:unit` cannot complete without installed workspace dependencies, including `yaml`,
+  `cel-js` and `ajv`; the service-catalog blackbox test also requires `yaml`.
+- `node scripts/validate-public-api.mjs` requires the absent `@apidevtools/swagger-parser` package.
+- `pnpm --filter @in-falcone/web-console test` cannot complete in this sandbox: pnpm's Node
+  subprocess is denied, and the workspace has no installed Vitest dependencies.
+- `bash tests/env/executor/run.sh` and `bash tests/env/flow-audit-outbox/run.sh` require Docker
+  services and container images. The Docker daemon is inaccessible here.
+- Both Analyze jobs require the unavailable CodeQL toolchain and GitHub analysis environment.
+
+Run the existing CI jobs after dependencies and tools are available; keep all tests, security
+checks and release gates intact. No dependency manifest or lockfile changes are required by this
+source follow-up. Image publication, enforcing-CNI evidence and independent verification remain
+release requirements.

@@ -14,7 +14,7 @@
 ## Companion deployment repository and release gates
 
 - [x] Seed control-plane-only signing material in OpenBao idempotently on fresh install and upgrade, preserving existing keys.
-- [ ] Preserve the ESO signer Secret across managed-ESO Helm upgrades and prove the lifecycle with a render test, without a Helm readiness deadlock.
+- [x] Define an ESO signer Secret lifecycle that survives managed-ESO hook replacement and add an upgrade render test; rerun the test in companion PR CI.
 - [x] Wire all three invocation env vars in the control-plane chart, with reuse-values-safe defaults and render tests excluding signing material from function workloads.
 - [x] Add default-enabled function ingress/egress NetworkPolicy and configurable allow-list.
 - [x] Prove selectors against rendered/fixture function pods in every shipped values profile.
@@ -28,18 +28,28 @@
 Completed chart seeding, wiring, policy and selector tasks reflect the supplied independent
 checker evidence for falcone-charts commit `c1bad265f62236cc24d20c418d40875c729c9e51`
 (passing bootstrap and secret-delivery tests, selector tests, reuse-values render and Helm lint).
-OpenBao now seeds the absent signer record and preserves existing signing material. The remaining
-blocking deployment finding is the managed-ESO ExternalSecret's hook lifecycle: Helm recreates
-the hook on upgrade, and `creationPolicy: Owner` lets garbage collection delete the signer Secret.
-Optional env references can then leave a starting control-plane pod without signing configuration
-until restarted. The companion chart must preserve the Secret across upgrades and add a render
-test for the chosen lifecycle. The source CI ExternalSecret readiness wait remains mandatory;
-this source follow-up reconciles the documentation and does not claim the deployment fix or
-cluster acceptance.
+OpenBao seeds the absent signer record and preserves existing signing material. Source review of
+the currently pinned companion chart `7c9b5f276fe2ed7ced1e6f06eb37fe18d82f5c62` confirms the signer
+ExternalSecret now uses `creationPolicy: Orphan` and `deletionPolicy: Retain`. The companion
+`tests/function-invocation-secret-delivery.test.mjs` asserts that lifecycle on managed-ESO upgrade
+renders. This closes the stale implementation task, without claiming the companion test was run
+in this source sandbox or that a live upgrade was verified. The source CI ExternalSecret readiness
+wait remains mandatory; optional env references still require reconciliation before rollout on
+fresh installs. Cluster acceptance and independent verification remain open.
 
 Current source follow-up validation: the invocation-auth, lifecycle-ownership, cleanup-ownership,
-caller-context and signed namespacing test files pass under a 60-second bound. This follow-up
-changes only the task record and operations guide; no dependency or workflow pin changes are
-needed. Image builds/scans, the full phased-install namespace suite, the service-catalog validator
-(missing installed dependencies) and policy-enforcing cluster acceptance remain PR CI/release
-checks. Companion chart lifecycle validation remains the deployment maker's responsibility.
+caller-context, signed namespacing, deploy tenant-scope, mutation authorization, runtime
+availability, input binding, rollback and public contract test files pass under a 30-second bound.
+The full namespace-preservation harness also passed. No additional authentication defect was
+reproduced. Three caller-context HTTP cases skipped because localhost listeners are forbidden;
+request-listener authentication unit tests passed without sockets. Repository structure validation
+and shell syntax checks passed. This follow-up changes only the task record and operations guide; no dependency or
+workflow pin changes are needed.
+
+The reported Analyze jobs, quality, real-stack and web-console failures cannot be attributed from
+job names without CI logs. Local quality checks lack npm and installed dependencies; the
+service-catalog test lacks yaml and public-API validation lacks swagger-parser; web-console lacks installed dependencies and pnpm's Node
+subprocess was denied. Real-stack/image checks require an accessible Docker daemon and images,
+and CodeQL is unavailable. These checks remain required in PR CI, alongside companion chart
+lifecycle tests. The operations guide records the exact commands and limits. Policy-enforcing
+cluster acceptance and independent verification remain release gates.
