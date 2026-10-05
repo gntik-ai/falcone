@@ -9,6 +9,7 @@
 - [x] Return a clear 400 for reserved workspace-secret env mappings and document existing-function migration.
 - [x] Reserve only runtime, invocation and Node configuration names; preserve unrelated FN_* secret mappings.
 - [x] Apply the function signer ExternalSecret in phased CI through the existing OpenBao/ESO readiness gates.
+- [x] Use the test runner's Node binary in the isolated e2e harness, including installations outside /usr/bin.
 
 ## Companion deployment repository and release gates
 
@@ -24,8 +25,20 @@
 - [ ] Independently verify the ChangeSet before release; kindnet alone is insufficient evidence.
 
 Completed chart wiring, policy and selector tasks reflect the supplied independent checker
-evidence for falcone-charts commit `1f259abf0de70a77a01a73a40c5c0d1bb707b8f0` (passing delivery and
-selector tests, reuse-values render and Helm lint). The same review found that neither the target
-Secret nor the OpenBao signer record is bootstrapped. Fresh-install/upgrade key provisioning and
-readiness remain a required companion deployment fix. This source follow-up restores the skipped
-CI ExternalSecret but does not claim chart key provisioning or cluster acceptance.
+evidence for falcone-charts commit `ef47547ec77ef0f902d584f7bafe928627b6954a` (passing delivery and
+selector tests, reuse-values render and Helm lint). That review found that the OpenBao signer
+record is not seeded, so ESO cannot create its target Secret on a fresh install. Both blocking
+findings require the companion OpenBao init Job to generate the absent record idempotently and
+preserve existing signing material. The operations guide records the exact properties and
+required companion tests. The source CI ExternalSecret readiness wait remains mandatory;
+this source follow-up fixes the isolated test harness's Node lookup and does not claim chart
+key provisioning or cluster acceptance.
+
+Source follow-up validation: the 25 invocation-auth and lifecycle/ownership unit tests pass,
+as do the caller-header tests, six signed namespacing cases and runtime Dockerfile COPY check.
+Scoped harness tests pass for Helm 3/4 phased install, signer ESO ordering, eight readiness
+failure gates and namespace preservation/cleanup. Three HTTP runtime blackbox cases require
+local sockets unavailable here. The service-catalog validator needs the already-declared
+`yaml` package installed in CI; the initial full namespace suite exceeded its 90-second
+budget, so only the scoped harness cases are claimed. Image builds/scans and policy-enforcing
+cluster acceptance remain CI/release gates.

@@ -42,6 +42,21 @@ plane to start while function operations remain fail-closed. The source phased C
 store are ready, and waits for ESO reconciliation before subsequent bootstrap and rollout gates.
 That reconciliation still requires the companion chart to provision the OpenBao record.
 
+The outstanding provisioning fix belongs in the companion chart's
+`charts/in-falcone/charts/openbao/templates/openbao-init-job.yaml`. When the record is absent,
+the existing bootstrap must generate an Ed25519 PKCS#8 private key, a nonempty key ID and a
+matching public-only JWKS, stored together under `secret/platform/functions/invocation` with
+properties `private-key`, `key-id` and `jwks`. Re-running bootstrap on install or upgrade must
+preserve the existing record, including the active signing key and overlapping verification
+keys. Keep generation inside the OpenBao bootstrap; do not generate keys in source CI, inline
+them in Helm values, log them or fall back to unsigned invocations.
+
+Companion tests must prove absent-record creation and existing-record preservation, ESO property
+mapping and private-key delivery only to the control-plane container. Until that fix lands,
+`platform-function-invocation` cannot become Ready on a fresh install and the phased CI install
+must stop at its existing ExternalSecret readiness wait. Removing or skipping that wait would
+hide missing provisioning and leave function deploys and invocations unavailable.
+
 Signing configuration errors fail before the control plane opens an invocation socket and record a
 failed activation. Missing or malformed runtime public-key/target configuration denies all POSTs
 while allowing probes. Errors do not return parser diagnostics or raw unauthorized runtime bodies.

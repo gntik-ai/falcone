@@ -381,6 +381,9 @@ function invokeHarness(scenario, extraEnv = {}) {
   for (const command of ['kubectl', 'helm', 'kind', 'curl', 'npx', 'npm', 'pnpm', 'yarn', 'docker', 'jq']) {
     symlinkSync('bbx-dispatch', join(fakeBin, command))
   }
+  // Keep cluster/package clients stubbed while using the Node that launched this
+  // test, even when it is installed outside the fixture's /usr/bin:/bin PATH.
+  symlinkSync(process.execPath, join(fakeBin, 'node'))
 
   const log = join(directory, 'commands.log')
   const releaseState = join(directory, 'release.state')
