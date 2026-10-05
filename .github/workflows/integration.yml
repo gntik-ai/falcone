@@ -1,6 +1,22 @@
 name: scheduled-integration
 
 on:
+  pull_request:
+    paths:
+      - 'tests/e2e/**'
+      - 'tests/blackbox/e2e-preserve-existing-namespace.test.mjs'
+      - 'tests/blackbox/e2e-failure-diagnostics.test.mjs'
+      - '.github/workflows/ci.yml' # Contains the Hermes-managed chart pin.
+      - '.github/workflows/integration.yml'
+      - 'deploy/kind/apisix/**'
+      - 'apps/control-plane-executor/src/console-auth.mjs'
+      - 'apps/control-plane-executor/src/authorization-model.mjs'
+      - 'apps/control-plane-executor/src/runtime/auth-roles.mjs'
+      - 'apps/control-plane-executor/src/runtime/jwt-verify.mjs'
+      - 'apps/control-plane-executor/src/runtime/main.mjs'
+      - 'apps/control-plane-executor/src/runtime/server.mjs'
+      - 'apps/control-plane-executor/src/mongo-data-api.mjs'
+      - 'apps/control-plane-executor/src/runtime/mongo-data-executor.mjs'
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
@@ -18,7 +34,7 @@ jobs:
   plan-enforcement:
     name: Plan-enforcement integration
     runs-on: ubuntu-latest
-    # The kind cluster name is fixed, so scheduled and manually dispatched runs
+    # The kind cluster name is fixed, so PR, scheduled and manually dispatched runs
     # must not overlap on a shared runner.
     concurrency:
       group: real-stack-shared-host
@@ -49,7 +65,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Validate E2E Helm compatibility and namespace safety
-        run: node --test tests/blackbox/e2e-preserve-existing-namespace.test.mjs
+        run: node --test tests/blackbox/e2e-preserve-existing-namespace.test.mjs tests/blackbox/e2e-failure-diagnostics.test.mjs
 
       - name: Create isolated kind cluster
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
