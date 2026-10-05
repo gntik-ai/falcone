@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '2b632ffde46b497b342690dd6da95aa1bb9b2d6b'
+  FALCONE_CHARTS_REF: '5051adf34796edba59114f890628abb84c4d8b3d'
 
 jobs:
   quality:
@@ -59,10 +59,12 @@ jobs:
       - name: Contract tests
         run: pnpm test:contracts
 
-      - name: Mongo gateway route and kind chart parity
+      - name: Database gateway routes, kind chart parity, and role gates
         run: |
           helm version --short
-          node --test tests/blackbox/mongo-gateway-route.test.mjs
+          node --test tests/blackbox/mongo-gateway-route.test.mjs \
+            tests/blackbox/postgres-gateway-route.test.mjs \
+            tests/blackbox/structural-write-role-gates-executor.test.mjs
 
       - name: Console E2E scaffolding
         run: pnpm test:e2e:console
