@@ -86,3 +86,46 @@ test('fn-lifecycle-own-02: fnDeploy UPDATE reuses the STABLE resource id so the 
   assert.equal(deploys[0].tenantId, 'tenant-a');
   assert.equal(deploys[0].functionResourceId, 'fn_known01', 'an update must reuse the stable function id');
 });
+
+test('fnDeploy create/PATCH reject reserved secret env mappings with 400 before resolution or mutations', async () => {
+  const existing = { resource_id: 'fn_known01', tenant_id: WS.tenant_id, workspace_id: WS.id };
+  const reservedRefs = [
+    'fn-token', 'fn_custom', 'k-service', 'node-options', 'node-path',
+    { name: 'fn-token' }, { secretName: 'fn-token' },
+    { name: 'api-token', env: 'FN_INVOCATION_PRIVATE_KEY' },
+    { secretName: 'api-token', env: 'FN_INVOCATION_JWKS' },
+    { name: 'api-token', env: 'K_SERVICE' },
+    { name: 'api-token', env: 'NODE_OPTIONS' },
+    { name: 'api-token', env: 'NODE_PATH' },
+  ];
+  for (const params of [{}, { actionId: existing.resource_id }]) {
+    for (const ref of reservedRefs) {
+      for (const secrets of [{ execution: { secrets: [ref] } }, { secrets: [ref] }]) {
+        const sideEffects = [];
+        const result = await FN_HANDLERS.fnDeploy(baseCtx({
+          params,
+          body: { workspaceId: WS.id, actionName: 'hello', source: { inlineCode: 'function main(){}' }, ...secrets },
+          store: {
+            getWorkspace: async () => WS,
+            getFnAction: async () => existing,
+            upsertFnAction: async () => { sideEffects.push('write'); },
+          },
+          deployKnativeService: async () => { sideEffects.push('deploy'); },
+        }));
+        assert.equal(result.statusCode, 400);
+        assert.equal(result.body.code, 'VALIDATION_ERROR');
+        assert.match(result.body.message, /different env mapping/);
+        assert.deepEqual(sideEffects, []);
+      }
+    }
+  }
+});
+
+test('fnDeploy preserves workspace authorization before reserved secret validation', async () => {
+  const result = await FN_HANDLERS.fnDeploy(baseCtx({
+    body: { workspaceId: 'ws-foreign', actionName: 'hello', source: { inlineCode: 'function main(){}' }, secrets: ['fn-token'] },
+    store: { getWorkspace: async () => ({ id: 'ws-foreign', tenant_id: 'tenant-b' }) },
+  }));
+  assert.equal(result.statusCode, 403);
+  assert.equal(result.body.code, 'FORBIDDEN');
+});

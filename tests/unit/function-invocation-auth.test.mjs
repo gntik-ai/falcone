@@ -8,6 +8,7 @@ import { mintInvocationCredential, invocationPublicJwks } from '../../apps/contr
 import { createInvocationVerifier } from '../../apps/fn-runtime/invocation-auth.mjs';
 import { createRuntimeServer } from '../../apps/fn-runtime/server.mjs';
 import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
+import { createWorkspaceSecretStore } from '../../apps/control-plane/vault-secrets.mjs';
 import { invocationFixture, installInvocationFixture, runtimeRequest } from '../helpers/function-invocation-fixture.mjs';
 
 const active = invocationFixture();
@@ -54,6 +55,17 @@ test('signed invocation verifies target/body/caller and rejects replays at expir
   assert.equal(verify(`Bearer ${credential}`, '{}', claims.exp), null);
   assert.equal(verify(`Bearer ${credential}`, '{}', claims.exp + 300), null);
   for (const [name, authorization] of negatives) assert.equal(verify(authorization, '{}', claims.iat), null, name);
+});
+
+test('issuance allows at most three seconds of clock skew without extending expiry or lifetime', () => {
+  const verify = createInvocationVerifier(env);
+  for (const offset of [1, 2, 3]) {
+    assert.deepEqual(verify(`Bearer ${credential}`, '{}', claims.iat - offset), caller);
+  }
+  assert.equal(verify(`Bearer ${credential}`, '{}', claims.iat - 4), null);
+  assert.deepEqual(verify(`Bearer ${credential}`, '{}', claims.exp - 1), caller);
+  assert.equal(verify(`Bearer ${credential}`, '{}', claims.exp), null);
+  assert.equal(verify(`Bearer ${signed({ exp: claims.iat + 61 })}`, '{}', claims.iat - 3), null);
 });
 
 test('overlapping public keys verify active and retiring credentials; configuration is captured', () => {
@@ -118,8 +130,23 @@ test('manifest labels actual function pods and injects public-only verification 
   // Avoid assertion diagnostics containing ephemeral key material.
   assert.equal(JSON.stringify(manifest).includes(active.env.FN_INVOCATION_PRIVATE_KEY), false);
   for (const name of ['FN_INVOCATION_PRIVATE_KEY', 'FN_INVOCATION_JWKS', 'FN_KSVC_NAME', 'FN_SRC', 'K_SERVICE', 'NODE_OPTIONS', 'NODE_PATH']) {
-    assert.throws(() => buildFunctionKsvcManifest(target.audience, '', { ...opts, secretEnv: [{ name, value: 'unsafe' }] }), /reserved/);
+    assert.throws(() => buildFunctionKsvcManifest(target.audience, '', { ...opts, secretEnv: [{ name, value: 'unsafe' }] }),
+      (error) => error.statusCode === 400 && /reserved/.test(error.message));
   }
+});
+
+test('an existing fn-prefixed workspace secret can use an explicit safe env mapping', async (t) => {
+  installInvocationFixture(t, active);
+  const secretStore = createWorkspaceSecretStore({ readSecret: async () => ({ data: { value: 'test-placeholder' } }) });
+  const secretEnv = await secretStore.resolveEnv(target.tenantId, target.workspaceId, [
+    { name: 'fn-token', env: 'APP_TOKEN' },
+  ]);
+  const manifest = buildFunctionKsvcManifest(target.audience, 'function main(){}', {
+    tenantId: target.tenantId, workspaceId: target.workspaceId, functionResourceId: 'fn-resource-a', secretEnv,
+  });
+  const entries = manifest.spec.template.spec.containers[0].env;
+  assert.ok(entries.some(({ name, value }) => name === 'APP_TOKEN' && value === 'test-placeholder'));
+  assert.ok(!entries.some(({ name }) => name === 'FN_TOKEN'));
 });
 
 test('ownership-checked PATCH idempotently re-rolls labels/public key ring without renaming', async (t) => {

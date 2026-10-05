@@ -4,6 +4,8 @@ Function runtimes require a signed control-plane credential on every POST before
 `FN_SRC`. Health/readiness GETs remain unauthenticated. Identity headers alone are insufficient.
 A credential is bound to a ksvc, target tenant/workspace, verified caller and exact JSON body for
 60 seconds. Signature, target, time or body failures return `401` without running user code.
+Issuance time permits at most three seconds of node clock skew. Expiry has no leeway: a credential
+is rejected at or after `exp`, and its declared lifetime still cannot exceed 60 seconds.
 The existing public invocation API and activation recording remain the invocation path.
 
 ## Key delivery contract
@@ -21,6 +23,12 @@ with `FN_KSVC_NAME`, `FN_TENANT_ID` and `FN_WORKSPACE_ID`. Knative's `K_SERVICE`
 audience when present. No signing implementation or private key is copied into the runtime image.
 The runtime captures this configuration at startup. Workspace-secret mappings cannot override
 `FN_*`, `K_SERVICE`, `NODE_OPTIONS` or `NODE_PATH`.
+
+Create and PATCH requests using reserved secret env names return `400 VALIDATION_ERROR` before
+secret resolution or workload mutation. This also affects existing references such as `fn-token`,
+whose default env name is `FN_TOKEN`. To re-roll those functions, keep the workspace secret and use
+an explicit safe mapping such as `{ "name": "fn-token", "env": "APP_TOKEN" }`, then update the code
+to read that name. The manifest builder independently rejects reserved env names with `400`.
 
 Signing configuration errors fail before the control plane opens an invocation socket and record a
 failed activation. Missing or malformed runtime public-key/target configuration denies all POSTs
@@ -42,6 +50,15 @@ Runtime logs, result serialization and errors redact the current invocation cred
    A mismatched owner fails closed; do not bypass this check to adopt old unlabeled resources.
 4. Verify the new revision before completing rollout. Existing revisions do not gain env or pod
    labels until patched/redeployed. Runtime enforcement has no enabled-off default or bypass flag.
+
+Release must remain gated until the companion chart delivers all three invocation variables to
+the control-plane container, with the private key and active key ID supplied through External
+Secrets/OpenBao. A NetworkPolicy alone does not satisfy this gate: missing public keys stop
+function deploys, and missing signing configuration returns `503` before invocation. Chart render
+tests must cover safe defaults for `--reuse-values` upgrades and prove signing material is absent
+from function workloads. Publish and pin the enforcing fn-runtime image by immutable digest;
+the pre-change `0.3.0` runtime tag does not authenticate POSTs. Confirm an authenticated cold start
+and exactly one activation after re-rolling existing functions before clearing this release gate.
 
 ## Rotation
 

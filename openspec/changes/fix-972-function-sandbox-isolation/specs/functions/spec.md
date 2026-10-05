@@ -6,8 +6,10 @@ The system SHALL verify an asymmetrically signed, control-plane-issued invocatio
 evaluating `FN_SRC`, resolving `main`, or executing user code. The credential SHALL bind the ksvc
 name as `aud`, target tenant ID, workspace ID, `iat`, `exp`, a nonempty `jti`, the request body and
 verified caller identity. Its lifetime SHALL NOT exceed 60 seconds. Runtime verification SHALL
-reject missing, malformed, unsigned, tampered, expired, future-issued and wrong-target credentials
-with HTTP `401`. Health and readiness GETs SHALL remain unauthenticated and SHALL NOT run user code.
+reject missing, malformed, unsigned, tampered, expired and wrong-target credentials with HTTP `401`.
+Issuance time SHALL permit at most three seconds of clock skew; later future-issued credentials
+SHALL be rejected. Health and readiness GETs SHALL remain unauthenticated and SHALL NOT run user code.
+Expiry SHALL have no clock allowance; credentials at or after `exp` SHALL be rejected.
 
 #### Scenario: Unauthenticated direct POST never evaluates source
 

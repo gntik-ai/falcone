@@ -1,5 +1,8 @@
 import { createHash, createPublicKey, verify } from 'node:crypto';
 
+// Allow small node-clock differences at issuance; expiry remains strict.
+const ISSUED_AT_LEEWAY_SECONDS = 3;
+
 // Capture target identity and public keys before tenant code can change process.env.
 // No signing implementation or private key is present in this image.
 export function createInvocationVerifier(env = process.env) {
@@ -32,7 +35,7 @@ export function createInvocationVerifier(env = process.env) {
       const c = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
       if (c.aud !== audience || c.tenantId !== tenantId || c.workspaceId !== workspaceId
         || !Number.isSafeInteger(c.iat) || !Number.isSafeInteger(c.exp)
-        || c.iat > now || c.exp <= now || c.exp <= c.iat || c.exp - c.iat > 60
+        || c.iat > now + ISSUED_AT_LEEWAY_SECONDS || c.exp <= now || c.exp <= c.iat || c.exp - c.iat > 60
         || typeof c.jti !== 'string' || !c.jti
         || c.bodySha256 !== createHash('sha256').update(body).digest('hex')) return null;
       const caller = c.caller;

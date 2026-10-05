@@ -30,6 +30,8 @@ export const FUNCTION_OWNERSHIP_LABELS = Object.freeze({
 
 const KUBERNETES_LABEL_VALUE = /^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$/;
 const KUBERNETES_SERVICE_NAME = /^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$/;
+const RESERVED_FUNCTION_ENV_NAME = /^(FN_|K_SERVICE$|NODE_OPTIONS$|NODE_PATH$)/;
+export const isReservedFunctionEnvName = (name) => typeof name === 'string' && RESERVED_FUNCTION_ENV_NAME.test(name);
 
 function k8s(method, path, body, { contentType = 'application/json' } = {}) {
   return new Promise((resolve, reject) => {
@@ -136,9 +138,8 @@ export function buildFunctionKsvcManifest(
   // tenant/workspace Vault path; only the names a function declares are injected.
   if (typeof workspaceId !== 'string' || !workspaceId) throw new TypeError('workspaceId is required for Function invocation verification');
   // Workspace secrets cannot override verification configuration or import signing material.
-  const reserved = /^(FN_|K_SERVICE$|NODE_OPTIONS$|NODE_PATH$)/;
-  if (!Array.isArray(secretEnv) || secretEnv.some((entry) => reserved.test(entry?.name ?? ''))) {
-    throw new TypeError('Workspace secret env uses a reserved Function runtime name');
+  if (!Array.isArray(secretEnv) || secretEnv.some((entry) => isReservedFunctionEnvName(entry?.name))) {
+    throw Object.assign(new TypeError('Workspace secret env uses a reserved Function runtime name'), { statusCode: 400 });
   }
   const env = [
     ...secretEnv,

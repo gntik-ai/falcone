@@ -7,8 +7,8 @@
 // FunctionInvocationAccepted / GatewayMutationAccepted).
 import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
-import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost } from './function-executor.mjs';
-import { vaultStoreFromEnv, vaultStoreHealthSnapshot } from './vault-secrets.mjs';
+import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost, isReservedFunctionEnvName } from './function-executor.mjs';
+import { vaultStoreFromEnv, vaultStoreHealthSnapshot, secretEnvVarName } from './vault-secrets.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { functionsDisabledResponse, knativeUnavailableResponse } from './knative-runtime.mjs';
 import { createRuntimeCleanupRepository } from './runtime-cleanup-repository.mjs';
@@ -414,6 +414,14 @@ async function fnDeploy(ctx) {
   }
   const code = b.source?.inlineCode ?? b.source?.code;
   if (!code) return err(400, 'VALIDATION_ERROR', 'source.inlineCode is required');
+  const secretRefs = b.execution?.secrets ?? b.secrets ?? [];
+  if (Array.isArray(secretRefs) && secretRefs.some((ref) => {
+    const name = typeof ref === 'string' ? ref : (ref?.name ?? ref?.secretName);
+    const envName = ref && typeof ref === 'object' && ref.env ? ref.env : secretEnvVarName(name);
+    return isReservedFunctionEnvName(envName);
+  })) {
+    return err(400, 'VALIDATION_ERROR', 'Workspace secret env names cannot use FN_*, K_SERVICE, NODE_OPTIONS or NODE_PATH; use a different env mapping');
+  }
   // Ownership and validation precede dependency status, but the gate precedes secret resolution,
   // registry writes, and every Kubernetes call. An adjacent tenant therefore gets no status oracle.
   const dependencyError = functionDependencyGate(ctx, ctx.params.actionId ? 'update' : 'deploy', {
@@ -431,7 +439,6 @@ async function fnDeploy(ctx) {
   // (add-vault-secret-consumption, #612). The values are read from THIS workspace's own KV path,
   // so a function only ever sees its own tenant/workspace secrets.
   let secretEnv = [];
-  const secretRefs = b.execution?.secrets ?? b.secrets ?? [];
   if (Array.isArray(secretRefs) && secretRefs.length > 0) {
     if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
     try { secretEnv = await vaultStore.resolveEnv(ws.tenant_id, ws.id, secretRefs); }
