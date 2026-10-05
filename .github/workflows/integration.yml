@@ -1,6 +1,8 @@
 name: scheduled-integration
 
 on:
+  # Re-enable the scoped pull_request trigger after a green workflow_dispatch
+  # run, as required by #1051. The inherited plan-suite API mismatch remains.
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
@@ -12,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '94d5c43cd95e506b7f9955547f5d0be64d8cd69d'
+  FALCONE_CHARTS_REF: '0ebbfef040bd68ef2cd1229d547d4fedf7498f87'
 
 jobs:
   plan-enforcement:
@@ -49,7 +51,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Validate E2E Helm compatibility and namespace safety
-        run: node --test tests/blackbox/e2e-preserve-existing-namespace.test.mjs
+        run: node --test tests/blackbox/e2e-preserve-existing-namespace.test.mjs tests/blackbox/e2e-failure-diagnostics.test.mjs
 
       - name: Create isolated kind cluster
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
@@ -98,6 +100,7 @@ jobs:
           E2E_HELM_RELEASE: falcone
           E2E_HELM_CHART: ${{ github.workspace }}/falcone-charts/charts/in-falcone
           E2E_HELM_VALUES: ${{ github.workspace }}/falcone-charts/deploy/kind/values-kind.yaml
+          E2E_HELM_VALUES_OVERLAY: ${{ github.workspace }}/tests/e2e/values-integration.yaml
           # The pinned chart uses a release digest that is not present in kind.
           # This isolated run instead consumes the local tag loaded above.
           E2E_USE_LOCAL_CONTROL_PLANE_IMAGE: 'true'

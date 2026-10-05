@@ -36,7 +36,12 @@ case "$command_name" in
     case " $* " in
       *" config current-context "*) printf '%s\n' 'kind-falcone-bbx'; exit 0 ;;
       *" port-forward "*) trap 'exit 0' TERM INT; while sleep 1; do :; done ;;
-      *" apply "*) cat >/dev/null; exit 0 ;;
+      *" apply "*)
+        applied_manifest="$(cat)"
+        if [[ " $* " == *" -o name "* ]]; then
+          printf '%s\n' "$applied_manifest" | awk '/^  name:/ { print "job.batch/" $2; exit }'
+        fi
+        exit 0 ;;
     esac
     if [[ " $* " == *" get --raw "* ]]; then
       discovery_path="\${*: -1}"
@@ -217,7 +222,7 @@ case "$command_name" in
       if [[ "\${BBX_HELM_MAJOR:-4}" == "3" ]]; then
         printf '%s\n' '      --atomic   roll back changes on failure'
       else
-        printf '%s\n' '      --rollback-on-failure   roll back changes on failure' '      --server-side string   apply changes server-side'
+        printf '%s\n' '      --rollback-on-failure   roll back changes on failure' '      --server-side string   apply changes server-side' '      --post-renderer string   name of a postrenderer type plugin'
       fi
       exit 0
     fi
@@ -234,7 +239,11 @@ case "$command_name" in
     if [[ " $* " == *" template "* ]]; then
       case "$BBX_SCENARIO" in
         helm-temporal|helm-temporal-eso|helm-temporal-large)
-          printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-schema'
+          if [[ " $* " == *" -s templates/temporal/bootstrap-job.yaml "* ]]; then
+            printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-r1-temporal-bootstrap'
+          else
+            printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: falcone-temporal-schema'
+          fi
           if [[ "$BBX_SCENARIO" == "helm-temporal-large" && " $* " != *" -s "* ]]; then
             # Exceed the pipe buffer after the marker: an early-exiting reader
             # must not turn the renderer's SIGPIPE into a non-Temporal install.
@@ -510,6 +519,7 @@ function invokeHarness(scenario, extraEnv = {}) {
 function mutations(invocation) {
   return invocation.calls.filter(({ command, args }) => (
     command === 'helm'
+    && !/^plugin\s/.test(args)
     && /(?:^|\s)(?:upgrade|install|uninstall|delete|rollback)(?:\s|$)/.test(args)
     && !/^(?:install|upgrade)\s+--help(?:\s|$)/.test(args)
   ) || (
@@ -591,7 +601,7 @@ test('large Temporal renders retain the phased install with Helm 3 and Helm 4', 
         assert.match(installs[0].args, /--no-hooks/)
         assert.doesNotMatch(installs[0].args, /--wait(?:\s|$)/)
         assert.ok(invocation.calls.some(({ command, args }) => command === 'kubectl'
-          && /wait job\/falcone-temporal-bootstrap /.test(args)), 'Temporal bootstrap was skipped')
+          && /wait job.batch\/falcone-temporal-r1-temporal-bootstrap /.test(args)), 'Temporal bootstrap was skipped')
       } finally { invocation.cleanup() }
     })
   }
@@ -635,6 +645,15 @@ test('isolated CI renders auxiliary namespaces and preserves ESO gates in the ph
     const store = indexOf('kubectl', /wait clustersecretstore\/openbao-backend /)
     const secrets = indexOf('kubectl', /wait externalsecret --all /)
     const bootstrap = indexOf('kubectl', /wait job\/falcone-in-falcone-bootstrap /)
+    const discard = indexOf('kubectl', /delete job falcone-temporal-schema falcone-temporal-db-bootstrap /)
+    const temporalSecret = indexOf('kubectl', /wait externalsecret\/platform-temporal-credentials /)
+    const secretExists = indexOf('kubectl', /get secret in-falcone-temporal .* -o name/)
+    const database = indexOf('kubectl', /wait job\/falcone-temporal-db-bootstrap /)
+    const schema = indexOf('kubectl', /wait job\/falcone-temporal-schema /)
+    assert.ok(install < discard && discard < openbao && secrets < temporalSecret
+      && temporalSecret < secretExists && secretExists < database && database < schema && schema < bootstrap,
+    'pre-created Temporal Jobs must be discarded and recreated only after ESO reconciliation')
+    assert.match(invocation.calls[install].args, /--post-renderer falcone-temporal-defer-jobs/)
     assert.ok(preflight >= 0 && preflight < install, 'ESO ownership must be checked before installation')
     assert.ok(install < webhook && webhook < openbao && openbao < store && store < secrets && secrets < bootstrap,
       'ESO/OpenBao readiness must gate platform bootstrap')
@@ -662,6 +681,10 @@ test('phased CI fails closed when an ESO ownership or readiness gate fails', asy
     ['job/eso-webhook-wait', 'helm', /-s charts\/openbao\/templates\/openbao-init-job\.yaml/],
     ['clustersecretstore/openbao-backend', 'helm', /-s charts\/eso\/templates\/external-secrets\//],
     ['externalsecret', 'helm', /-s templates\/bootstrap-job\.yaml/],
+    ['externalsecret/platform-temporal-credentials', 'helm', /-s templates\/temporal\/db-bootstrap-job\.yaml/],
+    ['job/falcone-temporal-db-bootstrap', 'helm', /-s templates\/temporal\/schema-job\.yaml/],
+    ['job/falcone-temporal-schema', 'kubectl', /rollout status deployment\/falcone-temporal-frontend /],
+    ['job.batch/falcone-temporal-r1-temporal-bootstrap', 'helm', /-s templates\/bootstrap-job\.yaml/],
   ]) {
     await t.test(failedWait, () => {
       const invocation = invokeHarness('helm-temporal-eso', {

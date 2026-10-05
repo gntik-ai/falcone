@@ -56,6 +56,20 @@ BASE="${E2E_BASE_URL:-http://localhost:3000}"
 
 require() { command -v "$1" >/dev/null 2>&1 || { echo "Missing '$1'." >&2; exit 2; }; }
 
+# EXIT also covers explicit exits in healthy()/smoke(), unlike ERR alone.
+# Collect only status/events and bounded, redacted logs; keep the original result
+# even when kubectl, Node, or the diagnostic collector itself fails.
+EPHEMERAL_HELM_DATA_HOME=""
+ephemeral_up_exit() {
+  local result=$?
+  trap - EXIT
+  if [ "$result" -ne 0 ]; then
+    node tests/e2e/failure-diagnostics.mjs "$NS" || true
+  fi
+  [ -z "$EPHEMERAL_HELM_DATA_HOME" ] || rm -rf "$EPHEMERAL_HELM_DATA_HOME" || true
+  exit "$result"
+}
+
 # Helm 3 applies client-side already; Helm 4 needs an explicit opt-out. Inspect
 # the actual subcommand so both versions retain the same apply behavior.
 helm_client_apply() {
@@ -649,6 +663,7 @@ case "${1:-up}" in
       preserve_up
       exit 0
     fi
+    trap ephemeral_up_exit EXIT
     echo ">> Recreating namespace '$NS' (clean slate) ..."
     kubectl delete namespace "$NS" --ignore-not-found --wait=true
     kubectl create namespace "$NS"
@@ -813,6 +828,11 @@ case "${1:-up}" in
       if [ -n "${E2E_HELM_VALUES:-}" ]; then
         HELM_VALUES_ARGS=(-f "$E2E_HELM_VALUES")
       fi
+      # Isolated CI can tune scheduling without changing the shared kind or
+      # production profiles. Every render and install consumes the same overlay.
+      if [ -n "${E2E_HELM_VALUES_OVERLAY:-}" ]; then
+        HELM_VALUES_ARGS+=(-f "$E2E_HELM_VALUES_OVERLAY")
+      fi
       # The release profile pins the production control-plane image by digest.
       # An isolated kind run cannot resolve that registry reference after
       # `kind load docker-image`, so this explicit CI-only opt-in removes the
@@ -838,7 +858,8 @@ case "${1:-up}" in
         local template_path="$1" hook_namespace="$2" hook_job="$3"
         helm_render -s "$template_path" | kubectl apply -f -
         kubectl wait job/"$hook_job" -n "$hook_namespace" --for=condition=complete --timeout=5m
-        kubectl logs -n "$hook_namespace" job/"$hook_job" 2>/dev/null | tail -5 || true
+        # Bootstrap hooks handle generated credentials. Never echo their logs;
+        # failure diagnostics report their container states and namespace events.
       }
 
       # The phased Temporal install omits all Helm hooks to avoid its bootstrap
@@ -874,12 +895,12 @@ case "${1:-up}" in
       fi
 
       # Check if the Temporal schema job renders. When it does we MUST break the circular-dependency
-      # deadlock: the schema job (pre-install hook) needs PostgreSQL, and the bootstrap job
+      # deadlock: the schema job needs PostgreSQL/ESO, and the bootstrap job
       # (post-install hook) needs the Temporal frontend running BEFORE the workflow-worker
       # starts (otherwise the worker crashes on missing namespace and helm --wait never
       # finishes).  Strategy:
-      #   1. Deploy ALL non-hook resources via --no-hooks --wait=false (Helm adopts them).
-      #   2. Wait for PostgreSQL then run the schema Job out-of-band.
+      #   1. Deploy non-hook resources, deferring ordinary Temporal Jobs.
+      #   2. Reconcile OpenBao/ESO, then run DB-bootstrap and schema in order.
       #   3. Wait for Temporal frontend then run the Temporal and platform
       #      Keycloak bootstrap Jobs out-of-band.
       #   4. Wait for all Deployments + StatefulSets to stabilise (retries self-heal).
@@ -895,24 +916,29 @@ case "${1:-up}" in
 
       if [ "$TEMPORAL_ENABLED" -eq 1 ]; then
         echo ">> Temporal schema job rendered: phased deploy to break bootstrap deadlock ..."
-        # Phase 1 — deploy everything without hooks; no --wait so CrashLoopBackOffs are OK.
-        helm_client_apply upgrade --install --skip-schema-validation --no-hooks \
-          "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}" "${HELM_NAMESPACE_ARGS[@]}"
+        HELM_POST_RENDERER="$PWD/tests/e2e/helm-temporal-postrenderer/render.sh"
+        # Helm 3 accepts an executable; Helm 4 accepts a typed plugin. Install
+        # our local plugin into a disposable data directory, leaving any user
+        # plugins intact. Neither path downloads code or changes apply semantics.
+        upgrade_help="$(helm upgrade --help 2>/dev/null)"
+        if grep -Eq -- '--post-renderer .*plugin' <<<"$upgrade_help"; then
+          EPHEMERAL_HELM_DATA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/falcone-e2e-helm.XXXXXX")"
+          export HELM_DATA_HOME="$EPHEMERAL_HELM_DATA_HOME"
+          helm plugin install "$PWD/tests/e2e/helm-temporal-postrenderer"
+          HELM_POST_RENDERER=falcone-temporal-defer-jobs
+        fi
+        # Phase 1 — no --wait so workloads can retry while bootstrap converges.
+        # On this pinned chart the fresh-install Temporal Jobs are ordinary
+        # resources, not hooks. Defer DB work until ESO readiness and namespace
+        # bootstrap until the frontend is ready, giving each a fresh deadline.
+        E2E_TEMPORAL_RELEASE="$REL" helm_client_apply upgrade --install --skip-schema-validation --no-hooks \
+          "$REL" "$CHART" -n "$NS" "${HELM_VALUES_ARGS[@]}" "${HELM_IMAGE_ARGS[@]}" "${HELM_NAMESPACE_ARGS[@]}" \
+          --post-renderer "$HELM_POST_RENDERER"
+        # Also discard any pre-created/expired Jobs before recreating them with
+        # a fresh deadline after the credential gate; applying cannot reset it.
+        kubectl delete job "$REL-temporal-schema" "$REL-temporal-db-bootstrap" -n "$NS" --ignore-not-found --wait=true
 
-        # Phase 2 — wait for PostgreSQL then run schema job.
-        echo ">> Waiting for PostgreSQL ..."
-        kubectl rollout status statefulset/"$REL"-postgresql -n "$NS" --timeout=5m
-        echo ">> Running Temporal schema migration ..."
-        helm_render \
-          -s templates/temporal/schema-job.yaml 2>/dev/null \
-          | kubectl apply -n "$NS" -f -
-        kubectl wait job/"$REL"-temporal-schema -n "$NS" --for=condition=complete --timeout=3m \
-          || kubectl wait job/"$REL"-temporal-schema -n "$NS" --for=condition=failed --timeout=30s || true
-        kubectl logs -n "$NS" job/"$REL"-temporal-schema 2>/dev/null | tail -5 || true
-
-        # Phase 3 — wait for Temporal frontend, then initialise Temporal.
-        # --no-hooks deliberately omits its post-install hook, so render and
-        # apply it explicitly.
+        # Phase 2 — OpenBao/ESO must converge before Temporal touches its DB.
         # OpenBao's post-install init hook is also excluded by --no-hooks.
         # Run it after its StatefulSet exists so workloads get a live, unsealed
         # OpenBao rather than only a mounted TLS Secret.
@@ -933,15 +959,40 @@ case "${1:-up}" in
           kubectl wait externalsecret --all -n "$NS" --for=condition=Ready --timeout=5m
         fi
 
+        # Require ESO reconciliation explicitly. Without CI bootstrap, the
+        # caller must provision this ExternalSecret; --no-hooks skips its hook.
+        kubectl wait externalsecret/platform-temporal-credentials -n "$NS" --for=condition=Ready --timeout=5m
+        # Read only existence, never Secret data. ESO Ready alone is not enough
+        # if its target was removed between reconciliation and Job creation.
+        kubectl get secret in-falcone-temporal -n "$NS" -o name >/dev/null
+        echo ">> Waiting for PostgreSQL ..."
+        kubectl rollout status statefulset/"$REL"-postgresql -n "$NS" --timeout=5m
+        echo ">> Running Temporal database bootstrap ..."
+        helm_render -s templates/temporal/db-bootstrap-job.yaml \
+          | kubectl apply -n "$NS" -f -
+        kubectl wait job/"$REL"-temporal-db-bootstrap -n "$NS" --for=condition=complete --timeout=3m
+        echo ">> Running Temporal schema migration ..."
+        helm_render -s templates/temporal/schema-job.yaml \
+          | kubectl apply -n "$NS" -f -
+        kubectl wait job/"$REL"-temporal-schema -n "$NS" --for=condition=complete --timeout=3m
+
+        # Phase 3 — wait for Temporal frontend, then initialise its namespace.
         echo ">> Waiting for Temporal frontend ..."
         kubectl rollout status deployment/"$REL"-temporal-frontend -n "$NS" --timeout=5m
         echo ">> Running Temporal namespace bootstrap ..."
-        helm_render \
+        temporal_bootstrap_resource="$(helm_render \
           -s templates/temporal/bootstrap-job.yaml 2>/dev/null \
-          | kubectl apply -n "$NS" -f -
-        kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=complete --timeout=5m \
-          || kubectl wait job/"$REL"-temporal-bootstrap -n "$NS" --for=condition=failed --timeout=30s || true
-        kubectl logs -n "$NS" job/"$REL"-temporal-bootstrap 2>/dev/null | tail -5 || true
+          | kubectl apply -n "$NS" -f - -o name)"
+        # The pinned chart uses a revision-scoped Job name. Wait for the
+        # applied resource rather than an obsolete, hard-coded name.
+        case "$temporal_bootstrap_resource" in
+          job.batch/*|job/*) : ;;
+          *) echo "Temporal bootstrap did not apply exactly one Job." >&2; exit 2 ;;
+        esac
+        case "$temporal_bootstrap_resource" in
+          *[!a-zA-Z0-9./-]*) echo "Invalid Temporal bootstrap resource identity." >&2; exit 2 ;;
+        esac
+        kubectl wait "$temporal_bootstrap_resource" -n "$NS" --for=condition=complete --timeout=5m
         # The platform bootstrap needs Secrets normally made by the skipped
         # pre-install hook. Keep it opt-in for the scheduled CI environment,
         # which supplies all three disposable credentials above; ordinary
@@ -952,7 +1003,6 @@ case "${1:-up}" in
             -s templates/bootstrap-job.yaml 2>/dev/null \
             | kubectl apply -n "$NS" -f -
           kubectl wait job/"$REL"-in-falcone-bootstrap -n "$NS" --for=condition=complete --timeout=5m
-          kubectl logs -n "$NS" job/"$REL"-in-falcone-bootstrap 2>/dev/null | tail -5 || true
           # This post-install authority hook grants the generated webhook
           # principals before the control plane begins serving requests.
           # This hook incorporates Helm's rendered release revision. helm

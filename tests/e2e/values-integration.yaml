@@ -1,0 +1,72 @@
+# Disposable single-node CI scheduling profile. The shared kind profile requests
+# 4.25 CPU cores and 8320 MiB for steady workloads, before Kubernetes and Jobs.
+# Keep every workload, replica, security setting and resource limit; reserve less
+# for this short integration run so bootstrap Jobs can schedule on small runners.
+apisix:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+controlPlane:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+controlPlaneExecutor:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+ferretdb:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+keycloak:
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+observability:
+  resources:
+    requests: {cpu: 25m, memory: 128Mi}
+webConsole:
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+workflowWorker:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+grafana:
+  resources:
+    requests: {cpu: 25m, memory: 128Mi}
+documentdb:
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+kafka:
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+postgresql:
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+postgresqlVector:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+seaweedfs:
+  master:
+    resources:
+      requests: {cpu: 25m, memory: 128Mi}
+  volume:
+    resources:
+      requests: {cpu: 25m, memory: 128Mi}
+  filer:
+    resources:
+      requests: {cpu: 25m, memory: 128Mi}
+  s3:
+    resources:
+      requests: {cpu: 25m, memory: 64Mi}
+temporal:
+  frontend:
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+  history:
+    resources:
+      requests: {cpu: 50m, memory: 256Mi}
+  matching:
+    resources:
+      requests: {cpu: 25m, memory: 128Mi}
+  worker:
+    resources:
+      requests: {cpu: 25m, memory: 128Mi}
+  ui:
+    resources:
+      requests: {cpu: 25m, memory: 64Mi}
