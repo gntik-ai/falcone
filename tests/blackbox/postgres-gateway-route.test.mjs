@@ -12,24 +12,32 @@ const route = (id) => {
   return routeTable.slice(start, end < 0 ? undefined : end);
 };
 const priority = (block) => Number(block.match(/priority: (\d+)/)[1]);
-const methods = (block) => JSON.parse(block.match(/methods: (\[[^\n]+\])/)[1]);
+const methods = (block) => {
+  const match = block.match(/methods: (\[[^\n]+\])/);
+  return match ? JSON.parse(match[1]) : null;
+};
 const vars = (block) => [...block.matchAll(/^      - (\[[^\n]+\])$/gm)]
   .map((match) => JSON.parse(match[1]));
-const postgresRoutes = [...routeTable.matchAll(/^  - id: "([^"]+)"$/gm)]
+const routes = [...routeTable.split('\nglobal_rules:')[0].matchAll(/^  - id: "([^"]+)"$/gm)]
   .map((match) => ({ id: match[1], block: route(match[1]) }))
-  .filter(({ block }) => block.includes('uri: "/v1/postgres/*"'))
   .sort((a, b) => priority(b.block) - priority(a.block));
 
-// Model APISIX's priority and regex-var selection using the checked-in declarations.
+// Include every route, so a competing URI or catch-all cannot hide behind a Postgres-only filter.
+// Model the table's exact/prefix-wildcard URIs, method restrictions, priority, and regex vars.
 // JWT validation happens after selection: absent/invalid tokens must still reach the verifier.
 function selectRoute(method, uri, headers = {}) {
-  return postgresRoutes.find(({ block }) => uri.startsWith('/v1/postgres/')
-    && methods(block).includes(method)
-    && vars(block).every(([name, operator, pattern]) => {
-      assert.equal(operator, '~~');
-      const value = name === 'uri' ? uri : headers[name.slice('http_'.length)] ?? '';
-      return new RegExp(pattern).test(value);
-    }));
+  return routes.find(({ block }) => {
+    const declaredUri = JSON.parse(block.match(/^    uri: ("[^\n]+")$/m)[1]);
+    const uriMatches = declaredUri.endsWith('*')
+      ? uri.startsWith(declaredUri.slice(0, -1)) : uri === declaredUri;
+    return uriMatches
+      && (methods(block) === null || methods(block).includes(method))
+      && vars(block).every(([name, operator, pattern]) => {
+        assert.equal(operator, '~~');
+        const value = name === 'uri' ? uri : headers[name.slice('http_'.length)] ?? '';
+        return new RegExp(pattern).test(value);
+      });
+  });
 }
 
 const tablePath = '/v1/postgres/workspaces/workspace-example/data/database-example/schemas/public/tables/table-example';
@@ -74,10 +82,12 @@ test('Postgres API keys keep route 2005-key and its per-key limit policy', () =>
 
 test('Postgres data regex leaves introspection, exports, imports, and unsupported suffixes on 2005', () => {
   const paths = [
-    `${tablePath}/exports`, `${tablePath}/imports`,
-    '/v1/postgres/databases/database-example/schemas',
-    '/v1/postgres/databases/database-example/schemas/public/tables',
-    '/v1/postgres/databases/database-example/schemas/public/tables/table-example/columns',
+    ['POST', `${tablePath}/exports`], ['POST', `${tablePath}/imports`],
+    ['GET', '/v1/postgres/databases/database-example/schemas'],
+    ['GET', '/v1/postgres/databases/database-example/schemas/public/tables'],
+    ['GET', '/v1/postgres/databases/database-example/schemas/public/tables/table-example/columns'],
+  ];
+  const unsupportedPaths = [
     `${tablePath}/rows/extra`, `${tablePath}/rows/by-primary-key/extra`,
     `${tablePath}/rows/`, `${tablePath}/bulk/insert/extra`, `${tablePath}/search/extra`,
     `${tablePath}/embedding-mapping/extra`, `${tablePath}/bulk/update`, `${tablePath}/bulk/delete`,
@@ -85,9 +95,9 @@ test('Postgres data regex leaves introspection, exports, imports, and unsupporte
     '/v1/postgres/data/database-example/schemas/public/tables/table-example/rows',
     '/v1/postgres/workspaces//data/database-example/schemas/public/tables/table-example/rows',
   ];
-  for (const uri of paths) {
-    const selected = selectRoute('POST', uri, { authorization: 'Bearer test-token' });
-    assert.equal(selected?.id, '2005', uri);
+  for (const [method, uri] of [...paths, ...unsupportedPaths.map((uri) => ['POST', uri])]) {
+    const selected = selectRoute(method, uri, { authorization: 'Bearer test-token' });
+    assert.equal(selected?.id, '2005', `${method} ${uri}`);
     assert.match(selected.block, /falcone-control-plane\.falcone\.svc\.cluster\.local:8080/);
   }
   assert.equal(priority(route('2005')), 235);
