@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Read status projections, never Pod specs, Secret data, or process environments
-// from Kubernetes. Every free-form field passes through the same redactor.
+// Print only Pod names/status, events and redacted logs, never Pod specs, Secret
+// data, or process environments. Every free-form field uses the same redactor.
 import { spawnSync } from 'node:child_process'
 import { writeSync } from 'node:fs'
 
@@ -56,12 +56,14 @@ function parseJson(text) {
 
 emit('>> Ephemeral up failure diagnostics (64 KiB / 600 lines total; 8 KiB per pod)')
 // Fetch all namespace summaries before potentially slow log reads consume the
-// deadline. Project just names/status, using kubectl's explicit JSON serializer.
+// deadline. Project names/status from PodList JSON: JSONPath unions return all
+// names before all statuses, so they cannot be read as interleaved pod pairs.
 const snapshots = [...new Set([process.argv[2], 'eso-system', 'secret-store'])]
   .filter((namespace) => namespace && /^[a-z0-9.-]+$/.test(namespace))
   .map((namespace) => ({
     namespace,
-    pods: parseJson(kubectl(['get', 'pods', '-n', namespace, '-o', "jsonpath-as-json={.items[*]['metadata.name','status']}"], 5)),
+    pods: parseJson(kubectl(['get', 'pods', '-n', namespace, '-o', 'json'], 5))?.items
+      ?.map(({ metadata, status }) => ({ name: metadata?.name, status })),
     events: parseJson(kubectl(['get', 'events', '-n', namespace, '-o', 'jsonpath-as-json={.items[*]}'], 5)),
   }))
 const logCandidates = []
@@ -73,9 +75,7 @@ for (const { namespace, pods, events } of snapshots) {
   sectionBytes = 12 * 1024
   sectionLines = 120
   let shown = 0
-  for (let index = 0; Array.isArray(pods) && index < pods.length; index += 2) {
-    const name = pods[index]
-    const status = pods[index + 1]
+  for (const { name, status } of Array.isArray(pods) ? pods : []) {
     if (!/^[a-z0-9.-]+$/.test(name) || !status || status.phase === 'Succeeded') continue
     const containers = [...(status.initContainerStatuses ?? []), ...(status.containerStatuses ?? []), ...(status.ephemeralContainerStatuses ?? [])]
     const ready = status.conditions?.some((condition) => condition.type === 'Ready' && condition.status === 'True')

@@ -37,7 +37,7 @@ Rendering the pinned chart confirms steady workload requests of 4250 mCPU and
 replicas, limits and all other workload spec fields. Production/shared kind
 values, safety gates and all integration suites remain unchanged.
 
-Diagnostics now explicitly serialize projected names/status as JSON and fetch
+Diagnostics now project names/status from PodList JSON and fetch
 all three namespaces' pod/event summaries before logs. Status/event reads allow
 5s API requests plus 3s client startup/discovery, within a 60s collector limit.
 A 3.2s delayed-client regression verifies pod evidence survives; the old 3s
@@ -51,7 +51,7 @@ identifies `temporal-stuck` with `CreateContainerConfigError` and the missing
 termination evidence. These are simulated diagnostics, not cluster log evidence.
 Seeded and randomly generated credential values must be absent from output.
 The collector limits output per pod, per namespace and overall; it never fetches
-Secret data or Pod specs and excludes credential-handling container logs.
+Secret data or emits Pod specs and excludes credential-handling container logs.
 
 Both E2E blackbox suites and Bash/Node syntax checks passed in this follow-up.
 The actual pinned-chart render comparison and Temporal post-renderer check passed
@@ -120,3 +120,31 @@ checks also passed with isolation disabled to expose their individual results.
 Fresh-kind integration, Mongo bearer requests and main
 workflow_dispatch still require PR CI/network/container execution; ShellCheck
 is still absent. No dependency changes or timeout increases are needed.
+
+The checker follow-up corrects the multi-pod JSONPath union parsing defect:
+Kubernetes returns all selected names before all selected statuses. The collector
+now reads a standard PodList with `get pods -o json` and immediately projects
+each item's name and status together, discarding specs and other metadata from
+the diagnostic snapshot. The stub now returns this actual Kubernetes shape.
+A regression associates the missing-Secret/init-container errors, failed
+credential loader, Unschedulable condition and restarted worker's OOMKilled
+termination with four distinct pods in each namespace, and verifies current and
+previous log targets. Completed/healthy pods, private spec/metadata markers and
+seeded/random credentials stay absent from output. This regression failed
+against `67f10b5a` and passed with the fix.
+
+The inherited plan-enforcement setup failure was reproduced again without
+network using the existing offline route fixture: 12 failed setup hooks include
+`plan-factory.mjs:29` reporting HTTP 404 for test-starter. The helper, HTTP client,
+suite, server and runtime route map have no differences from base `867bfad8`.
+This remains outside the approved test-logic scope; the supplied cancelled-child
+excerpt cannot establish the remote parent failure. Follow-up evidence artifact:
+`falcone-1051-followup-plan-route.tap` in `/tmp`, SHA256
+`22c84ec252259ae59d4d6bc9bc4454141c4398aec9ba634ccde2e250bb1c147a`.
+
+The exact paired blackbox command from integration.yml passed in the assigned
+worktree, including the lifecycle safety suite and the corrected diagnostics
+fixtures. The focused PodList regression, Bash/Node syntax checks and
+`git diff --check` also passed. ShellCheck is unavailable; fresh-kind bring-up,
+Mongo bearer verification and branch/main workflow_dispatch require the
+network/container-backed CI checks. No CI job, test or gate was weakened.

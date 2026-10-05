@@ -89,20 +89,27 @@ if (command === 'kubectl') {
   if (args[0] === 'get' && args[1] === 'deployment' && args.includes('name')) { out('deployment/test'); process.exit(0) }
   if (args[0] === 'get' && args[1] === 'pods') {
     if (process.env.BBX_DIAGNOSTICS_FAIL === 'true') process.exit(40)
-    if (text.includes('jsonpath-as-json=')) {
-      if (!args.includes("jsonpath-as-json={.items[*]['metadata.name','status']}")) process.exit(41)
+    if (args.includes('-o')) {
+      if (args[args.indexOf('-o') + 1] !== 'json') process.exit(41)
       if (process.env.BBX_SLOW_STATUS === 'true' && text.includes('diagnostic-test')) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3200)
       const status = { phase: 'Pending', containerStatuses: [
         { name: 'app', ready: false, restartCount: 2, state: { waiting: { reason: 'CreateContainerConfigError', message: 'secret "in-falcone-temporal" not found' } }, lastState: { terminated: { reason: 'Error', message: process.env.E2E_BOOTSTRAP_SUPERADMIN_PASSWORD, exitCode: 1 } } },
         { name: 'sidecar', ready: false, state: { terminated: { reason: 'Error', exitCode: 2 } } },
       ], initContainerStatuses: [{ name: 'init-db', ready: false, state: { waiting: { reason: 'ImagePullBackOff', message: 'image unavailable' } } }] }
-      const pods = ['temporal-stuck', status,
-        'credential-bootstrap-failed', { phase: 'Failed', containerStatuses: [{ name: 'credential-loader', ready: false, state: { terminated: { reason: 'Error', exitCode: 1 } } }] },
-        'completed-job', { phase: 'Succeeded' },
-        'ready-pod', { phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }], containerStatuses: [{ name: 'app', ready: true }] },
-        'unscheduled-pod', { phase: 'Pending', conditions: [{ type: 'PodScheduled', status: 'False', reason: 'Unschedulable', message: 'Insufficient cpu' }] }]
-      if (process.env.BBX_MANY_PODS === 'true') for (let i = 0; i < 100; i++) pods.push('stuck-' + i, status)
-      out(JSON.stringify(pods))
+      const pod = (name, status) => ({
+        metadata: { name, annotations: { private: 'pod-metadata-must-stay-private' } }, status,
+        spec: { containers: [{ name: 'app', env: [{ name: 'PASSWORD', value: process.env.E2E_BOOTSTRAP_SUPERADMIN_PASSWORD }, { name: 'PRIVATE', value: 'pod-spec-must-stay-private' }] }] },
+      })
+      // Match the real Kubernetes PodList shape, with distinct states that must
+      // remain associated with their own metadata.name across multiple pods.
+      const pods = [pod('temporal-stuck', status),
+        pod('credential-bootstrap-failed', { phase: 'Failed', containerStatuses: [{ name: 'credential-loader', ready: false, state: { terminated: { reason: 'Error', exitCode: 1 } } }] }),
+        pod('completed-job', { phase: 'Succeeded' }),
+        pod('ready-pod', { phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }], containerStatuses: [{ name: 'app', ready: true }] }),
+        pod('unscheduled-pod', { phase: 'Pending', conditions: [{ type: 'PodScheduled', status: 'False', reason: 'Unschedulable', message: 'Insufficient cpu' }] }),
+        pod('restarting-pod', { phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }], containerStatuses: [{ name: 'worker', ready: true, restartCount: 1, state: { running: {} }, lastState: { terminated: { reason: 'OOMKilled', exitCode: 137 } } }] })]
+      if (process.env.BBX_MANY_PODS === 'true') for (let i = 0; i < 100; i++) pods.push(pod('stuck-' + i, status))
+      out(JSON.stringify({ apiVersion: 'v1', kind: 'PodList', items: pods }))
     } else {
       out(process.env.BBX_FAIL_HEALTH === 'true' ? 'temporal-stuck 0/1 Pending 0 1m' : 'app 1/1 Running 0 1m')
     }
@@ -114,7 +121,7 @@ if (command === 'kubectl') {
   }
   if (args[0] === 'logs') {
     if (/bootstrap|credential/.test(text)) { out(process.env.BBX_UNKNOWN_CREDENTIAL); process.exit(0) }
-    for (let i = 0; i < 120; i++) out('log-line-' + i + ' ' + 'x'.repeat(40))
+    for (let i = 0; i < (process.env.BBX_SHORT_LOGS === 'true' ? 5 : 120); i++) out('log-line-' + i + ' ' + 'x'.repeat(40))
     out('known ' + process.env.E2E_BOOTSTRAP_KEYCLOAK_ADMIN_PASSWORD)
     out('random ' + process.env.E2E_BOOTSTRAP_SUPERADMIN_PASSWORD)
     out('password="' + process.env.BBX_UNKNOWN_CREDENTIAL + '"')
@@ -236,6 +243,34 @@ test('busy API client still reports pod states and collects every namespace befo
         assert.ok(index >= 0 && index < firstLogs)
       }
     }
+  } finally { f.cleanup() }
+})
+
+test('PodList diagnostics associate each pod with its own states and log candidates', () => {
+  const f = fixture({ BBX_SHORT_LOGS: 'true' })
+  try {
+    const result = f.run(collector)
+    assert.equal(result.status, 0, result.output)
+    for (const namespace of ['diagnostic-test', 'eso-system', 'secret-store']) {
+      const summary = result.stderr.split(`>> Namespace ${namespace}: pods`)[1]?.split('>> Namespace')[0]
+      assert.ok(summary, `missing ${namespace} summary`)
+      const pods = new Map([...summary.matchAll(/^Pod ([a-z0-9.-]+):([\s\S]*?)(?=^Pod |(?![\s\S]))/gm)].map((match) => [match[1], match[2]]))
+      assert.equal(pods.size, 4)
+      assert.match(pods.get('temporal-stuck'), /phase=Pending, Ready=false/)
+      assert.match(pods.get('temporal-stuck'), /current waiting: reason=CreateContainerConfigError; message=secret "in-falcone-temporal" not found/)
+      assert.match(pods.get('temporal-stuck'), /Container init-db:[\s\S]*reason=ImagePullBackOff/)
+      assert.match(pods.get('credential-bootstrap-failed'), /phase=Failed[\s\S]*Container credential-loader:[\s\S]*current terminated: reason=Error/)
+      assert.match(pods.get('unscheduled-pod'), /phase=Pending[\s\S]*PodScheduled: False; reason=Unschedulable; message=Insufficient cpu/)
+      assert.doesNotMatch(pods.get('unscheduled-pod'), /Container |CreateContainerConfigError|OOMKilled/)
+      assert.match(pods.get('restarting-pod'), /phase=Running, Ready=true[\s\S]*Container worker: ready=true, restarts=1[\s\S]*previous terminated: reason=OOMKilled/)
+      assert.doesNotMatch(pods.get('restarting-pod'), /CreateContainerConfigError|Unschedulable/)
+    }
+    const logs = f.calls().filter(({ args }) => args[0] === 'logs')
+    const candidates = new Set(logs.map(({ args }) => `${args[3]}/${args[args.indexOf('-c') + 1]}`))
+    assert.deepEqual(candidates, new Set(['temporal-stuck/init-db', 'temporal-stuck/app', 'temporal-stuck/sidecar', 'restarting-pod/worker']))
+    assert.ok(logs.some(({ args }) => args[3] === 'restarting-pod' && args.includes('--previous')))
+    assert.doesNotMatch(result.output, /phase=undefined|completed-job|ready-pod|pod-spec-must-stay-private|pod-metadata-must-stay-private/)
+    for (const value of [seeded, f.randomCredential, f.unknownCredential]) assert.ok(!result.output.includes(value))
   } finally { f.cleanup() }
 })
 
