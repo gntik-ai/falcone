@@ -35,7 +35,7 @@ Each SHALL use only `valueFrom.configMapKeyRef`, with no `value` field.
 Validation SHALL reject any executor env entry with both `value` and
 `valueFrom` and any duplicate JWT env name. Tests SHALL include default,
 staging, prod and ordered layers containing the production TLS overlay
-`deploy/kind/values-production.yaml`.
+`deploy/kind/values-production.yaml` on both prod and kind profiles.
 
 #### Scenario: Historical and target render contracts differ as intended
 
@@ -50,6 +50,30 @@ staging, prod and ordered layers containing the production TLS overlay
   both `value` and `valueFrom`, including one introduced by the prod-TLS overlay
 - **WHEN** the env regression check runs
 - **THEN** it fails rather than allowing last-entry-wins behavior
+
+### Requirement: TLS duplicate repair preserves effective executor JWT configuration
+
+The duplicate repair SHALL preserve the executor's effective JWT configuration
+from deployment base `93ee9371fdbd029ff49909ff1fb5c03eeff0ddae` for both
+prod-TLS and kind-TLS. Tests SHALL resolve the target executor's ConfigMap
+reference internally and compare the JWKS URL's scheme, host, port and path
+with the previously effective last env entry. The TLS endpoint SHALL remain
+HTTPS on port 8443. Moving that effective value into the executor ConfigMap
+source is permitted; changing the gateway verifier to accomplish it is not.
+Evidence SHALL report assertions without printing ConfigMap payloads.
+
+#### Scenario: TLS profiles retain the effective JWKS endpoint
+
+- **GIVEN** prod and kind profiles each layered with
+  `deploy/kind/values-production.yaml`, whose previous effective executor JWKS
+  env entry was the appended TLS literal
+- **WHEN** the duplicate repair renders each profile with one reference-only
+  `KEYCLOAK_JWKS_URL` entry
+- **THEN** resolving that reference yields the same effective scheme, host,
+  port and path as before the repair
+- **AND** the existing gateway verifier configuration remains unchanged
+- **AND** a regression to HTTP on port 8080 fails the check even when env
+  uniqueness and `NODE_EXTRA_CA_CERTS` checks pass
 
 ### Requirement: Executor migration is atomic, bounded and repeatable
 
@@ -96,6 +120,16 @@ backup, parity, immutable-image and External Secrets/OpenBao gates.
   replicas and annotations without emitting ConfigMap or Secret payloads
 - **AND** rollback covers reapplying the `433be51` executor Deployment render
   or retrying forward without deleting its Service or ConfigMap
+
+#### Scenario: Release guidance explains TLS duplicate repair
+
+- **GIVEN** the executor TLS literal is moved into its ConfigMap source
+- **WHEN** the operator reads the unpublished release notes, TLS overlay
+  guidance and prod checklist
+- **THEN** they describe how the effective HTTPS endpoint is preserved and
+  require its verification for the exact ordered values layers
+- **AND** they do not claim ConfigMap values are unchanged when the repair
+  changes the stored representation to preserve the effective env value
 
 #### Scenario: An Argo sync-option is selected
 

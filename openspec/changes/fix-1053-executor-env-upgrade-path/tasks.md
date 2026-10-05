@@ -9,6 +9,11 @@
 - [x] Preserve source runtime, workflows, dependencies, lockfiles and fixtures.
 - [x] Validate this change with OpenSpec strict mode and run the existing
   `tests/blackbox/mongo-gateway-route.test.mjs`; record bounded results below.
+- [x] Review existing source HEAD
+  `39bf53486a541ddd423ef16051687863ab7f68a9` on the same clean assigned branch;
+  retain the previous implementation and Hermes pin commit.
+- [x] Clarify the TLS semantics contract and hand off the deployment checker
+  findings without modifying the separately assigned deployment worktree.
 
 ## Deployment maker and platform scope
 
@@ -17,9 +22,18 @@
   record, and Helm 4 server-side apply as used by the harness. Record which
   paths fail and succeed; justify the choice from those results.
 - [ ] Test renders at `433be51` and the target revision for default, staging,
-  prod and prod-TLS layers. Require exactly one entry per JWT env name,
+  prod, prod-TLS and kind-TLS layers. Require exactly one entry per JWT env name,
   `valueFrom` only, and reject any env entry carrying both fields. Fix the
   prod-TLS duplicate if the check fails without changing JWT config semantics.
+- [ ] Repair the checker-confirmed TLS regression in the deployment worktree:
+  preserve the previous effective HTTPS JWKS endpoint through the executor
+  ConfigMap source without changing the gateway verifier. Add resolved URL
+  assertions for scheme, host, port and path against deployment base
+  `93ee9371fdbd029ff49909ff1fb5c03eeff0ddae` for prod-TLS and kind-TLS.
+  Uniqueness and CA env checks alone do not cover this regression.
+- [ ] Correct TLS overlay guidance and unpublished release notes that claim
+  the repair changes no ConfigMap values. Document preservation of the
+  effective TLS endpoint and verify it in the prod checklist.
 - [ ] Reproduce the API server's nonempty-value/valueFrom rejection on at
   least one untreated path, then prove the chosen migration succeeds, rolls
   out Available, and is idempotent on an already-migrated Deployment.
@@ -43,23 +57,24 @@
 - [ ] Hermes synchronizes both `FALCONE_CHARTS_REF` pins to the final deployment
   HEAD; rerun source Mongo route parity after synchronization.
 
-## Bounded source validation
+## Bounded source validation (follow-up review)
 
-The paired checkout on entry is `93ee9371fdbd029ff49909ff1fb5c03eeff0ddae`.
-Both managed workflow pins on entry are
-`00f8e97d5dda530cc2a1e6a10fd8b99e08bb991e`; final deployment work and Hermes
-pin synchronization are pending. No deployment files are modified by this
-source maker. Deployment tasks above are handoff obligations, not completed
-source work or claims of live-cluster evidence.
+The paired checkout on this review is
+`700bc42123d02ae1fc558275ab47b630136d8dde`; both managed workflow pins now
+match it after the existing Hermes commit. The earlier 5/6 parity failure
+against the initial deployment checkout is resolved. A subsequent deployment
+repair will require Hermes to converge both pins again. No deployment files
+are modified by this source maker. Deployment tasks above remain handoff
+obligations, not completed source work or claims of live-cluster evidence.
 
 - PASS: `timeout 45s openspec validate fix-1053-executor-env-upgrade-path
   --strict --no-interactive --json` validates the change with no findings.
-- FAIL (pending managed pins): with `FALCONE_CHART_PATH` pointing to the
+- PASS: with `FALCONE_CHART_PATH` pointing to the
   assigned deployment chart, `timeout 60s node --test
   --experimental-test-isolation=none tests/blackbox/mongo-gateway-route.test.mjs`
-  passes 5/6 tests. Both Helm render tests pass. The sole failing test is
-  workflow pin parity against the paired checkout's entry HEAD above.
-  Preserve that assertion; Hermes must synchronize the final pins and rerun it.
+  passes 6/6 tests, including both Helm renders and workflow pin parity against
+  the paired checkout's HEAD above. Preserve that assertion; Hermes must
+  synchronize the final repaired deployment pins and rerun it.
 - PASS: `git diff --check` for the staged source change.
 - SKIPPED: live deployment upgrade matrix and availability/idempotency checks
   belong to deployment CI. This source sandbox has no kind executable and

@@ -18,11 +18,17 @@ must each be tested from pre-#980 chart revision `433be51`.
   results. Prefer a documented one-time replacement of the target rendered
   Deployment, subject to the live regression evidence. Record successes and
   failures separately; do not assume Helm needs the same recovery as Argo.
-- Test default, staging, prod and the prod-TLS overlay
+- Test default, staging, prod, prod-TLS and kind-TLS using the overlay
   `deploy/kind/values-production.yaml`, including duplicate names, dual-field
   env entries, rollout availability, ConfigMap readiness and repeat execution.
   Resolve the overlay's duplicate `KEYCLOAK_JWKS_URL` in the deployment change
   if it violates the contract; do not waive the check or revert `valueFrom`.
+  Compare the executor's effective JWKS endpoint before and after the repair
+  for both TLS profiles, including scheme, host, port and path. Preserve the
+  previously effective HTTPS endpoint through the executor ConfigMap source,
+  without changing the gateway verifier. Silently dropping a colliding TLS
+  literal is not a semantics-preserving repair; rejecting a collision must
+  also have a documented, tested way to render each supported TLS profile.
 - Document the mechanism, preconditions, verification and rollback in the next
   unpublished chart version's release notes and the #980 prod checklist.
 - Hermes updates both source workflow `FALCONE_CHARTS_REF` pins to the final
@@ -41,8 +47,10 @@ live upgrade succeeded.
 
 Preserve deterministic Helm deployment, immutable image digests, External
 Secrets/OpenBao sourcing, and all migration, backup, parity and evidence gates.
-Do not change executor runtime behavior, JWT/audience semantics, env names,
-ConfigMap keys or values, reconciliation code, or prod host values. Audience
+Do not change executor runtime behavior, effective JWT/audience configuration,
+env names, ConfigMap keys, reconciliation code, or prod host values. Moving
+the previously effective TLS env value into the executor ConfigMap source is
+allowed to preserve behavior; changing the effective endpoint is not. Audience
 reconciliation and real operator-supplied prod issuer/JWKS hosts remain #980
 release prerequisites. Kind bearer round trips and the integration PR trigger
 remain deferred to #1051.
