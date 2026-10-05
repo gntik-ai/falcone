@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { recordHttp, recordMcpDependency, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
+import { publicErrorCode } from './errors.mjs';
 import { handleMcpMessage } from '../mcp-official-server.mjs';
 import { BASE_SCOPE } from '../mcp-official-catalog.mjs';
 import { mcpConfigStore } from '../mcp-config.mjs';
@@ -850,7 +851,7 @@ async function runPlatformMcp(c, upstream, config) {
 // touched: a 403 on a foreign workflow id is propagated as a hard HTTP 403 (no stream opened).
 async function runFlowMonitoringSse(flowMonitoringExecutor, target, c) {
   if (!flowMonitoringExecutor) throw Object.assign(new Error('Flow monitoring is not enabled'), { statusCode: 501, code: 'FLOW_MONITORING_DISABLED' });
-  const { req, res, identity } = c;
+  const { req, res, identity, logger } = c;
   const lastEventId = req.headers['last-event-id'];
   const controller = new AbortController();
   let started = false;
@@ -894,13 +895,14 @@ async function runFlowMonitoringSse(flowMonitoringExecutor, target, c) {
   } catch (err) {
     // A pre-stream rejection (403 foreign workflow id / 401 identity) must surface as an HTTP
     // status, NOT a 200 stream — the stream was never opened (ensureStarted not called).
+    const statusCode = err.statusCode ?? 500;
+    if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
     if (!started && !res.headersSent) {
-      const statusCode = err.statusCode ?? 500;
-      const payload = JSON.stringify({ code: err.code ?? 'FLOW_MONITORING_ERROR', message: statusCode >= 500 ? 'Internal server error' : err.message });
+      const payload = JSON.stringify({ code: publicErrorCode(err, 'FLOW_MONITORING_ERROR'), message: statusCode >= 500 ? 'Internal server error' : err.message });
       res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(payload) });
       res.end(payload);
     } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ code: err.code ?? 'FLOW_MONITORING_ERROR' })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ code: publicErrorCode(err, 'FLOW_MONITORING_ERROR') })}\n\n`);
       stop();
       res.end();
     }
@@ -1185,7 +1187,7 @@ async function runLlmUsage(llmExecutor, params, successStatus) {
 // secret) surface as HTTP error envelopes; once the stream is open, a late error is emitted as a
 // terminal SSE `error` frame (headers are already sent).
 async function runLlmComplete(llmExecutor, { workspaceId, tenantId }, c) {
-  const { req, res } = c;
+  const { req, res, logger } = c;
   if (!llmExecutor) {
     return sendJson(res, 501, { code: 'LLM_DISABLED', message: 'LLM provider is not enabled' });
   }
@@ -1216,7 +1218,8 @@ async function runLlmComplete(llmExecutor, { workspaceId, tenantId }, c) {
     current = await iter.next();
   } catch (err) {
     const statusCode = err.statusCode ?? 500;
-    return sendJson(res, statusCode, { code: err.code ?? 'LLM_PROVIDER_ERROR', message: statusCode >= 500 ? 'Internal server error' : err.message });
+    if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
+    return sendJson(res, statusCode, { code: publicErrorCode(err, 'LLM_PROVIDER_ERROR'), message: statusCode >= 500 ? 'Internal server error' : err.message });
   }
   res.writeHead(200, {
     'content-type': 'text/event-stream',
@@ -1429,7 +1432,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       }
       // SSE routes own the response (streaming); pass req/res and skip the JSON path.
       if (opts?.sse) {
-        await handler(groups, { url, identity, registry, req, res });
+        await handler(groups, { url, identity, registry, req, res, logger });
         return;
       }
       // Webhook trigger ingestion needs the RAW body (HMAC is computed over the exact bytes the
@@ -1464,7 +1467,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       const statusCode = err.statusCode ?? 500;
       if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
       const envelope = {
-        code: err.code ?? 'CONTROL_PLANE_ERROR',
+        code: publicErrorCode(err, 'CONTROL_PLANE_ERROR'),
         message: statusCode >= 500 ? 'Internal server error' : err.message,
       };
       // Flow validation failures carry a node-scoped error array (FLW-E codes + nodeId) — surface
