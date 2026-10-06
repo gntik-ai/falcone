@@ -14,6 +14,14 @@ services before switching the signing key. Credentials are absent from function 
 the current credential. Missing signing configuration fails invocation without opening a socket;
 missing verification configuration denies POSTs while keeping health probes available.
 
+The control plane supports a read-only optional signer Secret directory through
+`FN_INVOCATION_SECRET_DIR`. Deploy/re-roll reads only `jwks`; invocation reads `private-key`,
+`key-id` and `jwks` lazily from one resolved kubelet projection. This recovers from late ESO
+reconciliation without restarting and picks up atomic rotations. A configured mount takes
+precedence over legacy env and fails closed when unavailable. The companion chart must wire the
+entire directory into both signer consumers without `subPath` and test install/upgrade ordering;
+optional secretKeyRef env alone cannot update a container that started before reconciliation.
+
 ## Deployment boundary
 
 Function pods carry `in-falcone.io/component: function`; naming and ownership labels stay stable.

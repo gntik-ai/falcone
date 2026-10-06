@@ -10,20 +10,24 @@ The existing public invocation API and activation recording remain the invocatio
 
 ## Key delivery contract
 
-The companion falcone-charts deployment must configure these control-plane env vars:
+The companion falcone-charts deployment must mount the ESO signer Secret into the control-plane
+and control-plane-executor containers as a read-only optional Secret volume and set
+`FN_INVOCATION_SECRET_DIR=/var/run/falcone/function-invocation`. Mount the entire directory; do not
+use `subPath`, which prevents kubelet updates. The volume contains these Secret properties:
 
-| Variable | Delivery and meaning |
+| Secret property | Delivery and meaning |
 | --- | --- |
-| `FN_INVOCATION_PRIVATE_KEY` | Ed25519 PKCS#8 PEM from a control-plane-only Secret populated by External Secrets/OpenBao. Never inline in values or shared with functions. |
-| `FN_INVOCATION_KEY_ID` | Nonempty ID of the active signing key. |
-| `FN_INVOCATION_JWKS` | JSON object with `keys`, containing public Ed25519 JWKs with `kty`, `crv`, `x`, `kid`. Each `kid` is unique; private `d` fields are rejected. |
+| `private-key` | Ed25519 PKCS#8 PEM from a control-plane-only Secret populated by External Secrets/OpenBao. Never inline in values or shared with functions. |
+| `key-id` | Nonempty ID of the active signing key. |
+| `jwks` | JSON object with `keys`, containing public Ed25519 JWKs with `kty`, `crv`, `x`, `kid`. Each `kid` is unique; private `d` fields are rejected. |
 
 The executor copies only the public key ring to each function revision as `FN_INVOCATION_JWKS`,
 with `FN_KSVC_NAME`, `FN_TENANT_ID` and `FN_WORKSPACE_ID`. Knative's `K_SERVICE` is the authoritative
 audience when present. No signing implementation or private key is copied into the runtime image.
 The runtime captures this configuration at startup. Workspace-secret mappings cannot override
 `FN_SRC`, `FN_KSVC_NAME`, `FN_TENANT_ID`, `FN_WORKSPACE_ID`, `FN_INVOCATION_JWKS`,
-`FN_INVOCATION_PRIVATE_KEY`, `FN_INVOCATION_KEY_ID`, `K_SERVICE`, `NODE_OPTIONS` or `NODE_PATH`.
+`FN_INVOCATION_PRIVATE_KEY`, `FN_INVOCATION_KEY_ID`, `FN_INVOCATION_SECRET_DIR`, `K_SERVICE`,
+`NODE_OPTIONS` or `NODE_PATH`.
 
 Create and PATCH requests using reserved secret env names return `400 VALIDATION_ERROR` before
 secret resolution or workload mutation. Other `FN_*` names remain available: existing references
@@ -32,39 +36,30 @@ is reserved needs an explicit safe mapping such as `{ "name": "fn-src", "env": "
 with code updated to read that name. The manifest builder independently rejects reserved env names
 with `400`.
 
-Key delivery must also converge on fresh installs and upgrades without manual provisioning. The
-companion chart must seed `platform/functions/invocation` idempotently through its existing
-OpenBao bootstrap and preserve existing signing keys. Required Secret references cannot depend
-on a Secret created only by a post-install hook after Helm's workload readiness wait. Use the
-existing precreated Secret/ESO Merge lifecycle, or optional references that allow the control
-plane to start while function operations remain fail-closed. The source phased CI install applies
-`platform-function-invocation` alongside the other chart ExternalSecrets after OpenBao and the
-store are ready, and waits for ESO reconciliation before subsequent bootstrap and rollout gates.
-That reconciliation still requires the companion chart to provision the OpenBao record.
+The control plane reads the mount lazily on each deploy/re-roll or invocation, without caching
+missing files or signing material. It resolves kubelet's `..data` symlink once per operation to read
+one coherent Secret projection during rotation. The manifest builder reads only the public JWKS;
+the signer reads all three properties. A configured mount is authoritative: missing or invalid
+files fail closed even if legacy env contains valid keys. Without `FN_INVOCATION_SECRET_DIR`, the
+three legacy `FN_INVOCATION_PRIVATE_KEY`, `FN_INVOCATION_KEY_ID` and `FN_INVOCATION_JWKS` env vars
+remain supported for compatibility. Env-only delivery does not resolve late ESO reconciliation.
 
-The supplied independent checker evidence for falcone-charts commit
-`c1bad265f62236cc24d20c418d40875c729c9e51` confirms idempotent signer seeding and passing bootstrap
-and secret-delivery tests. When the record is absent, the OpenBao bootstrap generates an Ed25519
-PKCS#8 private key, a nonempty key ID and a matching public-only JWKS, stored together under
-`secret/platform/functions/invocation` with properties `private-key`, `key-id` and `jwks`.
-Re-running bootstrap on install or upgrade preserves the existing record, including the active
-signing key and overlapping verification keys. Keep generation inside the OpenBao bootstrap;
-do not generate keys in source CI, inline them in Helm values, log them or fall back to unsigned
-invocations.
+The companion chart must seed `platform/functions/invocation` idempotently through the existing
+OpenBao bootstrap, preserving active and overlapping keys. Its ExternalSecret must retain the
+signer Secret across upgrades (`creationPolicy: Orphan`, `deletionPolicy: Retain`). An optional
+volume allows control-plane readiness before the post-install/post-upgrade ESO hook creates the
+Secret; kubelet then projects it into the running container and the next function operation reads
+it without a manual restart. Function operations return a fixed configuration error until that
+projection exists; there is no unsigned fallback. The existing source CI ExternalSecret readiness
+wait remains mandatory and does not replace install/upgrade tests.
 
-The pinned companion chart at `7c9b5f276fe2ed7ced1e6f06eb37fe18d82f5c62` uses
-`creationPolicy: Orphan` with `deletionPolicy: Retain` in
-`charts/in-falcone/charts/eso/templates/external-secrets/platform-function-invocation.yaml`.
-ESO therefore creates the target without an owner reference, so replacing the managed-ESO hook
-on upgrade does not garbage-collect the signer Secret. `deletionPolicy: Retain` alone would not
-protect a target created with `creationPolicy: Owner`. The companion
-`tests/function-invocation-secret-delivery.test.mjs` includes a managed-ESO upgrade render test
-asserting the Orphan lifecycle. This source review confirms the template and test contents; PR CI
-must run that test, and live upgrade validation remains required. The phased CI install must still
-stop at its existing ExternalSecret readiness wait on reconciliation failure. A fresh control-plane
-pod starting before initial signer reconciliation can receive no signing env through the optional
-references and fail invocations with `503` until restarted. Keep ESO readiness before rollout;
-static lifecycle review does not establish live cluster acceptance.
+The assigned companion deployment snapshot still uses optional env-only references. Before
+release, its maker must replace them with the directory mount and add fresh-install, first-upgrade
+and reuse-values render tests for both signer consumers. Assert the mount is read-only and
+optional, uses no `subPath`, and is absent from function workloads. A live upgrade must prove an
+already-started control plane can invoke after ESO reconciliation and kubelet projection without a
+restart. Source tests simulate this delayed delivery and atomic key rotation; they do not prove
+Helm ordering or live kubelet behavior.
 
 Signing configuration errors fail before the control plane opens an invocation socket and record a
 failed activation. Missing or malformed runtime public-key/target configuration denies all POSTs
@@ -73,9 +68,10 @@ Runtime logs, result serialization and errors redact the current invocation cred
 
 ## Initial rollout and existing functions
 
-1. Provision the signing key through External Secrets/OpenBao and configure its public key ring
-   and active `kid` in the control plane. Publish the signer before enforcing runtimes; the signer
-   retains legacy identity headers so old runtimes can work during the coordinated rollout.
+1. Provision the signing key through External Secrets/OpenBao, mount the optional signer volume,
+   and configure `FN_INVOCATION_SECRET_DIR` in the control plane. Publish the signer before
+   enforcing runtimes; the signer retains legacy identity headers so old runtimes can work
+   during the coordinated rollout.
 2. Set the control plane's runtime image to the new image through the deployment repository's
    existing immutable-image process. Confirm signing configuration before re-rolling workloads.
 3. For each owned function, use the existing `PATCH /v1/functions/actions/{id}` flow with its same
@@ -87,9 +83,9 @@ Runtime logs, result serialization and errors redact the current invocation cred
 4. Verify the new revision before completing rollout. Existing revisions do not gain env or pod
    labels until patched/redeployed. Runtime enforcement has no enabled-off default or bypass flag.
 
-Release must remain gated until the companion chart delivers all three invocation variables to
-the control-plane container, with the private key and active key ID supplied through External
-Secrets/OpenBao. A NetworkPolicy alone does not satisfy this gate: missing public keys stop
+Release must remain gated until the companion chart mounts all three signer properties into
+both signer consumers through External Secrets/OpenBao and verifies late reconciliation without
+a restart. A NetworkPolicy alone does not satisfy this gate: missing public keys stop
 function deploys, and missing signing configuration returns `503` before invocation. Chart render
 tests must cover safe defaults for `--reuse-values` upgrades and prove signing material is absent
 from function workloads. Publish and pin the enforcing fn-runtime image by immutable digest;
@@ -133,34 +129,21 @@ supply this network-isolation evidence. No cluster acceptance is claimed by this
 
 ## Source follow-up validation limits
 
-The review of dependency-resolution commit `f7451be8e3db50a800f0a05ce41ed22cf2428ebb`
-confirms the reported security fixes: the root overrides require `source-map-js` at least `1.2.2`
-and `vue` / `@vue/server-renderer` at least `3.5.42`. Offline assertions checked matching lockfile
-overrides and every locked version of these packages: `source-map-js` resolves to `1.2.2`, and
-Vue/server-renderer resolve to `3.5.43`. The platform regenerated the lockfile; no further dependency
-or audit-exception changes are needed. This confirms the reported version floors, not the result
-of an online vulnerability audit.
+The root overrides and every locked version meet the reported patched floors: `source-map-js`
+is `1.2.2`, and Vue/server-renderer are `3.5.43` (required floor `3.5.42`). No manifest or lockfile
+changes are needed. This offline check does not replace the online audit.
 
-The invocation-auth, lifecycle-ownership, cleanup-ownership, caller-context and signed namespacing
-test files pass under a 30-second bound. All 12 invocation-auth cases pass, including rejection
-before source evaluation, verified identity, public-only env, expiry, rotation, credential
-redaction and one activation after readiness. The namespace-preservation harness also passed.
-Three caller-context HTTP cases skip because the sandbox forbids localhost listeners; request
-listener tests exercise runtime authentication without sockets. Shell syntax validation passes.
+The five scoped invocation-auth, lifecycle-ownership, cleanup-ownership, caller-context and signed
+namespacing test files pass under a 30-second bound. Running invocation-auth directly reports
+14 passing cases, including delayed Secret projection, recovery without restart, rotation,
+fail-closed mount precedence and fixed diagnostics for malformed material.
+Three caller-context HTTP cases skip because the sandbox forbids localhost listeners;
+request-listener tests verify runtime authentication without sockets.
+The broader namespace-preservation harness exceeded its 30-second bound (exit `124`);
+rerun it in PR CI. Shell syntax validation passes.
 
-Required CI checks retain these local limits:
-
-- `pnpm security:deps` needs network access to the vulnerability registry and the unavailable
-  `corepack` command; rerun the unchanged security job in PR CI.
-- `pnpm security:images` cannot launch its existing `npm` command because `npm` is absent.
-- `pnpm sbom:licenses` cannot produce a report without installed dependency package indexes.
-- `pnpm test:unit` was attempted and returned 100 failing test files and 86 passing files; missing
-  workspace dependencies include `yaml`, `cel-js`, `ajv`, `kafkajs` and `undici`. The
-  `source-build-root-context.test.mjs` service-catalog case likewise fails for missing `yaml`;
-  its five Dockerfile contract cases pass. Rerun both complete commands after installation.
-- `node scripts/validate-structure.mjs` requires the companion charts checkout at the expected
-  sibling path, which is absent in this sandbox layout.
-- Image builds/scans and policy-enforcing cluster acceptance need the CI/release environment.
-
-Keep the existing security, supply-chain and release gates intact. Image publication, re-rolls,
-enforcing-CNI evidence and independent verification remain release requirements.
+The matching security commands were attempted under 30-second bounds: `pnpm security:deps`
+cannot run without corepack/network, `pnpm security:images` cannot run without npm, and both
+`pnpm sbom:licenses` commands lack installed package indexes. Rerun the unchanged security job in
+PR CI. HTTP socket cases, image builds/scans, companion chart render tests and live policy-enforcing
+CNI acceptance remain CI/release checks. Keep every existing security and supply-chain gate.

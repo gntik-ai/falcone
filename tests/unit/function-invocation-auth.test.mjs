@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { EventEmitter } from 'node:events';
 import { sign } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { buildInvokeHeaders, buildFunctionKsvcManifest, buildFunctionOwnershipLabels, deployKnativeService, invokeKnative } from '../../apps/control-plane/function-executor.mjs';
 import { mintInvocationCredential, invocationPublicJwks } from '../../apps/control-plane/function-invocation-auth.mjs';
 import { createInvocationVerifier } from '../../apps/fn-runtime/invocation-auth.mjs';
@@ -23,6 +26,31 @@ const credential = mintInvocationCredential('{}', caller, target, active.env);
 const decode = (part) => JSON.parse(Buffer.from(part, 'base64url').toString());
 const claims = decode(credential.split('.')[1]);
 const header = decode(credential.split('.')[0]);
+
+function signerMount(t) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'function-signer-'));
+  const previous = process.env.FN_INVOCATION_SECRET_DIR;
+  process.env.FN_INVOCATION_SECRET_DIR = directory;
+  t.after(() => {
+    if (previous === undefined) delete process.env.FN_INVOCATION_SECRET_DIR;
+    else process.env.FN_INVOCATION_SECRET_DIR = previous;
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+  return {
+    directory,
+    project(fixture, revision) {
+      const snapshot = path.join(directory, revision);
+      fs.mkdirSync(snapshot);
+      for (const [name, value] of Object.entries({
+        'private-key': fixture.env.FN_INVOCATION_PRIVATE_KEY,
+        'key-id': fixture.env.FN_INVOCATION_KEY_ID,
+        jwks: fixture.env.FN_INVOCATION_JWKS,
+      })) fs.writeFileSync(path.join(snapshot, name), value, { mode: 0o600 });
+      fs.symlinkSync(revision, path.join(directory, '..data-next'));
+      fs.renameSync(path.join(directory, '..data-next'), path.join(directory, '..data'));
+    },
+  };
+}
 function signed(changes = {}, headerChanges = {}, key = active.privateKey) {
   const encode = (v) => Buffer.from(JSON.stringify(v)).toString('base64url');
   const input = `${encode({ ...header, ...headerChanges })}.${encode({ ...claims, ...changes })}`;
@@ -91,6 +119,73 @@ test('missing, duplicate, malformed or private public-key configuration fails cl
   assert.throws(() => mintInvocationCredential('{}', caller, target, { ...active.env, FN_INVOCATION_JWKS: retiring.env.FN_INVOCATION_JWKS }), /signing is not configured/);
 });
 
+test('late ESO projection restores deploy and invoke without restarting, and rotation refreshes signing', async (t) => {
+  installInvocationFixture(t, active);
+  const mount = signerMount(t);
+  const options = { tenantId: target.tenantId, workspaceId: target.workspaceId, functionResourceId: 'fn-resource-a' };
+  let calls = 0;
+  let expectedKid = active.jwk.kid;
+  const verify = createInvocationVerifier({ ...env, FN_INVOCATION_JWKS: JSON.stringify({ keys: [active.jwk, retiring.jwk] }) });
+  t.mock.method(http, 'request', (requestOptions, receive) => {
+    calls++;
+    const req = new EventEmitter();
+    let body;
+    req.write = (value) => { body = value; };
+    req.end = () => {
+      assert.deepEqual(verify(requestOptions.headers.authorization, body), caller);
+      const tokenHeader = decode(requestOptions.headers.authorization.slice(7).split('.')[0]);
+      assert.equal(tokenHeader.kid, expectedKid);
+      const response = Object.assign(new EventEmitter(), { statusCode: 200 });
+      receive(response);
+      response.emit('data', JSON.stringify({ status: 'success', result: { ok: true } }));
+      response.emit('end');
+    };
+    return req;
+  });
+  // Even valid stale env must not override the missing authoritative mount.
+  assert.equal((await invokeKnative('fn.example', {}, { ...target, caller })).statusCode, 503);
+  assert.equal(calls, 0);
+  assert.throws(() => buildFunctionKsvcManifest(target.audience, '', options),
+    (error) => error.message === 'Function invocation public keys are not configured correctly');
+
+  mount.project(active, '..revision-1');
+  for (const fixture of [active, retiring]) {
+    if (fixture === retiring) mount.project(retiring, '..revision-2');
+    expectedKid = fixture.jwk.kid;
+    const manifest = buildFunctionKsvcManifest(target.audience, '', options);
+    const entries = manifest.spec.template.spec.containers[0].env;
+    assert.deepEqual(JSON.parse(entries.find((entry) => entry.name === 'FN_INVOCATION_JWKS').value), { keys: [fixture.jwk] });
+    assert.equal(entries.some((entry) => ['FN_INVOCATION_PRIVATE_KEY', 'FN_INVOCATION_SECRET_DIR'].includes(entry.name)), false);
+    assert.equal(JSON.stringify(manifest).includes(fixture.env.FN_INVOCATION_PRIVATE_KEY), false);
+    assert.equal((await invokeKnative('fn.example', {}, { ...target, caller })).statusCode, 200);
+  }
+  assert.equal(calls, 2);
+  fs.unlinkSync(path.join(mount.directory, '..data'));
+  assert.equal((await invokeKnative('fn.example', {}, { ...target, caller })).statusCode, 503);
+  assert.equal(calls, 2);
+});
+
+test('mounted configuration pins the projection, supports direct files and redacts malformed material', (t) => {
+  const mount = signerMount(t);
+  mount.project(active, '..revision-1');
+  // Reading the resolved projection ignores inconsistent top-level file links.
+  for (const [name, value] of Object.entries({
+    'private-key': 'invalid-private-material', 'key-id': 'wrong-kid', jwks: 'invalid-public-material',
+  })) fs.writeFileSync(path.join(mount.directory, name), value);
+  const token = mintInvocationCredential('{}', caller, target);
+  assert.deepEqual(createInvocationVerifier(env)(`Bearer ${token}`, '{}'), caller);
+  assert.deepEqual(invocationPublicJwks(), { keys: [active.jwk] });
+  fs.unlinkSync(path.join(mount.directory, '..data'));
+  assert.throws(() => mintInvocationCredential('{}', caller, target),
+    (error) => error.message === 'Function invocation signing is not configured correctly');
+  assert.throws(() => invocationPublicJwks(),
+    (error) => error.message === 'Function invocation public keys are not configured correctly');
+  // Public-key deployment does not require reading the private key.
+  fs.writeFileSync(path.join(mount.directory, 'jwks'), active.env.FN_INVOCATION_JWKS);
+  fs.unlinkSync(path.join(mount.directory, 'private-key'));
+  assert.deepEqual(invocationPublicJwks(), { keys: [active.jwk] });
+});
+
 test('runtime returns 401 before source evaluation for every invalid credential; probes stay ready', async (t) => {
   const previous = process.env.FN_SRC;
   process.env.FN_SRC = 'globalThis.issue972Evaluated = true; function main(){ globalThis.issue972Invoked = true; }';
@@ -129,7 +224,7 @@ test('manifest labels actual function pods and injects public-only verification 
   assert.ok(!values.FN_INVOCATION_PRIVATE_KEY);
   // Avoid assertion diagnostics containing ephemeral key material.
   assert.equal(JSON.stringify(manifest).includes(active.env.FN_INVOCATION_PRIVATE_KEY), false);
-  for (const name of ['FN_INVOCATION_PRIVATE_KEY', 'FN_INVOCATION_KEY_ID', 'FN_INVOCATION_JWKS', 'FN_KSVC_NAME', 'FN_TENANT_ID', 'FN_WORKSPACE_ID', 'FN_SRC', 'K_SERVICE', 'NODE_OPTIONS', 'NODE_PATH']) {
+  for (const name of ['FN_INVOCATION_PRIVATE_KEY', 'FN_INVOCATION_KEY_ID', 'FN_INVOCATION_JWKS', 'FN_INVOCATION_SECRET_DIR', 'FN_KSVC_NAME', 'FN_TENANT_ID', 'FN_WORKSPACE_ID', 'FN_SRC', 'K_SERVICE', 'NODE_OPTIONS', 'NODE_PATH']) {
     assert.throws(() => buildFunctionKsvcManifest(target.audience, '', { ...opts, secretEnv: [{ name, value: 'unsafe' }] }),
       (error) => error.statusCode === 400 && /reserved/.test(error.message));
   }

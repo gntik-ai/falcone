@@ -52,6 +52,14 @@ control-plane errors. Runtime configuration SHALL be captured before evaluating 
 - **THEN** the stable ksvc name and ownership checks are preserved, the pod label and public-key env
   are applied idempotently, and both configured signing key IDs can be verified
 
+#### Scenario: Late signer delivery recovers without a control-plane restart
+
+- **WHEN** the control plane starts before ESO reconciles its optional signer Secret volume
+- **THEN** function operations fail closed until kubelet projects the Secret, and subsequent
+  operations read the mounted keys without a restart
+- **AND** rotation reads one coherent projection, a configured mount never falls back to stale
+  signing env, and function workloads receive neither the mount nor private signing material
+
 ### Requirement: Function pods have targeted ingress and egress isolation
 
 The system SHALL label function pod templates with `in-falcone.io/component: function`. The chart
