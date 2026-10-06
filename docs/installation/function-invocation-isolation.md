@@ -133,29 +133,34 @@ supply this network-isolation evidence. No cluster acceptance is claimed by this
 
 ## Source follow-up validation limits
 
-The review of source HEAD `ee6bd791a6f10d39d4a76f7f7a1533c2a00a70b3` reproduced passing signer,
-runtime authentication, caller-context, ownership, naming and Function lifecycle tests. The
-namespace-preservation harness also passed. No additional authentication defect was reproduced.
-Caller-context header tests passed; its three HTTP cases skipped because localhost listeners
-are forbidden here. The runtime request-listener unit tests exercised authentication without
-opening sockets.
+The review of dependency-resolution commit `f7451be8e3db50a800f0a05ce41ed22cf2428ebb`
+confirms the reported security fixes: the root overrides require `source-map-js` at least `1.2.2`
+and `vue` / `@vue/server-renderer` at least `3.5.42`. Offline assertions checked matching lockfile
+overrides and every locked version of these packages: `source-map-js` resolves to `1.2.2`, and
+Vue/server-renderer resolve to `3.5.43`. The platform regenerated the lockfile; no further dependency
+or audit-exception changes are needed. This confirms the reported version floors, not the result
+of an online vulnerability audit.
 
-The reported PR failures still require CI results with logs: `Analyze (javascript-typescript)`,
-`Analyze (python)`, `quality`, `real-stack` and `web-console`. The source diff does not change Python,
-CodeQL configuration, web-console source or the real-stack runners. Their failure causes cannot be
-determined from job names alone. Local validation has these limits:
+The invocation-auth, lifecycle-ownership, cleanup-ownership, caller-context and signed namespacing
+test files pass under a 30-second bound. All 12 invocation-auth cases pass, including rejection
+before source evaluation, verified identity, public-only env, expiry, rotation, credential
+redaction and one activation after readiness. The namespace-preservation harness also passed.
+Three caller-context HTTP cases skip because the sandbox forbids localhost listeners; request
+listener tests exercise runtime authentication without sockets. Shell syntax validation passes.
 
-- `pnpm lint` cannot launch its existing `npm` commands because `npm` is absent.
-- `pnpm test:unit` cannot complete without installed workspace dependencies, including `yaml`,
-  `cel-js` and `ajv`; the service-catalog blackbox test also requires `yaml`.
-- `node scripts/validate-public-api.mjs` requires the absent `@apidevtools/swagger-parser` package.
-- `pnpm --filter @in-falcone/web-console test` cannot complete in this sandbox: pnpm's Node
-  subprocess is denied, and the workspace has no installed Vitest dependencies.
-- `bash tests/env/executor/run.sh` and `bash tests/env/flow-audit-outbox/run.sh` require Docker
-  services and container images. The Docker daemon is inaccessible here.
-- Both Analyze jobs require the unavailable CodeQL toolchain and GitHub analysis environment.
+Required CI checks retain these local limits:
 
-Run the existing CI jobs after dependencies and tools are available; keep all tests, security
-checks and release gates intact. No dependency manifest or lockfile changes are required by this
-source follow-up. Image publication, enforcing-CNI evidence and independent verification remain
-release requirements.
+- `pnpm security:deps` needs network access to the vulnerability registry and the unavailable
+  `corepack` command; rerun the unchanged security job in PR CI.
+- `pnpm security:images` cannot launch its existing `npm` command because `npm` is absent.
+- `pnpm sbom:licenses` cannot produce a report without installed dependency package indexes.
+- `pnpm test:unit` was attempted and returned 100 failing test files and 86 passing files; missing
+  workspace dependencies include `yaml`, `cel-js`, `ajv`, `kafkajs` and `undici`. The
+  `source-build-root-context.test.mjs` service-catalog case likewise fails for missing `yaml`;
+  its five Dockerfile contract cases pass. Rerun both complete commands after installation.
+- `node scripts/validate-structure.mjs` requires the companion charts checkout at the expected
+  sibling path, which is absent in this sandbox layout.
+- Image builds/scans and policy-enforcing cluster acceptance need the CI/release environment.
+
+Keep the existing security, supply-chain and release gates intact. Image publication, re-rolls,
+enforcing-CNI evidence and independent verification remain release requirements.

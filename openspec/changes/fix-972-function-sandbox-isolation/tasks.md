@@ -10,6 +10,7 @@
 - [x] Reserve only runtime, invocation and Node configuration names; preserve unrelated FN_* secret mappings.
 - [x] Apply the function signer ExternalSecret in phased CI through the existing OpenBao/ESO readiness gates.
 - [x] Use the test runner's Node binary in the isolated e2e harness, including installations outside /usr/bin.
+- [x] Require patched source-map-js and Vue/server-renderer versions and verify the platform-regenerated lockfile offline.
 
 ## Companion deployment repository and release gates
 
@@ -37,19 +38,20 @@ in this source sandbox or that a live upgrade was verified. The source CI Extern
 wait remains mandatory; optional env references still require reconciliation before rollout on
 fresh installs. Cluster acceptance and independent verification remain open.
 
-Current source follow-up validation: the invocation-auth, lifecycle-ownership, cleanup-ownership,
-caller-context, signed namespacing, deploy tenant-scope, mutation authorization, runtime
-availability, input binding, rollback and public contract test files pass under a 30-second bound.
-The full namespace-preservation harness also passed. No additional authentication defect was
-reproduced. Three caller-context HTTP cases skipped because localhost listeners are forbidden;
-request-listener authentication unit tests passed without sockets. Repository structure validation
-and shell syntax checks passed. This follow-up changes only the task record and operations guide; no dependency or
-workflow pin changes are needed.
+Current source follow-up starts from the platform's dependency-resolution commit
+`f7451be8e3db50a800f0a05ce41ed22cf2428ebb`. Offline assertions confirm the root overrides and all
+locked source-map-js / Vue / server-renderer versions meet the reported patched floors; resolved
+versions are `1.2.2` / `3.5.43` / `3.5.43`. No additional manifest or lockfile edits are needed.
 
-The reported Analyze jobs, quality, real-stack and web-console failures cannot be attributed from
-job names without CI logs. Local quality checks lack npm and installed dependencies; the
-service-catalog test lacks yaml and public-API validation lacks swagger-parser; web-console lacks installed dependencies and pnpm's Node
-subprocess was denied. Real-stack/image checks require an accessible Docker daemon and images,
-and CodeQL is unavailable. These checks remain required in PR CI, alongside companion chart
-lifecycle tests. The operations guide records the exact commands and limits. Policy-enforcing
-cluster acceptance and independent verification remain release gates.
+Invocation-auth (12 cases), lifecycle-ownership, cleanup-ownership, caller-context and signed
+namespacing test files pass under a 30-second bound. The namespace-preservation harness and shell
+syntax check also pass. Three caller-context HTTP cases skip because localhost listeners are
+forbidden; runtime authentication request-listener tests pass without sockets.
+
+The complete unit command and source-build service-catalog case were attempted but cannot pass
+without installed workspace dependencies. Structure validation lacks the expected sibling chart
+path. The security job still needs its online audit, image-policy check and license reports in PR
+CI: this sandbox has no network, npm/corepack or installed dependency indexes. The operations guide
+records the commands and observed limits. All CI and release gates remain mandatory, including
+image builds/scans, companion chart validation, policy-enforcing cluster acceptance and independent
+verification. This follow-up updates only the task record and operations guide.
