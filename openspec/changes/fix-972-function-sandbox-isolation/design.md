@@ -19,8 +19,14 @@ The control plane supports a read-only optional signer Secret directory through
 `key-id` and `jwks` lazily from one resolved kubelet projection. This recovers from late ESO
 reconciliation without restarting and picks up atomic rotations. A configured mount takes
 precedence over legacy env and fails closed when unavailable. The companion chart must wire the
-entire directory into both signer consumers without `subPath` and test install/upgrade ordering;
-optional secretKeyRef env alone cannot update a container that started before reconciliation.
+entire directory only into the control-plane container without `subPath` and test install/upgrade
+ordering; optional secretKeyRef env alone cannot update a container that started before reconciliation.
+
+The separate control-plane-executor does not sign Knative invocations. Its default local worker
+backend executes tenant function source in-process without a security sandbox, so tenant code can
+read its filesystem. It must receive neither the signer Secret mount nor private signing env;
+otherwise a tenant could steal the key and forge credentials for another ksvc. Chart delivery tests
+must assert that signing material is absent from both executor and function workloads.
 
 ## Deployment boundary
 

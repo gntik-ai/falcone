@@ -38,6 +38,15 @@ Secrets/OpenBao, never inline in chart values. Function revisions SHALL receive 
 verification keys, support overlapping keys by `kid`, and contain no signing material in env,
 filesystem or memory. Credentials SHALL NOT be injected into function env or logged in runtime or
 control-plane errors. Runtime configuration SHALL be captured before evaluating tenant code.
+The separate control-plane-executor SHALL receive neither the signer Secret mount nor private
+signing env, because its local worker backend executes tenant function source in-process.
+
+#### Scenario: Executor cannot disclose the invocation signing key
+
+- **WHEN** tenant source executes through the control-plane-executor's local worker backend and
+  reads its environment or pod filesystem
+- **THEN** the invocation private key is absent and cannot be used to forge credentials for any ksvc
+- **AND** chart delivery tests prove that only the control-plane container receives the signer mount
 
 #### Scenario: Environment disclosure cannot forge another service credential
 
@@ -58,7 +67,8 @@ control-plane errors. Runtime configuration SHALL be captured before evaluating 
 - **THEN** function operations fail closed until kubelet projects the Secret, and subsequent
   operations read the mounted keys without a restart
 - **AND** rotation reads one coherent projection, a configured mount never falls back to stale
-  signing env, and function workloads receive neither the mount nor private signing material
+  signing env, and executor and function workloads receive neither the mount nor private signing
+  material
 
 ### Requirement: Function pods have targeted ingress and egress isolation
 
