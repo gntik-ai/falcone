@@ -39,11 +39,13 @@ signing env from the executor and update its tests and operations guide to enfor
 delivery. This source-only follow-up corrects the contract; the deployment security fix and live
 late-reconciliation evidence remain required.
 
-Scoped source tests report 36 passing cases, including all 14 invocation-auth cases, and three HTTP
-cases skipped because localhost listeners are prohibited. Offline manifest/lockfile checks confirm
-the already-resolved source-map-js and Vue/server-renderer security fixes. The four matching security
-commands cannot complete without corepack, npm, network and installed package indexes; direct
-image-policy validation also lacks the installed yaml package. Rerun them unchanged in PR CI.
-The earlier follow-up's broader namespace-preservation harness exceeded its 30-second bound; rerun
-it in CI. Shell syntax validation passes. Image publication, HTTP tests, re-rolls, live upgrade,
+The 2026-10-07 source review reports 52 passing cases, including all 14 invocation-auth cases and
+the mutation-authorization, Knative-availability and invocation-input-binding regressions. Three
+HTTP cases skip because localhost listeners are prohibited. Offline manifest/lockfile checks
+confirm that every source-map-js and Vue/server-renderer entry meets the reported patched floors;
+the security log reports vulnerable versions absent from the assigned snapshot. No further
+dependency changes are required. The four matching security commands cannot complete without
+corepack, npm, network and installed package indexes. Rerun them unchanged in PR CI.
+The namespace-preservation harness again exceeded its 30-second bound with exit 124 and no case
+output; rerun it in CI. Shell syntax validation passes. Image publication, HTTP tests, re-rolls, live upgrade,
 policy-enforcing CNI acceptance and independent verification remain release gates.

@@ -138,23 +138,27 @@ supply this network-isolation evidence. No cluster acceptance is claimed by this
 
 ## Source follow-up validation limits
 
-The root overrides and every locked version meet the reported patched floors: `source-map-js`
-is `1.2.2`, and Vue/server-renderer are `3.5.43` (required floor `3.5.42`). No manifest or lockfile
-changes are needed. This offline check does not replace the online audit.
+The 2026-10-07 source review started from commit
+`1fe158be837a6ca96162ae28b329295c6b02b211` with a clean assigned worktree. The supplied security
+failure log reports dependency versions already replaced in this snapshot: every package and
+snapshot entry resolves `source-map-js` to `1.2.2` and Vue/server-renderer to `3.5.43` (required
+floor `3.5.42`). Root overrides also require the patched floors. No further manifest or lockfile
+change is needed; this offline comparison does not replace the online audit.
 
-The five scoped invocation-auth, lifecycle-ownership, cleanup-ownership, caller-context and signed
-namespacing test files report 36 passing cases and three skipped HTTP cases when run directly under
-30-second bounds. Invocation-auth reports 14 passing cases, including delayed Secret projection,
-recovery without restart, rotation,
-fail-closed mount precedence and fixed diagnostics for malformed material.
-Three caller-context HTTP cases skip because the sandbox forbids localhost listeners;
-request-listener tests verify runtime authentication without sockets.
-The earlier follow-up's broader namespace-preservation harness exceeded its 30-second bound (exit `124`);
-rerun it in PR CI. Shell syntax validation passes.
+Direct runs under 30-second bounds report 52 passing cases across invocation-auth,
+lifecycle-ownership, cleanup-ownership, caller-context, signed namespacing, mutation-authorization,
+Knative-availability and invocation-input-binding tests. These include authentication before source
+evaluation, delayed Secret projection, rotation, fail-closed mount precedence, ownership-safe PATCH,
+verified caller context and exactly one activation. Three caller-context HTTP cases skip because
+the sandbox forbids localhost listeners; request-listener tests verify authentication without
+sockets. Run files directly with `node tests/...test.mjs` to retain individual case and skip evidence.
+Shell syntax validation passes for `tests/e2e/stack.sh` and `tests/e2e/run-issue.sh`.
+The namespace-preservation harness again exceeded its 30-second bound (exit `124`) without case
+output; rerun `node tests/blackbox/e2e-preserve-existing-namespace.test.mjs` in PR CI.
 
 The matching security commands were attempted under 30-second bounds: `pnpm security:deps`
-cannot run without corepack/network, `pnpm security:images` cannot run without npm, and both
-`pnpm sbom:licenses` commands lack installed package indexes. Rerun the unchanged security job in
-PR CI. Direct image-policy validation also cannot load the uninstalled `yaml` package.
-HTTP socket cases, image builds/scans, companion chart render tests and live policy-enforcing
-CNI acceptance remain CI/release checks. Keep every existing security and supply-chain gate.
+cannot run without corepack/network, `pnpm security:images` cannot run without npm, and
+`pnpm sbom:licenses` and `pnpm sbom:licenses:json` lack installed package indexes. Rerun the
+unchanged security job in PR CI. HTTP socket cases, image builds/scans, companion chart render
+tests and live policy-enforcing CNI acceptance remain CI/release checks. Keep every existing
+security and supply-chain gate.
