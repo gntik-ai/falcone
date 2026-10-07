@@ -39,7 +39,7 @@ signing env from the executor and update its tests and operations guide to enfor
 delivery. This source-only follow-up corrects the contract; the deployment security fix and live
 late-reconciliation evidence remain required.
 
-The 2026-10-07 follow-up review of source HEAD `aa52d7e9d4b75aff768ab3e11c22d5b3a998b1c7`
+The 2026-10-07 follow-up review of source HEAD `db370ca552ca824b39d6a834ff71a0af907b511b`
 reports 52 passing cases, including all 14 invocation-auth cases and
 the mutation-authorization, Knative-availability and invocation-input-binding regressions. Three
 HTTP cases skip because localhost listeners are prohibited. Offline manifest/lockfile checks
@@ -47,12 +47,15 @@ confirm that every source-map-js and Vue/server-renderer entry meets the reporte
 the security log reports vulnerable versions absent from the assigned snapshot. No further
 dependency changes are required. The four matching security commands cannot complete without
 corepack, npm, network and installed package indexes. Rerun them unchanged in PR CI.
-Five source-build Dockerfile cases also pass; its service-catalog case exits with a failure because
+Earlier validation at `aa52d7e9d4b75aff768ab3e11c22d5b3a998b1c7` recorded five passing
+source-build Dockerfile cases; its service-catalog case exited with a failure because
 the existing `yaml` dependency is not installed. Direct image-policy validation has the same limit.
 Rerun both after CI installs the frozen lockfile; no dependency or safety-gate changes are required.
-The complete namespace-preservation harness passes all 57 cases in approximately 94 seconds
+That earlier complete namespace-preservation harness passed all 57 cases in approximately 94 seconds
 without an added timeout wrapper, including signer reconciliation through ESO readiness gates.
 This supersedes the previous 30-second interruption, which was not a test failure. All scoped
 tests ran without added timeout wrappers. Shell syntax validation passes. Image publication,
 HTTP tests, re-rolls, live upgrade, policy-enforcing CNI acceptance and independent verification
-remain release gates.
+remain release gates. This documentation-only follow-up reran the eight scoped function test files,
+offline patched-floor checks and shell syntax validation; it did not rerun the unchanged Dockerfile
+or namespace-preservation harness files. No further source or dependency change was identified.

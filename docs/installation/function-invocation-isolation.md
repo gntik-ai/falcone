@@ -139,7 +139,7 @@ supply this network-isolation evidence. No cluster acceptance is claimed by this
 ## Source follow-up validation limits
 
 The 2026-10-07 source review started from commit
-`aa52d7e9d4b75aff768ab3e11c22d5b3a998b1c7` with a clean assigned worktree on
+`db370ca552ca824b39d6a834ff71a0af907b511b` with a clean assigned worktree on
 `agent/falcone/972/03f89078-61db-5d67-8133-5d9fd6680756`. The supplied security
 failure log reports dependency versions already replaced in this snapshot: every package and
 snapshot entry resolves `source-map-js` to `1.2.2` and Vue/server-renderer to `3.5.43` (required
@@ -153,16 +153,19 @@ evaluation, delayed Secret projection, rotation, fail-closed mount precedence, o
 verified caller context and exactly one activation. Three caller-context HTTP cases skip because
 the sandbox forbids localhost listeners; request-listener tests verify authentication without
 sockets. Run files directly with `node tests/...test.mjs` to retain individual case and skip evidence.
-Five Dockerfile assertions in `tests/blackbox/source-build-root-context.test.mjs` also pass. Its
+Previously recorded validation at source HEAD `aa52d7e9d4b75aff768ab3e11c22d5b3a998b1c7`
+includes five passing Dockerfile assertions in `tests/blackbox/source-build-root-context.test.mjs`. Its
 service-catalog validator case cannot complete because the sandbox has no installed `yaml`
 package; the file exits with one failed case for that missing dependency. Rerun the full file
 after CI installs the existing frozen lockfile; no manifest change or test relaxation is needed.
 Shell syntax validation passes for `tests/e2e/stack.sh` and `tests/e2e/run-issue.sh`.
-The complete `node tests/blackbox/e2e-preserve-existing-namespace.test.mjs` run passes all 57
+That earlier complete `node tests/blackbox/e2e-preserve-existing-namespace.test.mjs` run passed all 57
 cases in approximately 94 seconds without an added timeout wrapper. This supersedes the earlier
 30-second interruption, which was not a test failure. The passing fixture-based checks include
 signer ExternalSecret reconciliation through the ESO readiness gates, Helm 3/4 compatibility,
-namespace preservation and fail-closed cleanup; they do not access a real cluster.
+namespace preservation and fail-closed cleanup; they do not access a real cluster. The Dockerfile
+and namespace-preservation files were not rerun in this follow-up, which changes only validation
+documentation. Shell syntax and the eight scoped function test files were rerun at the assigned HEAD.
 
 The matching security commands were attempted: `pnpm security:deps`
 cannot run without corepack/network, `pnpm security:images` cannot run without npm, and
