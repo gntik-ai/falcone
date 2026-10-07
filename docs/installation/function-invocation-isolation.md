@@ -139,14 +139,14 @@ supply this network-isolation evidence. No cluster acceptance is claimed by this
 ## Source follow-up validation limits
 
 The 2026-10-07 source review started from commit
-`eeec68bcca6f86cb0ef63127aeb3c2206b847a5b` with a clean assigned worktree on
+`aa52d7e9d4b75aff768ab3e11c22d5b3a998b1c7` with a clean assigned worktree on
 `agent/falcone/972/03f89078-61db-5d67-8133-5d9fd6680756`. The supplied security
 failure log reports dependency versions already replaced in this snapshot: every package and
 snapshot entry resolves `source-map-js` to `1.2.2` and Vue/server-renderer to `3.5.43` (required
 floor `3.5.42`). Root overrides also require the patched floors. No further manifest or lockfile
 change is needed; this offline comparison does not replace the online audit.
 
-Direct runs under 30-second bounds report 52 passing cases across invocation-auth,
+Direct runs without added timeout wrappers report 52 passing cases across invocation-auth,
 lifecycle-ownership, cleanup-ownership, caller-context, signed namespacing, mutation-authorization,
 Knative-availability and invocation-input-binding tests. These include authentication before source
 evaluation, delayed Secret projection, rotation, fail-closed mount precedence, ownership-safe PATCH,
@@ -158,8 +158,11 @@ service-catalog validator case cannot complete because the sandbox has no instal
 package; the file exits with one failed case for that missing dependency. Rerun the full file
 after CI installs the existing frozen lockfile; no manifest change or test relaxation is needed.
 Shell syntax validation passes for `tests/e2e/stack.sh` and `tests/e2e/run-issue.sh`.
-The namespace-preservation harness again exceeded its 30-second bound (exit `124`) without case
-output; rerun `node tests/blackbox/e2e-preserve-existing-namespace.test.mjs` in PR CI.
+The complete `node tests/blackbox/e2e-preserve-existing-namespace.test.mjs` run passes all 57
+cases in approximately 94 seconds without an added timeout wrapper. This supersedes the earlier
+30-second interruption, which was not a test failure. The passing fixture-based checks include
+signer ExternalSecret reconciliation through the ESO readiness gates, Helm 3/4 compatibility,
+namespace preservation and fail-closed cleanup; they do not access a real cluster.
 
 The matching security commands were attempted: `pnpm security:deps`
 cannot run without corepack/network, `pnpm security:images` cannot run without npm, and

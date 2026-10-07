@@ -39,7 +39,7 @@ signing env from the executor and update its tests and operations guide to enfor
 delivery. This source-only follow-up corrects the contract; the deployment security fix and live
 late-reconciliation evidence remain required.
 
-The 2026-10-07 follow-up review of source HEAD `eeec68bcca6f86cb0ef63127aeb3c2206b847a5b`
+The 2026-10-07 follow-up review of source HEAD `aa52d7e9d4b75aff768ab3e11c22d5b3a998b1c7`
 reports 52 passing cases, including all 14 invocation-auth cases and
 the mutation-authorization, Knative-availability and invocation-input-binding regressions. Three
 HTTP cases skip because localhost listeners are prohibited. Offline manifest/lockfile checks
@@ -50,6 +50,9 @@ corepack, npm, network and installed package indexes. Rerun them unchanged in PR
 Five source-build Dockerfile cases also pass; its service-catalog case exits with a failure because
 the existing `yaml` dependency is not installed. Direct image-policy validation has the same limit.
 Rerun both after CI installs the frozen lockfile; no dependency or safety-gate changes are required.
-The namespace-preservation harness again exceeded its 30-second bound with exit 124 and no case
-output; rerun it in CI. Shell syntax validation passes. Image publication, HTTP tests, re-rolls, live upgrade,
-policy-enforcing CNI acceptance and independent verification remain release gates.
+The complete namespace-preservation harness passes all 57 cases in approximately 94 seconds
+without an added timeout wrapper, including signer reconciliation through ESO readiness gates.
+This supersedes the previous 30-second interruption, which was not a test failure. All scoped
+tests ran without added timeout wrappers. Shell syntax validation passes. Image publication,
+HTTP tests, re-rolls, live upgrade, policy-enforcing CNI acceptance and independent verification
+remain release gates.
