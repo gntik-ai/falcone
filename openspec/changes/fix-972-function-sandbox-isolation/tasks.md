@@ -14,13 +14,16 @@
 - [x] Test delayed projection, rotation, public-only manifests and fail-closed mount precedence.
 - [x] Require patched source-map-js and Vue/server-renderer versions and verify the platform-regenerated lockfile offline.
 - [x] Correct source docs and spec to exclude control-plane-executor from signer delivery and record the companion security fix as a release gate.
+- [x] Correct the signer KV path and document effective OpenBao policy isolation for executor and workflow-worker service accounts.
 
 ## Companion deployment repository and release gates
 
-- [x] Seed control-plane-only signing material in OpenBao idempotently on fresh install and upgrade, preserving existing keys.
+- [x] Seed signing material in OpenBao idempotently on fresh install and upgrade, preserving existing keys; dedicated-path policy isolation remains gated below.
 - [x] Define an ESO signer Secret lifecycle that survives managed-ESO hook replacement and add an upgrade render test; rerun the test in companion PR CI.
 - [x] Replace env-only signer delivery with a read-only optional Secret directory mount; render-test fresh install, first upgrade and reuse-values, with no subPath or function mount.
-- [ ] Restrict the signer mount and private signing env to control-plane only; remove delivery to control-plane-executor and update companion delivery tests and operations guide to assert executor exclusion.
+- [x] Restrict the signer mount and private signing env to control-plane only; remove delivery to control-plane-executor and update companion delivery tests and operations guide to assert executor exclusion.
+- [ ] Move the signer KV record to `secret/control-plane/function-invocation`, outside `platform/*`; update remoteKey validation, schema, seeding and ExternalSecret references, and grant read only through a dedicated ESO policy, with writes limited to the init/seed role.
+- [ ] Prove that no OpenBao policy bound to executor or workflow-worker service accounts covers the dedicated signer path, while ESO can read it.
 - [x] Add default-enabled function ingress/egress NetworkPolicy and configurable allow-list.
 - [x] Prove selectors against rendered/fixture function pods in every shipped values profile.
 - [ ] Run HTTP blackbox tests, image builds/scans and chart validation in PR CI.
@@ -32,12 +35,26 @@
 
 The assigned companion chart now mounts an optional read-only signer Secret directory. Source
 supports `FN_INVOCATION_SECRET_DIR`, reading the projected Secret lazily and recovering without
-restart once the volume is populated. The chart still mounts the private key into
-control-plane-executor, which never signs Knative invocations and runs tenant source in-process
-through its default local worker backend. The deployment maker must remove that mount and private
-signing env from the executor and update its tests and operations guide to enforce control-plane-only
-delivery. This source-only follow-up corrects the contract; the deployment security fix and live
-late-reconciliation evidence remain required.
+restart once the volume is populated. The independent checker confirmed that the reviewed chart
+restricts the signer mount to control-plane. However, the signer remains under
+`secret/platform/functions/invocation`, readable through the platform policy bound to executor and
+workflow-worker service accounts. The executor's local worker backend runs tenant source in-process,
+so tenant code can use its service-account token to retrieve the key from OpenBao. The deployment
+maker must move the record outside `platform/*` to `secret/control-plane/function-invocation` and
+restrict effective policy access to ESO and init/seed roles. This source-only follow-up corrects the
+contract and stale mount finding; the companion policy fix and live late-reconciliation evidence
+remain release gates. No deployment files are changed by this source follow-up.
+
+This follow-up started from assigned source HEAD `873a23505dcc151493fdcb071d2189e65a2bf7e7`
+and reviewed companion HEAD `de94b6c69162cdfd5a0403eb229de38374720a1d` read-only. All eight
+scoped source function test files completed without added timeout wrappers: 52 cases passed and
+three caller-context HTTP cases skipped because localhost listeners are forbidden. Authentication,
+source-evaluation ordering, caller identity, public-only manifests, rotation, ownership-checked
+PATCH and single-activation wiring remain covered. The source code and dependency manifests need
+no further change. Image builds/scans, live ESO reconciliation, policy-enforcing CNI isolation and
+cold-start activation acceptance remain PR CI/release checks. The deployment maker must also review
+the seed Job's stale-marker retry edge case and obtain product/operations confirmation of the
+DNS-only default egress before release.
 
 The 2026-10-07 follow-up review of source HEAD `db370ca552ca824b39d6a834ff71a0af907b511b`
 reports 52 passing cases, including all 14 invocation-auth cases and

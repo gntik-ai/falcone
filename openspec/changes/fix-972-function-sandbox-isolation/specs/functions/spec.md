@@ -40,6 +40,10 @@ filesystem or memory. Credentials SHALL NOT be injected into function env or log
 control-plane errors. Runtime configuration SHALL be captured before evaluating tenant code.
 The separate control-plane-executor SHALL receive neither the signer Secret mount nor private
 signing env, because its local worker backend executes tenant function source in-process.
+Signing material SHALL be stored outside the shared `platform/*` OpenBao KV subtree at
+`secret/control-plane/function-invocation`. A dedicated policy SHALL grant read only to the ESO
+role, with writes limited to the init/seed role. No policy bound to the executor or workflow-worker
+service accounts SHALL grant access to the signer path.
 
 #### Scenario: Executor cannot disclose the invocation signing key
 
@@ -47,6 +51,13 @@ signing env, because its local worker backend executes tenant function source in
   reads its environment or pod filesystem
 - **THEN** the invocation private key is absent and cannot be used to forge credentials for any ksvc
 - **AND** chart delivery tests prove that only the control-plane container receives the signer mount
+
+#### Scenario: Workload OpenBao credentials cannot disclose the invocation signing key
+
+- **WHEN** tenant source authenticates to OpenBao using an executor or workflow-worker service account
+- **THEN** its effective policies cannot read the invocation signing record
+- **AND** chart tests prove that no policy bound to either service account covers the dedicated signer path
+- **AND** ESO can still read the record through its dedicated signer policy
 
 #### Scenario: Environment disclosure cannot forge another service credential
 

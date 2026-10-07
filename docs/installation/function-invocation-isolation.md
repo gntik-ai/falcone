@@ -36,6 +36,15 @@ tenant function source in-process and is not a security sandbox: tenant code can
 filesystem. Giving that component the private key would let a tenant forge credentials for any
 ksvc. The signer belongs only in the control-plane component that issues Knative invocations.
 
+Mount exclusion alone is insufficient. The signer KV record must live outside `platform/*`, at
+`secret/control-plane/function-invocation` (remoteKey `control-plane/function-invocation`). The
+executor and workflow-worker service accounts can authenticate to OpenBao with the platform
+policy, which reads `secret/data/platform/*`. Store the key under a dedicated policy granting read
+only to the ESO role, with writes limited to the init/seed role. No policy bound to executor or
+workflow-worker may cover the signer path. An explicit deny in the shared platform policy would
+also deny ESO, so it does not replace a separate path and policy. Companion chart tests must
+verify the effective policy grants and service-account bindings, as well as Secret mounts.
+
 Create and PATCH requests using reserved secret env names return `400 VALIDATION_ERROR` before
 secret resolution or workload mutation. Other `FN_*` names remain available: existing references
 such as `fn-token` retain their default `FN_TOKEN` mapping on re-roll. A secret whose default name
@@ -51,7 +60,7 @@ files fail closed even if legacy env contains valid keys. Without `FN_INVOCATION
 three legacy `FN_INVOCATION_PRIVATE_KEY`, `FN_INVOCATION_KEY_ID` and `FN_INVOCATION_JWKS` env vars
 remain supported for compatibility. Env-only delivery does not resolve late ESO reconciliation.
 
-The companion chart must seed `platform/functions/invocation` idempotently through the existing
+The companion chart must seed `control-plane/function-invocation` idempotently through the existing
 OpenBao bootstrap, preserving active and overlapping keys. Its ExternalSecret must retain the
 signer Secret across upgrades (`creationPolicy: Orphan`, `deletionPolicy: Retain`). An optional
 volume allows control-plane readiness before the post-install/post-upgrade ESO hook creates the
@@ -62,10 +71,11 @@ wait remains mandatory and does not replace install/upgrade tests.
 
 The assigned companion deployment snapshot uses an optional read-only directory mount and has
 fresh-install, first-upgrade and reuse-values render coverage. Before release, its maker must remove
-the signer mount from `control-plane-executor`, update its delivery tests and operations guide, and
-assert that only the control-plane container receives it. The mount must remain read-only and
-optional, use no `subPath`, and be absent from executor and function workloads. A live upgrade must
-prove an already-started control plane can invoke after ESO reconciliation and kubelet projection
+the signer's access through the shared platform policy, move the KV record to the dedicated path,
+and update remoteKey validation, schema, seeding and ExternalSecret references. The reviewed chart
+already restricts the signer mount to control-plane; preserve that restriction. The mount must
+remain read-only and optional, use no `subPath`, and be absent from executor and function workloads.
+A live upgrade must prove an already-started control plane can invoke after ESO reconciliation and kubelet projection
 without a restart. Source tests simulate this delayed delivery and atomic key rotation; they do not
 prove Helm ordering or live kubelet behavior.
 
@@ -96,8 +106,10 @@ only the control plane through External Secrets/OpenBao and verifies late reconc
 a restart. A NetworkPolicy alone does not satisfy this gate: missing public keys stop
 function deploys, and missing signing configuration returns `503` before invocation. Chart render
 tests must cover safe defaults for `--reuse-values` upgrades and prove signing material is absent
-from control-plane-executor and function workloads. Publish and pin the enforcing fn-runtime image
-by immutable digest; the pre-change `0.3.0` runtime tag does not authenticate POSTs. Confirm an
+from control-plane-executor and function workloads, including access through OpenBao policies.
+No executor or workflow-worker policy may grant access to the dedicated signer path. Publish and
+pin the enforcing fn-runtime image by immutable digest; the pre-change `0.3.0` runtime tag does not
+authenticate POSTs. Confirm an
 authenticated cold start and exactly one activation after re-rolling existing functions before
 clearing this release gate.
 

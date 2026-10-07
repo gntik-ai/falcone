@@ -28,6 +28,14 @@ read its filesystem. It must receive neither the signer Secret mount nor private
 otherwise a tenant could steal the key and forge credentials for another ksvc. Chart delivery tests
 must assert that signing material is absent from both executor and function workloads.
 
+That exclusion also applies to indirect OpenBao access. The existing platform policy grants read
+on `secret/data/platform/*` to executor and workflow-worker service accounts. Store signing material
+at `secret/control-plane/function-invocation`, outside that wildcard, and grant read only through a
+dedicated policy attached to the ESO role, with writes limited to the init/seed role. Update the
+companion chart's remoteKey validation, schema, seed and ExternalSecret together. Tests must prove
+that no policy bound to executor or workflow-worker covers this path. An explicit deny in the
+shared platform policy would deny ESO too and is not a substitute for separating the signer path.
+
 ## Deployment boundary
 
 Function pods carry `in-falcone.io/component: function`; naming and ownership labels stay stable.
