@@ -953,7 +953,7 @@ case "${1:-up}" in
           # do not substitute direct Secret writes for ESO reconciliation.
           helm_render -s charts/eso/templates/cluster-secret-store.yaml | kubectl apply -f -
           kubectl wait clustersecretstore/openbao-backend --for=condition=Ready --timeout=5m
-          for secret_template in platform-postgresql platform-documentdb platform-kafka platform-s3 platform-temporal gateway-apisix iam-keycloak; do
+          for secret_template in platform-postgresql platform-documentdb platform-kafka platform-s3 platform-temporal platform-function-invocation gateway-apisix iam-keycloak; do
             helm_render -s "charts/eso/templates/external-secrets/${secret_template}.yaml" | kubectl apply -f -
           done
           kubectl wait externalsecret --all -n "$NS" --for=condition=Ready --timeout=5m

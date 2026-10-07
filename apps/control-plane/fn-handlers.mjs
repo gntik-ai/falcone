@@ -7,8 +7,8 @@
 // FunctionInvocationAccepted / GatewayMutationAccepted).
 import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
-import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost } from './function-executor.mjs';
-import { vaultStoreFromEnv, vaultStoreHealthSnapshot } from './vault-secrets.mjs';
+import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost, isReservedFunctionEnvName } from './function-executor.mjs';
+import { vaultStoreFromEnv, vaultStoreHealthSnapshot, secretEnvVarName } from './vault-secrets.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { functionsDisabledResponse, knativeUnavailableResponse } from './knative-runtime.mjs';
 import { createRuntimeCleanupRepository } from './runtime-cleanup-repository.mjs';
@@ -414,6 +414,14 @@ async function fnDeploy(ctx) {
   }
   const code = b.source?.inlineCode ?? b.source?.code;
   if (!code) return err(400, 'VALIDATION_ERROR', 'source.inlineCode is required');
+  const secretRefs = b.execution?.secrets ?? b.secrets ?? [];
+  if (Array.isArray(secretRefs) && secretRefs.some((ref) => {
+    const name = typeof ref === 'string' ? ref : (ref?.name ?? ref?.secretName);
+    const envName = ref && typeof ref === 'object' && ref.env ? ref.env : secretEnvVarName(name);
+    return isReservedFunctionEnvName(envName);
+  })) {
+    return err(400, 'VALIDATION_ERROR', 'Workspace secret env name is reserved for Function runtime configuration; use a different env mapping');
+  }
   // Ownership and validation precede dependency status, but the gate precedes secret resolution,
   // registry writes, and every Kubernetes call. An adjacent tenant therefore gets no status oracle.
   const dependencyError = functionDependencyGate(ctx, ctx.params.actionId ? 'update' : 'deploy', {
@@ -431,7 +439,6 @@ async function fnDeploy(ctx) {
   // (add-vault-secret-consumption, #612). The values are read from THIS workspace's own KV path,
   // so a function only ever sees its own tenant/workspace secrets.
   let secretEnv = [];
-  const secretRefs = b.execution?.secrets ?? b.secrets ?? [];
   if (Array.isArray(secretRefs) && secretRefs.length > 0) {
     if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
     try { secretEnv = await vaultStore.resolveEnv(ws.tenant_id, ws.id, secretRefs); }
@@ -441,6 +448,7 @@ async function fnDeploy(ctx) {
   try {
     await (ctx.deployKnativeService ?? deployKnativeService)(name, code, {
       tenantId: ws.tenant_id,
+      workspaceId: ws.id,
       functionResourceId: resourceId,
       memoryMb,
       timeoutMs,
@@ -595,7 +603,7 @@ async function fnInvoke(ctx) {
     // Verified caller context (#639): tenant/principal/roles from the JWT-verified
     // ctx.identity; workspace from the resolved function row (the resource being
     // invoked), falling back to the caller's ambient workspace. Delivered to the
-    // function as X-Falcone-* headers — never from the user-controlled body.
+    // function in signed invocation claims — never from the user-controlled body.
     const caller = {
       tenantId: ctx.identity?.tenantId ?? null,
       workspaceId: r.workspace_id ?? ctx.identity?.workspaceId ?? null,
@@ -606,7 +614,10 @@ async function fnInvoke(ctx) {
     // Cold start: the cluster-local DNS only resolves once the ksvc is Ready.
     const ready = await (ctx.waitKsvcReady ?? waitKsvcReady)(r.ksvc_name, 90000);
     run = ready
-      ? await (ctx.invokeKnative ?? invokeKnative)(ksvcHost(r.ksvc_name), params, { timeoutMs: (r.timeout_ms || 60000) + 30000, caller })
+      ? await (ctx.invokeKnative ?? invokeKnative)(ksvcHost(r.ksvc_name), params, {
+        timeoutMs: (r.timeout_ms || 60000) + 30000, caller,
+        audience: r.ksvc_name, tenantId: r.tenant_id, workspaceId: r.workspace_id,
+      })
       : { status: 'failure', result: { error: 'function (Knative service) is not ready' }, logs: [], durationMs: 0, statusCode: 503 };
   }
   const activationId = `act_${randomUUID().slice(0, 12)}`;
@@ -709,6 +720,7 @@ async function fnRollback(ctx) {
     try {
       await (ctx.deployKnativeService ?? deployKnativeService)(deployName, target.source_code, {
         tenantId: r.tenant_id,
+        workspaceId: r.workspace_id,
         functionResourceId: r.resource_id,
         memoryMb: target.memory_mb,
         timeoutMs: target.timeout_ms,

@@ -13,6 +13,7 @@ import https from 'node:https';
 import http from 'node:http';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
+import { invocationPublicJwks, mintInvocationCredential } from './function-invocation-auth.mjs';
 
 const SA = '/var/run/secrets/kubernetes.io/serviceaccount';
 export const NS = (() => { try { return fs.readFileSync(`${SA}/namespace`, 'utf8').trim(); } catch { return 'falcone'; } })();
@@ -29,6 +30,13 @@ export const FUNCTION_OWNERSHIP_LABELS = Object.freeze({
 
 const KUBERNETES_LABEL_VALUE = /^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$/;
 const KUBERNETES_SERVICE_NAME = /^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$/;
+const RESERVED_FUNCTION_ENV_NAMES = new Set([
+  'FN_SRC', 'FN_KSVC_NAME', 'FN_TENANT_ID', 'FN_WORKSPACE_ID',
+  'FN_INVOCATION_JWKS', 'FN_INVOCATION_PRIVATE_KEY', 'FN_INVOCATION_KEY_ID',
+  'FN_INVOCATION_SECRET_DIR',
+  'K_SERVICE', 'NODE_OPTIONS', 'NODE_PATH',
+]);
+export const isReservedFunctionEnvName = (name) => RESERVED_FUNCTION_ENV_NAMES.has(name);
 
 function k8s(method, path, body, { contentType = 'application/json' } = {}) {
   return new Promise((resolve, reject) => {
@@ -128,12 +136,24 @@ function servicePath(name) {
 export function buildFunctionKsvcManifest(
   name,
   source,
-  { tenantId, functionResourceId, memoryMb = 256, timeoutMs = 60000, secretEnv = [] } = {},
+  { tenantId, workspaceId, functionResourceId, memoryMb = 256, timeoutMs = 60000, secretEnv = [] } = {},
 ) {
   // Workspace secrets resolved from Vault (add-vault-secret-consumption, #612) are injected as plain
   // env vars alongside FN_SRC. The values are read server-side at deploy from the caller's own
   // tenant/workspace Vault path; only the names a function declares are injected.
-  const env = [{ name: 'FN_SRC', value: source }, ...(Array.isArray(secretEnv) ? secretEnv : [])];
+  if (typeof workspaceId !== 'string' || !workspaceId) throw new TypeError('workspaceId is required for Function invocation verification');
+  // Workspace secrets cannot override verification configuration or import signing material.
+  if (!Array.isArray(secretEnv) || secretEnv.some((entry) => isReservedFunctionEnvName(entry?.name))) {
+    throw Object.assign(new TypeError('Workspace secret env uses a reserved Function runtime name'), { statusCode: 400 });
+  }
+  const env = [
+    ...secretEnv,
+    { name: 'FN_SRC', value: source },
+    { name: 'FN_KSVC_NAME', value: name },
+    { name: 'FN_TENANT_ID', value: tenantId },
+    { name: 'FN_WORKSPACE_ID', value: workspaceId },
+    { name: 'FN_INVOCATION_JWKS', value: JSON.stringify(invocationPublicJwks()) },
+  ];
   const ownershipLabels = buildFunctionOwnershipLabels({ tenantId, functionResourceId });
   return {
     apiVersion: 'serving.knative.dev/v1', kind: 'Service',
@@ -153,7 +173,7 @@ export function buildFunctionKsvcManifest(
             'autoscaling.knative.dev/min-scale': '0',
             'autoscaling.knative.dev/max-scale': '5',
           },
-          labels: ownershipLabels,
+          labels: { ...ownershipLabels, 'in-falcone.io/component': 'function' },
         },
         spec: {
           containerConcurrency: 10,
@@ -275,14 +295,13 @@ export async function waitKsvcReady(name, timeoutMs = 90000) {
   return false;
 }
 
-// Build the POST headers for a function invocation. The VERIFIED caller context
-// (from the control-plane JWT identity, never the request body) is injected as
-// X-Falcone-* headers so the fn-runtime can expose it to user code out-of-band
-// from the user-controlled params. Absent/empty fields are omitted (not sent
-// blank); no `caller` -> only the content headers (unchanged behaviour). Exported
-// as the deterministic unit-test seam (invokeKnative itself opens a real socket).
-export function buildInvokeHeaders(payload, caller = null) {
-  const headers = { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) };
+// Sign the target and verified caller identity, independently of user-controlled params.
+// Legacy identity headers remain for rollout compatibility; new runtimes use signed claims.
+export function buildInvokeHeaders(payload, caller = null, target = {}) {
+  const headers = {
+    'content-type': 'application/json', 'content-length': Buffer.byteLength(payload),
+    authorization: `Bearer ${mintInvocationCredential(payload, caller, target)}`,
+  };
   if (caller) {
     const set = (name, value) => { if (typeof value === 'string' && value.length) headers[name] = value; };
     set('x-falcone-tenant-id', caller.tenantId);
@@ -296,28 +315,36 @@ export function buildInvokeHeaders(payload, caller = null) {
 }
 
 // Invoke a function over its ksvc cluster-internal URL (Knative scales from zero).
-// `caller` (verified identity) is delivered to the runtime as X-Falcone-* headers.
-export function invokeKnative(host, params, { timeoutMs = 60000, caller = null } = {}) {
+// `caller` (verified identity) is signed with the target; headers support old runtime revisions.
+export function invokeKnative(host, params, { timeoutMs = 60000, caller = null, audience, tenantId, workspaceId } = {}) {
   return new Promise((resolve) => {
     const started = Date.now();
     const payload = JSON.stringify(params ?? {});
+    let headers;
+    try {
+      headers = buildInvokeHeaders(payload, caller, { audience, tenantId, workspaceId });
+    } catch {
+      return resolve({ status: 'failure', result: { error: 'Function invocation signing is not configured correctly' }, logs: [], durationMs: 0, statusCode: 503 });
+    }
+    const credential = headers.authorization.slice(7);
+    const redact = (value) => String(value).split(credential).join('[REDACTED]');
     const req = http.request({
       host, port: 80, path: '/', method: 'POST',
-      headers: buildInvokeHeaders(payload, caller), timeout: timeoutMs
+      headers, timeout: timeoutMs
     }, (res) => {
       let buf = ''; res.on('data', (c) => { buf += c; });
       res.on('end', () => {
         const durationMs = Date.now() - started;
-        let parsed; try { parsed = JSON.parse(buf); } catch { parsed = null; }
+        let parsed; try { parsed = JSON.parse(redact(buf)); } catch { parsed = null; }
         if (res.statusCode >= 200 && res.statusCode < 300 && parsed) {
           resolve({ status: parsed.status === 'success' ? 'success' : 'failure', result: parsed.result ?? {}, logs: parsed.logs ?? [], durationMs, statusCode: parsed.status === 'success' ? 200 : 502 });
         } else {
-          resolve({ status: 'failure', result: { error: `runtime HTTP ${res.statusCode}: ${buf.slice(0, 200)}` }, logs: [], durationMs, statusCode: 502 });
+          resolve({ status: 'failure', result: { error: `runtime HTTP ${res.statusCode}` }, logs: [], durationMs, statusCode: 502 });
         }
       });
     });
     req.on('timeout', () => { req.destroy(); resolve({ status: 'failure', result: { error: 'invocation timed out' }, logs: [], durationMs: Date.now() - started, statusCode: 504 }); });
-    req.on('error', (e) => resolve({ status: 'failure', result: { error: String(e.message ?? e) }, logs: [], durationMs: Date.now() - started, statusCode: 502 }));
+    req.on('error', (e) => resolve({ status: 'failure', result: { error: redact(e.message ?? e) }, logs: [], durationMs: Date.now() - started, statusCode: 502 }));
     req.write(payload); req.end();
   });
 }

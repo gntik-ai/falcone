@@ -8,6 +8,7 @@
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
+import { createInvocationVerifier } from './invocation-auth.mjs';
 
 const PORT = Number(process.env.PORT || 8080);
 const require = createRequire(import.meta.url);
@@ -22,59 +23,62 @@ function resolveMain(captureConsole) {
   return compiled(mod, mod.exports, require, captureConsole);
 }
 
-// Build the read-only caller context (#639) from the trusted X-Falcone-* request
-// headers the control-plane executor injects from the VERIFIED JWT identity. Read
-// ONLY from headers (never the user-controlled body) and surfaced to user code as
-// the second argument of main(params, context), so a function can scope behaviour
-// to its caller and the body cannot forge it. Exported for unit testing.
-export function callerContextFromHeaders(headers = {}) {
-  const h = (k) => { const v = headers[k]; return (typeof v === 'string' && v.length) ? v : null; };
-  const roles = h('x-falcone-roles');
-  return {
-    tenantId: h('x-falcone-tenant-id'),
-    workspaceId: h('x-falcone-workspace-id'),
-    principal: h('x-falcone-principal'),
-    actorType: h('x-falcone-actor-type'),
-    roles: roles ? roles.split(',').map((r) => r.trim()).filter(Boolean) : [],
-  };
-}
-
-const server = http.createServer((req, res) => {
-  // GET = readiness/health (Knative probes the container).
-  if (req.method !== 'POST') {
-    res.writeHead(200, { 'content-type': 'application/json' });
-    return res.end(JSON.stringify({ status: 'ready', runtime: 'nodejs', node: process.version }));
-  }
-  let body = '';
-  req.on('data', (c) => { body += c; if (body.length > 5e6) req.destroy(); });
-  req.on('end', async () => {
-    let params = {};
-    if (body) { try { params = JSON.parse(body); } catch { params = {}; } }
-    const logs = [];
-    const cc = {
-      log: (...a) => logs.push(a.map(String).join(' ')),
-      info: (...a) => logs.push(a.map(String).join(' ')),
-      warn: (...a) => logs.push(a.map(String).join(' ')),
-      error: (...a) => logs.push(a.map(String).join(' '))
-    };
-    try {
-      const main = resolveMain(cc);
-      if (typeof main !== 'function') throw new Error('the action must define a main(params) function');
-      // #639: deliver the verified caller context as a second argument. Built from
-      // the trusted request headers, NOT from `params` (the user-controlled body).
-      const context = callerContextFromHeaders(req.headers);
-      const result = await Promise.resolve(main(params, context));
+// Public keys and target identity are fixed for the revision before any FN_SRC evaluation.
+export function createRuntimeServer(env = process.env) {
+  const verifyInvocation = createInvocationVerifier(env);
+  return http.createServer((req, res) => {
+    // GET = readiness/health (Knative probes the container).
+    if (req.method !== 'POST') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ status: 'success', result: result === undefined ? {} : result, logs }));
-    } catch (e) {
-      // Full stack to pod stdout (operators); return only the message to the caller
-      // — never the stack trace (stack-trace exposure).
-      console.error('[fn-runtime] action threw:', e);
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ status: 'failure', result: { error: e instanceof Error ? e.message : String(e) }, logs }));
+      return res.end(JSON.stringify({ status: 'ready', runtime: 'nodejs', node: process.version }));
     }
+    // Missing credentials are rejected even before reading the body.
+    const authorization = req.headers.authorization;
+    const unauthorized = () => {
+      res.writeHead(401, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized invocation' }));
+    };
+    if (typeof authorization !== 'string' || !authorization.startsWith('Bearer ')) return unauthorized();
+    const credential = authorization.slice(7);
+    const redact = (value) => String(value).split(credential).join('[REDACTED]');
+    const chunks = [];
+    let bodyLength = 0;
+    req.on('data', (c) => {
+      bodyLength += c.length;
+      if (bodyLength > 5e6) return req.destroy();
+      chunks.push(c);
+    });
+    req.on('end', async () => {
+      const body = Buffer.concat(chunks).toString('utf8');
+      const context = verifyInvocation(authorization, body);
+      if (!context) return unauthorized();
+      let params = {};
+      if (body) { try { params = JSON.parse(body); } catch { params = {}; } }
+      const logs = [];
+      const cc = {
+        log: (...a) => logs.push(a.map(redact).join(' ')),
+        info: (...a) => logs.push(a.map(redact).join(' ')),
+        warn: (...a) => logs.push(a.map(redact).join(' ')),
+        error: (...a) => logs.push(a.map(redact).join(' '))
+      };
+      try {
+        const main = resolveMain(cc);
+        if (typeof main !== 'function') throw new Error('the action must define a main(params) function');
+        // #639: only the verified claims provide caller context; headers and params cannot forge it.
+        const result = await Promise.resolve(main(params, context));
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(redact(JSON.stringify({ status: 'success', result: result === undefined ? {} : result, logs })));
+      } catch (e) {
+        // Never log a raw tenant-controlled error: it may contain invocation credentials.
+        const message = redact(e instanceof Error ? e.message : String(e));
+        console.error('[fn-runtime] action threw:', message);
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ status: 'failure', result: { error: message }, logs }));
+      }
+    });
   });
-});
+}
+const server = createRuntimeServer();
 // Bind only when run as the container entrypoint (CMD ["node","server.mjs"]); a
 // test that imports this module gets `server` + the helpers without binding a port.
 export { server };

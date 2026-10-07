@@ -59,6 +59,7 @@ test('fn-lifecycle-own-01: fnRollback re-deploys the retained revision under the
   const result = await FN_HANDLERS.fnRollback(ctx);
   assert.equal(result.statusCode, 202);
   assert.equal(deploys.length, 1);
+  assert.equal(deploys[0].workspaceId, 'ws-a');
   assert.deepEqual(
     { tenantId: deploys[0].tenantId, functionResourceId: deploys[0].functionResourceId },
     { tenantId: 'tenant-a', functionResourceId: 'fn-a' },
@@ -81,6 +82,52 @@ test('fn-lifecycle-own-02: fnDeploy UPDATE reuses the STABLE resource id so the 
   const result = await FN_HANDLERS.fnDeploy(ctx);
   assert.equal(result.statusCode, 202);
   assert.equal(deploys.length, 1);
+  assert.equal(deploys[0].workspaceId, 'ws-a');
   assert.equal(deploys[0].tenantId, 'tenant-a');
   assert.equal(deploys[0].functionResourceId, 'fn_known01', 'an update must reuse the stable function id');
+});
+
+test('fnDeploy create/PATCH reject reserved secret env mappings with 400 before resolution or mutations', async () => {
+  const existing = { resource_id: 'fn_known01', tenant_id: WS.tenant_id, workspace_id: WS.id };
+  const reservedRefs = [
+    'fn-src', 'fn-ksvc-name', 'fn-tenant-id', 'fn-workspace-id',
+    'fn-invocation-private-key', 'fn-invocation-key-id', 'fn-invocation-jwks',
+    'k-service', 'node-options', 'node-path',
+    { name: 'fn-src' }, { secretName: 'fn-src' },
+    { name: 'api-token', env: 'FN_INVOCATION_PRIVATE_KEY' },
+    { secretName: 'api-token', env: 'FN_INVOCATION_JWKS' },
+    { name: 'api-token', env: 'K_SERVICE' },
+    { name: 'api-token', env: 'NODE_OPTIONS' },
+    { name: 'api-token', env: 'NODE_PATH' },
+  ];
+  for (const params of [{}, { actionId: existing.resource_id }]) {
+    for (const ref of reservedRefs) {
+      for (const secrets of [{ execution: { secrets: [ref] } }, { secrets: [ref] }]) {
+        const sideEffects = [];
+        const result = await FN_HANDLERS.fnDeploy(baseCtx({
+          params,
+          body: { workspaceId: WS.id, actionName: 'hello', source: { inlineCode: 'function main(){}' }, ...secrets },
+          store: {
+            getWorkspace: async () => WS,
+            getFnAction: async () => existing,
+            upsertFnAction: async () => { sideEffects.push('write'); },
+          },
+          deployKnativeService: async () => { sideEffects.push('deploy'); },
+        }));
+        assert.equal(result.statusCode, 400);
+        assert.equal(result.body.code, 'VALIDATION_ERROR');
+        assert.match(result.body.message, /different env mapping/);
+        assert.deepEqual(sideEffects, []);
+      }
+    }
+  }
+});
+
+test('fnDeploy preserves workspace authorization before reserved secret validation', async () => {
+  const result = await FN_HANDLERS.fnDeploy(baseCtx({
+    body: { workspaceId: 'ws-foreign', actionName: 'hello', source: { inlineCode: 'function main(){}' }, secrets: ['fn-src'] },
+    store: { getWorkspace: async () => ({ id: 'ws-foreign', tenant_id: 'tenant-b' }) },
+  }));
+  assert.equal(result.statusCode, 403);
+  assert.equal(result.body.code, 'FORBIDDEN');
 });

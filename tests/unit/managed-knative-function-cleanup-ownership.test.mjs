@@ -8,6 +8,7 @@ import {
   deleteKnativeService,
   deployKnativeService,
 } from '../../apps/control-plane/function-executor.mjs';
+import { invocationFixture, installInvocationFixture } from '../helpers/function-invocation-fixture.mjs';
 import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
 
 const OWNERSHIP = { tenantId: 'tenant-a', functionResourceId: 'fn_aaaaaaaaaaaa' };
@@ -16,7 +17,8 @@ function statusError(statusCode) {
   return Object.assign(new Error(`Kubernetes ${statusCode}`), { statusCode });
 }
 
-test('managed-function-ownership-01: creation stamps stable Kubernetes-valid ownership labels', () => {
+test('managed-function-ownership-01: creation stamps stable Kubernetes-valid ownership labels', (t) => {
+  installInvocationFixture(t, invocationFixture());
   const labels = buildFunctionOwnershipLabels(OWNERSHIP);
   assert.deepEqual(labels, {
     [FUNCTION_OWNERSHIP_LABELS.tenant]: OWNERSHIP.tenantId,
@@ -33,7 +35,7 @@ test('managed-function-ownership-01: creation stamps stable Kubernetes-valid own
     assert.match(value, /^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$/);
   }
 
-  const manifest = buildFunctionKsvcManifest('fn-app-hello-abc', 'export function main() {}', OWNERSHIP);
+  const manifest = buildFunctionKsvcManifest('fn-app-hello-abc', 'export function main() {}', { ...OWNERSHIP, workspaceId: 'workspace-a' });
   for (const [key, value] of Object.entries(labels)) {
     assert.equal(manifest.metadata.labels[key], value);
     assert.equal(manifest.spec.template.metadata.labels[key], value);
@@ -166,11 +168,12 @@ test('managed-function-ownership-04: absent resources are idempotent and absent 
   assert.equal(unsafeCalls, 0);
 });
 
-test('managed-function-ownership-05: deploy never patches a same-named mismatched Service', async () => {
+test('managed-function-ownership-05: deploy never patches a same-named mismatched Service', async (t) => {
+  installInvocationFixture(t, invocationFixture());
   const calls = [];
   await assert.rejects(
     () => deployKnativeService('fn-app-hello-abc', 'export function main() {}', {
-      ...OWNERSHIP,
+      ...OWNERSHIP, workspaceId: 'workspace-a',
       request: async (method, path) => {
         calls.push({ method, path });
         if (method === 'POST') throw statusError(409);
