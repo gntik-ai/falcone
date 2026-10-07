@@ -39,13 +39,17 @@ signing env from the executor and update its tests and operations guide to enfor
 delivery. This source-only follow-up corrects the contract; the deployment security fix and live
 late-reconciliation evidence remain required.
 
-The 2026-10-07 source review reports 52 passing cases, including all 14 invocation-auth cases and
+The 2026-10-07 follow-up review of source HEAD `eeec68bcca6f86cb0ef63127aeb3c2206b847a5b`
+reports 52 passing cases, including all 14 invocation-auth cases and
 the mutation-authorization, Knative-availability and invocation-input-binding regressions. Three
 HTTP cases skip because localhost listeners are prohibited. Offline manifest/lockfile checks
 confirm that every source-map-js and Vue/server-renderer entry meets the reported patched floors;
 the security log reports vulnerable versions absent from the assigned snapshot. No further
 dependency changes are required. The four matching security commands cannot complete without
 corepack, npm, network and installed package indexes. Rerun them unchanged in PR CI.
+Five source-build Dockerfile cases also pass; its service-catalog case exits with a failure because
+the existing `yaml` dependency is not installed. Direct image-policy validation has the same limit.
+Rerun both after CI installs the frozen lockfile; no dependency or safety-gate changes are required.
 The namespace-preservation harness again exceeded its 30-second bound with exit 124 and no case
 output; rerun it in CI. Shell syntax validation passes. Image publication, HTTP tests, re-rolls, live upgrade,
 policy-enforcing CNI acceptance and independent verification remain release gates.

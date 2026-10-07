@@ -139,7 +139,8 @@ supply this network-isolation evidence. No cluster acceptance is claimed by this
 ## Source follow-up validation limits
 
 The 2026-10-07 source review started from commit
-`1fe158be837a6ca96162ae28b329295c6b02b211` with a clean assigned worktree. The supplied security
+`eeec68bcca6f86cb0ef63127aeb3c2206b847a5b` with a clean assigned worktree on
+`agent/falcone/972/03f89078-61db-5d67-8133-5d9fd6680756`. The supplied security
 failure log reports dependency versions already replaced in this snapshot: every package and
 snapshot entry resolves `source-map-js` to `1.2.2` and Vue/server-renderer to `3.5.43` (required
 floor `3.5.42`). Root overrides also require the patched floors. No further manifest or lockfile
@@ -152,13 +153,19 @@ evaluation, delayed Secret projection, rotation, fail-closed mount precedence, o
 verified caller context and exactly one activation. Three caller-context HTTP cases skip because
 the sandbox forbids localhost listeners; request-listener tests verify authentication without
 sockets. Run files directly with `node tests/...test.mjs` to retain individual case and skip evidence.
+Five Dockerfile assertions in `tests/blackbox/source-build-root-context.test.mjs` also pass. Its
+service-catalog validator case cannot complete because the sandbox has no installed `yaml`
+package; the file exits with one failed case for that missing dependency. Rerun the full file
+after CI installs the existing frozen lockfile; no manifest change or test relaxation is needed.
 Shell syntax validation passes for `tests/e2e/stack.sh` and `tests/e2e/run-issue.sh`.
 The namespace-preservation harness again exceeded its 30-second bound (exit `124`) without case
 output; rerun `node tests/blackbox/e2e-preserve-existing-namespace.test.mjs` in PR CI.
 
-The matching security commands were attempted under 30-second bounds: `pnpm security:deps`
+The matching security commands were attempted: `pnpm security:deps`
 cannot run without corepack/network, `pnpm security:images` cannot run without npm, and
 `pnpm sbom:licenses` and `pnpm sbom:licenses:json` lack installed package indexes. Rerun the
-unchanged security job in PR CI. HTTP socket cases, image builds/scans, companion chart render
+unchanged security job in PR CI. Calling `node scripts/validate-image-policy.mjs` directly also
+requires the missing `yaml` package. These are sandbox limits, not evidence of a passing online
+audit or image policy check. HTTP socket cases, image builds/scans, companion chart render
 tests and live policy-enforcing CNI acceptance remain CI/release checks. Keep every existing
 security and supply-chain gate.
