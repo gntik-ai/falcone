@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import { routes } from '../../apps/control-plane/routes.mjs';
 import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
+import { load as loadQuota } from '../helpers/live-quota-fixture.mjs';
 
 const {
   storageGetObject, storageDeleteBucket, storagePresignObject,
@@ -357,31 +358,27 @@ test('bbx-stor-io-multipart-complete-badlist: a gapped/unordered part list is re
   assert.equal(fetched, false, 'an invalid part list is rejected before the backend completion call');
 });
 
-test('bbx-stor-io-multipart-complete-quota: completion enforces the per-workspace byte quota (no bypass)', async () => {
-  const pool = makeMockPool();
-  process.env.STORAGE_MAX_BYTES = '10'; // tiny limit so the assembled object exceeds it
-  let deletedAssembled = false;
-  try {
-    await withFetch((url, opts) => {
-      if (opts.method === 'POST' && url.includes('uploadId=')) {
-        return s3Response({ status: 200, body: '<CompleteMultipartUploadResult><ETag>&#34;final&#34;</ETag></CompleteMultipartUploadResult>' });
-      }
-      if (opts.method === 'HEAD') return s3Response({ status: 200, headers: { 'content-length': '100', 'content-type': 'application/octet-stream' } });
-      if (opts.method === 'GET') return s3Response({ status: 200, body: '<ListBucketResult><Contents><Key>big.bin</Key><Size>100</Size></Contents></ListBucketResult>' });
-      if (opts.method === 'DELETE') { deletedAssembled = true; return s3Response({ status: 204 }); }
-      return s3Response({ status: 200 });
-    }, async () => {
-      const res = await storageMultipartComplete(ctxFor(
-        { bucketId: BUCKET_A, objectKey: 'big.bin', uploadId: 'UP-123' },
-        { pool, body: { parts: [{ partNumber: 1, etag: 'e1' }] } }
-      ));
-      assert.equal(res.statusCode, 409, JSON.stringify(res.body));
-      assert.equal(res.body.code, 'STORAGE_QUOTA_EXCEEDED');
-    });
-    assert.equal(deletedAssembled, true, 'the over-quota assembled object is rolled back (deleted)');
-  } finally {
-    delete process.env.STORAGE_MAX_BYTES;
-  }
+test('bbx-stor-io-multipart-complete-quota: tenant catalog admission precedes assembly', async () => {
+  const pool = makeMockPool({ buckets: { [BUCKET_A]: BUCKET_ROWS[BUCKET_A] } });
+  const originalQuery = pool.query;
+  pool.query = (sql, params) => {
+    if (sql.includes('FROM quota_dimension_catalog')) return { rows: [{ dimension_key: 'max_storage_bytes', display_label: 'Storage bytes', default_value: 10, unit: 'bytes' }] };
+    return originalQuery(sql, params);
+  };
+  await withFetch((url, opts) => {
+    assert.equal(opts.method, 'GET', 'refusal must not assemble or delete an object');
+    if (url.includes('uploadId=')) return s3Response({ status: 200, body: '<ListPartsResult><Part><PartNumber>1</PartNumber><ETag>e1</ETag><Size>100</Size></Part><IsTruncated>false</IsTruncated></ListPartsResult>' });
+    return s3Response({ status: 200, body: '<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>' });
+  }, async () => {
+    const call = ctxFor(
+      { bucketId: BUCKET_A, objectKey: 'big.bin', uploadId: 'UP-123' },
+      { pool, body: { parts: [{ partNumber: 1, etag: 'e1' }] } }
+    );
+    call.quotaOptions = { load: loadQuota };
+    const res = await storageMultipartComplete(call);
+    assert.equal(res.statusCode, 402, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'QUOTA_EXCEEDED');
+  });
 });
 
 test('bbx-stor-io-multipart-abort: aborts an in-progress upload (cleanup)', async () => {

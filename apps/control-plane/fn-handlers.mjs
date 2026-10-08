@@ -13,6 +13,7 @@ import { canManageTenant } from './tenant-scope.mjs';
 import { functionsDisabledResponse, knativeUnavailableResponse } from './knative-runtime.mjs';
 import { createRuntimeCleanupRepository } from './runtime-cleanup-repository.mjs';
 import { recordKnativeDependencyEvent } from './metrics-registry.mjs';
+import { checkDimensionQuota, quotaDenial } from './dimension-quota.mjs';
 
 // Scope-validation builder for function definition import (#683). It lives in apps/control-plane-executor
 // (vendored into the CP image at /repo/apps/control-plane-executor, alongside packages/internal-contracts
@@ -428,6 +429,12 @@ async function fnDeploy(ctx) {
     tenantId: ws.tenant_id, workspaceId: ws.id,
   });
   if (dependencyError) return dependencyError;
+  if (!actionId) {
+    const decision = await checkDimensionQuota(ctx.pool, ws.tenant_id, 'max_functions',
+      () => st.countTenantFunctions(ctx.pool, ws.tenant_id), ctx.quotaOptions);
+    const denial = await quotaDenial(ctx, ws, decision, 'function.create');
+    if (denial) return denial;
+  }
   const resourceId = existing?.resource_id ?? `fn_${randomUUID().slice(0, 12)}`;
   const limits = b.execution?.limits ?? {};
   const memoryMb = Number(limits.memoryMb) || 256;

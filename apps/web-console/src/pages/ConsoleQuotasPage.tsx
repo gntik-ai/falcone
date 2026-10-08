@@ -13,7 +13,8 @@ import { cn } from '@/lib/utils'
 
 const policyModeLabels: Record<string, string> = {
   enforced: 'Aplicada',
-  unbounded: 'Sin límite'
+  unbounded: 'Sin límite',
+  not_enforced: 'No aplicada'
 }
 
 const freshnessStatusLabels: Record<string, string> = {

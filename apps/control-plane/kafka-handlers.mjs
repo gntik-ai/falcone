@@ -13,6 +13,7 @@ import { Kafka, logLevel } from 'kafkajs';
 import * as store from './tenant-store.mjs';
 import { resolveKafkaSecurity } from './transport-security.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
+import { checkDimensionQuota, quotaDenial } from './dimension-quota.mjs';
 
 const BROKERS = (process.env.KAFKA_BROKERS || 'falcone-kafka:9092').split(',').map((s) => s.trim());
 const ok = (statusCode, body) => ({ statusCode, body });
@@ -381,6 +382,10 @@ async function eventsProvisionTopic(ctx) {
   }
   const topicName = slug(ctx.body?.name);
   if (!topicName) return err(400, 'VALIDATION_ERROR', 'topic name is required');
+  const decision = await checkDimensionQuota(ctx.pool, ws.tenant_id, 'max_kafka_topics',
+    () => getStore().countTenantTopics(ctx.pool, ws.tenant_id), ctx.quotaOptions);
+  const denial = await quotaDenial(ctx, ws, decision, 'topic.create');
+  if (denial) return denial;
   const partitions = Number(ctx.body?.partitions ?? 1) || 1;
   const physical = physicalTopicName(ws.id, topicName);
   const resourceId = `res_topic_${randomUUID().slice(0, 8)}`;

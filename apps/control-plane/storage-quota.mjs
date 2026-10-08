@@ -24,7 +24,25 @@
 
 // Default per-workspace bucket-count limit. Matches the product engine's
 // DEFAULT_STORAGE_BUCKET_LIMIT (packages/adapters/src/storage-tenant-context.mjs:147).
+import { checkDimensionQuota } from './dimension-quota.mjs';
+
 export const DEFAULT_MAX_BUCKETS = 8;
+
+// Runtime byte admission uses governance, not STORAGE_MAX_BYTES. Keep the legacy
+// synchronous helpers below for the independent bucket gate and adapter callers.
+export function checkTenantByteQuota(pool, tenantId, currentBytes, incomingBytes, opts = {}) {
+  return checkDimensionQuota(pool, tenantId, 'max_storage_bytes', currentBytes, { ...opts, incomingBytes, skipUnlimitedMeter: true });
+}
+
+export async function tenantByteLimit(pool, tenantId, opts = {}) {
+  const decision = await checkDimensionQuota(pool, tenantId, 'max_storage_bytes', 0, opts);
+  return {
+    // Retain the legacy usage-report fallback only when governance is unavailable;
+    // admission itself still fails open. A resolved catalog/plan/override always wins.
+    maxBytes: decision.effectiveLimit === -1 ? null : decision.effectiveLimit ?? usageLimits().maxBytes,
+    decision: decision.decision,
+  };
+}
 
 // Canonical error code for a capacity denial (HTTP 409). Mirrors the product engine's
 // STORAGE_QUOTA_GUARDRAIL_ERROR_CODES.*.normalizedCode === 'STORAGE_QUOTA_EXCEEDED'.

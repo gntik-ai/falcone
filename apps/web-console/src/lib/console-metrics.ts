@@ -14,7 +14,7 @@ export interface ConsoleMetricDimensionView {
   measuredValue: number
   hardLimit: number | null
   pctUsed: number | null
-  policyMode: 'enforced' | 'unbounded'
+  policyMode: 'enforced' | 'unbounded' | 'not_enforced'
   freshnessStatus: 'fresh' | 'degraded' | 'unavailable'
   // #766: mirrors `ConsoleQuotaDimensionView.isWarning`/`.isExceeded` in console-quotas.ts (same
   // >=80%/>=100% thresholds) so a metric row can render the same breach-honest, non-color-only
@@ -95,7 +95,7 @@ interface OverviewResponse {
     displayName?: string
     measuredValue?: number
     hardLimit?: number | null
-    policyMode?: 'enforced' | 'unbounded'
+    policyMode?: 'enforced' | 'unbounded' | 'not_enforced'
     freshnessStatus?: 'fresh' | 'degraded' | 'unavailable'
     unit?: string
   }>

@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { queryAuditEvents, auditRowToRecord } from './audit-store.mjs';
+import { ENFORCED_DIMENSION_KEYS } from './dimension-quota.mjs';
 
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
@@ -22,18 +23,18 @@ const ENTITLEMENTS = '/repo/packages/provisioning-orchestrator/src/actions/tenan
 const WS_CONSUMPTION = '/repo/packages/provisioning-orchestrator/src/actions/workspace-consumption-get.mjs';
 
 // Normalized limit row -> posture/overview dimension (shared by quotas + observability).
-function dimensionsFromLimits(limits) {
+export function dimensionsFromLimits(limits) {
   const dimensions = [];
   const breaches = [];
   for (const l of limits) {
-    const hardLimit = typeof l.effectiveValue === 'number' ? l.effectiveValue : null;
+    const hardLimit = typeof l.effectiveValue === 'number' && l.effectiveValue !== -1 ? l.effectiveValue : null;
     const measured = typeof l.currentUsage === 'number' ? l.currentUsage : 0;
     const known = Boolean(l.usageStatus) && l.usageStatus !== 'unknown';
     if (known && hardLimit != null && measured >= hardLimit) breaches.push(l.dimensionKey);
     dimensions.push({
       dimensionId: l.dimensionKey,
       displayName: l.displayLabel ?? l.dimensionKey,
-      policyMode: l.quotaType === 'soft' || hardLimit == null ? 'unbounded' : 'enforced',
+      policyMode: !ENFORCED_DIMENSION_KEYS.has(l.dimensionKey) ? 'not_enforced' : hardLimit == null ? 'unbounded' : 'enforced',
       hardLimit,
       softLimit: null,
       measuredValue: measured,

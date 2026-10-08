@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '5466eed9ba9d2d51dc2d1b18a6cd0243b777ba2d'
+  FALCONE_CHARTS_REF: '38ef593dc00a0f87c5e1a836f6313573215f4a1c'
 
 jobs:
   quality:
@@ -52,6 +52,15 @@ jobs:
 
       - name: Unit tests
         run: pnpm test:unit
+
+      - name: Live catalog quota admission
+        run: |
+          node --test tests/blackbox/live-resource-quota-enforcement.test.mjs \
+            tests/blackbox/live-storage-function-quotas.test.mjs \
+            tests/blackbox/workspace-quota-enforcement.test.mjs \
+            tests/blackbox/storage-quota-enforcement.test.mjs \
+            tests/blackbox/storage-quota-handlers.test.mjs \
+            tests/blackbox/storage-object-io-completeness.test.mjs
 
       - name: Adapter integration scaffolding
         run: pnpm test:adapters
