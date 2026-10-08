@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import * as store from './tenant-store.mjs';
-import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE } from './kc-admin.mjs';
+import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, OIDC_APP_CLIENT_SCOPE_NAMES } from './kc-admin.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
 
 const ok = (statusCode, body) => ({ statusCode, body });
@@ -320,7 +320,7 @@ function normalizeApplicationBody(body = {}, { id, workspace, existing = null } 
   const protocol = body.protocol ?? existing?.protocol;
   // Lifecycle state belongs to the server. Legacy/unrealized rows cannot be activated by a body.
   const state = existing?.iamClient
-    ? (body.desiredState ?? body.state ?? existing.state)
+    ? existing.state
     : 'provisioning';
   const redirectUris = Array.isArray(body.redirectUris)
     ? body.redirectUris
@@ -381,6 +381,14 @@ async function validateApplicationForWrite(application, { planId } = {}) {
   }
   if (!STATES.has(application.state)) {
     checks.push(validationCheck('invalid_state', 'desiredState/state is not a supported entity state.', 'desiredState'));
+  }
+  if (application.iamClient?.protocolMappers?.length) {
+    checks.push(validationCheck('unsupported_protocol_mappers', 'Caller-defined IAM protocol mappers are not supported.', 'iamClient.protocolMappers'));
+  }
+  for (const field of ['defaultClientScopes', 'optionalClientScopes']) {
+    if (application.iamClient?.[field]?.some((scope) => !OIDC_APP_CLIENT_SCOPE_NAMES.includes(scope))) {
+      checks.push(validationCheck('unsupported_client_scope', 'Only built-in OIDC client scopes are supported.', `iamClient.${field}`));
+    }
   }
   if (checks.length > 0) return { ok: false, validation: { status: 'invalid', checks } };
 
@@ -525,7 +533,16 @@ export async function createExternalApplication(ctx) {
       return err(409, 'APPLICATION_CLIENT_EXISTS', 'Application client already exists in the tenant realm.');
     }
     clientUuid = await kc.createOidcAppClient(realm, {
-      ...app.iamClient,
+      clientId: app.iamClient.clientId,
+      clientType: app.iamClient.clientType,
+      redirectUris: app.iamClient.redirectUris,
+      webOrigins: app.iamClient.webOrigins,
+      // Omitted scope lists let Keycloak apply the realm defaults. Never forward mappers.
+      ...(ctx.body?.iamClient?.defaultClientScopes !== undefined ? { defaultClientScopes: app.iamClient.defaultClientScopes } : {}),
+      optionalClientScopes: app.iamClient.optionalClientScopes,
+      postLogoutRedirectUris: app.iamClient.postLogoutRedirectUris,
+      frontChannelLogoutUri: app.iamClient.frontChannelLogoutUri,
+      backChannelLogoutUri: app.iamClient.backChannelLogoutUri,
       name: app.displayName,
       authenticationFlows: app.authenticationFlows,
     });
@@ -580,6 +597,10 @@ export async function updateExternalApplication(ctx) {
   const app = normalizeApplicationBody(ctx.body, { id: existing.applicationId, workspace: resolved.ws, existing });
   const unsupported = protocolNotProvisionable(app.protocol);
   if (unsupported) return unsupported;
+  if (resolved.app.kc_client_uuid && ['desiredState', 'state']
+    .some((field) => ctx.body?.[field] !== undefined && ctx.body[field] !== existing.state)) {
+    return err(409, 'APPLICATION_STATE_UPDATE_UNSUPPORTED', 'Updating a realized application lifecycle state is not supported.');
+  }
   if (app.protocol !== existing.protocol
     || (ctx.body?.iamClient?.realm !== undefined && ctx.body.iamClient.realm !== resolved.app.iam_realm)
     || app.iamClient?.clientId !== (existing.iamClient?.clientId ?? existing.slug)) {

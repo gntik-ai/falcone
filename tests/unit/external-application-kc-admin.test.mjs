@@ -23,7 +23,7 @@ test('external OIDC clients configure declared flows, PKCE and redirect URIs wit
       const uuid = await kcAdmin.createOidcAppClient('tenant/realm', {
         clientId: 'registered-app', name: 'Registered app', clientType, authenticationFlows,
         redirectUris: ['https://app.example.test/callback'], webOrigins: ['https://app.example.test'],
-        defaultClientScopes: ['openid', 'profile'], optionalClientScopes: ['email'],
+        protocolMappers: [{ protocolMapper: 'oidc-hardcoded-claim-mapper', config: { 'claim.name': 'actor_type', 'claim.value': 'superadmin' } }],
         postLogoutRedirectUris: ['https://app.example.test/logged-out'],
       });
       assert.equal(uuid, `client-${clients.length}`);
@@ -40,14 +40,37 @@ test('external OIDC clients configure declared flows, PKCE and redirect URIs wit
       assert.equal(client.attributes['post.logout.redirect.uris'], 'https://app.example.test/logged-out');
       assert.deepEqual(client.redirectUris, ['https://app.example.test/callback']);
       assert.deepEqual(client.webOrigins, ['https://app.example.test']);
-      assert.deepEqual(client.defaultClientScopes, ['openid', 'profile']);
-      assert.deepEqual(client.optionalClientScopes, ['email']);
+      assert.equal('defaultClientScopes' in client, false, 'preserve the realm default scopes');
+      assert.equal('optionalClientScopes' in client, false, 'preserve the realm optional scopes');
+      assert.equal('protocolMappers' in client, false, 'never forward caller-defined mappers');
       assert.equal(client.secret, undefined);
     }
+    await kcAdmin.createOidcAppClient('tenant/realm', {
+      clientId: 'explicit-scopes', clientType: 'public',
+      defaultClientScopes: ['openid', 'profile', 'roles'], optionalClientScopes: ['email'],
+    });
+    assert.deepEqual(clients.at(-1).defaultClientScopes, ['profile', 'roles'], 'openid is not a Keycloak client scope');
+    assert.deepEqual(clients.at(-1).optionalClientScopes, ['email']);
     await kcAdmin.createConfidentialClient('tenant/realm', { clientId: 'existing-service-account' });
     assert.equal(clients.at(-1).attributes['in-falcone.kind'], 'service-account');
     assert.equal(clients.at(-1).standardFlowEnabled, false);
     assert.equal(clients.at(-1).serviceAccountsEnabled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('external OIDC client helper rejects arbitrary client scopes before any admin request', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { assert.fail('unsafe client scopes must not reach Keycloak'); };
+  try {
+    for (const clientType of ['public', 'confidential']) {
+      for (const field of ['defaultClientScopes', 'optionalClientScopes']) {
+        await assert.rejects(kcAdmin.createOidcAppClient('tenant/realm', {
+          clientId: 'app', clientType, [field]: ['privileged-scope'],
+        }), { message: KEYCLOAK_ADMIN_SAFE_MESSAGE });
+      }
+    }
   } finally {
     globalThis.fetch = originalFetch;
   }

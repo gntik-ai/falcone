@@ -243,6 +243,8 @@ test('fix-781-02: valid tenant-owner create is accepted and persisted through th
   assert.equal(kcAdmin.calls[1][0], 'createOidcAppClient');
   assert.equal(kcAdmin.calls[1][1], 'realm-acme');
   assert.equal(kcAdmin.calls[1][2].clientId, 'acme-portal');
+  assert.equal(kcAdmin.calls[1][2].defaultClientScopes, undefined, 'ordinary creates retain the realm defaults');
+  assert.equal(kcAdmin.calls[1][2].protocolMappers, undefined);
   assertSchemaCompatibleIamClient(upserts[0][1].appJson.iamClient);
 
   const getRes = await APPLICATION_HANDLERS.getExternalApplication(ctx({
@@ -414,7 +416,7 @@ test('fix-781-08: valid provider create persists and remains compatible with ful
 
   const { federatedProviders: _providers, ...updateBody } = validApplicationPayload({
     displayName: 'Acme Portal Updated',
-    desiredState: 'soft_deleted',
+    desiredState: 'active',
   });
   const update = await APPLICATION_HANDLERS.updateExternalApplication(ctx({
     method: 'PUT',
@@ -427,7 +429,7 @@ test('fix-781-08: valid provider create persists and remains compatible with ful
   assert.equal(update.body.status, 'accepted');
   assert.equal(update.body.entityId, 'app_existing');
   const updateUpsert = store.calls.filter(([name]) => name === 'upsertExternalApplication').at(-1);
-  assert.equal(updateUpsert[1].state, 'soft_deleted');
+  assert.equal(updateUpsert[1].state, 'active');
   assert.equal(updateUpsert[1].kcClientUuid, 'kc-app-uuid');
   assert.equal(updateUpsert[1].appJson.federatedProviders.length, 1);
 });
@@ -583,6 +585,91 @@ test('fix-969: realized IAM configuration and identity changes are rejected with
     assert.equal([409, 422].includes(res.statusCode), true, JSON.stringify(body));
     assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
     assert.deepEqual(kcAdmin.calls, []);
+  }
+});
+
+test('fix-969: caller-defined claim mappers cannot provision a privileged client', async () => {
+  for (const clientType of ['public', 'confidential']) {
+    for (const claim of ['actor_type', 'tenant_id', 'realm_access', 'workspace_id', 'workspace_ids', 'aud', 'azp', 'sub', 'custom_claim']) {
+      const store = fakeStore();
+      const kcAdmin = fakeKcAdmin();
+      const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({
+        store, kcAdmin, body: validApplicationPayload({
+          authenticationFlows: [clientType === 'public' ? 'oidc_authorization_code_pkce' : 'oidc_authorization_code_client_secret'],
+          iamClient: {
+            clientType,
+            protocolMappers: [{
+              name: 'injected-claim', protocol: 'openid-connect', protocolMapper: 'oidc-hardcoded-claim-mapper',
+              config: { 'claim.name': claim, 'claim.value': 'superadmin', 'access.token.claim': 'true' },
+            }],
+          },
+        }),
+      }));
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.body.code, 'VALIDATION_ERROR');
+      assert.equal(res.body.validation.checks[0].code, 'unsupported_protocol_mappers');
+      assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+      assert.deepEqual(kcAdmin.calls, []);
+      const list = await APPLICATION_HANDLERS.listExternalApplications(ctx({ store }));
+      assert.deepEqual(list.body.items, []);
+    }
+  }
+});
+
+test('fix-969: arbitrary realm client scopes cannot introduce privileged mappers', async () => {
+  for (const field of ['defaultClientScopes', 'optionalClientScopes']) {
+    const store = fakeStore();
+    const kcAdmin = fakeKcAdmin();
+    const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({
+      store, kcAdmin, body: validApplicationPayload({ iamClient: { clientType: 'public', [field]: ['profile', 'privileged-scope'] } }),
+    }));
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.validation.checks[0].code, 'unsupported_client_scope');
+    assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+    assert.deepEqual(kcAdmin.calls, []);
+  }
+});
+
+test('fix-969: published registration contracts describe the realized envelope and provisioning errors', async () => {
+  const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({ store: fakeStore(), body: validApplicationPayload() }));
+  assert.equal(res.statusCode, 202);
+  for (const path of [
+    '../../apps/control-plane-executor/openapi/control-plane.openapi.json',
+    '../../apps/control-plane-executor/openapi/families/workspaces.openapi.json',
+  ]) {
+    const document = JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
+    const operation = document.paths['/v1/workspaces/{workspaceId}/applications'].post;
+    for (const status of ['400', '409', '422', '502']) {
+      assert.equal(operation.responses[status].content['application/json'].schema.$ref, '#/components/schemas/ErrorResponse');
+    }
+    const schemaRef = operation.responses['202'].content['application/json'].schema.$ref;
+    const schema = document.components.schemas[schemaRef.split('/').at(-1)];
+    assert.equal(schema.additionalProperties, false);
+    assert.equal(schema.required.includes('state'), true);
+    assert.deepEqual(schema.properties.state.enum, ['active']);
+    for (const field of schema.required) assert.ok(field in res.body, `required field ${field}`);
+    for (const field of Object.keys(res.body)) assert.ok(field in schema.properties, `documented field ${field}`);
+  }
+  const catalog = JSON.parse(readFileSync(new URL('../../packages/internal-contracts/src/public-route-catalog.json', import.meta.url), 'utf8'));
+  const route = catalog.routes.find((item) => item.operationId === 'createExternalApplication');
+  assert.match(route.summary, /materialize.*tenant realm/);
+});
+
+test('fix-969: realized lifecycle changes fail closed without pretending to disable the IAM client', async () => {
+  for (const field of ['state', 'desiredState']) {
+    for (const state of ['suspended', 'soft_deleted', 'provisioning']) {
+      const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload(), {
+        iam_realm: 'realm-acme', kc_client_id: 'acme-portal', kc_client_uuid: 'kc-app-uuid',
+      })] });
+      const kcAdmin = fakeKcAdmin();
+      const params = { workspaceId: 'ws-acme', applicationId: 'app_existing' };
+      const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({ store, kcAdmin, params, body: { [field]: state } }));
+      assert.equal(res.statusCode, 409);
+      assert.equal(res.body.code, 'APPLICATION_STATE_UPDATE_UNSUPPORTED');
+      assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+      assert.deepEqual(kcAdmin.calls, []);
+      assert.equal((await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }))).body.state, 'active');
+    }
   }
 });
 

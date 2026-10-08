@@ -31,6 +31,20 @@ export function isTenantAudienceMapper(mapper, audience) {
 
 export const KEYCLOAK_ADMIN_SAFE_MESSAGE = 'Identity provider operation failed. Please retry or contact support if the problem continues.';
 
+// External app callers may select built-in OIDC scopes, never arbitrary realm scopes
+// (which can carry privileged protocol mappers). `openid` is a protocol scope only.
+export const OIDC_APP_CLIENT_SCOPE_NAMES = Object.freeze([
+  'openid', 'profile', 'email', 'address', 'phone', 'roles', 'web-origins', 'basic', 'offline_access',
+]);
+
+function oidcAppClientScopes(scopes) {
+  if (scopes === undefined) return undefined; // Preserve the realm's configured defaults.
+  if (!Array.isArray(scopes) || scopes.some((scope) => !OIDC_APP_CLIENT_SCOPE_NAMES.includes(scope))) {
+    throw new Error(KEYCLOAK_ADMIN_SAFE_MESSAGE);
+  }
+  return scopes.filter((scope) => scope !== 'openid');
+}
+
 function diagnosticBody(body) {
   if (body === undefined || body === null) return '';
   return typeof body === 'string' ? body : JSON.stringify(body);
@@ -448,8 +462,8 @@ export const kcAdmin = {
   // External OIDC applications: enable only their declared flows; never fetch a client secret.
   async createOidcAppClient(realm, {
     clientId, name, clientType, authenticationFlows = [], redirectUris = [], webOrigins = [],
-    defaultClientScopes = [], optionalClientScopes = [], postLogoutRedirectUris = [],
-    frontChannelLogoutUri, backChannelLogoutUri, protocolMappers = [],
+    defaultClientScopes, optionalClientScopes, postLogoutRedirectUris = [],
+    frontChannelLogoutUri, backChannelLogoutUri,
   }) {
     const publicClient = clientType === 'public';
     const configuration = {
@@ -457,7 +471,9 @@ export const kcAdmin = {
       standardFlowEnabled: authenticationFlows.some((flow) => flow.startsWith('oidc_authorization_code_')),
       serviceAccountsEnabled: !publicClient && authenticationFlows.includes('oidc_client_credentials'),
       directAccessGrantsEnabled: false,
-      redirectUris, webOrigins, defaultClientScopes, optionalClientScopes, protocolMappers,
+      redirectUris, webOrigins,
+      defaultClientScopes: oidcAppClientScopes(defaultClientScopes),
+      optionalClientScopes: oidcAppClientScopes(optionalClientScopes),
       ...(frontChannelLogoutUri ? { frontchannelLogout: true, frontchannelLogoutUrl: frontChannelLogoutUri } : {}),
       attributes: {
         'in-falcone.kind': 'external-application',

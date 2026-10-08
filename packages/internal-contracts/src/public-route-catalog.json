@@ -32633,7 +32633,7 @@
       "requiredPlanFlags": [],
       "resourceType": "application",
       "scope": "workspace",
-      "summary": "Submit a canonical external application write request under the workspaces family",
+      "summary": "Register an OIDC application and materialize its client in the tenant realm",
       "supportsIdempotencyKey": true,
       "tags": [
         "Workspaces",
