@@ -5,7 +5,7 @@ vi.mock('@/lib/console-session', () => ({
 }))
 
 import { requestConsoleSessionJson } from '@/lib/console-session'
-import { consumeMessages, createTopic, listTopics, publishMessage } from './eventsApi'
+import { consumeMessages, createTopic, listTopics, publishMessage, type ConsumeMessagesResult } from './eventsApi'
 
 const mock = requestConsoleSessionJson as unknown as ReturnType<typeof vi.fn>
 const lastCall = () => mock.mock.calls[mock.mock.calls.length - 1]
@@ -40,5 +40,16 @@ describe('eventsApi — executor event routes (workspace-scoped)', () => {
   it('consumeMessages without options omits the query string', async () => {
     await consumeMessages('ws1', 'orders')
     expect(lastCall()).toEqual([`${topics}/orders/messages`])
+  })
+
+  it.each(['complete', 'empty', 'timeout'] as const)('preserves the %s status and partial items', async (status) => {
+    const response: ConsumeMessagesResult = {
+      items: status === 'empty' ? [] : [{ value: { seq: 1 }, offset: '0' }],
+      status,
+      ...(status === 'timeout' ? { reason: 'read' as const } : {})
+    }
+    mock.mockResolvedValue(response)
+    expect(await consumeMessages('ws1', 'orders', { maxMessages: 10 })).toEqual(response)
+    expect(lastCall()).toEqual([`${topics}/orders/messages?maxMessages=10`])
   })
 })
