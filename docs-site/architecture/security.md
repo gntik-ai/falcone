@@ -6,11 +6,15 @@ Security in a multi-tenant BaaS reduces to one question: **can tenant A ever rea
 
 | Credential | Form | Used for |
 | --- | --- | --- |
-| **Anon API key** | `apikey: flc_anon_…` | Read-mostly, shippable to a browser; bound to a low-privilege RLS DB role |
+| **Anon API key** | `apikey: flc_anon_…` | Shippable to a browser; capped at `data:read` on every backend |
 | **Service API key** | `apikey: flc_service_…` | Server-side / CI; elevated within the tenant; never exposed to clients |
 | **Bearer JWT** | `Authorization: Bearer <jwt>` | Operator/user calls; issued by Keycloak (OIDC) |
 
 Keys are verified by `apps/control-plane-executor/src/runtime/api-keys.mjs`; JWTs by `jwt-verify.mjs`. Keys are matched at the gateway by the `apikey` header (route `vars` on `^flc_`).
+
+Issuing or rotating an anon key with `data:write` or `ddl:write` returns `400 SCOPE_EXCEEDS_KEY_TYPE`; scopes are rejected rather than silently dropped. Omitted or empty scopes default to `data:read`. Service keys may request any subset of `data:read`, `data:write` and `ddl:write`, and default to all three. PostgreSQL uses restricted DB roles and RLS; Mongo isolation comes from the adapter-injected tenant predicate, not RLS.
+
+This issuance ceiling does not change previously stored keys. Operators must revoke any legacy over-scoped anon key; trying to rotate it returns `400` and leaves the original key active.
 
 ## Authorization: identity resolution & precedence
 
