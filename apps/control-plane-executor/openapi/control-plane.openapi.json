@@ -12445,11 +12445,21 @@
             }
           },
           "200": {
-            "description": "Workspace deletion completed.",
+            "description": "Workspace deletion completed. Workspace secret KV data and metadata are destroyed before registry deletion. A disabled backend is disclosed in residual.secretsBackend.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WorkspaceDeleteCompleted"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "SECRET_TEARDOWN_INCOMPLETE: secret destruction or verification failed. Registry rows are retained; retry the same authorized purge or delete request. Residual entries are names or unverified prefixes, never values.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretTeardownIncomplete"
                 }
               }
             }
@@ -19247,11 +19257,21 @@
             }
           },
           "200": {
-            "description": "Tenant purge completed.",
+            "description": "Tenant purge completed. Workspace secret KV data and metadata are destroyed before registry deletion. A disabled backend is disclosed in residual.secretsBackend.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TenantPurgeCompleted"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "SECRET_TEARDOWN_INCOMPLETE: secret destruction or verification failed. Registry rows are retained; retry the same authorized purge or delete request. Residual entries are names or unverified prefixes, never values.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretTeardownIncomplete"
                 }
               }
             }
@@ -93640,7 +93660,8 @@
               "buckets",
               "topics",
               "mongoDatabases",
-              "mongoDatabasesRetained"
+              "mongoDatabasesRetained",
+              "secrets"
             ],
             "properties": {
               "workspaces": {
@@ -93682,6 +93703,13 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "secrets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Destroyed secret names (workspace deletion) or workspaceId/name paths (tenant purge)."
               }
             }
           },
@@ -93689,7 +93717,8 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "knativeServices"
+              "knativeServices",
+              "secrets"
             ],
             "properties": {
               "knativeServices": {
@@ -93697,6 +93726,17 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "secrets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Secret names or unverified prefixes; empty when the configured backend is verified empty."
+              },
+              "secretsBackend": {
+                "const": "disabled",
+                "description": "Present when no secret backend is configured; purge proceeds without backend verification."
               }
             }
           }
@@ -93762,7 +93802,8 @@
               "buckets",
               "topics",
               "mongoDatabases",
-              "mongoDatabasesRetained"
+              "mongoDatabasesRetained",
+              "secrets"
             ],
             "properties": {
               "databases": {
@@ -93794,6 +93835,13 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "secrets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Destroyed secret names (workspace deletion) or workspaceId/name paths (tenant purge)."
               }
             }
           },
@@ -93801,7 +93849,8 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "knativeServices"
+              "knativeServices",
+              "secrets"
             ],
             "properties": {
               "knativeServices": {
@@ -93809,6 +93858,67 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "secrets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Secret names or unverified prefixes; empty when the configured backend is verified empty."
+              },
+              "secretsBackend": {
+                "const": "disabled",
+                "description": "Present when no secret backend is configured; purge proceeds without backend verification."
+              }
+            }
+          }
+        }
+      },
+      "SecretTeardownIncomplete": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "removed",
+          "residual"
+        ],
+        "properties": {
+          "code": {
+            "const": "SECRET_TEARDOWN_INCOMPLETE"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "removed": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "secrets"
+            ],
+            "properties": {
+              "secrets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "residual": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "secrets"
+            ],
+            "properties": {
+              "secrets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
               }
             }
           }

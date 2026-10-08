@@ -34,9 +34,9 @@ export function workspaceSecretPath(tenantId, workspaceId, name) {
   return `${SECRET_ROOT}/${tenantId}/${workspaceId}/${name}`;
 }
 
-/** The Vault KV prefix that lists one workspace's secrets. */
+/** The Vault KV prefix for one workspace, or its tenant when workspaceId is omitted. */
 export function workspaceSecretPrefix(tenantId, workspaceId) {
-  return `${SECRET_ROOT}/${tenantId}/${workspaceId}`;
+  return `${SECRET_ROOT}/${tenantId}${workspaceId === undefined ? '' : `/${workspaceId}`}`;
 }
 
 function vaultError(op, path, status) {
@@ -227,7 +227,7 @@ export function createKubernetesAuthTokenProvider({
   return provider;
 }
 
-export function createVaultKvClient({ addr, token, tokenProvider, mount = 'secret', namespace, fetchImpl = globalThis.fetch } = {}) {
+export function createVaultKvClient({ addr, token, tokenProvider, mount = 'secret', namespace, fetchImpl = globalThis.fetch, requestTimeoutMs = AUTH_REQUEST_TIMEOUT_MS } = {}) {
   if (!addr) throw new TypeError('createVaultKvClient requires a Vault addr');
   if (!token && typeof tokenProvider !== 'function') throw new TypeError('createVaultKvClient requires a Vault token or tokenProvider');
   const base = String(addr).replace(/\/+$/, '');
@@ -244,6 +244,7 @@ export function createVaultKvClient({ addr, token, tokenProvider, mount = 'secre
     let activeToken = token || await tokenProvider();
     const request = () => fetchImpl(u, {
       method, headers: headers(activeToken), body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(requestTimeoutMs),
     });
     let res = await request();
     if (res.status === 403 && !token && typeof tokenProvider.invalidate === 'function') {
@@ -345,6 +346,41 @@ function metaShape(name, { data, meta } = {}) {
  * the reserved `_desc` key; the read path whitelists it so it surfaces as metadata only.
  */
 export function createWorkspaceSecretStore(client) {
+  function requireScopeId(id) {
+    if (typeof id !== 'string' || !/^[A-Za-z0-9_-]+$/.test(id))
+      throw new TypeError('secret teardown requires a resolved tenant/workspace id');
+  }
+
+  // List metadata only, destroy every version, then verify the prefix is empty.
+  async function purgePrefix(prefix) {
+    async function collect(path, relative = '') {
+      const names = [];
+      const unknown = [];
+      let keys;
+      try { keys = await client.listSecrets(path); }
+      catch { return { names, unknown: [relative || `${prefix}/`] }; }
+      for (const key of keys) {
+        if (key.endsWith('/')) {
+          const subtree = await collect(`${path}/${key.slice(0, -1)}`, `${relative}${key}`);
+          names.push(...subtree.names); unknown.push(...subtree.unknown);
+        }
+        else names.push(`${relative}${key}`);
+      }
+      return { names, unknown };
+    }
+    const initial = await collect(prefix);
+    const removed = [];
+    const failed = [];
+    for (const name of initial.names) {
+      try { await client.deleteSecret(`${prefix}/${name}`); removed.push(name); }
+      catch { failed.push(name); }
+    }
+    const verified = await collect(prefix);
+    const unverified = initial.names.filter((name) => verified.unknown.some((scope) => scope === `${prefix}/` || name.startsWith(scope)));
+    const residual = [...new Set([...failed, ...initial.unknown, ...verified.names, ...verified.unknown, ...unverified])].sort();
+    return { removed: removed.filter((name) => !residual.includes(name)), residual };
+  }
+
   // Internal: write a secret value (+ optional description) at the workspace path. Shared by the
   // create (set) and replace paths — KV-v2 writes a new version either way; the create-vs-replace
   // distinction (conflict on an existing name) is enforced by the caller via exists().
@@ -374,6 +410,17 @@ export function createWorkspaceSecretStore(client) {
       consecutiveFailures: 0, tokenExpiresAt: null,
     },
     validName: (n) => SECRET_NAME_RE.test(String(n ?? '')),
+
+    async purgeWorkspace(tenantId, workspaceId) {
+      requireScopeId(tenantId);
+      requireScopeId(workspaceId);
+      return purgePrefix(workspaceSecretPrefix(tenantId, workspaceId));
+    },
+
+    async purgeTenant(tenantId) {
+      requireScopeId(tenantId);
+      return purgePrefix(workspaceSecretPrefix(tenantId));
+    },
 
     // CREATE or REPLACE the value at the workspace path (KV-v2 new version). Returns metadata only
     // (no value, no version). The handler enforces POST=create-only via exists() before calling.
@@ -468,6 +515,13 @@ export function vaultStoreFromEnv(env = process.env, fetchImpl) {
     fetchImpl,
   });
   return createWorkspaceSecretStore(client);
+}
+
+let sharedVaultStore;
+/** One store and Kubernetes-auth token provider per control-plane process. */
+export function getSharedVaultStore() {
+  if (sharedVaultStore === undefined) sharedVaultStore = vaultStoreFromEnv();
+  return sharedVaultStore;
 }
 
 /** Read-only process health for an optional workspace-secret store. */
