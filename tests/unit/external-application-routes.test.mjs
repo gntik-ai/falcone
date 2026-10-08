@@ -120,6 +120,7 @@ function fakeKcAdmin(overrides = {}) {
     calls,
     async findClient(realm, clientId) { calls.push(['findClient', realm, clientId]); return null; },
     async createOidcAppClient(realm, args) { calls.push(['createOidcAppClient', realm, args]); return 'kc-app-uuid'; },
+    async setClientEnabled(realm, uuid, enabled) { calls.push(['setClientEnabled', realm, uuid, enabled]); },
     async deleteClient(realm, uuid) { calls.push(['deleteClient', realm, uuid]); },
     ...overrides,
   };
@@ -243,7 +244,7 @@ test('fix-781-02: valid tenant-owner create is accepted and persisted through th
   assert.equal(kcAdmin.calls[1][0], 'createOidcAppClient');
   assert.equal(kcAdmin.calls[1][1], 'realm-acme');
   assert.equal(kcAdmin.calls[1][2].clientId, 'acme-portal');
-  assert.equal(kcAdmin.calls[1][2].defaultClientScopes, undefined, 'ordinary creates retain the realm defaults');
+  assert.deepEqual(kcAdmin.calls[1][2].defaultClientScopes, ['openid', 'profile'], 'provisioned scopes match the read model');
   assert.equal(kcAdmin.calls[1][2].protocolMappers, undefined);
   assertSchemaCompatibleIamClient(upserts[0][1].appJson.iamClient);
 
@@ -416,7 +417,7 @@ test('fix-781-08: valid provider create persists and remains compatible with ful
 
   const { federatedProviders: _providers, ...updateBody } = validApplicationPayload({
     displayName: 'Acme Portal Updated',
-    desiredState: 'active',
+    desiredState: 'soft_deleted',
   });
   const update = await APPLICATION_HANDLERS.updateExternalApplication(ctx({
     method: 'PUT',
@@ -429,7 +430,7 @@ test('fix-781-08: valid provider create persists and remains compatible with ful
   assert.equal(update.body.status, 'accepted');
   assert.equal(update.body.entityId, 'app_existing');
   const updateUpsert = store.calls.filter(([name]) => name === 'upsertExternalApplication').at(-1);
-  assert.equal(updateUpsert[1].state, 'active');
+  assert.equal(updateUpsert[1].state, 'soft_deleted');
   assert.equal(updateUpsert[1].kcClientUuid, 'kc-app-uuid');
   assert.equal(updateUpsert[1].appJson.federatedProviders.length, 1);
 });
@@ -580,7 +581,7 @@ test('fix-969: realized IAM configuration and identity changes are rejected with
     })] });
     const kcAdmin = fakeKcAdmin();
     const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({
-      store, kcAdmin, params: { workspaceId: 'ws-acme', applicationId: 'app_existing' }, body,
+      store, kcAdmin, params: { workspaceId: 'ws-acme', applicationId: 'app_existing' }, body: { ...body, desiredState: 'soft_deleted' },
     }));
     assert.equal([409, 422].includes(res.statusCode), true, JSON.stringify(body));
     assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
@@ -655,21 +656,155 @@ test('fix-969: published registration contracts describe the realized envelope a
   assert.match(route.summary, /materialize.*tenant realm/);
 });
 
-test('fix-969: realized lifecycle changes fail closed without pretending to disable the IAM client', async () => {
+test('fix-969: suspension and soft deletion disable the realized client before persistence, including retries', async () => {
   for (const field of ['state', 'desiredState']) {
-    for (const state of ['suspended', 'soft_deleted', 'provisioning']) {
+    for (const state of ['suspended', 'soft_deleted']) {
       const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload(), {
         iam_realm: 'realm-acme', kc_client_id: 'acme-portal', kc_client_uuid: 'kc-app-uuid',
       })] });
       const kcAdmin = fakeKcAdmin();
       const params = { workspaceId: 'ws-acme', applicationId: 'app_existing' };
-      const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({ store, kcAdmin, params, body: { [field]: state } }));
+      const save = store.upsertExternalApplication;
+      store.upsertExternalApplication = async (...args) => {
+        assert.deepEqual(kcAdmin.calls.at(-1), ['setClientEnabled', 'realm-acme', 'kc-app-uuid', false]);
+        return save(...args);
+      };
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({ store, kcAdmin, params, body: { [field]: state } }));
+        assert.equal(res.statusCode, 202);
+        assert.equal(res.body.desiredState, state);
+        assert.equal((await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }))).body.state, state);
+        assert.equal((await APPLICATION_HANDLERS.listExternalApplications(ctx({ store }))).body.items[0].state, state);
+      }
+      assert.equal(kcAdmin.calls.length, 2, 'each retirement retry confirms the client is disabled');
+      const row = await store.getExternalApplication({}, { applicationId: 'app_existing' });
+      assert.equal(row.kc_client_uuid, 'kc-app-uuid');
+      assert.equal(row.app_json.state, state);
+    }
+  }
+});
+
+test('fix-969: console create, rename and full-payload soft deletion succeed', async () => {
+  const store = fakeStore();
+  const kcAdmin = fakeKcAdmin();
+  const created = await APPLICATION_HANDLERS.createExternalApplication(ctx({ store, kcAdmin, body: validApplicationPayload() }));
+  assert.equal(created.statusCode, 202);
+  const params = { workspaceId: 'ws-acme', applicationId: created.body.entityId };
+  const renamed = await APPLICATION_HANDLERS.updateExternalApplication(ctx({
+    store, kcAdmin, params, body: validApplicationPayload({ displayName: 'Renamed' }),
+  }));
+  assert.equal(renamed.statusCode, 202);
+  const get = await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }));
+  const retired = await APPLICATION_HANDLERS.updateExternalApplication(ctx({
+    store, kcAdmin, params, body: { ...get.body, desiredState: 'soft_deleted' },
+  }));
+  assert.equal(retired.statusCode, 202);
+  assert.equal(retired.body.desiredState, 'soft_deleted');
+  assert.deepEqual(kcAdmin.calls.at(-1), ['setClientEnabled', 'realm-acme', 'kc-app-uuid', false]);
+  assert.equal((await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }))).body.state, 'soft_deleted');
+});
+
+test('fix-969: retirement preserves tenant isolation and management scope checks', async () => {
+  for (const identity of [
+    { actorType: 'tenant_owner', tenantId: 'ten-foreign' },
+    { actorType: 'tenant_member', tenantId: 'ten-acme' },
+  ]) {
+    const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload(), {
+      iam_realm: 'realm-acme', kc_client_id: 'acme-portal', kc_client_uuid: 'kc-app-uuid',
+    })] });
+    const kcAdmin = fakeKcAdmin();
+    const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({
+      store, kcAdmin, identity, params: { workspaceId: 'ws-acme', applicationId: 'app_existing' }, body: { desiredState: 'soft_deleted' },
+    }));
+    assert.equal(res.statusCode, identity.tenantId === 'ten-acme' ? 403 : 404);
+    assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+    assert.deepEqual(kcAdmin.calls, []);
+  }
+});
+
+test('fix-969: unrealized retirement requests never disable an unrelated client', async () => {
+  const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload())] });
+  const kcAdmin = fakeKcAdmin();
+  const params = { workspaceId: 'ws-acme', applicationId: 'app_existing' };
+  const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({ store, kcAdmin, params, body: { desiredState: 'soft_deleted' } }));
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.body.desiredState, 'provisioning');
+  assert.deepEqual(kcAdmin.calls, []);
+  assert.equal((await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }))).body.iamClient, undefined);
+});
+
+test('fix-969: published update contracts describe retirement and redacted failures', () => {
+  for (const path of [
+    '../../apps/control-plane-executor/openapi/control-plane.openapi.json',
+    '../../apps/control-plane-executor/openapi/families/workspaces.openapi.json',
+  ]) {
+    const document = JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
+    const operation = document.paths['/v1/workspaces/{workspaceId}/applications/{applicationId}'].put;
+    assert.match(operation.description, /suspended or soft_deleted disables the existing Keycloak client by UUID before persisting/);
+    assert.match(operation.description, /client stays disabled/);
+    assert.match(operation.responses['409'].description, /other than suspension and soft deletion/);
+    assert.match(operation.responses['502'].description, /APPLICATION_STATE_UPDATE_FAILED/);
+    assert.equal(operation.responses['502'].content['application/json'].schema.$ref, '#/components/schemas/ErrorResponse');
+  }
+});
+
+test('fix-969: unsupported lifecycle changes and reactivation fail without IAM or persistence calls', async () => {
+  for (const existingState of ['active', 'suspended', 'soft_deleted']) {
+    for (const state of ['draft', 'provisioning', 'pending_activation', 'deleted', ...(existingState !== 'active' ? ['active'] : [])]) {
+      const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload({ state: existingState }), {
+        iam_realm: 'realm-acme', kc_client_id: 'acme-portal', kc_client_uuid: 'kc-app-uuid',
+      })] });
+      const kcAdmin = fakeKcAdmin();
+      const params = { workspaceId: 'ws-acme', applicationId: 'app_existing' };
+      const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({ store, kcAdmin, params, body: { desiredState: state } }));
       assert.equal(res.statusCode, 409);
       assert.equal(res.body.code, 'APPLICATION_STATE_UPDATE_UNSUPPORTED');
       assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
       assert.deepEqual(kcAdmin.calls, []);
-      assert.equal((await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }))).body.state, 'active');
+      assert.equal((await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }))).body.state, existingState);
     }
+  }
+});
+
+test('fix-969: a failed client disable is redacted and cannot persist retirement', async () => {
+  for (const state of ['suspended', 'soft_deleted']) {
+    const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload(), {
+      iam_realm: 'realm-acme', kc_client_id: 'acme-portal', kc_client_uuid: 'kc-app-uuid',
+    })] });
+    const kcAdmin = fakeKcAdmin({ async setClientEnabled() {
+      throw Object.assign(new Error('disable-admin-token-canary client-secret-canary'), { kcStatus: 500 });
+    } });
+    const params = { workspaceId: 'ws-acme', applicationId: 'app_existing' };
+    const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({ store, kcAdmin, params, body: { desiredState: state } }));
+    assert.equal(res.statusCode, 502);
+    assert.equal(res.body.code, 'APPLICATION_STATE_UPDATE_FAILED');
+    assert.doesNotMatch(JSON.stringify(res), /token-canary|secret-canary/);
+    assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+    assert.equal((await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }))).body.state, 'active');
+  }
+});
+
+test('fix-969: failed retirement persistence leaves the client disabled and permits a safe retry', async () => {
+  for (const failure of ['exception', 'empty-row']) {
+    const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload(), {
+      iam_realm: 'realm-acme', kc_client_id: 'acme-portal', kc_client_uuid: 'kc-app-uuid',
+    })] });
+    const kcAdmin = fakeKcAdmin();
+    const params = { workspaceId: 'ws-acme', applicationId: 'app_existing' };
+    const save = store.upsertExternalApplication;
+    store.upsertExternalApplication = async () => {
+      if (failure === 'empty-row') return null;
+      throw new Error('database-secret-canary');
+    };
+    const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({ store, kcAdmin, params, body: { desiredState: 'soft_deleted' } }));
+    assert.equal(res.statusCode, 502);
+    assert.equal(res.body.code, 'APPLICATION_PERSISTENCE_FAILED');
+    assert.doesNotMatch(JSON.stringify(res), /secret-canary/);
+    assert.deepEqual(kcAdmin.calls, [['setClientEnabled', 'realm-acme', 'kc-app-uuid', false]]);
+    store.upsertExternalApplication = save;
+    const retry = await APPLICATION_HANDLERS.updateExternalApplication(ctx({ store, kcAdmin, params, body: { desiredState: 'soft_deleted' } }));
+    assert.equal(retry.statusCode, 202);
+    assert.equal((await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }))).body.state, 'soft_deleted');
   }
 });
 

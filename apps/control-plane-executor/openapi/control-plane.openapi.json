@@ -12952,7 +12952,7 @@
         },
         "responses": {
           "202": {
-            "description": "External application update accepted.",
+            "description": "External application update accepted after required client disabling and persistence complete.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12992,7 +12992,7 @@
             }
           },
           "409": {
-            "description": "Changing a realized IAM configuration or lifecycle state is unsupported (APPLICATION_IAM_UPDATE_UNSUPPORTED or APPLICATION_STATE_UPDATE_UNSUPPORTED); IAM realm and clientId are immutable (APPLICATION_IAM_IMMUTABLE).",
+            "description": "IAM configuration changes are unsupported (APPLICATION_IAM_UPDATE_UNSUPPORTED); lifecycle changes other than suspension and soft deletion are unsupported (APPLICATION_STATE_UPDATE_UNSUPPORTED); IAM realm and clientId are immutable (APPLICATION_IAM_IMMUTABLE).",
             "content": {
               "application/json": {
                 "schema": {
@@ -13060,6 +13060,16 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Client disabling or persistence failed (APPLICATION_STATE_UPDATE_FAILED or APPLICATION_PERSISTENCE_FAILED). No successful retirement is reported; errors are redacted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-resource-type": "application",
@@ -13080,7 +13090,8 @@
         "x-family": "workspaces",
         "x-scope": "workspace",
         "x-visibility": "public",
-        "x-owning-service": "control_api"
+        "x-owning-service": "control_api",
+        "description": "For realized OIDC applications, desiredState/state suspended or soft_deleted disables the existing Keycloak client by UUID before persisting the state. Other lifecycle transitions and IAM configuration changes are rejected. If persistence fails after disabling, the client stays disabled; retry the retirement request to finish saving. Legacy rows without IAM linkage remain provisioning, including when updated; their persisted state is normalized on the next write."
       }
     },
     "/v1/workspaces/{workspaceId}/effective-capabilities": {

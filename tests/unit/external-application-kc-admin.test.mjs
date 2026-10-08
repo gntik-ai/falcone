@@ -97,3 +97,29 @@ test('external OIDC client creation retains safe Keycloak error handling', async
     globalThis.fetch = originalFetch;
   }
 });
+
+test('external OIDC retirement disables the exact client UUID and redacts upstream failures', async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamStatus = 204;
+  globalThis.fetch = async (url, init = {}) => {
+    if (url.endsWith('/realms/master/protocol/openid-connect/token')) {
+      return new Response(JSON.stringify({ access_token: 'test-admin-token', expires_in: 300 }));
+    }
+    assert.ok(url.endsWith('/admin/realms/tenant%2Frealm/clients/client%2Fuuid'));
+    assert.equal(init.method, 'PUT');
+    assert.deepEqual(JSON.parse(init.body), { enabled: false });
+    return new Response(upstreamStatus === 204 ? null : JSON.stringify({ secret: 'disable-secret-canary' }), { status: upstreamStatus });
+  };
+  try {
+    await kcAdmin.setClientEnabled('tenant/realm', 'client/uuid', false);
+    upstreamStatus = 500;
+    await assert.rejects(kcAdmin.setClientEnabled('tenant/realm', 'client/uuid', false), (error) => {
+      assert.equal(error.kcStatus, 500);
+      assert.equal(error.message, KEYCLOAK_ADMIN_SAFE_MESSAGE);
+      assert.doesNotMatch(JSON.stringify(error), /disable-secret-canary|test-admin-token/);
+      return true;
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

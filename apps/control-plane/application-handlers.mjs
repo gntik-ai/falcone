@@ -537,8 +537,8 @@ export async function createExternalApplication(ctx) {
       clientType: app.iamClient.clientType,
       redirectUris: app.iamClient.redirectUris,
       webOrigins: app.iamClient.webOrigins,
-      // Omitted scope lists let Keycloak apply the realm defaults. Never forward mappers.
-      ...(ctx.body?.iamClient?.defaultClientScopes !== undefined ? { defaultClientScopes: app.iamClient.defaultClientScopes } : {}),
+      // Apply the same default scopes exposed by the read model. Never forward mappers.
+      defaultClientScopes: app.iamClient.defaultClientScopes,
       optionalClientScopes: app.iamClient.optionalClientScopes,
       postLogoutRedirectUris: app.iamClient.postLogoutRedirectUris,
       frontChannelLogoutUri: app.iamClient.frontChannelLogoutUri,
@@ -597,9 +597,11 @@ export async function updateExternalApplication(ctx) {
   const app = normalizeApplicationBody(ctx.body, { id: existing.applicationId, workspace: resolved.ws, existing });
   const unsupported = protocolNotProvisionable(app.protocol);
   if (unsupported) return unsupported;
-  if (resolved.app.kc_client_uuid && ['desiredState', 'state']
-    .some((field) => ctx.body?.[field] !== undefined && ctx.body[field] !== existing.state)) {
-    return err(409, 'APPLICATION_STATE_UPDATE_UNSUPPORTED', 'Updating a realized application lifecycle state is not supported.');
+  const requestedState = ctx.body?.desiredState ?? ctx.body?.state;
+  const retireClient = resolved.app.kc_client_uuid && ['suspended', 'soft_deleted'].includes(requestedState);
+  if (resolved.app.kc_client_uuid && requestedState !== undefined
+    && requestedState !== existing.state && !retireClient) {
+    return err(409, 'APPLICATION_STATE_UPDATE_UNSUPPORTED', 'Only suspension and soft deletion of a realized application are supported.');
   }
   if (app.protocol !== existing.protocol
     || (ctx.body?.iamClient?.realm !== undefined && ctx.body.iamClient.realm !== resolved.app.iam_realm)
@@ -612,9 +614,18 @@ export async function updateExternalApplication(ctx) {
     .some((key) => !isDeepStrictEqual(app[key], baseline[key]))) {
     return err(409, 'APPLICATION_IAM_UPDATE_UNSUPPORTED', 'Updating a realized application IAM configuration is not supported.');
   }
+  if (retireClient) app.state = requestedState;
   const validation = await validateApplicationForWrite(app, { planId: ctx.body?.planId ?? app.metadata?.planId });
   if (!validation.ok) return validationError(validation.validation.checks);
   app.validation = validation.validation;
+
+  if (retireClient) {
+    try {
+      await (ctx.kcAdmin ?? kcAdmin).setClientEnabled(resolved.app.iam_realm, resolved.app.kc_client_uuid, false);
+    } catch {
+      return err(502, 'APPLICATION_STATE_UPDATE_FAILED', KEYCLOAK_ADMIN_SAFE_MESSAGE);
+    }
+  }
 
   let row;
   try {
@@ -629,10 +640,12 @@ export async function updateExternalApplication(ctx) {
       appJson: app,
       actorId: ctx.identity?.sub ?? null,
     });
+    if (!row) throw new Error('application persistence returned no row');
   } catch (error) {
+    // Retirement fails closed: do not re-enable the client if persistence fails.
+    // Retrying the same request disables it again before completing the row update.
     return mapPersistenceError(error, app.slug);
   }
-  if (!row) return err(404, 'APPLICATION_NOT_FOUND', `application ${existing.applicationId} not found`);
   return ok(202, mutationAccepted(ctx, {
     entityId: row.id,
     tenantId: row.tenant_id,
