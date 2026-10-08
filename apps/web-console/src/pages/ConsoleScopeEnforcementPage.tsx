@@ -36,6 +36,7 @@ export function ConsoleScopeEnforcementPage({ isSuperadmin = true }: { isSuperad
 
   const summary = useMemo(() => ({
     SCOPE_INSUFFICIENT: countByType(denials, 'SCOPE_INSUFFICIENT'),
+    ROLE_INSUFFICIENT: countByType(denials, 'ROLE_INSUFFICIENT'),
     PLAN_ENTITLEMENT_DENIED: countByType(denials, 'PLAN_ENTITLEMENT_DENIED'),
     WORKSPACE_SCOPE_MISMATCH: countByType(denials, 'WORKSPACE_SCOPE_MISMATCH'),
     CONFIG_ERROR: countByType(denials, 'CONFIG_ERROR')
@@ -58,7 +59,7 @@ export function ConsoleScopeEnforcementPage({ isSuperadmin = true }: { isSuperad
           Puntos de conexión sin configurar detectados. Revisa la configuración de plataforma.
         </div>
       ) : null}
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-5">
         {Object.entries(summary).map(([key, value]) => (
           <Card key={key} className="p-3 text-sm">
             <div className="text-muted-foreground">{key}</div>

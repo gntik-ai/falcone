@@ -8,6 +8,7 @@ import { exportDenialsAsCsv, type ScopeEnforcementDenial } from '@/lib/console-s
 
 const badgeTones: Record<string, string> = {
   SCOPE_INSUFFICIENT: 'border-red-500/30 bg-red-500/10 text-red-300',
+  ROLE_INSUFFICIENT: 'border-red-500/30 bg-red-500/10 text-red-300',
   PLAN_ENTITLEMENT_DENIED: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
   WORKSPACE_SCOPE_MISMATCH: 'border-orange-500/30 bg-orange-500/10 text-orange-300',
   CONFIG_ERROR: 'border-border bg-muted/40 text-muted-foreground'
@@ -67,7 +68,7 @@ export function ScopeEnforcementDenialsTable({ denials, isLoading, onLoadMore, h
                 {denial.actor_id} <span className="text-muted-foreground">({denial.actor_type})</span>
               </TableCell>
               <TableCell>{denial.http_method} {denial.request_path}</TableCell>
-              <TableCell>{denial.missing_scopes?.join(', ') || denial.required_entitlement || '—'}</TableCell>
+              <TableCell>{denial.missing_scopes?.join(', ') || denial.required_entitlement || denial.required_role || '—'}</TableCell>
               {isSuperadmin ? <TableCell>{denial.tenant_id}</TableCell> : null}
               <TableCell>{denial.source_ip ?? '—'}</TableCell>
             </TableRow>
