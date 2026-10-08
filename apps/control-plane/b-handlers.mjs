@@ -24,6 +24,7 @@ import { KNATIVE_RUNTIME_HANDLERS } from './knative-runtime-handlers.mjs';
 import { checkWorkspaceQuota } from './workspace-quota.mjs';
 import { recordScopeDenial, recordQuotaEnforcement } from './audit-writer.mjs';
 import { buildTenantConfigExport } from './tenant-config-export.mjs';
+import { getSharedVaultStore, logSecretTeardownFailure } from './vault-secrets.mjs';
 
 function slugify(s) {
   return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
@@ -466,9 +467,9 @@ async function deleteTenant(ctx) {
 }
 
 // POST /v1/tenants/{tenantId}/purge — hard cascade: remove EVERY resource the tenant owns
-// (workspaces, databases, realms, buckets, topics, keys, registry rows, async-op rows), leaving
-// no orphaned data. Physical teardown (DB drop, realm delete) is reliable; bucket/topic teardown
-// is best-effort (the registry rows are removed regardless, so no orphaned rows remain).
+// (workspaces, databases, realms, buckets, topics, keys, registry rows, async-op rows).
+// Runtime cleanup gates the cascade; secret destruction must finish before row deletion.
+// Other physical teardown is best-effort, with the removed resources reported below.
 async function purgeTenant(ctx) {
   const { params, identity, pool } = ctx;
   const tenant = await store.getTenant(pool, params.tenantId);
@@ -477,6 +478,8 @@ async function purgeTenant(ctx) {
   if (!ctx.runtimeTeardownCoordinator) return err(503, 'RUNTIME_TEARDOWN_UNAVAILABLE', 'runtime teardown coordinator is required');
   const pending = await ctx.runtimeTeardownCoordinator.purgeTenant(pool, tenant.id, ctx.callerContext?.correlationId);
   if (pending.pending) return ok(202, { tenantId: tenant.id, status: 'cleanup_pending', obligations: (pending.obligations ?? []).map((o) => ({ resourceType: o.resourceType ?? (o.type === 'mcp' ? 'mcp' : (o.ksvcName ? 'function' : 'mcp')), resourceId: o.resourceId ?? o.id ?? o.ksvcName, status: 'pending' })) });
+  const secrets = await tearDownSecrets(ctx, { tenantId: tenant.id });
+  if (secrets.error) return secrets.error;
   const realm = tenant.iam_realm;
 
   // 1. Delete all registry rows + collect the physical resources to tear down.
@@ -504,14 +507,36 @@ async function purgeTenant(ctx) {
       workspaces: phys.workspaceIds.length,
       databases: databasesDropped, realm: realmDeleted ? realm : null,
       buckets: bucketsDeleted, topics: topicsDeleted,
+      secrets: secrets.removed,
       // FerretDB databases physically dropped (empty across all tenants); `mongoDatabasesRetained`
       // are same-named shared dbs kept because another tenant still has data (only this tenant's
       // documents were removed).
       mongoDatabases: mongo.dropped, mongoDatabasesRetained: mongo.retained,
     },
     // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
-    residual: { knativeServices: [] },
+    residual: { knativeServices: [], ...secrets.residual },
   });
+}
+
+// A disabled backend is disclosed; any incomplete destruction retains the registry for retry.
+async function tearDownSecrets(ctx, scope) {
+  const { tenantId, workspaceId } = scope;
+  const workspace = Object.hasOwn(scope, 'workspaceId');
+  const vault = ctx.vaultStore === undefined ? getSharedVaultStore() : ctx.vaultStore;
+  if (!vault) return { removed: [], residual: { secrets: [], secretsBackend: 'disabled' } };
+  let result;
+  try {
+    result = workspace ? await vault.purgeWorkspace(tenantId, workspaceId) : await vault.purgeTenant(tenantId);
+  } catch (error) {
+    logSecretTeardownFailure(workspace ? 'purgeWorkspace' : 'purgeTenant', error);
+    result = { removed: [], residual: [workspace ? `${workspaceId ?? 'unresolved-workspace'}/` : `${tenantId ?? 'unresolved-tenant'}/`] };
+  }
+  if (result.residual.length) return { error: ok(502, {
+    code: 'SECRET_TEARDOWN_INCOMPLETE',
+    message: 'workspace secret teardown incomplete; retry the same purge or delete request',
+    removed: { secrets: result.removed }, residual: { secrets: result.residual },
+  }) };
+  return { removed: result.removed, residual: { secrets: [] } };
 }
 
 // Run the isolation-safe FerretDB teardown for a purge/delete, best-effort. The mongo
@@ -879,6 +904,8 @@ async function deleteWorkspace(ctx) {
   if (!ctx.runtimeTeardownCoordinator) return err(503, 'RUNTIME_TEARDOWN_UNAVAILABLE', 'runtime teardown coordinator is required');
   const pending = await ctx.runtimeTeardownCoordinator.purgeWorkspace(pool, ws.id, ctx.callerContext?.correlationId);
   if (pending.pending) return ok(202, { workspaceId: ws.id, tenantId: ws.tenant_id, status: 'cleanup_pending', obligations: (pending.obligations ?? []).map((o) => ({ resourceType: o.resourceType ?? (o.type === 'mcp' ? 'mcp' : (o.ksvcName ? 'function' : 'mcp')), resourceId: o.resourceId ?? o.id ?? o.ksvcName, status: 'pending' })) });
+  const secrets = await tearDownSecrets(ctx, { tenantId: ws.tenant_id, workspaceId: ws.id });
+  if (secrets.error) return secrets.error;
 
   // 1. Delete the workspace's registry rows + collect the physical resources to tear down.
   const phys = await store.purgeWorkspace(pool, ws.id);
@@ -900,10 +927,11 @@ async function deleteWorkspace(ctx) {
     workspaceId: ws.id, tenantId: ws.tenant_id, deleted: true,
     removed: {
       databases: databasesDropped, buckets: bucketsDeleted, topics: topicsDeleted,
+      secrets: secrets.removed,
       mongoDatabases: mongo.dropped, mongoDatabasesRetained: mongo.retained,
     },
     // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
-    residual: { knativeServices: [] },
+    residual: { knativeServices: [], ...secrets.residual },
   });
 }
 

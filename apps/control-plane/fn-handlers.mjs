@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import * as store from './tenant-store.mjs';
 import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost, isReservedFunctionEnvName } from './function-executor.mjs';
-import { vaultStoreFromEnv, vaultStoreHealthSnapshot, secretEnvVarName } from './vault-secrets.mjs';
+import { getSharedVaultStore, vaultStoreHealthSnapshot, secretEnvVarName } from './vault-secrets.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { functionsDisabledResponse, knativeUnavailableResponse } from './knative-runtime.mjs';
 import { createRuntimeCleanupRepository } from './runtime-cleanup-repository.mjs';
@@ -56,7 +56,7 @@ const err = (statusCode, code, message) => ({ statusCode, body: { code, message 
 // OpenBao-backed workspace-secret store (add-vault-secret-consumption, #612). Null when OpenBao is not
 // configured (BAO_ADDR/BAO_TOKEN or compatible VAULT_* env unset) — the secrets API reports the backend disabled and
 // function deploys ignore secret refs, so default behaviour is unchanged.
-const vaultStore = vaultStoreFromEnv();
+const vaultStore = getSharedVaultStore();
 
 // Read-only process health for the same store used by secret routes.
 export function secretBackendHealth() {
