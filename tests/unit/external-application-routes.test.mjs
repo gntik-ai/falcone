@@ -244,7 +244,8 @@ test('fix-781-02: valid tenant-owner create is accepted and persisted through th
   assert.equal(kcAdmin.calls[1][0], 'createOidcAppClient');
   assert.equal(kcAdmin.calls[1][1], 'realm-acme');
   assert.equal(kcAdmin.calls[1][2].clientId, 'acme-portal');
-  assert.deepEqual(kcAdmin.calls[1][2].defaultClientScopes, ['openid', 'profile'], 'provisioned scopes match the read model');
+  assert.equal('defaultClientScopes' in kcAdmin.calls[1][2], false, 'preserve the tenant realm default scopes');
+  assert.equal('optionalClientScopes' in kcAdmin.calls[1][2], false, 'preserve the tenant realm optional scopes');
   assert.equal(kcAdmin.calls[1][2].protocolMappers, undefined);
   assertSchemaCompatibleIamClient(upserts[0][1].appJson.iamClient);
 
@@ -255,6 +256,35 @@ test('fix-781-02: valid tenant-owner create is accepted and persisted through th
   assert.equal(getRes.statusCode, 200);
   assert.equal(getRes.body.state, 'active');
   assertSchemaCompatibleIamClient(getRes.body.iamClient);
+});
+
+test('fix-969: registration forwards only explicitly supplied client scope lists', async () => {
+  for (const clientType of ['public', 'confidential']) {
+    for (const [scopeLists, expected] of [
+      [undefined, {}],
+      [{}, {}],
+      [{ optionalClientScopes: ['email'] }, { optionalClientScopes: ['email'] }],
+      [{ defaultClientScopes: ['openid', 'profile', 'roles'] }, { defaultClientScopes: ['openid', 'profile', 'roles'] }],
+      [{ defaultClientScopes: [], optionalClientScopes: [] }, { defaultClientScopes: [], optionalClientScopes: [] }],
+      [{ defaultClientScopes: [' profile '], optionalClientScopes: [' email '] }, { defaultClientScopes: ['profile'], optionalClientScopes: ['email'] }],
+    ]) {
+      const store = fakeStore();
+      const kcAdmin = fakeKcAdmin();
+      const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({
+        store, kcAdmin, body: validApplicationPayload({
+          authenticationFlows: [clientType === 'public' ? 'oidc_authorization_code_pkce' : 'oidc_authorization_code_client_secret'],
+          iamClient: scopeLists === undefined ? undefined : { clientType, ...scopeLists },
+        }),
+      }));
+      assert.equal(res.statusCode, 202);
+      const configuration = kcAdmin.calls.find(([name]) => name === 'createOidcAppClient')[2];
+      assert.equal(configuration.clientType, clientType);
+      for (const field of ['defaultClientScopes', 'optionalClientScopes']) {
+        assert.equal(field in configuration, field in expected, `${clientType}: ${field} must be caller-supplied`);
+        assert.deepEqual(configuration[field], expected[field]);
+      }
+    }
+  }
 });
 
 test('fix-781-03: malformed create returns structured validation error and never writes', async () => {
@@ -436,11 +466,13 @@ test('fix-781-08: valid provider create persists and remains compatible with ful
 });
 
 test('fix-969: IAM creation failure is redacted and leaves no active application', async () => {
-  for (const failingMethod of ['findClient', 'createOidcAppClient']) {
+  const failures = ['findClient', 'createOidcAppClient']
+    .flatMap((method) => [400, 401, 403, 500].map((status) => [method, status]));
+  for (const [failingMethod, kcStatus] of failures) {
     const store = fakeStore();
     const kcAdmin = fakeKcAdmin({
       async [failingMethod]() {
-        throw Object.assign(new Error('admin-token-canary client-secret-canary'), { kcStatus: 500 });
+        throw Object.assign(new Error('admin-token-canary client-secret-canary'), { kcStatus });
       },
     });
     const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({

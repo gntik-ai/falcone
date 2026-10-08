@@ -484,7 +484,7 @@ function mapPersistenceError(error, slug) {
 
 function provisioningError(error) {
   const status = Number(error?.statusCode ?? error?.kcStatus);
-  return err(status >= 400 && status < 500 ? status : 502,
+  return err(status === 409 ? 409 : 502,
     status === 409 ? 'APPLICATION_CLIENT_EXISTS' : 'APPLICATION_PROVISIONING_FAILED',
     KEYCLOAK_ADMIN_SAFE_MESSAGE);
 }
@@ -542,6 +542,7 @@ export async function createExternalApplication(ctx) {
   const realm = tenant.iam_realm;
   app.iamClient.realm = realm;
   const kc = ctx.kcAdmin ?? kcAdmin;
+  const requestedClient = ctx.body?.iamClient;
   let clientUuid;
   try {
     if (await kc.findClient(realm, app.iamClient.clientId)) {
@@ -552,9 +553,11 @@ export async function createExternalApplication(ctx) {
       clientType: app.iamClient.clientType,
       redirectUris: app.iamClient.redirectUris,
       webOrigins: app.iamClient.webOrigins,
-      // Apply the same default scopes exposed by the read model. Never forward mappers.
-      defaultClientScopes: app.iamClient.defaultClientScopes,
-      optionalClientScopes: app.iamClient.optionalClientScopes,
+      // Omit read-model defaults so Keycloak retains the tenant realm's scope mappings.
+      ...(Array.isArray(requestedClient?.defaultClientScopes)
+        ? { defaultClientScopes: stringArray(requestedClient.defaultClientScopes) } : {}),
+      ...(Array.isArray(requestedClient?.optionalClientScopes)
+        ? { optionalClientScopes: stringArray(requestedClient.optionalClientScopes) } : {}),
       postLogoutRedirectUris: app.iamClient.postLogoutRedirectUris,
       frontChannelLogoutUri: app.iamClient.frontChannelLogoutUri,
       backChannelLogoutUri: app.iamClient.backChannelLogoutUri,
