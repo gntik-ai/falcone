@@ -1,7 +1,7 @@
 // Workspace API keys (change: add-app-api-keys).
 //
 // Supabase-style credentials a frontend/app uses to call the data API:
-//   - ANON  key: publishable (browser-safe); resolves to a restricted, RLS-governed DB role.
+//   - ANON  key: publishable (browser-safe); capped at data:read on every backend.
 //   - SERVICE key: secret; resolves to an elevated DB role.
 // Keys are stored HASHED (SHA-256); the plaintext is shown once at issuance and never again.
 // Verification resolves a presented key to {tenantId, workspaceId, keyType, scopes, dbRole}.
@@ -53,11 +53,21 @@ export function createApiKeyStore({ pool }) {
     return Object.assign(new Error(message), { statusCode, code });
   }
 
+  function resolveScopes(keyType, scopes) {
+    if (!KEY_TYPES.includes(keyType)) throw clientError(`Invalid key type ${keyType}`, 400, 'INVALID_KEY_TYPE');
+    if (scopes !== undefined && (!Array.isArray(scopes) || scopes.some((scope) => typeof scope !== 'string'))) {
+      throw clientError('Scopes must be an array of strings', 400, 'SCOPE_EXCEEDS_KEY_TYPE');
+    }
+    const effectiveScopes = Array.isArray(scopes) && scopes.length > 0 ? scopes : SCOPES_BY_TYPE[keyType];
+    const offendingScopes = effectiveScopes.filter((scope) => !SCOPES_BY_TYPE[keyType].includes(scope));
+    if (offendingScopes.length > 0) throw clientError(`Scopes exceed key type: ${offendingScopes.join(', ')}`, 400, 'SCOPE_EXCEEDS_KEY_TYPE');
+    return effectiveScopes;
+  }
+
   async function issueKey({ tenantId, workspaceId, keyType = 'anon', scopes } = {}) {
     if (!tenantId || !workspaceId) throw clientError('tenantId and workspaceId are required', 400, 'IDENTITY_MISSING');
-    if (!KEY_TYPES.includes(keyType)) throw clientError(`Invalid key type ${keyType}`, 400, 'INVALID_KEY_TYPE');
+    const effectiveScopes = resolveScopes(keyType, scopes);
     const { key, prefix } = generateKey(keyType);
-    const effectiveScopes = Array.isArray(scopes) && scopes.length > 0 ? scopes : SCOPES_BY_TYPE[keyType];
     const res = await pool.query(
       `INSERT INTO workspace_api_keys (tenant_id, workspace_id, key_type, key_prefix, key_hash, scopes)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, key_prefix, key_type, scopes, created_at`,
@@ -118,12 +128,14 @@ export function createApiKeyStore({ pool }) {
     return { id, revoked: true };
   }
 
-  // Rotate = revoke the old key and issue a fresh one of the same type.
+  // Rotate = revoke the old key and issue a fresh one of the same type and scopes.
   async function rotateKey({ id, workspaceId }) {
     const cur = await pool.query('SELECT tenant_id, workspace_id, key_type, scopes FROM workspace_api_keys WHERE id = $1 AND workspace_id = $2', [id, workspaceId]);
     if (cur.rowCount === 0) throw clientError('Key not found', 404, 'KEY_NOT_FOUND');
-    await revokeKey({ id, workspaceId }).catch(() => {});
     const row = cur.rows[0];
+    // Reject legacy over-scoped rows before revoking the original key.
+    resolveScopes(row.key_type, row.scopes);
+    await revokeKey({ id, workspaceId }).catch(() => {});
     return issueKey({ tenantId: row.tenant_id, workspaceId: row.workspace_id, keyType: row.key_type, scopes: row.scopes });
   }
 

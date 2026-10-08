@@ -36,9 +36,9 @@ The significant architectural decisions visible in the codebase, captured as sho
 
 ## ADR-5 — Supabase-style anon/service API keys
 
-**Decision.** Offer `flc_anon_…` (read-mostly, browser-safe, RLS-bound) and `flc_service_…` (server-side, elevated) keys, transported via the `apikey` header (and `?apikey=` for SSE).
+**Decision.** Offer `flc_anon_…` (browser-safe, capped at `data:read` on every backend) and `flc_service_…` (server-side, elevated) keys, transported via the `apikey` header (and `?apikey=` for SSE).
 
-**Why.** Lets frontends talk to the platform directly without a backend, while keeping privileged access server-side. Anon keys bind to a constrained DB role so RLS still applies.
+**Why.** Lets frontends talk to the platform directly without a backend, while keeping privileged access server-side. PostgreSQL anon keys bind to a constrained DB role with RLS; Mongo isolation uses the adapter's tenant predicate, not RLS.
 
 **Evidence.** `api-keys.mjs`; gateway `vars` on `^flc_`.
 

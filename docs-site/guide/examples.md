@@ -99,9 +99,11 @@ curl -s "$API/v1/analytics/query?metric=requests&window=24h" -H "$H"
 | | `flc_anon_…` | `flc_service_…` |
 | --- | --- | --- |
 | Where it lives | shippable to the browser | server-side / CI only |
-| Privilege | read-mostly, RLS-scoped | elevated within the tenant |
+| Privilege | capped at `data:read` on every backend | elevated within the tenant |
 | Transport | `apikey` header, or `?apikey=` for SSE | `apikey` header only |
 
 Both are **tenant-bound**: the platform never trusts a client-supplied `x-tenant-id`; the tenant comes from the verified key (or a verified JWT). A presented-but-invalid key fails closed with `401`.
+
+Anon issuance defaults to `data:read` when scopes are omitted or empty. Requests for write or DDL scopes fail with `400 SCOPE_EXCEEDS_KEY_TYPE`; use a server-side service key for those scopes. PostgreSQL isolation uses RLS, while Mongo isolation uses the adapter's tenant predicate, not RLS. Compliant rotations retain the key's type and scopes; legacy over-scoped anon keys must be revoked because rotation rejects them without changing the original key.
 
 See [Gateway & Routing](/api/gateway) for rate limiting and JWT issuance.
