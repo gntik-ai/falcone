@@ -390,6 +390,21 @@ async function validateApplicationForWrite(application, { planId } = {}) {
       checks.push(validationCheck('unsupported_client_scope', 'Only built-in OIDC client scopes are supported.', `iamClient.${field}`));
     }
   }
+  // Validate the effective Keycloak targets, including caller overrides. The shared
+  // validator checks login/logout, which may differ from the normalized IAM client.
+  for (const field of ['redirectUris', 'webOrigins', 'postLogoutRedirectUris', 'frontChannelLogoutUri', 'backChannelLogoutUri']) {
+    const value = application.iamClient?.[field];
+    const values = Array.isArray(value) ? value : (value === undefined ? [] : [value]);
+    for (const [index, uri] of values.entries()) {
+      const fieldPath = `iamClient.${field}${Array.isArray(value) ? `[${index}]` : ''}`;
+      if (!isHttpsUri(uri)) {
+        checks.push(validationCheck('invalid_uri', 'IAM client URIs must use HTTPS (HTTP is allowed only for localhost).', fieldPath));
+      }
+      if (typeof uri === 'string' && uri.includes('*')) {
+        checks.push(validationCheck('wildcard_uri', 'IAM client URIs cannot contain wildcards.', fieldPath));
+      }
+    }
+  }
   if (checks.length > 0) return { ok: false, validation: { status: 'invalid', checks } };
 
   if (application.protocol === 'api_key') {

@@ -574,6 +574,10 @@ test('fix-969: realized IAM configuration and identity changes are rejected with
     { redirectUris: ['https://changed.example.test/cb'] },
     { login: { redirectUris: ['https://changed.example.test/cb'] } },
     { iamClient: { redirectUris: ['https://changed.example.test/cb'] } },
+    { iamClient: { webOrigins: ['*'] } },
+    { iamClient: { postLogoutRedirectUris: ['https://changed.example.test/*'] } },
+    { iamClient: { frontChannelLogoutUri: 'http://evil.example.test/logout' } },
+    { iamClient: { backChannelLogoutUri: 'http://169.254.169.254/latest' } },
     { authenticationFlows: ['oidc_client_credentials'] },
   ]) {
     const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload(), {
@@ -587,6 +591,89 @@ test('fix-969: realized IAM configuration and identity changes are rejected with
     assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
     assert.deepEqual(kcAdmin.calls, []);
   }
+});
+
+test('fix-969: unsafe IAM URI overrides are rejected before any Keycloak call', async () => {
+  const arrayFields = ['redirectUris', 'webOrigins', 'postLogoutRedirectUris'];
+  const fields = [...arrayFields, 'frontChannelLogoutUri', 'backChannelLogoutUri'];
+  for (const clientType of ['public', 'confidential']) {
+    for (const field of fields) {
+      for (const uri of ['*', 'https://*.example.test/cb', 'https://app.example.test/*', 'http://169.254.169.254/latest', 'http://evil.example.test/cb']) {
+        const store = fakeStore();
+        const kcAdmin = fakeKcAdmin();
+        const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({
+          store, kcAdmin,
+          body: validApplicationPayload({
+            authenticationFlows: [clientType === 'public' ? 'oidc_authorization_code_pkce' : 'oidc_authorization_code_client_secret'],
+            iamClient: { clientType, [field]: arrayFields.includes(field) ? ['https://safe.example.test/cb', uri] : uri },
+          }),
+        }));
+        assert.equal(res.statusCode, 400, `${clientType}: ${field} ${uri}`);
+        assert.equal(res.body.code, 'VALIDATION_ERROR');
+        assert.equal(res.body.validation.checks.some((check) => check.fieldPath.startsWith(`iamClient.${field}`)), true);
+        assert.equal(res.body.validation.checks.some((check) => check.code === (uri.includes('*') ? 'wildcard_uri' : 'invalid_uri')), true);
+        assert.deepEqual(kcAdmin.calls, []);
+        assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+        assert.deepEqual((await APPLICATION_HANDLERS.listExternalApplications(ctx({ store }))).body.items, []);
+      }
+    }
+  }
+});
+
+test('fix-969: mixed malicious IAM overrides cannot bypass valid login redirect validation', async () => {
+  const store = fakeStore();
+  const kcAdmin = fakeKcAdmin();
+  const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({
+    store, kcAdmin,
+    body: validApplicationPayload({ iamClient: {
+      clientType: 'public', redirectUris: ['*', 'http://evil.example/cb'],
+      webOrigins: ['*'], backChannelLogoutUri: 'http://169.254.169.254/latest',
+    } }),
+  }));
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.code, 'VALIDATION_ERROR');
+  assert.deepEqual(kcAdmin.calls, []);
+  assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+});
+
+test('fix-969: validated IAM URI overrides reach Keycloak and the realized read model', async () => {
+  const iamClient = {
+    clientType: 'public',
+    redirectUris: ['https://alternate.example.test/cb', 'http://localhost:3000/cb'],
+    webOrigins: ['https://alternate.example.test', 'http://127.0.0.1:3000'],
+    postLogoutRedirectUris: ['https://alternate.example.test/signed-out'],
+    frontChannelLogoutUri: 'https://alternate.example.test/front-logout',
+    backChannelLogoutUri: 'https://alternate.example.test/back-logout',
+  };
+  const store = fakeStore();
+  const kcAdmin = fakeKcAdmin();
+  const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({
+    store, kcAdmin, body: validApplicationPayload({ iamClient }),
+  }));
+  assert.equal(res.statusCode, 202);
+  const configuration = kcAdmin.calls.find(([name]) => name === 'createOidcAppClient')[2];
+  const get = await APPLICATION_HANDLERS.getExternalApplication(ctx({
+    store, params: { workspaceId: 'ws-acme', applicationId: res.body.entityId },
+  }));
+  assert.equal(get.body.state, 'active');
+  for (const [field, value] of Object.entries(iamClient)) {
+    assert.deepEqual(configuration[field], value);
+    assert.deepEqual(get.body.iamClient[field], value);
+  }
+});
+
+test('fix-969: unsafe IAM overrides cannot be persisted on an unrealized application', async () => {
+  const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload())] });
+  const kcAdmin = fakeKcAdmin();
+  const params = { workspaceId: 'ws-acme', applicationId: 'app_existing' };
+  const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({
+    store, kcAdmin, params, body: { desiredState: 'active', iamClient: { redirectUris: ['*'] } },
+  }));
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.code, 'VALIDATION_ERROR');
+  assert.deepEqual(kcAdmin.calls, []);
+  assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+  assert.equal((await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }))).body.state, 'provisioning');
 });
 
 test('fix-969: caller-defined claim mappers cannot provision a privileged client', async () => {
