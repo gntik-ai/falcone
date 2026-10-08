@@ -46,6 +46,13 @@ function vaultError(op, path, status) {
   return e;
 }
 
+// Error messages and response bodies may carry values; log only bounded diagnostics.
+export function logSecretTeardownFailure(operation, error) {
+  const status = error?.vaultStatus;
+  console.error(JSON.stringify({ event: 'secret_teardown_failure', operation,
+    status: Number.isInteger(status) && status >= 400 && status <= 599 ? status : 0 }));
+}
+
 /**
  * A minimal Vault KV v2 client. Methods map to the KV v2 REST surface:
  *   write    → POST   {mount}/data/{path}      body { data }
@@ -358,7 +365,10 @@ export function createWorkspaceSecretStore(client) {
       const unknown = [];
       let keys;
       try { keys = await client.listSecrets(path); }
-      catch { return { names, unknown: [relative || `${prefix}/`] }; }
+      catch (error) {
+        logSecretTeardownFailure('list', error);
+        return { names, unknown: [relative || `${prefix}/`] };
+      }
       for (const key of keys) {
         if (key.endsWith('/')) {
           const subtree = await collect(`${path}/${key.slice(0, -1)}`, `${relative}${key}`);
@@ -373,7 +383,7 @@ export function createWorkspaceSecretStore(client) {
     const failed = [];
     for (const name of initial.names) {
       try { await client.deleteSecret(`${prefix}/${name}`); removed.push(name); }
-      catch { failed.push(name); }
+      catch (error) { logSecretTeardownFailure('delete', error); failed.push(name); }
     }
     const verified = await collect(prefix);
     const unverified = initial.names.filter((name) => verified.unknown.some((scope) => scope === `${prefix}/` || name.startsWith(scope)));

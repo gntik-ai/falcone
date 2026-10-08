@@ -2216,6 +2216,7 @@ test('bbx-933-aggregate-completed-response-35: completed tenant purge and worksp
     pool: poolFor({ tenant: { id: 'ten_completed', iam_realm: null } }),
     callerContext: { correlationId: 'corr-tenant-completed' },
     runtimeTeardownCoordinator,
+    vaultStore: null,
   });
   const workspace = await LOCAL_HANDLERS.deleteWorkspace({
     params: { workspaceId: 'wrk_completed' },
@@ -2223,6 +2224,7 @@ test('bbx-933-aggregate-completed-response-35: completed tenant purge and worksp
     pool: poolFor({ workspace: { id: 'wrk_completed', tenant_id: 'ten_completed' } }),
     callerContext: { correlationId: 'corr-workspace-completed' },
     runtimeTeardownCoordinator,
+    vaultStore: null,
     dropWorkspaceDatabase: async () => undefined,
     deleteBucket: async () => undefined,
     deleteTopics: async () => undefined,
@@ -2241,8 +2243,9 @@ test('bbx-933-aggregate-completed-response-35: completed tenant purge and worksp
         topics: [],
         mongoDatabases: [],
         mongoDatabasesRetained: [],
+        secrets: [],
       },
-      residual: { knativeServices: [] },
+      residual: { knativeServices: [], secrets: [], secretsBackend: 'disabled' },
     },
   });
   assert.deepEqual(workspace, {
@@ -2257,8 +2260,9 @@ test('bbx-933-aggregate-completed-response-35: completed tenant purge and worksp
         topics: [],
         mongoDatabases: [],
         mongoDatabasesRetained: [],
+        secrets: [],
       },
-      residual: { knativeServices: [] },
+      residual: { knativeServices: [], secrets: [], secretsBackend: 'disabled' },
     },
   });
 
@@ -2284,9 +2288,13 @@ test('bbx-933-aggregate-completed-response-35: completed tenant purge and worksp
     tenantNotPurged: [validateTenant, { ...tenant.body, purged: false }],
     tenantWrongIdentityKind: [validateTenant, { ...tenant.body, tenantId: 'wrk_completed' }],
     tenantPendingClaim: [validateTenant, { ...tenant.body, status: 'cleanup_pending' }],
+    tenantMissingRemovedSecrets: [validateTenant, { ...tenant.body, removed: Object.fromEntries(Object.entries(tenant.body.removed).filter(([key]) => key !== 'secrets')) }],
+    tenantMissingResidualSecrets: [validateTenant, { ...tenant.body, residual: { knativeServices: [], secretsBackend: 'disabled' } }],
     workspaceNotDeleted: [validateWorkspace, { ...workspace.body, deleted: false }],
     workspaceWrongIdentityKind: [validateWorkspace, { ...workspace.body, workspaceId: 'ten_completed' }],
     workspacePendingClaim: [validateWorkspace, { ...workspace.body, status: 'cleanup_pending' }],
+    workspaceMissingRemovedSecrets: [validateWorkspace, { ...workspace.body, removed: Object.fromEntries(Object.entries(workspace.body.removed).filter(([key]) => key !== 'secrets')) }],
+    workspaceMissingResidualSecrets: [validateWorkspace, { ...workspace.body, residual: { knativeServices: [], secretsBackend: 'disabled' } }],
   };
   const acceptedDrift = Object.entries(driftCandidates)
     .filter(([, [validate, body]]) => validate(body))

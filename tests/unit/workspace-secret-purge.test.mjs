@@ -9,6 +9,22 @@ function setup() {
   return { bao, client, store: createWorkspaceSecretStore(client) };
 }
 
+test('teardown diagnostics disclose operations and HTTP status without secret values', async (t) => {
+  const { bao, store } = setup();
+  const logs = [];
+  t.mock.method(console, 'error', (record) => logs.push(JSON.parse(record)));
+  await store.set('tenant-a', 'ws-a', 'probe', 'synthetic-value-977');
+  bao.faults.set(`DELETE:${workspaceSecretPath('tenant-a', 'ws-a', 'probe')}`, 403);
+  await store.purgeWorkspace('tenant-a', 'ws-a');
+  bao.faults.set('GET:falcone/workspace-secrets/tenant-a/ws-a:list', 500);
+  await store.purgeWorkspace('tenant-a', 'ws-a');
+  assert.deepEqual(logs, [
+    { event: 'secret_teardown_failure', operation: 'delete', status: 403 },
+    { event: 'secret_teardown_failure', operation: 'list', status: 500 },
+    { event: 'secret_teardown_failure', operation: 'list', status: 500 },
+  ]);
+});
+
 for (const fault of [403, 500, new Error('synthetic-value-must-not-leak')]) {
   test(`purge continues after a delete ${typeof fault === 'number' ? fault : 'timeout'} and reports only failed names`, async () => {
     const { bao, store } = setup();

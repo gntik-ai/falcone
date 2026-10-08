@@ -154,6 +154,9 @@ for (const scope of ['tenant', 'workspace']) {
     assert.equal(result.body.code, 'SECRET_TEARDOWN_INCOMPLETE');
     assert.deepEqual(result.body.residual.secrets, [scope === 'tenant' ? 'tenant-a/' : 'ws-a/']);
     assert.match(result.body.message, /retry the same/);
+    assert.deepEqual(logs.map(([record]) => JSON.parse(record)), [
+      { event: 'secret_teardown_failure', operation: scope === 'tenant' ? 'purgeTenant' : 'purgeWorkspace', status: 0 },
+    ]);
     assert.ok(!JSON.stringify({ result, logs }).includes(MARKER));
   });
 }

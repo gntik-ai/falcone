@@ -18,3 +18,5 @@ No Knative inline secret copies (#970), generic deletion recovery (#967), BYOK c
 Metadata deletion irreversibly destroys every secret version. Isolation relies on resolved registry identifiers and guarded path segments. An OpenBao outage or policy denial now intentionally blocks registry deletion. Sequential deletion adds latency; batching is out of scope.
 
 Rollback is a control-plane image revert without a chart or schema change. Destroyed secrets remain destroyed after rollback. Before release, verify policy parity with deployment revision `3be423c6`: `workspace-secrets-role` must grant list and delete on `secret/metadata/falcone/workspace-secrets/*`. Historical orphan removal needs a separate human decision and risk classification.
+
+For `SECRET_TEARDOWN_INCOMPLETE`, the `secret_teardown_failure` log event reports the failed operation and upstream HTTP status only. Status `0` means no HTTP status was available, including transport failures or invalid resolved scope. Error messages and upstream response bodies are excluded; retry the same purge or delete request after backend recovery.

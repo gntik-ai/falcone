@@ -24,7 +24,7 @@ import { KNATIVE_RUNTIME_HANDLERS } from './knative-runtime-handlers.mjs';
 import { checkWorkspaceQuota } from './workspace-quota.mjs';
 import { recordScopeDenial, recordQuotaEnforcement } from './audit-writer.mjs';
 import { buildTenantConfigExport } from './tenant-config-export.mjs';
-import { getSharedVaultStore } from './vault-secrets.mjs';
+import { getSharedVaultStore, logSecretTeardownFailure } from './vault-secrets.mjs';
 
 function slugify(s) {
   return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
@@ -527,7 +527,8 @@ async function tearDownSecrets(ctx, scope) {
   let result;
   try {
     result = workspace ? await vault.purgeWorkspace(tenantId, workspaceId) : await vault.purgeTenant(tenantId);
-  } catch {
+  } catch (error) {
+    logSecretTeardownFailure(workspace ? 'purgeWorkspace' : 'purgeTenant', error);
     result = { removed: [], residual: [workspace ? `${workspaceId ?? 'unresolved-workspace'}/` : `${tenantId ?? 'unresolved-tenant'}/`] };
   }
   if (result.residual.length) return { error: ok(502, {
