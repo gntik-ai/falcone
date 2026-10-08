@@ -20,6 +20,12 @@ export interface EventMessage {
   timestamp?: string
 }
 
+export interface ConsumeMessagesResult {
+  items: EventMessage[]
+  status: 'complete' | 'empty' | 'timeout'
+  reason?: 'assignment' | 'read'
+}
+
 const topicsBase = (workspaceId: string) => `/v1/events/workspaces/${enc(workspaceId)}/topics`
 
 export function listTopics(workspaceId: string): Promise<{ items: TopicRecord[] }> {
@@ -52,12 +58,12 @@ export function consumeMessages(
   workspaceId: string,
   topic: string,
   options: { maxMessages?: number; timeoutMs?: number } = {}
-): Promise<{ items: EventMessage[] }> {
+): Promise<ConsumeMessagesResult> {
   const params = new URLSearchParams()
   if (options.maxMessages != null) params.set('maxMessages', String(options.maxMessages))
   if (options.timeoutMs != null) params.set('timeoutMs', String(options.timeoutMs))
   const qs = params.toString()
-  return requestConsoleSessionJson<{ items: EventMessage[] }>(
+  return requestConsoleSessionJson<ConsumeMessagesResult>(
     `${topicsBase(workspaceId)}/${enc(topic)}/messages${qs ? `?${qs}` : ''}`
   )
 }

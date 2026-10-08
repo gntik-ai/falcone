@@ -251,49 +251,91 @@ async function publishToTopicRecord(ctx, t) {
   }
 }
 
-function boundedNumber(value, fallback, { min = 1, max = 100 } = {}) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(max, Math.max(min, Math.trunc(n)));
-}
-
 async function consumeTopicMessages(t, { maxMessages = 10, timeoutMs = 3000 } = {}) {
-  const consumer = getKafka().consumer({ groupId: `console-messages-${randomUUID().slice(0, 8)}` });
-  const limit = boundedNumber(maxMessages, 10, { min: 1, max: 100 });
-  const timeout = boundedNumber(timeoutMs, 3000, { min: 100, max: 30000 });
   const items = [];
-  let runError = null;
-  try {
-    await consumer.connect();
-    await consumer.subscribe({ topic: t.physical_topic_name, fromBeginning: true });
-    await new Promise((resolve) => {
-      let done = false;
-      let timer = null;
-      const finish = () => {
+  let consumer, setup, joinTimer, readTimer, totalTimer;
+  let done = false, joined = false;
+  const removeListeners = [];
+  let finish, fail;
+  const result = new Promise((resolve, reject) => {
+    finish = (status, reason) => {
+      if (done) return;
+      done = true;
+      clearTimeout(joinTimer);
+      clearTimeout(readTimer);
+      resolve({ items, status, ...(reason ? { reason } : {}) });
+    };
+    fail = (e) => {
+      if (done) return;
+      done = true;
+      reject(e);
+    };
+  });
+  // Setup and assignment share a 10s budget; teardown shares the total deadline.
+  joinTimer = setTimeout(() => finish('timeout', 'assignment'), 10000);
+  const totalExpired = new Promise((resolve) => {
+    totalTimer = setTimeout(() => {
+      finish('timeout', joined ? 'read' : 'assignment');
+      resolve();
+    }, 10000 + timeoutMs);
+  });
+  const startRead = () => {
+    if (done || joined) return;
+    joined = true;
+    clearTimeout(joinTimer);
+    readTimer = setTimeout(() => finish('timeout', 'read'), timeoutMs);
+  };
+  const start = async () => {
+    const a = await admin();
+    if (done) return;
+    const offsets = await a.fetchTopicOffsets(t.physical_topic_name);
+    if (done) return;
+    if (!offsets.length) throw new Error('topic offsets unavailable');
+    const pending = new Map(offsets.filter((o) => BigInt(o.low) < BigInt(o.high))
+      .map((o) => [o.partition, BigInt(o.high)]));
+    if (!pending.size) { finish('empty'); return; }
+    consumer = getKafka().consumer({ groupId: `console-messages-${randomUUID().slice(0, 8)}` });
+    removeListeners.push(consumer.on(consumer.events.GROUP_JOIN, startRead));
+    removeListeners.push(consumer.on(consumer.events.CRASH, ({ payload }) => fail(payload.error)));
+    setup = (async () => {
+      await consumer.connect();
+      if (done) return;
+      await consumer.subscribe({ topic: t.physical_topic_name, fromBeginning: true });
+    })();
+    await setup;
+    if (done) return;
+    await consumer.run({
+      eachMessage: async ({ message, partition }) => {
         if (done) return;
-        done = true;
-        if (timer) clearTimeout(timer);
-        resolve();
-      };
-      timer = setTimeout(finish, timeout);
-      Promise.resolve(consumer.run({
-        eachMessage: async ({ message, partition }) => {
-          if (done) return;
-          items.push({
-            key: message.key?.toString() ?? null,
-            value: safeParse(message.value?.toString() ?? ''),
-            partition,
-            offset: message.offset,
-            timestamp: message.timestamp
-          });
-          if (items.length >= limit) finish();
-        }
-      })).catch((e) => { runError = e; finish(); });
+        startRead();
+        const high = pending.get(partition);
+        if (high == null) return;
+        const offset = BigInt(message.offset);
+        if (offset < high) items.push({
+          key: message.key?.toString() ?? null,
+          value: safeParse(message.value?.toString() ?? ''),
+          partition,
+          offset: message.offset,
+          timestamp: message.timestamp
+        });
+        if (offset + 1n >= high) pending.delete(partition);
+        if (!pending.size || items.length >= maxMessages) finish('complete');
+      }
     });
-    if (runError) throw runError;
-    return items.slice(0, limit);
+  };
+  void start().catch(fail);
+  try {
+    return await result;
   } finally {
-    try { await consumer.disconnect(); } catch { /* ignore */ }
+    clearTimeout(joinTimer);
+    clearTimeout(readTimer);
+    for (const remove of removeListeners) remove();
+    const disconnect = async () => {
+      try { await setup; } catch { /* disconnect after failed setup */ }
+      if (consumer) await consumer.disconnect();
+    };
+    try { await Promise.race([disconnect(), totalExpired]); } catch { /* ignore */ }
+    clearTimeout(totalTimer);
   }
 }
 
@@ -442,12 +484,20 @@ async function eventsWorkspaceTopicPublish(ctx) {
 // GET /v1/events/workspaces/{workspaceId}/topics/{topic}/messages
 async function eventsWorkspaceTopicMessages(ctx) {
   const r = await resolveWorkspaceTopic(ctx); if (r.error) return r.error;
+  const query = ctx.query ?? {};
+  const options = {};
+  for (const key of Object.keys(query)) {
+    if (key !== 'maxMessages' && key !== 'timeoutMs') return err(400, 'VALIDATION_ERROR', `unsupported query parameter: ${key}`);
+    const max = key === 'maxMessages' ? 100 : 30000;
+    const min = key === 'maxMessages' ? 1 : 100;
+    const value = query[key];
+    if ((typeof value !== 'string' && typeof value !== 'number') || !/^[0-9]+$/.test(String(value)) || !Number.isSafeInteger(Number(value)) || Number(value) < min || Number(value) > max) {
+      return err(400, 'VALIDATION_ERROR', `${key} must be an integer between ${min} and ${max}`);
+    }
+    options[key] = Number(value);
+  }
   try {
-    const items = await consumeTopicMessages(r.t, {
-      maxMessages: ctx.query?.maxMessages,
-      timeoutMs: ctx.query?.timeoutMs
-    });
-    return ok(200, { items });
+    return ok(200, await consumeTopicMessages(r.t, options));
   } catch (e) {
     return err(502, 'CONSUME_FAILED', String(e.message ?? e));
   }

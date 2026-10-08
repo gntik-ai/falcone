@@ -55,12 +55,44 @@ describe('EventsConsole — UX enriquecida', () => {
   })
 
   it('consumes messages and shows an empty note when none', async () => {
-    mocked.consumeMessages.mockResolvedValue({ items: [] })
+    mocked.consumeMessages.mockResolvedValue({ items: [], status: 'empty' })
     render1()
     await screen.findByText('orders')
     fireEvent.click(screen.getByRole('radio', { name: /orders/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Consultar mensajes' }))
     expect(await screen.findByText('No hay mensajes.')).toBeInTheDocument()
+    expect(mocked.consumeMessages).toHaveBeenCalledWith('ws1', 'orders', { maxMessages: 10 })
+    expect(screen.queryByText(/agotó el tiempo de espera/)).not.toBeInTheDocument()
+  })
+
+  it.each([{ items: [] }, { items: [{ key: 'order-1', value: { amount: 10 }, partition: 0, offset: '0' }] }])(
+    'shows a distinct timeout notice while displaying any partial messages: %j', async ({ items }) => {
+      mocked.consumeMessages.mockResolvedValue({ items, status: 'timeout', reason: 'read' })
+      render1()
+      await screen.findByText('orders')
+      fireEvent.click(screen.getByRole('radio', { name: /orders/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Consultar mensajes' }))
+      expect(await screen.findByText(/La consulta agotó el tiempo de espera/)).toBeInTheDocument()
+      expect(screen.queryByText('No hay mensajes.')).not.toBeInTheDocument()
+      if (items.length) expect(screen.getByText(/"amount": 10/)).toBeInTheDocument()
+      expect(mocked.consumeMessages).toHaveBeenCalledWith('ws1', 'orders', { maxMessages: 10 })
+
+      mocked.consumeMessages.mockResolvedValue({ items: [], status: 'empty' })
+      fireEvent.click(screen.getByRole('button', { name: 'Consultar mensajes' }))
+      expect(await screen.findByText('No hay mensajes.')).toBeInTheDocument()
+      expect(screen.queryByText(/agotó el tiempo de espera/)).not.toBeInTheDocument()
+    }
+  )
+
+  it('displays messages from a complete read', async () => {
+    mocked.consumeMessages.mockResolvedValue({ items: [{ value: { amount: 10 }, offset: '7' }], status: 'complete' })
+    render1()
+    await screen.findByText('orders')
+    fireEvent.click(screen.getByRole('radio', { name: /orders/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Consultar mensajes' }))
+    expect(await screen.findByText(/"amount": 10/)).toBeInTheDocument()
+    expect(screen.getByText('offset=7')).toBeInTheDocument()
+    expect(screen.queryByText(/agotó el tiempo de espera/)).not.toBeInTheDocument()
   })
 
   it('crea un tópico y recarga', async () => {

@@ -79,6 +79,7 @@ Message polling returns parsed values when the Kafka value is JSON and raw strin
 
 ```json
 {
+  "status": "complete",
   "items": [
     {
       "key": "order-1",
@@ -93,8 +94,32 @@ Message polling returns parsed values when the Kafka value is JSON and raw strin
 }
 ```
 
-`maxMessages` and `timeoutMs` are accepted as query parameters. The kind handler clamps them to a
-small bounded batch so a console poll cannot create an unbounded consume loop.
+Message polling accepts only these query parameters:
+
+| Parameter | Default | Inclusive bounds |
+| --- | --- | --- |
+| `maxMessages` | 10 | Integer, 1–100 |
+| `timeoutMs` | 3000 | Integer milliseconds, 100–30000 |
+
+The read window starts after partition assignment. A separate 10000 ms budget covers Kafka
+metadata lookup, connection, subscription and group joining. Kafka work, including waiting for
+disconnect, is bounded by 10000 + `timeoutMs` ms (13000 by default, 40000 maximum), after workspace
+and topic resolution. Disconnect is always scheduled for an allocated consumer after any pending
+setup settles; cleanup that exceeds the deadline continues in the background. The console sends
+only `maxMessages` and uses the server's default window.
+
+The handler snapshots each partition's low and high offsets before consuming from the beginning.
+`status: empty` means every partition had equal low and high offsets; no consumer is allocated.
+`status: complete` means all snapshot high-water marks were reached or `maxMessages` was reached
+(a bounded sample, not a guarantee that no further messages exist). `status: timeout` preserves
+any partial `items` and means the snapshot read did not finish; `reason: assignment` indicates
+that setup or joining exhausted its budget, and `reason: read` indicates that the read window
+expired. The console displays partial messages and a distinct retry notice for a timeout.
+
+Unsupported parameters (including previously ignored `limit`, `offset`, `groupId` and
+`fromBeginning`), non-numeric values and out-of-range values return `400 VALIDATION_ERROR`
+naming the parameter before contacting Kafka. Callers using previously ignored parameters must
+remove them; values are no longer silently clamped.
 
 ## Scope and authorization
 

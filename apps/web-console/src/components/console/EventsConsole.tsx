@@ -48,6 +48,7 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
   const [messageJson, setMessageJson] = useState('{"value":{}}')
   const [messages, setMessages] = useState<EventMessage[]>([])
   const [consumed, setConsumed] = useState(false)
+  const [consumeTimedOut, setConsumeTimedOut] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [operation, setOperation] = useState<EventOperation | null>(null)
@@ -123,9 +124,10 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
     setStatus(null)
     setOperation('consume')
     try {
-      const result = await consumeMessages(workspaceId, selected, { maxMessages: 10, timeoutMs: 3000 })
+      const result = await consumeMessages(workspaceId, selected, { maxMessages: 10 })
       setMessages(result.items)
       setConsumed(true)
+      setConsumeTimedOut(result.status === 'timeout')
     } catch (caught) {
       setError(errorMessage(caught))
     } finally {
@@ -302,9 +304,12 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
                 {operation === 'consume' ? 'Consultando…' : 'Consultar mensajes'}
               </Button>
 
+              {operation !== 'consume' && consumeTimedOut ? (
+                <p role="status" className={emptyStateClassName}>La consulta agotó el tiempo de espera. Puede haber mensajes pendientes; vuelve a consultar.</p>
+              ) : null}
               {operation === 'consume' ? (
                 <p role="status" className="text-sm text-muted-foreground">Consultando mensajes…</p>
-              ) : consumed && messages.length === 0 ? (
+              ) : consumed && messages.length === 0 && !consumeTimedOut ? (
                 <p className={emptyStateClassName}>No hay mensajes.</p>
               ) : messages.length > 0 ? (
                 <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
@@ -320,12 +325,12 @@ export function EventsConsole({ workspaceId, canManageEvents = true }: EventsCon
                     </li>
                   ))}
                 </ul>
-              ) : (
+              ) : !consumeTimedOut ? (
                 <div className={emptyStateClassName}>
                   <Inbox className="mb-2 h-4 w-4" aria-hidden="true" />
                   <p>Todavía no se consultaron mensajes.</p>
                 </div>
-              )}
+              ) : null}
             </div>
           </section>
         </div>
