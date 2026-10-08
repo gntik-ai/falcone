@@ -1528,6 +1528,56 @@
         ],
         "type": "object"
       },
+      "SecretTeardownIncomplete": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "const": "SECRET_TEARDOWN_INCOMPLETE"
+          },
+          "message": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "removed": {
+            "additionalProperties": false,
+            "properties": {
+              "secrets": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "secrets"
+            ],
+            "type": "object"
+          },
+          "residual": {
+            "additionalProperties": false,
+            "properties": {
+              "secrets": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "secrets"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "removed",
+          "residual"
+        ],
+        "type": "object"
+      },
       "StorageCapabilityBaseline": {
         "additionalProperties": false,
         "properties": {
@@ -2887,6 +2937,13 @@
                   "null"
                 ]
               },
+              "secrets": {
+                "description": "Destroyed secret names (workspace deletion) or workspaceId/name paths (tenant purge).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "topics": {
                 "items": {
                   "type": "string"
@@ -2905,7 +2962,8 @@
               "buckets",
               "topics",
               "mongoDatabases",
-              "mongoDatabasesRetained"
+              "mongoDatabasesRetained",
+              "secrets"
             ],
             "type": "object"
           },
@@ -2917,10 +2975,22 @@
                   "type": "string"
                 },
                 "type": "array"
+              },
+              "secrets": {
+                "description": "Secret names or unverified prefixes; empty when the configured backend is verified empty.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "secretsBackend": {
+                "const": "disabled",
+                "description": "Present when no secret backend is configured; purge proceeds without backend verification."
               }
             },
             "required": [
-              "knativeServices"
+              "knativeServices",
+              "secrets"
             ],
             "type": "object"
           },
@@ -6242,7 +6312,7 @@
                 }
               }
             },
-            "description": "Tenant purge completed."
+            "description": "Tenant purge completed. Workspace secret KV data and metadata are destroyed before registry deletion. A disabled backend is disclosed in residual.secretsBackend."
           },
           "202": {
             "content": {
@@ -6313,6 +6383,16 @@
               }
             },
             "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretTeardownIncomplete"
+                }
+              }
+            },
+            "description": "SECRET_TEARDOWN_INCOMPLETE: secret destruction or verification failed. Registry rows are retained; retry the same authorized purge or delete request. Residual entries are names or unverified prefixes, never values."
           },
           "503": {
             "content": {

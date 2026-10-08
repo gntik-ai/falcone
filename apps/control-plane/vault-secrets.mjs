@@ -386,6 +386,7 @@ export function createWorkspaceSecretStore(client) {
       catch (error) { logSecretTeardownFailure('delete', error); failed.push(name); }
     }
     const verified = await collect(prefix);
+    // A failed re-list leaves every previously observed name in that subtree unverified.
     const unverified = initial.names.filter((name) => verified.unknown.some((scope) => scope === `${prefix}/` || name.startsWith(scope)));
     const residual = [...new Set([...failed, ...initial.unknown, ...verified.names, ...verified.unknown, ...unverified])].sort();
     return { removed: removed.filter((name) => !residual.includes(name)), residual };
