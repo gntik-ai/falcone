@@ -116,6 +116,11 @@ function secretMetaOut(meta, ws, refCount) {
   };
 }
 
+// Audit attribution comes from the verified workspace, including bodyless and error responses.
+function auditedSecretResult(result, ws) {
+  return { ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } };
+}
+
 // Resolve the function's invocation input from the request body. The documented body is the
 // `{ parameters: {...} }` envelope (OpenAPI FunctionInvocationWriteRequest); a bare top-level
 // input map is also accepted so a body like {n:21} is honored, not silently dropped. Envelope-only
@@ -786,25 +791,25 @@ async function secretSet(ctx) {
   // tenant_developer) would otherwise reach this write. Gate AFTER the 404 so cross-tenant stays 404
   // (no existence leak) and own-tenant-non-admin is 403, mirroring b-handlers' canManageTenantId.
   if (!canManageTenant(ctx.identity, ws.tenant_id)) {
-    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+    return auditedSecretResult(err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin'), ws);
   }
   const b = ctx.body ?? {};
   const name = b.secretName ?? b.name;
   const value = b.secretValue ?? b.value;
   const description = typeof b.description === 'string' ? b.description : undefined;
-  if (!vault.validName(name)) return err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$');
+  if (!vault.validName(name)) return auditedSecretResult(err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$'), ws);
   const valueError = validateSecretValue(value);
-  if (valueError) return valueError;
+  if (valueError) return auditedSecretResult(valueError, ws);
   try {
     // Create-only: do not overwrite an existing secret — the explicit PUT replace path is required
     // to change a value. The existing value is preserved.
     if (await vault.exists(ws.tenant_id, ws.id, name)) {
-      return err(409, 'SECRET_ALREADY_EXISTS', `secret ${name} already exists; use PUT to replace it`);
+      return auditedSecretResult(err(409, 'SECRET_ALREADY_EXISTS', `secret ${name} already exists; use PUT to replace it`), ws);
     }
     const meta = await vault.set(ws.tenant_id, ws.id, name, value, description);
     const refCount = await resolvedRefCount(ctx, ws, name);
-    return ok(201, secretMetaOut(meta, ws, refCount));
-  } catch (e) { return err(502, 'SECRET_WRITE_FAILED', String(e.message ?? e)); }
+    return auditedSecretResult(ok(201, secretMetaOut(meta, ws, refCount)), ws);
+  } catch (e) { return auditedSecretResult(err(502, 'SECRET_WRITE_FAILED', String(e.message ?? e)), ws); }
 }
 
 // PUT /v1/functions/workspaces/{workspaceId}/secrets/{secretName}  { secretValue, description? }
@@ -853,8 +858,8 @@ async function secretList(ctx) {
     for (const meta of metas) {
       items.push(secretMetaOut(meta, ws, await resolvedRefCount(ctx, ws, meta.secretName ?? meta.name)));
     }
-    return ok(200, { items, page: { size: items.length } });
-  } catch (e) { return err(502, 'SECRET_LIST_FAILED', String(e.message ?? e)); }
+    return auditedSecretResult(ok(200, { items, page: { size: items.length } }), ws);
+  } catch (e) { return auditedSecretResult(err(502, 'SECRET_LIST_FAILED', String(e.message ?? e)), ws); }
 }
 
 // GET /v1/functions/workspaces/{workspaceId}/secrets/{secretName}  (metadata only — never the value)
@@ -865,9 +870,9 @@ async function secretGet(ctx) {
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
   try {
     const meta = await vault.getMeta(ws.tenant_id, ws.id, ctx.params.secretName);
-    if (!meta) return err(404, 'SECRET_NOT_FOUND', `secret ${ctx.params.secretName} not found`);
-    return ok(200, secretMetaOut(meta, ws, await resolvedRefCount(ctx, ws, ctx.params.secretName)));
-  } catch (e) { return err(502, 'SECRET_READ_FAILED', String(e.message ?? e)); }
+    if (!meta) return auditedSecretResult(err(404, 'SECRET_NOT_FOUND', `secret ${ctx.params.secretName} not found`), ws);
+    return auditedSecretResult(ok(200, secretMetaOut(meta, ws, await resolvedRefCount(ctx, ws, ctx.params.secretName))), ws);
+  } catch (e) { return auditedSecretResult(err(502, 'SECRET_READ_FAILED', String(e.message ?? e)), ws); }
 }
 
 // DELETE /v1/functions/workspaces/{workspaceId}/secrets/{secretName}
@@ -879,17 +884,17 @@ async function secretDelete(ctx) {
   // Role gate (#798): deleting a secret requires an admin tenant role (see secretSet). After the 404
   // so cross-tenant stays 404; own-tenant non-admin is 403, before the vault delete side effect.
   if (!canManageTenant(ctx.identity, ws.tenant_id)) {
-    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+    return auditedSecretResult(err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin'), ws);
   }
   const name = ctx.params.secretName;
-  if (!vault.validName(name)) return err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$');
+  if (!vault.validName(name)) return auditedSecretResult(err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$'), ws);
   try {
     if (!(await vault.exists(ws.tenant_id, ws.id, name))) {
-      return err(404, 'SECRET_NOT_FOUND', `secret ${name} not found`);
+      return auditedSecretResult(err(404, 'SECRET_NOT_FOUND', `secret ${name} not found`), ws);
     }
     await vault.delete(ws.tenant_id, ws.id, name);
-    return ok(204, null);
-  } catch (e) { return err(502, 'SECRET_DELETE_FAILED', String(e.message ?? e)); }
+    return auditedSecretResult(ok(204, null), ws);
+  } catch (e) { return auditedSecretResult(err(502, 'SECRET_DELETE_FAILED', String(e.message ?? e)), ws); }
 }
 
 // ---- function definition export / import (#683, data-export-import-clone) ---

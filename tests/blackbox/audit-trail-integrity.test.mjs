@@ -14,8 +14,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { auditCanonical, computeRowHash, verifyAuditChain } from '../../apps/control-plane/audit-hash.mjs';
-import { recordAuditEvent, auditRowToRecord } from '../../apps/control-plane/audit-store.mjs';
-import { auditEventForRoute, AUDITABLE_LOCAL_HANDLERS } from '../../apps/control-plane/audit-writer.mjs';
+import { recordAuditEvent, queryAuditEvents, auditRowToRecord } from '../../apps/control-plane/audit-store.mjs';
+import { auditEventForRoute, recordRouteAudit, AUDITABLE_LOCAL_HANDLERS } from '../../apps/control-plane/audit-writer.mjs';
+import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
 
 // ---- pure hash helpers -----------------------------------------------------
 
@@ -108,6 +110,13 @@ function chainPool() {
       audit.push(row);
       return { rows: [row] };
     }
+    if (s.includes('FROM plan_audit_events')) {
+      let rows = audit.filter((r) => r.tenant_id === params[0]);
+      if (s.includes("new_state->>'workspaceId' =")) {
+        rows = rows.filter((r) => r.new_state.workspaceId === params[1]);
+      }
+      return { rows: rows.slice().reverse().slice(0, params.at(-1)) };
+    }
     return { rows: [] };
   };
   const client = { query: q, release() {} };
@@ -164,4 +173,190 @@ test('bbx-audit-secret-handlers: secret-access handlers are auditable', () => {
     assert.ok(desc, `${lh} yields an audit descriptor`);
     assert.equal(desc.tenantId, 'ten-a', `${lh} scoped to the actor tenant`);
   }
+});
+
+// Resolved workspace-secret scope (#974). Only the persistence/vault boundaries are faked;
+// the real handlers and writer must attribute bodyless, collection, and error responses.
+const SECRET_ADMIN = { actorType: 'superadmin', sub: 'platform-admin' };
+const SECRET_OWNER = { actorType: 'tenant_owner', sub: 'owner', tenantId: 'ten-a' };
+const SECRET_META = { secretName: 'api_key', name: 'api_key', timestamps: { createdAt: null, updatedAt: null } };
+const SECRET_META_BODY = '{"secretName":"api_key","name":"api_key","tenantId":"ten-a","workspaceId":"ws-a","resolvedRefCount":0,"timestamps":{"createdAt":null,"updatedAt":null}}';
+
+function secretContext({ identity = SECRET_ADMIN, body = {}, params = {}, vault = {} } = {}) {
+  return {
+    pool: {}, identity, body, params: { workspaceId: 'ws-a', secretName: 'api_key', ...params },
+    store: {
+      async getWorkspace() { return { id: 'ws-a', tenant_id: 'ten-a' }; },
+      async listFnActions() { return []; },
+    },
+    vaultStore: {
+      validName: (name) => /^[a-z][a-z0-9_-]{0,62}$/.test(String(name ?? '')),
+      async exists() { return false; },
+      async set() { return SECRET_META; },
+      async replace() { return SECRET_META; },
+      async list() { return [SECRET_META]; },
+      async getMeta() { return SECRET_META; },
+      async delete() {},
+      ...vault,
+    },
+  };
+}
+
+function secretDescriptor(handler, ctx, result) {
+  assert.ok(!JSON.stringify(result.body).includes('auditScope'), 'audit scope is internal to dispatch');
+  assert.deepEqual(result.headers ?? {}, {}, 'secret routes retain their existing response headers');
+  return auditEventForRoute(routes.find((r) => r.localHandler === handler), ctx, result);
+}
+
+test('bbx-974-list: superadmin collection and vault error belong to the resolved workspace', async () => {
+  for (const [vault, status, outcome, body] of [
+    [{}, 200, 'succeeded', `{"items":[${SECRET_META_BODY}],"page":{"size":1}}`],
+    [{ async list() { throw new Error('vault unavailable'); } }, 502, 'error', '{"code":"SECRET_LIST_FAILED","message":"vault unavailable"}'],
+  ]) {
+    const ctx = secretContext({ vault, params: { workspaceId: 'workspace-alias' }, body: { tenantId: 'forged', workspaceId: 'forged' } });
+    const result = await FN_HANDLERS.secretList(ctx);
+    assert.equal(result.statusCode, status);
+    assert.equal(JSON.stringify(result.body), body, 'HTTP body stays byte-identical');
+    const desc = secretDescriptor('secretList', ctx, result);
+    assert.ok(desc, 'superadmin list must yield an audit descriptor');
+    assert.deepEqual(result.auditScope, { tenantId: 'ten-a', workspaceId: 'ws-a' });
+    assert.deepEqual([desc.tenantId, desc.workspaceId, desc.actorId, desc.actionType, desc.outcome],
+      ['ten-a', 'ws-a', 'platform-admin', 'workspace.secret.list', outcome]);
+  }
+});
+
+test('bbx-974-set: superadmin create, duplicate, validation and vault errors retain verified scope', async () => {
+  for (const [body, vault, status, outcome, responseBody] of [
+    [{ secretName: 'api_key', secretValue: 'sentinel-974' }, {}, 201, 'succeeded', SECRET_META_BODY],
+    [{ secretName: 'api_key', secretValue: 'sentinel-974' }, { async exists() { return true; } }, 409, 'failed', '{"code":"SECRET_ALREADY_EXISTS","message":"secret api_key already exists; use PUT to replace it"}'],
+    [{ secretName: 'INVALID', secretValue: 'sentinel-974' }, {}, 400, 'failed', '{"code":"VALIDATION_ERROR","message":"secret name must match ^[a-z][a-z0-9_-]{0,62}$"}'],
+    [{ secretName: 'api_key', secretValue: '' }, {}, 400, 'failed', '{"code":"VALIDATION_ERROR","message":"secret value is required"}'],
+    [{ secretName: 'api_key', secretValue: 'x'.repeat(65536) }, {}, 413, 'failed', '{"code":"VALUE_TOO_LARGE","message":"secret value exceeds 65535 characters"}'],
+    [{ secretName: 'api_key', secretValue: 'sentinel-974' }, { async set() { throw new Error('vault unavailable'); } }, 502, 'error', '{"code":"SECRET_WRITE_FAILED","message":"vault unavailable"}'],
+  ]) {
+    const ctx = secretContext({ body: { tenantId: 'forged', workspaceId: 'forged', ...body }, vault });
+    const result = await FN_HANDLERS.secretSet(ctx);
+    assert.equal(result.statusCode, status);
+    assert.equal(JSON.stringify(result.body), responseBody);
+    assert.deepEqual(result.auditScope, { tenantId: 'ten-a', workspaceId: 'ws-a' });
+    const desc = secretDescriptor('secretSet', ctx, result);
+    assert.deepEqual([desc?.tenantId, desc?.workspaceId, desc?.actorId, desc?.actionType, desc?.outcome],
+      ['ten-a', 'ws-a', 'platform-admin', 'workspace.secret.set', outcome]);
+    assert.ok(!JSON.stringify(desc).includes('sentinel-974'));
+  }
+});
+
+test('bbx-974-get: superadmin metadata, missing secret and vault error retain verified scope', async () => {
+  for (const [vault, status, outcome, body] of [
+    [{}, 200, 'succeeded', SECRET_META_BODY],
+    [{ async getMeta() { return null; } }, 404, 'failed', '{"code":"SECRET_NOT_FOUND","message":"secret api_key not found"}'],
+    [{ async getMeta() { throw new Error('vault unavailable'); } }, 502, 'error', '{"code":"SECRET_READ_FAILED","message":"vault unavailable"}'],
+  ]) {
+    const ctx = secretContext({ vault });
+    const result = await FN_HANDLERS.secretGet(ctx);
+    assert.equal(result.statusCode, status);
+    assert.equal(JSON.stringify(result.body), body);
+    assert.deepEqual(result.auditScope, { tenantId: 'ten-a', workspaceId: 'ws-a' });
+    const desc = secretDescriptor('secretGet', ctx, result);
+    assert.deepEqual([desc?.tenantId, desc?.workspaceId, desc?.actorId, desc?.actionType, desc?.outcome],
+      ['ten-a', 'ws-a', 'platform-admin', 'workspace.secret.get', outcome]);
+  }
+});
+
+test('bbx-974-delete: superadmin bodyless success, missing secret, validation and vault errors retain verified scope', async () => {
+  for (const [params, vault, status, outcome, body] of [
+    [{}, { async exists() { return true; } }, 204, 'succeeded', 'null'],
+    [{}, {}, 404, 'failed', '{"code":"SECRET_NOT_FOUND","message":"secret api_key not found"}'],
+    [{ secretName: 'INVALID' }, {}, 400, 'failed', '{"code":"VALIDATION_ERROR","message":"secret name must match ^[a-z][a-z0-9_-]{0,62}$"}'],
+    [{}, { async exists() { return true; }, async delete() { throw new Error('vault unavailable'); } }, 502, 'error', '{"code":"SECRET_DELETE_FAILED","message":"vault unavailable"}'],
+  ]) {
+    const ctx = secretContext({ params, vault });
+    const result = await FN_HANDLERS.secretDelete(ctx);
+    assert.equal(result.statusCode, status);
+    assert.equal(JSON.stringify(result.body), body);
+    const desc = secretDescriptor('secretDelete', ctx, result);
+    assert.ok(desc, 'superadmin delete must yield an audit descriptor');
+    assert.deepEqual(result.auditScope, { tenantId: 'ten-a', workspaceId: 'ws-a' });
+    assert.deepEqual([desc.tenantId, desc.workspaceId, desc.actorId, desc.actionType, desc.outcome],
+      ['ten-a', 'ws-a', 'platform-admin', 'workspace.secret.delete', outcome]);
+  }
+});
+
+test('bbx-974-sequence: superadmin and tenant-owner operations yield the same tenant-visible, value-free audit trail', async () => {
+  const expected = [
+    ['workspace.secret.set', 'succeeded', 'ten-a', 'ws-a'],
+    ['workspace.secret.get', 'succeeded', 'ten-a', 'ws-a'],
+    ['workspace.secret.list', 'succeeded', 'ten-a', 'ws-a'],
+    ['workspace.secret.set', 'failed', 'ten-a', 'ws-a'],
+    ['workspace.secret.delete', 'succeeded', 'ten-a', 'ws-a'],
+    ['workspace.secret.delete', 'failed', 'ten-a', 'ws-a'],
+  ];
+  for (const identity of [SECRET_ADMIN, SECRET_OWNER]) {
+    const pool = chainPool();
+    let present = false;
+    const vault = {
+      async exists() { return present; },
+      async set() { present = true; return SECRET_META; },
+      async delete() { present = false; },
+    };
+    const descriptors = [];
+    const operations = [
+      ['secretSet', 201], ['secretGet', 200], ['secretList', 200],
+      ['secretSet', 409], ['secretDelete', 204], ['secretDelete', 404],
+    ];
+    for (const [handler, status] of operations) {
+      const ctx = secretContext({ identity, vault, body: { secretName: 'api_key', secretValue: 'sentinel-974' } });
+      const result = await FN_HANDLERS[handler](ctx);
+      assert.equal(result.statusCode, status);
+      assert.ok(!JSON.stringify(result.body).includes('auditScope'));
+      assert.ok(!JSON.stringify(result.headers ?? {}).includes('auditScope'));
+      const desc = secretDescriptor(handler, ctx, result);
+      assert.equal(desc?.actorId, identity.sub);
+      assert.ok(!JSON.stringify(desc).includes('sentinel-974'));
+      descriptors.push([desc.actionType, desc.outcome, desc.tenantId, desc.workspaceId]);
+      await recordRouteAudit(pool, routes.find((r) => r.localHandler === handler), ctx, result, 'corr-974');
+    }
+    assert.deepEqual(descriptors, expected);
+    const rows = await queryAuditEvents(pool, { tenantId: 'ten-a', workspaceId: 'ws-a' });
+    assert.deepEqual(rows.map((r) => [r.action_type, r.outcome, r.tenant_id, r.new_state.workspaceId]).reverse(), expected);
+    assert.ok(rows.every((r) => r.actor_id === identity.sub));
+    assert.ok(!JSON.stringify(rows).includes('sentinel-974'), 'no persisted column carries the value');
+    assert.equal((await queryAuditEvents(pool, { tenantId: 'ten-a' })).length, 6);
+    assert.deepEqual(await queryAuditEvents(pool, { tenantId: 'ten-b', workspaceId: 'ws-a' }), []);
+    assert.deepEqual(await queryAuditEvents(pool, { tenantId: 'ten-a', workspaceId: 'ws-b' }), []);
+  }
+});
+
+test('bbx-974-isolation: a foreign workspace never supplies audit scope or leaks its owning tenant', async () => {
+  for (const handler of ['secretSet', 'secretReplace', 'secretGet', 'secretList', 'secretDelete']) {
+    const ctx = secretContext({
+      identity: { actorType: 'tenant_member', sub: 'outsider', tenantId: 'ten-b' },
+      body: { secretName: 'api_key', secretValue: 'sentinel-974', tenantId: 'ten-a' },
+    });
+    const result = await FN_HANDLERS[handler](ctx);
+    assert.equal(result.statusCode, 404);
+    assert.equal(JSON.stringify(result.body), '{"code":"WORKSPACE_NOT_FOUND","message":"workspace ws-a not found"}');
+    assert.equal(result.auditScope, undefined);
+    assert.notEqual(secretDescriptor(handler, ctx, result)?.tenantId, 'ten-a');
+  }
+});
+
+test('bbx-974-denied: own-tenant forbidden mutations retain resolved scope and existing role-gate response', async () => {
+  for (const handler of ['secretSet', 'secretDelete']) {
+    const ctx = secretContext({ identity: { actorType: 'tenant_member', sub: 'member', tenantId: 'ten-a' } });
+    const result = await FN_HANDLERS[handler](ctx);
+    assert.equal(result.statusCode, 403);
+    assert.equal(JSON.stringify(result.body), '{"code":"FORBIDDEN","message":"requires superadmin or tenant owner/admin"}');
+    assert.deepEqual(result.auditScope, { tenantId: 'ten-a', workspaceId: 'ws-a' });
+    assert.equal(secretDescriptor(handler, ctx, result)?.outcome, 'denied');
+  }
+});
+
+test('bbx-974-replace-body: the fifth secret route keeps its existing body and headers without audit scope', async () => {
+  const ctx = secretContext({ vault: { async exists() { return true; } }, body: { secretValue: 'sentinel-974' } });
+  const result = await FN_HANDLERS.secretReplace(ctx);
+  assert.equal(result.statusCode, 200);
+  assert.equal(JSON.stringify(result.body), SECRET_META_BODY);
+  assert.deepEqual(result.headers ?? {}, {});
+  assert.equal(secretDescriptor('secretReplace', ctx, result), null, 'PUT audit allow-list is a separate issue');
 });
