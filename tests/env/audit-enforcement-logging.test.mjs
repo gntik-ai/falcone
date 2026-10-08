@@ -7,6 +7,7 @@
 // Run: PGHOST=localhost PGPORT=55432 PGUSER=falcone PGPASSWORD=falcone node --test <file>
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 import { recordQuotaEnforcement, recordRouteDenial } from '../../apps/control-plane/audit-writer.mjs';
 
@@ -22,6 +23,8 @@ const url = (db) => ADMIN_URL.replace(/\/[^/?]+(\?.*)?$/, `/${db}$1`);
 const TEN_A = '11111111-1111-1111-1111-111111111111';
 const TEN_B = '22222222-2222-2222-2222-222222222222';
 const WS_A = '33333333-3333-3333-3333-333333333333';
+const scopeMigration = await readFile(new URL('../../packages/provisioning-orchestrator/src/migrations/093-scope-enforcement.sql', import.meta.url), 'utf8');
+const roleMigration = await readFile(new URL('../../packages/provisioning-orchestrator/src/migrations/123-authorization-denial-audit.sql', import.meta.url), 'utf8');
 
 // Exact migration DDL (093 scope_enforcement_denials, 103 quota_enforcement_log + its FK catalog).
 const SCHEMA = `
@@ -77,6 +80,7 @@ before(async () => {
   await bootstrap.query(`CREATE DATABASE ${PROBE_DB}`);
   pool = new Pool({ connectionString: url(PROBE_DB), max: 2 });
   await pool.query(SCHEMA);
+  await pool.query(roleMigration);
 });
 
 after(async () => {
@@ -112,7 +116,8 @@ test('recordRouteDenial writes a scope-enforcement denial for a 403 (correlated,
   assert.equal(r.rows[0].tenant_id, TEN_A);
   assert.equal(r.rows[0].actor_id, 'acme-ops');
   assert.equal(r.rows[0].actor_type, 'user');
-  assert.equal(r.rows[0].denial_type, 'SCOPE_INSUFFICIENT');
+  assert.equal(r.rows[0].denial_type, 'ROLE_INSUFFICIENT');
+  assert.equal(r.rows[0].workspace_id, null);
   assert.equal(r.rows[0].request_path, '/v1/workspaces/{workspaceId}');
 });
 
@@ -139,4 +144,39 @@ test('recordRouteDenial cannot attribute a denial without a tenant/actor → rec
   const out = await recordRouteDenial(pool, { method: 'GET', path: '/x' },
     { identity: { actorType: 'superadmin' }, params: {} }, { statusCode: 403 }, 'corr-na-001', silent);
   assert.equal(out, null);
+});
+
+test('#958: migration supports fresh and populated 093 schemas, remains idempotent and preserves legacy rows', async () => {
+  const client = await pool.connect();
+  try {
+    for (const legacy of [false, true]) {
+      await client.query('BEGIN');
+      await client.query('CREATE SCHEMA denial_migration_probe');
+      await client.query('SET LOCAL search_path TO denial_migration_probe, public');
+      await client.query(scopeMigration);
+      if (legacy) {
+        await client.query(`INSERT INTO scope_enforcement_denials
+          (tenant_id, actor_id, actor_type, denial_type, http_method, request_path, correlation_id)
+          VALUES ($1, 'legacy-actor', 'user', 'SCOPE_INSUFFICIENT', 'GET', '/legacy', 'legacy-corr')`, [TEN_A]);
+      }
+      await client.query(roleMigration);
+      await client.query(roleMigration);
+      const row = await recordRouteDenial(client, { method: 'GET', path: '/v1/plans', auth: 'superadmin' },
+        { identity: { tenantId: TEN_A, sub: 'actor', isServiceAccount: true } }, { statusCode: 403 }, 'new-role', silent);
+      assert.equal(row.denial_type, 'ROLE_INSUFFICIENT');
+      assert.equal(row.required_role, 'superadmin');
+      const old = await client.query("SELECT denial_type, required_role FROM scope_enforcement_denials WHERE correlation_id = 'legacy-corr'");
+      assert.deepEqual(old.rows, legacy ? [{ denial_type: 'SCOPE_INSUFFICIENT', required_role: null }] : []);
+      await client.query('SAVEPOINT invalid_type');
+      await assert.rejects(client.query(`INSERT INTO scope_enforcement_denials
+        (tenant_id, actor_id, actor_type, denial_type, http_method, request_path, correlation_id)
+        VALUES ($1, 'actor', 'user', 'MADE_UP', 'GET', '/invalid', 'invalid-corr')`, [TEN_A]),
+      (error) => error.code === '23514');
+      await client.query('ROLLBACK TO SAVEPOINT invalid_type');
+      await client.query('ROLLBACK');
+    }
+  } finally {
+    await client.query('ROLLBACK');
+    client.release();
+  }
 });

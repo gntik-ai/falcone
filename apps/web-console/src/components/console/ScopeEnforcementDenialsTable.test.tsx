@@ -19,6 +19,12 @@ describe('ScopeEnforcementDenialsTable', () => {
     expect(screen.getByText(/POST \/v1\/functions\/1\/deploy/)).toBeInTheDocument()
   })
 
+  it('[#958] renders a role denial with the required role', () => {
+    render(<ScopeEnforcementDenialsTable denials={[{ ...rows[0], denial_type: 'ROLE_INSUFFICIENT', required_role: 'superadmin', missing_scopes: [] }]} isLoading={false} hasMore={false} isSuperadmin />)
+    expect(screen.getByText('ROLE_INSUFFICIENT')).toBeInTheDocument()
+    expect(screen.getByText('superadmin')).toBeInTheDocument()
+  })
+
   it('hides tenant column when not superadmin', () => {
     render(<ScopeEnforcementDenialsTable denials={rows as any} isLoading={false} hasMore={false} isSuperadmin={false} />)
     expect(screen.queryByText('Tenant')).toBeNull()

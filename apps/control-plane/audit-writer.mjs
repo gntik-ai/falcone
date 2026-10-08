@@ -134,22 +134,25 @@ export async function recordRouteAudit(db, route, ctx, result, correlationId, lo
 export async function recordScopeDenial(db, {
   tenantId, workspaceId = null, actorId, actorType = 'user', denialType = 'SCOPE_INSUFFICIENT',
   httpMethod, requestPath, requiredScopes = [], presentedScopes = [], missingScopes = [],
-  requiredEntitlement = null, currentPlanId = null, sourceIp = null,
+  requiredEntitlement = null, currentPlanId = null, sourceIp = null, requiredRole = null,
   correlationId, deniedAt = new Date().toISOString()
 } = {}, log = console) {
   try {
     if (!tenantId || !actorId || !correlationId) return null;
+    // A role refusal has no scope evidence; do not invent a scope failure (#958).
+    if (denialType === 'SCOPE_INSUFFICIENT'
+      && !requiredScopes?.length && !missingScopes?.length) denialType = 'ROLE_INSUFFICIENT';
     const res = await db.query(
       `INSERT INTO scope_enforcement_denials (
         id, tenant_id, workspace_id, actor_id, actor_type, denial_type, http_method, request_path,
         required_scopes, presented_scopes, missing_scopes, required_entitlement, current_plan_id,
-        source_ip, correlation_id, denied_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        source_ip, correlation_id, denied_at, required_role
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
       ON CONFLICT (correlation_id, denied_at) DO NOTHING
       RETURNING *`,
       [randomUUID(), tenantId, workspaceId, actorId, actorType, denialType, httpMethod ?? 'GET',
         requestPath ?? '/', requiredScopes ?? [], presentedScopes ?? [], missingScopes ?? [],
-        requiredEntitlement, currentPlanId, sourceIp, correlationId, deniedAt]
+        requiredEntitlement, currentPlanId, sourceIp, correlationId, deniedAt, requiredRole]
     );
     return res.rows[0] ?? null;
   } catch (e) {
@@ -197,26 +200,37 @@ function denialActorType(actorType) {
   return 'user';
 }
 
-// Record a scope-enforcement denial for a dispatched local action that returned 403
+// Record an authorization denial from any dispatch path that returned 403 (#958)
 // (best-effort). Attributed to the caller's verified tenant + actor and the request
 // correlation id (generated if absent), so a tenant's audit query surfaces its own denied
-// attempts. A non-403 result, or an action with no attributable tenant/actor, records nothing.
+// attempts. Unattributable denials are logged without request or credential material.
 export async function recordRouteDenial(db, route, ctx, result, correlationId, log = console) {
   try {
     if ((result?.statusCode ?? 200) !== 403) return null;
     const identity = ctx.identity ?? {};
     const tenantId = identity.tenantId ?? null;
     const actorId = identity.sub ?? identity.actorId ?? null;
-    if (!tenantId || !actorId) return null; // cannot attribute (e.g. unauthenticated/superadmin)
+    const actorType = identity.isServiceAccount ? 'service_account' : denialActorType(identity.actorType);
+    const requestCorrelationId = correlationId || randomUUID();
+    if (!tenantId || !actorId) {
+      log.warn?.(JSON.stringify({
+        event: 'authorization_denial_unattributed', tenant_id: tenantId, actor_id: actorId,
+        actor_type: actorType, http_method: ctx.req?.method ?? route?.method ?? 'GET',
+        request_path: route?.path ?? '/', required_role: route?.auth ?? null,
+        correlation_id: requestCorrelationId
+      }));
+      return null;
+    }
     return await recordScopeDenial(db, {
       tenantId,
-      workspaceId: ctx.params?.workspaceId ?? identity.workspaceId ?? null,
+      workspaceId: identity.workspaceId ?? null,
       actorId,
-      actorType: denialActorType(identity.actorType),
-      denialType: 'SCOPE_INSUFFICIENT',
-      httpMethod: route?.method ?? ctx.req?.method ?? 'GET',
+      actorType,
+      denialType: 'ROLE_INSUFFICIENT',
+      requiredRole: route?.auth ?? null,
+      httpMethod: ctx.req?.method ?? route?.method ?? 'GET',
       requestPath: route?.path ?? '/',
-      correlationId: correlationId ?? randomUUID(),
+      correlationId: requestCorrelationId,
     }, log);
   } catch (e) {
     log.warn?.(`[control-plane] route denial write skipped: ${e?.message ?? e}`);

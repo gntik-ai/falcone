@@ -35,12 +35,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFile } from 'node:fs/promises';
 
 import { GOVERNANCE_MIGRATIONS, applyGovernanceSchema, forwardMigration } from '../../apps/control-plane/governance-schema.mjs';
 import { main as asyncOperationQueryAction } from '../../packages/provisioning-orchestrator/src/actions/async-operation-query.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
+
+test('#958: authorization denial migration is required by both fail-closed schema gates', async () => {
+  const migration = 'packages/provisioning-orchestrator/src/migrations/123-authorization-denial-audit.sql';
+  assert.ok(GOVERNANCE_MIGRATIONS.includes(migration));
+  assert.ok(GOVERNANCE_MIGRATIONS.indexOf(migration) > GOVERNANCE_MIGRATIONS.findIndex((path) => path.includes('/122-')));
+  const required = (await readFile(resolve(REPO_ROOT, 'apps/control-plane/required-migrations.txt'), 'utf8'))
+    .split('\n').filter((line) => line && !line.startsWith('#'));
+  assert.ok(required.includes(migration));
+  assert.ok(required.indexOf(migration) > required.findIndex((path) => path.includes('/122-')));
+});
 
 // A pool that records the SQL it would execute; reads the real migration files.
 async function runBootstrap() {

@@ -5,8 +5,9 @@ import { ConsoleScopeEnforcementPage } from './ConsoleScopeEnforcementPage'
 vi.mock('@/lib/console-scope-enforcement', () => ({
   fetchDenials: vi.fn(async () => ({ denials: [
     { tenant_id: 'tenant-1', actor_id: 'actor-1', actor_type: 'user', denial_type: 'CONFIG_ERROR', http_method: 'GET', request_path: '/v1/workspaces/ws-1', correlation_id: 'corr-1', denied_at: '2026-03-31T00:00:00Z' },
-    { tenant_id: 'tenant-1', actor_id: 'actor-1', actor_type: 'user', denial_type: 'SCOPE_INSUFFICIENT', http_method: 'POST', request_path: '/v1/functions/1/deploy', correlation_id: 'corr-2', denied_at: '2026-03-31T00:10:00Z' }
-  ], nextCursor: null, totalInWindow: 2 }))
+    { tenant_id: 'tenant-1', actor_id: 'actor-1', actor_type: 'user', denial_type: 'SCOPE_INSUFFICIENT', http_method: 'POST', request_path: '/v1/functions/1/deploy', correlation_id: 'corr-2', denied_at: '2026-03-31T00:10:00Z' },
+    { tenant_id: 'tenant-1', actor_id: 'actor-1', actor_type: 'service_account', denial_type: 'ROLE_INSUFFICIENT', http_method: 'GET', request_path: '/v1/plans', correlation_id: 'corr-3', denied_at: '2026-03-31T00:15:00Z' }
+  ], nextCursor: null, totalInWindow: 3 }))
 }))
 
 describe('ConsoleScopeEnforcementPage', () => {
@@ -17,6 +18,11 @@ describe('ConsoleScopeEnforcementPage', () => {
     render(<ConsoleScopeEnforcementPage isSuperadmin />)
     await waitFor(() => expect(screen.getAllByText('1').length).toBeGreaterThan(0))
     expect(screen.getByText(/Cumplimiento de scopes — eventos denegados/)).toBeInTheDocument()
+  })
+
+  it('[#958] includes role denials in the summary and table', async () => {
+    render(<ConsoleScopeEnforcementPage isSuperadmin />)
+    await waitFor(() => expect(screen.getAllByText('ROLE_INSUFFICIENT')).toHaveLength(2))
   })
 
   it('shows config error banner only for superadmin', async () => {

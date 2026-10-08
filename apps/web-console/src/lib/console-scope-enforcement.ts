@@ -10,6 +10,7 @@ export interface ScopeEnforcementDenial {
   presented_scopes?: string[]
   missing_scopes?: string[]
   required_entitlement?: string | null
+  required_role?: string | null
   current_plan_id?: string | null
   source_ip?: string | null
   correlation_id: string

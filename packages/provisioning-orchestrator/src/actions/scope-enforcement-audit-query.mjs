@@ -1,6 +1,6 @@
 import { queryDenials } from '../repositories/scope-enforcement-repo.mjs';
 
-const ALLOWED_DENIAL_TYPES = new Set(['SCOPE_INSUFFICIENT', 'PLAN_ENTITLEMENT_DENIED', 'WORKSPACE_SCOPE_MISMATCH', 'CONFIG_ERROR']);
+const ALLOWED_DENIAL_TYPES = new Set(['SCOPE_INSUFFICIENT', 'PLAN_ENTITLEMENT_DENIED', 'WORKSPACE_SCOPE_MISMATCH', 'CONFIG_ERROR', 'ROLE_INSUFFICIENT']);
 
 export async function main(params = {}, overrides = {}) {
   const db = overrides.db ?? params.db;

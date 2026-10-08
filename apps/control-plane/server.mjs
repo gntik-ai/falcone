@@ -22,7 +22,7 @@ import { routes as seedRoutes } from './routes.mjs';
 import { LOCAL_HANDLERS } from './b-handlers.mjs';
 import * as tenantStore from './tenant-store.mjs';
 import { createRuntimeTeardownCoordinator, createProductionRuntimeAdapter } from './runtime-teardown-coordinator.mjs';
-import { createSaRevocationCheck } from './sa-revocation.mjs';
+import { createSaRevocationCheck, clientIdFromClaims, isServiceAccountClientId } from './sa-revocation.mjs';
 import { runWithRetry, migrationRetryConfig } from './schema-retry.mjs';
 import { resolveWebhookKeyBeforeServing, sanitizedWebhookBootstrapError } from './webhook-key-runtime.mjs';
 import { setWebhookKeyContext } from './webhook-handlers.mjs';
@@ -241,6 +241,7 @@ async function authenticate(headers) {
     workspaceId: payload.workspace_id ?? null,
     workspaceIds,
     actorType: deriveActorType(payload),
+    isServiceAccount: isServiceAccountClientId(clientIdFromClaims(payload)),
     trustKind: trust.kind,
     roles, scopes,
     // The trusted x-* headers a Falcone action / buildCallerContext expects.
@@ -351,6 +352,8 @@ const server = http.createServer(async (req, res) => {
   const startNs = process.hrtime.bigint();
   const metric = { method, route: 'unmatched', tenantId: '' };
   res.on('finish', () => recordHttp({ ...metric, status: res.statusCode, durationSeconds: Number(process.hrtime.bigint() - startNs) / 1e9 }));
+  // Keep verified attribution available to the mapped-error path (#958).
+  let route = null, identity = null, correlationId = null, routeParams = {};
   try {
     const parsed = new URL(req.url, `http://localhost:${PORT}`);
     const path = parsed.pathname;
@@ -364,12 +367,12 @@ const server = http.createServer(async (req, res) => {
 
     const matched = matchRoute(method, path);
     if (!matched) return sendJson(res, 404, { code: 'NO_ROUTE', message: `No action mapped for ${method} ${path}` });
-    const route = matched.route;
+    route = matched.route;
+    routeParams = matched.params;
 
     const headers = lowercaseHeaders(req.headers);
-    const correlationId = headers['x-correlation-id'] ?? null;
+    correlationId = headers['x-correlation-id'] ?? null;
 
-    let identity = null;
     if (route.auth !== 'public') {
       try { identity = await authenticate(headers); }
       catch (e) {
@@ -384,6 +387,9 @@ const server = http.createServer(async (req, res) => {
           : { code: 'UNAUTHENTICATED', message: 'Missing or invalid Bearer token' });
       }
       if (!authzOk(route, identity)) {
+        // Route-gate denials must carry the required role too (#958).
+        void recordRouteDenial(pool, route, { identity, params: matched.params, req },
+          { statusCode: 403 }, correlationId);
         return sendJson(res, 403, route.auth === 'knative_status'
           ? knativeRuntimeAuthorizationError(correlationId)
           : { code: 'FORBIDDEN', message: `requires ${route.auth}` });
@@ -449,8 +455,7 @@ const server = http.createServer(async (req, res) => {
       // request correlation id, scoped to the action's owning tenant. Best-effort and
       // non-blocking — auditing must never fail or slow the action it describes.
       void recordRouteAudit(pool, route, ctx, result, correlationId);
-      // Enforcement audit (#594): a 403 from a local handler (e.g. cross-tenant access) is
-      // recorded as a scope-enforcement denial so the table is not silently empty.
+      // Enforcement audit (#594, #958): record a local-handler 403 exactly once.
       void recordRouteDenial(pool, route, ctx, result, correlationId);
       // Forward any response headers a local handler chose to set (e.g. Content-Range /
       // Accept-Ranges for a 206 partial read — #676). Mirrors the OW-proxied path below;
@@ -494,6 +499,8 @@ const server = http.createServer(async (req, res) => {
     } finally {
       if (client) client.release();
     }
+    // Module results share the same best-effort denial recorder (#958).
+    void recordRouteDenial(pool, route, { identity, params: routeParams, req }, result, correlationId);
     const respHeaders = {};
     for (const [k, v] of Object.entries(result?.headers ?? {})) {
       if (v == null) continue;
@@ -507,6 +514,8 @@ const server = http.createServer(async (req, res) => {
     // message/stack to the client (stack-trace exposure). Return the stable code.
     console.error('[control-plane] request failed:', err);
     const statusCode = err?.statusCode ?? (err?.code === 'FORBIDDEN' ? 403 : 500);
+    void recordRouteDenial(pool, route, { identity, params: routeParams, req },
+      { statusCode }, correlationId);
     // Never surface a backend-specific code (e.g. a raw Postgres SQLSTATE like "23505") on a 5xx —
     // those are unmapped internal errors and the SQLSTATE leaks the storage engine (#634). Only echo
     // the stable application code for deliberately mapped client errors (< 500).

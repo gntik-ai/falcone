@@ -62,6 +62,9 @@ packages/provisioning-orchestrator/src/migrations/122-knative-runtime-cleanup.sq
 # runtime_cleanup_obligations — durable cleanup queue for managed runtime resources.
 # Keep this migration applied while obligations exist; rollback must not drop the table.
 
+packages/provisioning-orchestrator/src/migrations/123-authorization-denial-audit.sql
+# #958: widen denial types and add nullable required_role without relabelling historical rows.
+
 # --- workspace-docs-service (packages/workspace-docs-service/migrations) ---
 
 packages/workspace-docs-service/migrations/087-workspace-doc-notes.sql
