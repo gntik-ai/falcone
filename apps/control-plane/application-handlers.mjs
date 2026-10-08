@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import * as store from './tenant-store.mjs';
+import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, OIDC_APP_CLIENT_SCOPE_NAMES } from './kc-admin.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
 
 const ok = (statusCode, body) => ({ statusCode, body });
@@ -172,12 +174,15 @@ function applicationOut(row) {
     displayName: rest.displayName ?? row.slug,
     protocol: row.protocol,
     redirectUris,
-    state: row.state,
+    state: row.kc_client_uuid ? row.state : 'provisioning',
     timestamps: { createdAt, updatedAt },
     metadata: normalizeMetadata(_metadata),
     federatedProviders: Array.isArray(rest.federatedProviders) ? rest.federatedProviders : [],
   };
-  const iamClient = defaultIamClient({ application: { ...application, iamClient: _iamClient } });
+  const iamClient = row.kc_client_uuid ? defaultIamClient({ application: {
+    ...application,
+    iamClient: { ..._iamClient, realm: row.iam_realm, clientId: row.kc_client_id },
+  } }) : undefined;
   if (iamClient) application.iamClient = iamClient;
   return application;
 }
@@ -283,7 +288,6 @@ function defaultIamClient({ application, existing }) {
       ? 'confidential'
       : 'public';
   }
-  current.realm = current.realm ?? application.tenantId;
   current.clientId = current.clientId ?? application.slug;
   current.defaultClientScopes = stringArray(current.defaultClientScopes);
   if (current.defaultClientScopes.length === 0) current.defaultClientScopes = ['openid', 'profile'];
@@ -296,7 +300,7 @@ function defaultIamClient({ application, existing }) {
   const protocolMappers = Array.isArray(current.protocolMappers) ? current.protocolMappers : [];
 
   return {
-    realm: String(current.realm),
+    ...(current.realm ? { realm: String(current.realm) } : {}),
     clientId: String(current.clientId),
     clientType: current.clientType,
     defaultClientScopes: current.defaultClientScopes,
@@ -314,7 +318,10 @@ function normalizeApplicationBody(body = {}, { id, workspace, existing = null } 
   const displayName = typeof body.displayName === 'string' ? body.displayName.trim() : existing?.displayName;
   const slug = typeof body.slug === 'string' ? body.slug.trim() : existing?.slug;
   const protocol = body.protocol ?? existing?.protocol;
-  const state = body.desiredState ?? body.state ?? existing?.state ?? 'active';
+  // Lifecycle state belongs to the server. Legacy/unrealized rows cannot be activated by a body.
+  const state = existing?.iamClient
+    ? existing.state
+    : 'provisioning';
   const redirectUris = Array.isArray(body.redirectUris)
     ? body.redirectUris
     : (Array.isArray(body.login?.redirectUris) ? body.login.redirectUris : (existing?.redirectUris ?? []));
@@ -322,6 +329,7 @@ function normalizeApplicationBody(body = {}, { id, workspace, existing = null } 
     ...(existing?.login ?? {}),
     ...(body.login && typeof body.login === 'object' ? body.login : {}),
   };
+  if (Array.isArray(body.redirectUris) && !Array.isArray(body.login?.redirectUris)) login.redirectUris = redirectUris;
   if (!Array.isArray(login.redirectUris)) login.redirectUris = redirectUris;
   if (!login.defaultRedirectUri && redirectUris.length > 0) login.defaultRedirectUri = redirectUris[0];
 
@@ -349,7 +357,9 @@ function normalizeApplicationBody(body = {}, { id, workspace, existing = null } 
     federatedProviders: Array.isArray(body.federatedProviders) ? body.federatedProviders : (existing?.federatedProviders ?? []),
     endpoints: Array.isArray(body.endpoints) ? body.endpoints : (existing?.endpoints ?? []),
   };
-  const iamClient = body.iamClient ?? existing?.iamClient;
+  const iamClient = body.iamClient
+    ? { ...existing?.iamClient, ...body.iamClient }
+    : existing?.iamClient;
   if (iamClient) application.iamClient = iamClient;
   application.iamClient = defaultIamClient({ application, existing });
   return application;
@@ -371,6 +381,29 @@ async function validateApplicationForWrite(application, { planId } = {}) {
   }
   if (!STATES.has(application.state)) {
     checks.push(validationCheck('invalid_state', 'desiredState/state is not a supported entity state.', 'desiredState'));
+  }
+  if (application.iamClient?.protocolMappers?.length) {
+    checks.push(validationCheck('unsupported_protocol_mappers', 'Caller-defined IAM protocol mappers are not supported.', 'iamClient.protocolMappers'));
+  }
+  for (const field of ['defaultClientScopes', 'optionalClientScopes']) {
+    if (application.iamClient?.[field]?.some((scope) => !OIDC_APP_CLIENT_SCOPE_NAMES.includes(scope))) {
+      checks.push(validationCheck('unsupported_client_scope', 'Only built-in OIDC client scopes are supported.', `iamClient.${field}`));
+    }
+  }
+  // Validate the effective Keycloak targets, including caller overrides. The shared
+  // validator checks login/logout, which may differ from the normalized IAM client.
+  for (const field of ['redirectUris', 'webOrigins', 'postLogoutRedirectUris', 'frontChannelLogoutUri', 'backChannelLogoutUri']) {
+    const value = application.iamClient?.[field];
+    const values = Array.isArray(value) ? value : (value === undefined ? [] : [value]);
+    for (const [index, uri] of values.entries()) {
+      const fieldPath = `iamClient.${field}${Array.isArray(value) ? `[${index}]` : ''}`;
+      if (!isHttpsUri(uri)) {
+        checks.push(validationCheck('invalid_uri', 'IAM client URIs must use HTTPS (HTTP is allowed only for localhost).', fieldPath));
+      }
+      if (typeof uri === 'string' && uri.includes('*')) {
+        checks.push(validationCheck('wildcard_uri', 'IAM client URIs cannot contain wildcards.', fieldPath));
+      }
+    }
   }
   if (checks.length > 0) return { ok: false, validation: { status: 'invalid', checks } };
 
@@ -446,7 +479,24 @@ function mapPersistenceError(error, slug) {
   if (error?.code === '23505') {
     return err(409, 'APPLICATION_SLUG_TAKEN', `external application slug '${slug}' already exists in workspace`);
   }
-  throw error;
+  return err(502, 'APPLICATION_PERSISTENCE_FAILED', 'External application could not be saved.');
+}
+
+function provisioningError(error) {
+  const status = Number(error?.statusCode ?? error?.kcStatus);
+  return err(status === 409 ? 409 : 502,
+    status === 409 ? 'APPLICATION_CLIENT_EXISTS' : 'APPLICATION_PROVISIONING_FAILED',
+    KEYCLOAK_ADMIN_SAFE_MESSAGE);
+}
+
+function protocolNotProvisionable(protocol) {
+  return ['saml', 'api_key'].includes(protocol)
+    ? err(422, 'PROTOCOL_NOT_PROVISIONABLE', 'This application protocol cannot be provisioned yet.')
+    : null;
+}
+
+function iamLinkage(row) {
+  return { iamRealm: row.iam_realm, kcClientId: row.kc_client_id, kcClientUuid: row.kc_client_uuid };
 }
 
 // GET /v1/workspaces/{workspaceId}/applications
@@ -481,9 +531,44 @@ export async function createExternalApplication(ctx) {
   if (resolved.error) return resolved.error;
   const applicationId = newId('app');
   const app = normalizeApplicationBody(ctx.body, { id: applicationId, workspace: resolved.ws });
+  const unsupported = protocolNotProvisionable(app.protocol);
+  if (unsupported) return unsupported;
   const validation = await validateApplicationForWrite(app, { planId: ctx.body?.planId ?? app.metadata?.planId });
   if (!validation.ok) return validationError(validation.validation.checks);
   app.validation = validation.validation;
+
+  const tenant = await resolved.st.getTenant(ctx.pool, resolved.ws.tenant_id);
+  if (!tenant?.iam_realm) return err(409, 'NO_REALM', 'tenant has no IAM realm');
+  const realm = tenant.iam_realm;
+  app.iamClient.realm = realm;
+  const kc = ctx.kcAdmin ?? kcAdmin;
+  const requestedClient = ctx.body?.iamClient;
+  let clientUuid;
+  try {
+    if (await kc.findClient(realm, app.iamClient.clientId)) {
+      return err(409, 'APPLICATION_CLIENT_EXISTS', 'Application client already exists in the tenant realm.');
+    }
+    clientUuid = await kc.createOidcAppClient(realm, {
+      clientId: app.iamClient.clientId,
+      clientType: app.iamClient.clientType,
+      redirectUris: app.iamClient.redirectUris,
+      webOrigins: app.iamClient.webOrigins,
+      // Omit read-model defaults so Keycloak retains the tenant realm's scope mappings.
+      ...(Array.isArray(requestedClient?.defaultClientScopes)
+        ? { defaultClientScopes: stringArray(requestedClient.defaultClientScopes) } : {}),
+      ...(Array.isArray(requestedClient?.optionalClientScopes)
+        ? { optionalClientScopes: stringArray(requestedClient.optionalClientScopes) } : {}),
+      postLogoutRedirectUris: app.iamClient.postLogoutRedirectUris,
+      frontChannelLogoutUri: app.iamClient.frontChannelLogoutUri,
+      backChannelLogoutUri: app.iamClient.backChannelLogoutUri,
+      name: app.displayName,
+      authenticationFlows: app.authenticationFlows,
+    });
+    if (!clientUuid) return err(502, 'APPLICATION_PROVISIONING_FAILED', KEYCLOAK_ADMIN_SAFE_MESSAGE);
+  } catch (error) {
+    return provisioningError(error);
+  }
+  app.state = 'active';
 
   let row;
   try {
@@ -494,19 +579,25 @@ export async function createExternalApplication(ctx) {
       slug: app.slug,
       protocol: app.protocol,
       state: app.state,
+      iamRealm: realm,
+      kcClientId: app.iamClient.clientId,
+      kcClientUuid: clientUuid,
       appJson: app,
       actorId: ctx.identity?.sub ?? null,
     });
+    if (!row) throw new Error('application persistence returned no row');
   } catch (error) {
+    // Only delete this attempt's client. Never delete a conflicting pre-existing client.
+    try { await kc.deleteClient(realm, clientUuid); } catch { /* best-effort compensation */ }
     return mapPersistenceError(error, app.slug);
   }
-  return ok(202, mutationAccepted(ctx, {
+  return ok(202, { ...mutationAccepted(ctx, {
     entityId: row.id,
     tenantId: row.tenant_id,
     workspaceId: row.workspace_id,
     desiredState: row.state,
     eventType: 'external_application.create.accepted',
-  }));
+  }), state: app.state });
 }
 
 // GET /v1/workspaces/{workspaceId}/applications/{applicationId}
@@ -522,9 +613,37 @@ export async function updateExternalApplication(ctx) {
   if (resolved.error) return resolved.error;
   const existing = resolved.application;
   const app = normalizeApplicationBody(ctx.body, { id: existing.applicationId, workspace: resolved.ws, existing });
+  const unsupported = protocolNotProvisionable(app.protocol);
+  if (unsupported) return unsupported;
+  const requestedState = ctx.body?.desiredState ?? ctx.body?.state;
+  const retireClient = resolved.app.kc_client_uuid && ['suspended', 'soft_deleted'].includes(requestedState);
+  if (resolved.app.kc_client_uuid && requestedState !== undefined
+    && requestedState !== existing.state && !retireClient) {
+    return err(409, 'APPLICATION_STATE_UPDATE_UNSUPPORTED', 'Only suspension and soft deletion of a realized application are supported.');
+  }
+  if (app.protocol !== existing.protocol
+    || (ctx.body?.iamClient?.realm !== undefined && ctx.body.iamClient.realm !== resolved.app.iam_realm)
+    || app.iamClient?.clientId !== (existing.iamClient?.clientId ?? existing.slug)) {
+    return err(409, 'APPLICATION_IAM_IMMUTABLE', 'Application protocol, IAM realm and clientId cannot be changed.');
+  }
+  // Fail closed until IAM configuration updates can be applied atomically to the existing client.
+  const baseline = normalizeApplicationBody({}, { id: existing.applicationId, workspace: resolved.ws, existing });
+  if (resolved.app.kc_client_uuid && ['iamClient', 'redirectUris', 'login', 'logout', 'authenticationFlows']
+    .some((key) => !isDeepStrictEqual(app[key], baseline[key]))) {
+    return err(409, 'APPLICATION_IAM_UPDATE_UNSUPPORTED', 'Updating a realized application IAM configuration is not supported.');
+  }
+  if (retireClient) app.state = requestedState;
   const validation = await validateApplicationForWrite(app, { planId: ctx.body?.planId ?? app.metadata?.planId });
   if (!validation.ok) return validationError(validation.validation.checks);
   app.validation = validation.validation;
+
+  if (retireClient) {
+    try {
+      await (ctx.kcAdmin ?? kcAdmin).setClientEnabled(resolved.app.iam_realm, resolved.app.kc_client_uuid, false);
+    } catch {
+      return err(502, 'APPLICATION_STATE_UPDATE_FAILED', KEYCLOAK_ADMIN_SAFE_MESSAGE);
+    }
+  }
 
   let row;
   try {
@@ -535,13 +654,16 @@ export async function updateExternalApplication(ctx) {
       slug: app.slug,
       protocol: app.protocol,
       state: app.state,
+      ...iamLinkage(resolved.app),
       appJson: app,
       actorId: ctx.identity?.sub ?? null,
     });
+    if (!row) throw new Error('application persistence returned no row');
   } catch (error) {
+    // Retirement fails closed: do not re-enable the client if persistence fails.
+    // Retrying the same request disables it again before completing the row update.
     return mapPersistenceError(error, app.slug);
   }
-  if (!row) return err(404, 'APPLICATION_NOT_FOUND', `application ${existing.applicationId} not found`);
   return ok(202, mutationAccepted(ctx, {
     entityId: row.id,
     tenantId: row.tenant_id,
@@ -602,6 +724,7 @@ async function persistProviders(ctx, resolved, providers, { eventType, subresour
     slug: application.slug,
     protocol: application.protocol,
     state: application.state,
+    ...iamLinkage(resolved.app),
     appJson: application,
     actorId: ctx.identity?.sub ?? null,
   });

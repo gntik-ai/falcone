@@ -578,7 +578,7 @@ Workspace lifecycle, application inventory, workload identities, and managed-res
 | PUT | `/v1/workspaces/{workspaceId}` | workspace | workspace | Update one canonical workspace including IAM, lifecycle, and inheritance policy settings |
 | GET | `/v1/workspaces/{workspaceId}/api-surface` | workspace | workspace_api_surface | Fetch workspace-specific base URLs and application endpoint bindings for external clients |
 | GET | `/v1/workspaces/{workspaceId}/applications` | workspace | application | List canonical external applications, authentication flows, and validation status for one workspace |
-| POST | `/v1/workspaces/{workspaceId}/applications` | workspace | application | Submit a canonical external application write request under the workspaces family |
+| POST | `/v1/workspaces/{workspaceId}/applications` | workspace | application | Register an OIDC application and materialize its client in the tenant realm |
 | GET | `/v1/workspaces/{workspaceId}/applications/{applicationId}` | workspace | application | Fetch one canonical external application entity under the workspaces family |
 | PUT | `/v1/workspaces/{workspaceId}/applications/{applicationId}` | workspace | application | Update one canonical external application including federation, logout, scope, and role settings |
 | GET | `/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers` | workspace | application | List federated OIDC and SAML identity providers attached to one external application |

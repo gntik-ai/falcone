@@ -12628,7 +12628,7 @@
       },
       "post": {
         "operationId": "createExternalApplication",
-        "summary": "Submit a canonical external application write request under the workspaces family",
+        "summary": "Register an OIDC application and materialize its client in the tenant realm",
         "tags": [
           "Workspaces",
           "Applications"
@@ -12664,11 +12664,11 @@
         },
         "responses": {
           "202": {
-            "description": "External application mutation accepted.",
+            "description": "OIDC application materialized and persisted with realized state active.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MutationAccepted"
+                  "$ref": "#/components/schemas/ExternalApplicationRegistrationAccepted"
                 }
               }
             }
@@ -12694,7 +12694,7 @@
             }
           },
           "409": {
-            "description": "The request conflicts with current entity integrity or lifecycle state.",
+            "description": "No tenant IAM realm (NO_REALM), an existing client (APPLICATION_CLIENT_EXISTS), or a conflicting application slug (APPLICATION_SLUG_TAKEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -12705,6 +12705,16 @@
           },
           "413": {
             "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "SAML and api_key cannot be provisioned (PROTOCOL_NOT_PROVISIONABLE); no application is persisted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12725,6 +12735,16 @@
           },
           "431": {
             "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "IAM materialization or persistence failed (APPLICATION_PROVISIONING_FAILED or APPLICATION_PERSISTENCE_FAILED). Errors are redacted; persistence failure triggers client deletion.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12767,7 +12787,8 @@
         ],
         "x-visibility": "public",
         "x-rate-limit-class": "control-write",
-        "x-owning-service": "control_api"
+        "x-owning-service": "control_api",
+        "description": "Returns the accepted envelope with realized state active only after Keycloak client creation and persistence succeed. The tenant owns the realm. Caller-defined protocol mappers and arbitrary realm client scopes are rejected. Without explicit client scope lists, Keycloak retains the realm defaults. Confidential client secrets are never returned; credential delivery is outside this operation."
       }
     },
     "/v1/workspaces/{workspaceId}/applications/{applicationId}": {
@@ -12931,7 +12952,7 @@
         },
         "responses": {
           "202": {
-            "description": "External application update accepted.",
+            "description": "External application update accepted after required client disabling and persistence complete.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12971,7 +12992,7 @@
             }
           },
           "409": {
-            "description": "The request conflicts with current entity integrity or lifecycle state.",
+            "description": "IAM configuration changes are unsupported (APPLICATION_IAM_UPDATE_UNSUPPORTED); lifecycle changes other than suspension and soft deletion are unsupported (APPLICATION_STATE_UPDATE_UNSUPPORTED); IAM realm and clientId are immutable (APPLICATION_IAM_IMMUTABLE).",
             "content": {
               "application/json": {
                 "schema": {
@@ -12982,6 +13003,16 @@
           },
           "413": {
             "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "SAML and api_key cannot be provisioned (PROTOCOL_NOT_PROVISIONABLE); no application is persisted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13029,6 +13060,16 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Client disabling or persistence failed (APPLICATION_STATE_UPDATE_FAILED or APPLICATION_PERSISTENCE_FAILED). No successful retirement is reported; errors are redacted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-resource-type": "application",
@@ -13049,7 +13090,8 @@
         "x-family": "workspaces",
         "x-scope": "workspace",
         "x-visibility": "public",
-        "x-owning-service": "control_api"
+        "x-owning-service": "control_api",
+        "description": "For realized OIDC applications, desiredState/state suspended or soft_deleted disables the existing Keycloak client by UUID before persisting the state. Other lifecycle transitions and IAM configuration changes are rejected. If persistence fails after disabling, the client stays disabled; retry the retirement request to finish saving. Legacy rows without IAM linkage remain provisioning, including when updated; their persisted state is normalized on the next write."
       }
     },
     "/v1/workspaces/{workspaceId}/effective-capabilities": {
@@ -62959,6 +63001,109 @@
         },
         "additionalProperties": false
       },
+      "ExternalApplicationRegistrationAccepted": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "requestId",
+          "entityType",
+          "entityId",
+          "status",
+          "acceptedEventType",
+          "desiredState",
+          "correlationId",
+          "acceptedAt",
+          "state"
+        ],
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "platform_user",
+              "tenant",
+              "workspace",
+              "invitation",
+              "external_application",
+              "service_account",
+              "managed_resource"
+            ]
+          },
+          "entityId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 128
+          },
+          "tenantId": {
+            "type": "string",
+            "pattern": "^ten_[0-9a-z]+$"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^wrk_[0-9a-z]+$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "queued"
+            ]
+          },
+          "acceptedEventType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "desiredState": {
+            "$ref": "#/components/schemas/EntityState"
+          },
+          "correlationId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mutationScope": {
+            "type": "string",
+            "enum": [
+              "entity",
+              "federated_provider"
+            ]
+          },
+          "subresourceType": {
+            "type": "string",
+            "enum": [
+              "federated_provider"
+            ]
+          },
+          "subresourceId": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 128
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active"
+            ],
+            "description": "The server-owned realized state."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Registration acceptance after the OIDC client has been materialized and the application persisted."
+      },
       "ExternalApplicationWriteRequest": {
         "type": "object",
         "required": [
@@ -67217,13 +67362,15 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Explicit selections are limited to built-in OIDC scopes: openid, profile, email, address, phone, roles, web-origins, basic, offline_access. openid is a protocol scope and is not sent as a Keycloak client scope. Omitted lists preserve the realm defaults on registration."
           },
           "optionalClientScopes": {
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Explicit selections are limited to built-in OIDC scopes: openid, profile, email, address, phone, roles, web-origins, basic, offline_access. openid is a protocol scope and is not sent as a Keycloak client scope. Omitted lists preserve the realm defaults on registration."
           },
           "redirectUris": {
             "type": "array",
@@ -67242,7 +67389,8 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/KeycloakProtocolMapper"
-            }
+            },
+            "description": "Caller-defined protocol mappers are unsupported on application writes and are never sent to Keycloak."
           },
           "postLogoutRedirectUris": {
             "type": "array",

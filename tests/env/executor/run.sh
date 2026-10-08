@@ -40,4 +40,5 @@ node --test "$HERE"/postgres-data-executor.test.mjs "$HERE"/postgres-ddl-executo
   "$HERE"/embedding-provider-persistence.test.mjs "$HERE"/postgres-extension-preflight.test.mjs \
   "$HERE"/auto-embedding-write.test.mjs \
   "$HERE"/workspace-environment-promotion.test.mjs \
+  "$HERE"/external-application-store.test.mjs \
   "$HERE"/workspace-db-dedicated-credential.test.mjs
