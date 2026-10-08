@@ -9,7 +9,8 @@
 import crypto from 'node:crypto';
 import * as store from './tenant-store.mjs';
 import { issueBucketIdentity, revokeBucketIdentity, revokeIdentityByName, workspaceIdentityName } from './seaweedfs-identity.mjs';
-import { checkBucketQuota, checkByteQuota, usageLimits, dimensionStatus, STORAGE_QUOTA_EXCEEDED } from './storage-quota.mjs';
+import { checkBucketQuota, checkTenantByteQuota, tenantByteLimit, usageLimits, dimensionStatus, STORAGE_QUOTA_EXCEEDED } from './storage-quota.mjs';
+import { quotaDenial } from './dimension-quota.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { isJsonBody } from './request-body.mjs';
 
@@ -116,7 +117,7 @@ function amzDates() {
 
 // Signed S3 request (path-style). `path` is the raw path incl. leading '/'
 // (e.g. '/', '/bucket', '/bucket/key'); `query` is an object of query params.
-async function s3(method, path, { query = {}, headers = {}, body } = {}) {
+async function s3(method, path, { query = {}, headers = {}, body, signal } = {}) {
   const url = new URL(ENDPOINT);
   const host = url.host;
   const payload = body ?? '';
@@ -144,6 +145,7 @@ async function s3(method, path, { query = {}, headers = {}, body } = {}) {
   const qs = canonicalQuery ? `?${canonicalQuery}` : '';
   const res = await fetch(`${ENDPOINT}${canonicalUri}${qs}`, {
     method,
+    signal,
     headers: { ...headers, authorization, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate },
     body: body ?? undefined
   });
@@ -231,16 +233,18 @@ export async function listBuckets() {
   const { text } = await s3('GET', '/');
   return allTags(text, 'Bucket').map((b) => ({ name: oneTag(b, 'Name'), creationDate: oneTag(b, 'CreationDate') }));
 }
-export async function listObjects(bucket, { maxKeys = 50, after } = {}) {
+export async function listObjects(bucket, { maxKeys = 50, after, signal } = {}) {
   const query = { 'list-type': '2', 'max-keys': String(maxKeys) };
   if (after) query['continuation-token'] = after;
-  const { text } = await s3('GET', `/${bucket}`, { query });
+  const { text } = await s3('GET', `/${bucket}`, { query, signal });
   const objects = allTags(text, 'Contents').map((c) => ({
     key: oneTag(c, 'Key'), size: Number(oneTag(c, 'Size') ?? 0), etag: (oneTag(c, 'ETag') ?? '').replace(/&quot;|&#34;|"/g, ''),
     lastModified: oneTag(c, 'LastModified'), storageClass: oneTag(c, 'StorageClass') ?? 'STANDARD'
   }));
   const truncated = oneTag(text, 'IsTruncated') === 'true';
-  return { objects, nextToken: truncated ? oneTag(text, 'NextContinuationToken') : null };
+  const nextToken = truncated ? oneTag(text, 'NextContinuationToken') : null;
+  if (truncated && !nextToken) throw new Error('incomplete object listing');
+  return { objects, nextToken };
 }
 export async function headObject(bucket, key) {
   const { headers } = await s3('HEAD', `/${bucket}/${key}`);
@@ -318,6 +322,36 @@ export async function completeMultipartUpload(bucket, key, uploadId, parts) {
   const { text } = await s3('POST', `/${bucket}/${key}`, { query: { uploadId }, headers: { 'content-type': 'application/xml' }, body });
   return { etag: (oneTag(text, 'ETag') ?? '').replace(/&quot;|&#34;|"/g, ''), location: oneTag(text, 'Location') ?? null };
 }
+// ListParts is paginated independently of ListObjects (up to 10,000 S3 parts).
+async function multipartIncomingBytes(bucket, key, uploadId, selected) {
+  const signal = AbortSignal.timeout(5000);
+  const sizes = new Map();
+  let marker;
+  for (let page = 0; page < 10; page++) {
+    const query = { uploadId, 'max-parts': '1000' };
+    if (marker) query['part-number-marker'] = marker;
+    const { text } = await s3('GET', `/${bucket}/${key}`, { query, signal });
+    for (const part of allTags(text, 'Part')) {
+      const number = Number(oneTag(part, 'PartNumber'));
+      const rawSize = oneTag(part, 'Size');
+      const size = Number(rawSize);
+      if (rawSize == null || !Number.isSafeInteger(size) || size < 0) throw new Error('invalid multipart size');
+      sizes.set(number, { size, etag: (oneTag(part, 'ETag') ?? '').replace(/"/g, '') });
+    }
+    if (oneTag(text, 'IsTruncated') !== 'true') {
+      return selected.reduce((total, part) => {
+        const stored = sizes.get(part.partNumber);
+        if (!stored || stored.etag !== String(part.etag).replace(/"/g, '')) throw new Error('multipart part unavailable');
+        return total + stored.size;
+      }, 0);
+    }
+    const next = oneTag(text, 'NextPartNumberMarker');
+    if (!next || Number(next) <= Number(marker ?? 0)) throw new Error('incomplete multipart listing');
+    marker = next;
+  }
+  throw new Error('multipart metering page budget exceeded');
+}
+
 export async function abortMultipartUpload(bucket, key, uploadId) {
   await s3('DELETE', `/${bucket}/${key}`, { query: { uploadId } });
 }
@@ -475,40 +509,47 @@ export function resolveObjectBody(ctx) {
       'object write body must carry contentBase64 (a base64-encoded payload string); an empty object is written with an empty request body or an empty contentBase64, never by omitting the field')
   };
 }
-// Sum the CURRENT stored bytes across every bucket of the workspace that owns `bucket`
-// (#674 byte-quota admission). Mirrors storageWorkspaceUsage's per-bucket listObjects scan;
-// scoped strictly to the owning workspace (no cross-tenant read). Used only when a byte
-// limit is configured, so the upload hot-path pays this cost only on opt-in.
-async function workspaceCurrentBytes(ctx, bucket) {
-  const rec = await store.getBucketRecord(ctx.pool, bucket);
-  if (!rec) return 0;
-  const mapped = await store.listBucketsForWorkspace(ctx.pool, rec.workspace_id);
-  let total = 0;
+// Complete tenant-wide scan, bounded to 100 pages and five seconds per request.
+// Never admit against a partial count: a scan failure becomes quota_unavailable.
+// No cached counts means successful writes/deletes cannot leave stale admission usage.
+export async function tenantCurrentBytes(ctx, tenantId, replacement = {}) {
+  const mapped = await store.listBucketsForTenant(ctx.pool, tenantId);
+  const signal = AbortSignal.timeout(5000);
+  let total = 0, pages = 0;
   for (const row of mapped) {
-    try {
-      const { objects } = await listObjects(row.bucket_name, { maxKeys: 1000 });
-      total += objects.filter((o) => !isReservedKey(o.key)).reduce((s, o) => s + o.size, 0);
-    } catch { /* a transient per-bucket list failure must not falsely block an upload */ }
+    let after;
+    const seen = new Set();
+    do {
+      if (++pages > 100) throw new Error('storage metering page budget exceeded');
+      signal.throwIfAborted();
+      const { objects, nextToken } = await listObjects(row.bucket_name, { maxKeys: 1000, after, signal });
+      for (const object of objects) {
+        if (object.key == null || !Number.isSafeInteger(object.size) || object.size < 0) throw new Error('invalid storage meter');
+        if (row.bucket_name === replacement.bucket && object.key === replacement.key) replacement.bytes = object.size;
+      }
+      total += objects.filter((o) => !isReservedKey(o.key)).reduce((sum, o) => sum + o.size, 0);
+      if (nextToken && seen.has(nextToken)) throw new Error('repeated storage continuation token');
+      if (nextToken) seen.add(nextToken);
+      after = nextToken;
+    } while (after);
   }
   return total;
+}
+
+async function storageUploadDenial(ctx, rec, key, incomingBytes) {
+  const replacement = { bucket: rec.bucket_name, key, bytes: 0 };
+  const decision = await checkTenantByteQuota(ctx.pool, rec.tenant_id,
+    () => tenantCurrentBytes(ctx, rec.tenant_id, replacement),
+    async () => (await (typeof incomingBytes === 'function' ? incomingBytes() : incomingBytes)) - replacement.bytes,
+    ctx.quotaOptions);
+  return quotaDenial(ctx, { id: rec.workspace_id, tenant_id: rec.tenant_id }, decision, 'storage.upload');
 }
 async function storagePutObject(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
   const bucket = ctx.params.bucketId; const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   const { bytes, contentType, error: bodyError } = resolveObjectBody(ctx); if (bodyError) return bodyError;
-  // Per-workspace total-bytes quota admission (#674). Enforced ONLY when STORAGE_MAX_BYTES is
-  // configured (default unlimited) — usageLimits().maxBytes == null short-circuits BEFORE any
-  // usage scan, so the upload hot-path is unchanged unless an operator opts in. The body is
-  // already buffered (bytes.length), so the incoming size is known at the CP layer. Fails OPEN
-  // if the quota model is unavailable.
-  if (usageLimits().maxBytes != null) {
-    const currentBytes = await workspaceCurrentBytes(ctx, bucket);
-    const byteDecision = checkByteQuota(currentBytes, bytes.length, {});
-    if (!byteDecision.allowed) {
-      return err(409, STORAGE_QUOTA_EXCEEDED,
-        `storage byte quota would be exceeded for this workspace: ${currentBytes + bytes.length}/${byteDecision.limit} bytes`);
-    }
-  }
+  const denial = await storageUploadDenial(ctx, gate.rec, key, bytes.length);
+  if (denial) return denial;
   try {
     await putObject(bucket, key, bytes, contentType);
     return ok(201, { objectKey: key, bucketName: bucket, sizeBytes: bytes.length, contentType });
@@ -614,13 +655,9 @@ async function storageObjectMetadata(ctx) {
 }
 async function storageWorkspaceUsage(ctx) {
   const workspaceId = ctx.params.workspaceId;
-  // Ownership check: verify the workspace belongs to the caller's tenant.
-  // Superadmin/internal bypass the check. Non-owners get 404 (no existence leak).
-  if (!isSuperOrInternal(ctx.identity)) {
-    const ws = await store.getWorkspace(ctx.pool, workspaceId);
-    if (!ws || ws.tenant_id !== ctx.identity.tenantId) {
-      return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
-    }
+  const ws = await store.getWorkspace(ctx.pool, workspaceId);
+  if (!ws || (!isSuperOrInternal(ctx.identity) && ws.tenant_id !== ctx.identity.tenantId)) {
+    return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
   }
   const mapped = await store.listBucketsForWorkspace(ctx.pool, workspaceId);
   let totalBytes = 0, objectCount = 0; const bucketEntries = [];
@@ -635,17 +672,19 @@ async function storageWorkspaceUsage(ctx) {
         largestObjectSizeBytes: objects.reduce((mx, o) => Math.max(mx, o.size), 0) });
     } catch { bucketEntries.push({ bucketId: row.bucket_name, totalBytes: 0, objectCount: 0, largestObjectSizeBytes: 0 }); }
   }
-  // Report the EFFECTIVE per-workspace limit + remaining capacity per dimension (#674): the
-  // bucket-count limit always applies (default 8), and the byte limit applies to totalBytes/
-  // objectSizeBytes only when STORAGE_MAX_BYTES is configured (otherwise null = unlimited).
-  // dimensionStatus fills remaining = max(limit-used,0) and utilizationPercent = round(used/
-  // limit*100), or leaves them null when the dimension is unlimited (so the API never reports
-  // a perpetual null when a limit is set). objectCount has no configured limit → unlimited.
-  const { maxBuckets, maxBytes } = usageLimits();
+  const { maxBuckets } = usageLimits();
+  const { maxBytes, decision: limitDecision } = await tenantByteLimit(ctx.pool, ws.tenant_id, ctx.quotaOptions);
+  let tenantBytes = totalBytes;
+  let collectionStatus = 'complete';
+  if (limitDecision !== 'quota_unavailable') {
+    try { tenantBytes = await tenantCurrentBytes(ctx, ws.tenant_id); }
+    catch { tenantBytes = null; collectionStatus = 'unavailable'; }
+  }
   return ok(200, {
-    collectionMethod: 'live', collectionStatus: 'complete', snapshotAt: nowIso(), cacheSnapshotAt: null,
+    collectionMethod: 'live', collectionStatus, snapshotAt: nowIso(), cacheSnapshotAt: null,
     dimensions: {
-      totalBytes: { dimension: 'totalBytes', ...dimensionStatus(totalBytes, maxBytes) },
+      totalBytes: { dimension: 'totalBytes', ...dimensionStatus(tenantBytes, maxBytes), used: tenantBytes, scope: 'tenant',
+        ...(tenantBytes == null ? { remaining: null, utilizationPercent: null } : {}) },
       bucketCount: { dimension: 'bucketCount', ...dimensionStatus(mapped.length, maxBuckets) },
       objectCount: { dimension: 'objectCount', ...dimensionStatus(objectCount, null) },
       objectSizeBytes: { dimension: 'objectSizeBytes', ...dimensionStatus(totalBytes, maxBytes) }
@@ -850,8 +889,8 @@ async function storagePresignObject(ctx) {
 // re-runs the bucket ownership/admin-role gate + decodeObjectKey: the uploadId is opaque/S3-managed
 // and grants nothing on its own, so isolation comes from re-checking that the CALLER owns the bucket
 // and may structurally write on each call. A multipart session for a bucket the caller does not own
-// is impossible (404 before any S3 call). On COMPLETE the SAME per-workspace byte-quota admission
-// storagePutObject applies is enforced against the assembled object's real size, so multipart cannot
+// is impossible (404 before any S3 call). On COMPLETE the SAME tenant-wide byte-quota admission
+// storagePutObject applies is enforced against S3 part sizes before assembly, so multipart cannot
 // bypass the quota.
 
 // POST .../objects/{objectKey}/multipart — CreateMultipartUpload. Returns the opaque uploadId.
@@ -895,28 +934,12 @@ async function storageMultipartComplete(ctx) {
   const validation = validatePartListInline(parts);
   if (!validation.valid) return err(400, 'INVALID_PART_LIST', validation.errors[0]);
   try {
+    // Read sizes from S3, never from caller-supplied completion metadata. Admission
+    // precedes assembly, preserving any existing destination object on denial.
+    const denial = await storageUploadDenial(ctx, gate.rec, key,
+      () => multipartIncomingBytes(bucket, key, uploadId, validation.parts));
+    if (denial) return denial;
     const result = await completeMultipartUpload(bucket, key, uploadId, validation.parts);
-    // Per-workspace byte-quota admission AFTER assembly (#674/#676): multipart must not be a
-    // quota bypass. Enforced only when STORAGE_MAX_BYTES is configured (usageLimits().maxBytes
-    // != null short-circuits otherwise, so the hot path is unchanged). HEAD the assembled object
-    // for its real size, then check it against the workspace's other buckets' current bytes. If
-    // it would exceed the limit, delete the just-assembled object and return 409 — the bytes do
-    // not persist. Fails OPEN if the quota model / size lookup is unavailable.
-    if (usageLimits().maxBytes != null) {
-      let assembledBytes = 0;
-      try { const meta = await headObject(bucket, key); assembledBytes = Number(meta.size) || 0; } catch { /* size unknown → fail open */ }
-      if (assembledBytes > 0) {
-        const currentBytes = await workspaceCurrentBytes(ctx, bucket);
-        // currentBytes already includes the just-completed object; compare prior usage + this object.
-        const priorBytes = Math.max(currentBytes - assembledBytes, 0);
-        const decision = checkByteQuota(priorBytes, assembledBytes, {});
-        if (!decision.allowed) {
-          try { await deleteObject(bucket, key); } catch { /* best-effort rollback */ }
-          return err(409, STORAGE_QUOTA_EXCEEDED,
-            `storage byte quota would be exceeded for this workspace: ${priorBytes + assembledBytes}/${decision.limit} bytes`);
-        }
-      }
-    }
     return ok(200, { objectKey: key, bucketName: bucket, etag: result.etag, parts: validation.parts.length, completed: true });
   } catch (e) { return storageFailure(e, 'STORAGE_MULTIPART_COMPLETE_FAILED'); }
 }

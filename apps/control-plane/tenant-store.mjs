@@ -848,6 +848,24 @@ export async function countTenantWorkspaces(pool, tenantId) {
   const { rows } = await pool.query('SELECT count(*)::int AS n FROM workspaces WHERE tenant_id=$1', [tenantId]);
   return rows[0]?.n ?? 0;
 }
+
+export async function countTenantTopics(pool, tenantId) {
+  const { rows } = await pool.query('SELECT count(*)::bigint AS n FROM workspace_topics WHERE tenant_id=$1', [tenantId]);
+  return Number(rows[0]?.n ?? 0);
+}
+
+export async function countTenantFunctions(pool, tenantId) {
+  // The legacy registry and the live Knative action registry are separate create surfaces.
+  const { rows } = await pool.query(`SELECT
+    (SELECT count(*) FROM workspace_functions WHERE tenant_id=$1) +
+    (SELECT count(*) FROM fn_actions WHERE tenant_id=$1) AS n`, [tenantId]);
+  return Number(rows[0]?.n ?? 0);
+}
+
+export async function listBucketsForTenant(pool, tenantId) {
+  const { rows } = await pool.query('SELECT * FROM workspace_buckets WHERE tenant_id=$1 ORDER BY bucket_name', [tenantId]);
+  return rows;
+}
 export async function insertWorkspace(pool, { id, tenantId, slug, displayName, environment = 'dev', createdBy }) {
   const { rows } = await pool.query(
     `INSERT INTO workspaces (id, tenant_id, slug, display_name, environment, created_by)

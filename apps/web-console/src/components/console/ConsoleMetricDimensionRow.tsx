@@ -35,6 +35,7 @@ export function ConsoleMetricDimensionRow({ dimension }: { dimension: ConsoleMet
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <h3 className="font-medium text-foreground">{dimension.displayName}</h3>
+          {dimension.policyMode === 'not_enforced' ? <Badge variant="outline">Cuota no aplicada</Badge> : null}
           <p className="mt-0.5 break-all font-mono text-xs text-muted-foreground">{dimension.dimensionId}</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-sm">

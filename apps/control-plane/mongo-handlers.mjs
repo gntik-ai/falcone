@@ -10,6 +10,7 @@ import { MongoClient } from 'mongodb';
 import * as store from './tenant-store.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
 import { resolveMongoTls } from './transport-security.mjs';
+import { checkDimensionQuota, quotaDenial } from './dimension-quota.mjs';
 
 const HOST = process.env.MONGO_HOST || 'falcone-ferretdb:27017';
 const USER = process.env.MONGO_USER || 'falcone';
@@ -300,9 +301,20 @@ async function mongoDataImport(ctx) {
 // engine=mongodb provisioning: create the database + initial collections.
 async function mongoProvision(ctx) {
   const ws = ctx.workspace; // set by the generic dispatcher
+  // The dispatcher checks ownership; also enforce the boundary for direct callers.
+  const scope = callerTenantScope(ctx.identity);
+  if (!ws || (scope != null && ws.tenant_id !== scope)) return err(404, 'WORKSPACE_NOT_FOUND', 'workspace not found');
+  if (!canManageTenant(ctx.identity, ws.tenant_id)) return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
   // The public provision body names the database `databaseName`; accept both that and `name`.
   const name = String(ctx.body?.name ?? ctx.body?.databaseName ?? '').trim().replace(/[\/\\. "$*<>:|?]/g, '_').slice(0, 63);
   if (!name) return err(400, 'VALIDATION_ERROR', 'database name is required');
+  let registered = null;
+  try { registered = await store.collectTenantMongoDatabases(ctx.pool, ws.tenant_id); } catch { /* unavailable meter → fail open */ }
+  if (!registered?.includes(name)) {
+    const decision = await checkDimensionQuota(ctx.pool, ws.tenant_id, 'max_mongo_databases', registered?.length ?? null, ctx.quotaOptions);
+    const denial = await quotaDenial(ctx, ws, decision, 'mongo_database.create');
+    if (denial) return denial;
+  }
   const collections = Array.isArray(ctx.body?.collections) && ctx.body.collections.length ? ctx.body.collections : ['default'];
   try {
     const c = await mc(ctx);

@@ -5,7 +5,7 @@ import { requestConsoleSessionJson } from '@/lib/console-session'
 export interface ConsoleQuotaDimensionView {
   dimensionId: string
   displayName: string
-  policyMode: 'enforced' | 'unbounded'
+  policyMode: 'enforced' | 'unbounded' | 'not_enforced'
   hardLimit: number | null
   softLimit: number | null
   measuredValue: number
@@ -34,7 +34,7 @@ interface QuotaPostureResponse {
   dimensions?: Array<{
     dimensionId?: string
     displayName?: string
-    policyMode?: 'enforced' | 'unbounded'
+    policyMode?: 'enforced' | 'unbounded' | 'not_enforced'
     hardLimit?: number | null
     softLimit?: number | null
     measuredValue?: number

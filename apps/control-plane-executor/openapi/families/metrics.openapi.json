@@ -1365,7 +1365,8 @@
           "policyMode": {
             "enum": [
               "enforced",
-              "unbounded"
+              "unbounded",
+              "not_enforced"
             ],
             "type": "string"
           },

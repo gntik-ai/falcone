@@ -53,6 +53,15 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit
 
+      - name: Live catalog quota admission
+        run: |
+          node --test tests/blackbox/live-resource-quota-enforcement.test.mjs \
+            tests/blackbox/live-storage-function-quotas.test.mjs \
+            tests/blackbox/workspace-quota-enforcement.test.mjs \
+            tests/blackbox/storage-quota-enforcement.test.mjs \
+            tests/blackbox/storage-quota-handlers.test.mjs \
+            tests/blackbox/storage-object-io-completeness.test.mjs
+
       - name: Adapter integration scaffolding
         run: pnpm test:adapters
 
