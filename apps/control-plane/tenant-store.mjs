@@ -94,7 +94,7 @@ export async function ensureSchema(pool) {
       tenant_id TEXT NOT NULL,
       slug TEXT NOT NULL,
       protocol TEXT NOT NULL,
-      state TEXT NOT NULL DEFAULT 'active',
+      state TEXT NOT NULL DEFAULT 'provisioning',
       app_json JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -102,6 +102,10 @@ export async function ensureSchema(pool) {
       updated_by TEXT,
       UNIQUE (workspace_id, slug)
     )`);
+  await pool.query('ALTER TABLE external_applications ADD COLUMN IF NOT EXISTS iam_realm TEXT');
+  await pool.query('ALTER TABLE external_applications ADD COLUMN IF NOT EXISTS kc_client_id TEXT');
+  await pool.query('ALTER TABLE external_applications ADD COLUMN IF NOT EXISTS kc_client_uuid TEXT');
+  await pool.query("ALTER TABLE external_applications ALTER COLUMN state SET DEFAULT 'provisioning'");
   await pool.query('CREATE INDEX IF NOT EXISTS external_applications_scope_idx ON external_applications (tenant_id, workspace_id, state)');
   // ---- identity: tenant/workspace invitations ------------------------------
   // POST /v1/tenants/{tenantId}/invitations is public-contract surface used by
@@ -992,7 +996,7 @@ export async function listExternalApplications(pool, {
   }
   if (state) {
     params.push(state);
-    clauses.push(`state = $${params.length}`);
+    clauses.push(`(CASE WHEN kc_client_uuid IS NULL THEN 'provisioning' ELSE state END) = $${params.length}`);
   }
   params.push(limit);
   const limitParam = `$${params.length}`;
@@ -1000,7 +1004,7 @@ export async function listExternalApplications(pool, {
   const offsetParam = `$${params.length}`;
 
   const { rows } = await pool.query(
-    `SELECT id, workspace_id, tenant_id, slug, protocol, state, app_json, created_at, updated_at, created_by, updated_by,
+    `SELECT id, workspace_id, tenant_id, slug, protocol, state, iam_realm, kc_client_id, kc_client_uuid, app_json, created_at, updated_at, created_by, updated_by,
             COUNT(*) OVER() AS total
        FROM external_applications
       WHERE ${clauses.join(' AND ')}
@@ -1012,7 +1016,7 @@ export async function listExternalApplications(pool, {
 
 export async function getExternalApplication(pool, { workspaceId, tenantId, applicationId }) {
   const { rows } = await pool.query(
-    `SELECT id, workspace_id, tenant_id, slug, protocol, state, app_json, created_at, updated_at, created_by, updated_by
+    `SELECT id, workspace_id, tenant_id, slug, protocol, state, iam_realm, kc_client_id, kc_client_uuid, app_json, created_at, updated_at, created_by, updated_by
        FROM external_applications
       WHERE workspace_id = $1
         AND tenant_id = $2
@@ -1028,24 +1032,30 @@ export async function upsertExternalApplication(pool, {
   tenantId,
   slug,
   protocol,
-  state = 'active',
+  state = 'provisioning',
+  iamRealm = null,
+  kcClientId = null,
+  kcClientUuid = null,
   appJson,
   actorId = null,
 }) {
   const { rows } = await pool.query(
-    `INSERT INTO external_applications (id, workspace_id, tenant_id, slug, protocol, state, app_json, created_by, updated_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$8)
+    `INSERT INTO external_applications (id, workspace_id, tenant_id, slug, protocol, state, app_json, created_by, updated_by, iam_realm, kc_client_id, kc_client_uuid)
+     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$8,$9,$10,$11)
      ON CONFLICT (id) DO UPDATE
        SET slug = EXCLUDED.slug,
            protocol = EXCLUDED.protocol,
            state = EXCLUDED.state,
+           iam_realm = EXCLUDED.iam_realm,
+           kc_client_id = EXCLUDED.kc_client_id,
+           kc_client_uuid = EXCLUDED.kc_client_uuid,
            app_json = EXCLUDED.app_json,
            updated_at = NOW(),
            updated_by = EXCLUDED.updated_by
       WHERE external_applications.workspace_id = EXCLUDED.workspace_id
         AND external_applications.tenant_id = EXCLUDED.tenant_id
-     RETURNING id, workspace_id, tenant_id, slug, protocol, state, app_json, created_at, updated_at, created_by, updated_by`,
-    [id, workspaceId, tenantId, slug, protocol, state, JSON.stringify(appJson ?? {}), actorId]);
+     RETURNING id, workspace_id, tenant_id, slug, protocol, state, iam_realm, kc_client_id, kc_client_uuid, app_json, created_at, updated_at, created_by, updated_by`,
+    [id, workspaceId, tenantId, slug, protocol, state, JSON.stringify(appJson ?? {}), actorId, iamRealm, kcClientId, kcClientUuid]);
   return rows[0] ?? null;
 }
 

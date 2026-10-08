@@ -71,7 +71,7 @@ function rowFromApplication(application, overrides = {}) {
   };
 }
 
-function fakeStore({ workspace = { id: 'ws-acme', tenant_id: 'ten-acme' }, applications = [] } = {}) {
+function fakeStore({ workspace = { id: 'ws-acme', tenant_id: 'ten-acme' }, tenant = { iam_realm: 'realm-acme' }, applications = [] } = {}) {
   const calls = [];
   const rows = [...applications];
   return {
@@ -79,6 +79,10 @@ function fakeStore({ workspace = { id: 'ws-acme', tenant_id: 'ten-acme' }, appli
     async getWorkspace(_pool, workspaceId) {
       calls.push(['getWorkspace', workspaceId]);
       return workspace;
+    },
+    async getTenant(_pool, tenantId) {
+      calls.push(['getTenant', tenantId]);
+      return tenant;
     },
     async listExternalApplications(_pool, args) {
       calls.push(['listExternalApplications', args]);
@@ -97,6 +101,9 @@ function fakeStore({ workspace = { id: 'ws-acme', tenant_id: 'ten-acme' }, appli
         slug: args.slug,
         protocol: args.protocol,
         state: args.state,
+        iam_realm: args.iamRealm,
+        kc_client_id: args.kcClientId,
+        kc_client_uuid: args.kcClientUuid,
         updated_at: new Date('2026-06-30T00:01:00Z'),
       });
       const index = rows.findIndex((item) => item.id === row.id);
@@ -107,7 +114,18 @@ function fakeStore({ workspace = { id: 'ws-acme', tenant_id: 'ten-acme' }, appli
   };
 }
 
-function ctx({ method = 'GET', params = { workspaceId: 'ws-acme' }, query = {}, body = {}, identity, store } = {}) {
+function fakeKcAdmin(overrides = {}) {
+  const calls = [];
+  return {
+    calls,
+    async findClient(realm, clientId) { calls.push(['findClient', realm, clientId]); return null; },
+    async createOidcAppClient(realm, args) { calls.push(['createOidcAppClient', realm, args]); return 'kc-app-uuid'; },
+    async deleteClient(realm, uuid) { calls.push(['deleteClient', realm, uuid]); },
+    ...overrides,
+  };
+}
+
+function ctx({ method = 'GET', params = { workspaceId: 'ws-acme' }, query = {}, body = {}, identity, store, kcAdmin = fakeKcAdmin() } = {}) {
   return {
     method,
     params,
@@ -116,6 +134,7 @@ function ctx({ method = 'GET', params = { workspaceId: 'ws-acme' }, query = {}, 
     identity: identity ?? { actorType: 'tenant_owner', tenantId: 'ten-acme', sub: 'owner-1' },
     pool: {},
     store,
+    kcAdmin,
     callerContext: { correlationId: 'corr_781_unit' },
   };
 }
@@ -131,7 +150,7 @@ function assertCollectionEnvelope(body, { pageSize }) {
   if ('nextCursor' in body.page) assert.equal(typeof body.page.nextCursor, 'string');
 }
 
-function assertSchemaCompatibleIamClient(iamClient, { clientType = 'public', clientId = 'acme-portal', realm = 'ten-acme' } = {}) {
+function assertSchemaCompatibleIamClient(iamClient, { clientType = 'public', clientId = 'acme-portal', realm = 'realm-acme' } = {}) {
   assert.equal(iamClient.realm, realm);
   assert.equal(iamClient.clientId, clientId);
   assert.equal(iamClient.clientType, clientType);
@@ -197,10 +216,12 @@ test('fix-781-01b: starter templates collection uses the published page envelope
 
 test('fix-781-02: valid tenant-owner create is accepted and persisted through the local handler', async () => {
   const store = fakeStore();
+  const kcAdmin = fakeKcAdmin();
   const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({
     method: 'POST',
     body: validApplicationPayload(),
     store,
+    kcAdmin,
   }));
 
   assert.equal(res.statusCode, 202);
@@ -208,11 +229,20 @@ test('fix-781-02: valid tenant-owner create is accepted and persisted through th
   assert.equal(res.body.entityType, 'external_application');
   assert.equal(res.body.workspaceId, 'ws-acme');
   assert.equal(res.body.tenantId, 'ten-acme');
+  assert.equal(res.body.state, 'active');
+  assert.equal(res.body.desiredState, 'active');
   assert.notEqual(res.body.code, 'NO_ROUTE');
 
   const upserts = store.calls.filter(([name]) => name === 'upsertExternalApplication');
   assert.equal(upserts.length, 1);
   assert.equal(upserts[0][1].slug, 'acme-portal');
+  assert.equal(upserts[0][1].iamRealm, 'realm-acme');
+  assert.equal(upserts[0][1].kcClientId, 'acme-portal');
+  assert.equal(upserts[0][1].kcClientUuid, 'kc-app-uuid');
+  assert.deepEqual(kcAdmin.calls[0], ['findClient', 'realm-acme', 'acme-portal']);
+  assert.equal(kcAdmin.calls[1][0], 'createOidcAppClient');
+  assert.equal(kcAdmin.calls[1][1], 'realm-acme');
+  assert.equal(kcAdmin.calls[1][2].clientId, 'acme-portal');
   assertSchemaCompatibleIamClient(upserts[0][1].appJson.iamClient);
 
   const getRes = await APPLICATION_HANDLERS.getExternalApplication(ctx({
@@ -220,6 +250,7 @@ test('fix-781-02: valid tenant-owner create is accepted and persisted through th
     store,
   }));
   assert.equal(getRes.statusCode, 200);
+  assert.equal(getRes.body.state, 'active');
   assertSchemaCompatibleIamClient(getRes.body.iamClient);
 });
 
@@ -344,7 +375,9 @@ test('fix-781-08: valid provider create persists and remains compatible with ful
     state: 'active',
     validation: { status: 'valid', checks: [] },
   };
-  const store = fakeStore({ applications: [rowFromApplication(application)] });
+  const store = fakeStore({ applications: [rowFromApplication(application, {
+    iam_realm: 'realm-acme', kc_client_id: 'acme-portal', kc_client_uuid: 'kc-app-uuid',
+  })] });
 
   const res = await APPLICATION_HANDLERS.createExternalApplicationFederatedProvider(ctx({
     method: 'POST',
@@ -395,5 +428,169 @@ test('fix-781-08: valid provider create persists and remains compatible with ful
   assert.equal(update.body.entityId, 'app_existing');
   const updateUpsert = store.calls.filter(([name]) => name === 'upsertExternalApplication').at(-1);
   assert.equal(updateUpsert[1].state, 'soft_deleted');
+  assert.equal(updateUpsert[1].kcClientUuid, 'kc-app-uuid');
   assert.equal(updateUpsert[1].appJson.federatedProviders.length, 1);
+});
+
+test('fix-969: IAM creation failure is redacted and leaves no active application', async () => {
+  for (const failingMethod of ['findClient', 'createOidcAppClient']) {
+    const store = fakeStore();
+    const kcAdmin = fakeKcAdmin({
+      async [failingMethod]() {
+        throw Object.assign(new Error('admin-token-canary client-secret-canary'), { kcStatus: 500 });
+      },
+    });
+    const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({
+      store, kcAdmin, body: validApplicationPayload({ desiredState: 'active', state: 'active' }),
+    }));
+    assert.equal(res.statusCode, 502);
+    assert.equal(res.body.code, 'APPLICATION_PROVISIONING_FAILED');
+    assert.doesNotMatch(JSON.stringify(res), /admin-token-canary|client-secret-canary/);
+    assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+    assert.equal(kcAdmin.calls.some(([name]) => name === 'deleteClient'), false);
+    const list = await APPLICATION_HANDLERS.listExternalApplications(ctx({ store }));
+    assert.deepEqual(list.body.items, []);
+  }
+});
+
+test('fix-969: persistence failure deletes only the newly created client', async () => {
+  for (const failure of ['exception', 'empty-row', 'slug-conflict']) {
+    const store = fakeStore();
+    store.upsertExternalApplication = async () => {
+      if (failure === 'empty-row') return null;
+      throw Object.assign(new Error('database-secret-canary'), { code: failure === 'slug-conflict' ? '23505' : 'XX000' });
+    };
+    const kcAdmin = fakeKcAdmin();
+    const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({ store, kcAdmin, body: validApplicationPayload() }));
+    assert.equal(res.statusCode, failure === 'slug-conflict' ? 409 : 502);
+    assert.deepEqual(kcAdmin.calls.at(-1), ['deleteClient', 'realm-acme', 'kc-app-uuid']);
+    assert.doesNotMatch(JSON.stringify(res), /database-secret-canary/);
+  }
+});
+
+test('fix-969: compensation failure still returns a redacted persistence error', async () => {
+  const store = fakeStore();
+  store.upsertExternalApplication = async () => { throw new Error('persistence-secret-canary'); };
+  const kcAdmin = fakeKcAdmin({ async deleteClient() { throw new Error('cleanup-admin-token-canary'); } });
+  const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({ store, kcAdmin, body: validApplicationPayload() }));
+  assert.equal(res.statusCode, 502);
+  assert.doesNotMatch(JSON.stringify(res), /secret-canary|token-canary/);
+});
+
+test('fix-969: existing realm client and concurrent Keycloak conflict both return 409 without writing', async () => {
+  for (const concurrent of [false, true]) {
+    const store = fakeStore();
+    const kcAdmin = fakeKcAdmin(concurrent ? {
+      async createOidcAppClient() { throw Object.assign(new Error('upstream-secret-canary'), { kcStatus: 409 }); },
+    } : { async findClient() { return { id: 'existing-client' }; } });
+    const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({ store, kcAdmin, body: validApplicationPayload() }));
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.code, 'APPLICATION_CLIENT_EXISTS');
+    assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+    assert.equal(kcAdmin.calls.some(([name]) => name === 'deleteClient'), false);
+    assert.doesNotMatch(JSON.stringify(res), /upstream-secret-canary/);
+    if (!concurrent) assert.equal(kcAdmin.calls.some(([name]) => name === 'createOidcAppClient'), false);
+  }
+});
+
+for (const protocol of ['saml', 'api_key']) {
+  test(`fix-969: ${protocol} is rejected before persistence or IAM access`, async () => {
+    const store = fakeStore();
+    const kcAdmin = fakeKcAdmin();
+    const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({
+      store, kcAdmin, body: validApplicationPayload({ protocol }),
+    }));
+    assert.equal(res.statusCode, 422);
+    assert.equal(res.body.code, 'PROTOCOL_NOT_PROVISIONABLE');
+    assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+    assert.deepEqual(kcAdmin.calls, []);
+  });
+}
+
+test('fix-969: no tenant realm fails closed without IAM or persistence calls', async () => {
+  const store = fakeStore({ tenant: { iam_realm: null } });
+  const kcAdmin = fakeKcAdmin();
+  const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({ store, kcAdmin, body: validApplicationPayload() }));
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.code, 'NO_REALM');
+  assert.deepEqual(kcAdmin.calls, []);
+  assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+});
+
+test('fix-969: tenant realm and realized state override caller claims and secrets are discarded', async () => {
+  const store = fakeStore();
+  const kcAdmin = fakeKcAdmin();
+  const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({ store, kcAdmin, body: validApplicationPayload({
+    desiredState: 'deleted', state: 'suspended',
+    iamClient: { realm: 'foreign-realm', clientId: 'custom-client', clientType: 'public', clientSecret: 'client-secret-canary' },
+  }) }));
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.body.state, 'active');
+  assert.equal(kcAdmin.calls[1][1], 'realm-acme');
+  assert.equal(kcAdmin.calls[1][2].clientId, 'custom-client');
+  assert.deepEqual(store.calls.find(([name]) => name === 'getTenant'), ['getTenant', 'ten-acme']);
+  const args = store.calls.find(([name]) => name === 'upsertExternalApplication')[1];
+  assert.equal(args.iamRealm, 'realm-acme');
+  assert.equal(args.kcClientId, 'custom-client');
+  assert.doesNotMatch(JSON.stringify(args.appJson), /client-secret-canary/);
+  assert.doesNotMatch(JSON.stringify(res.body), /client-secret-canary/);
+});
+
+test('fix-969: an absent created client UUID cannot produce an active row', async () => {
+  const store = fakeStore();
+  const kcAdmin = fakeKcAdmin({ async createOidcAppClient() { return undefined; } });
+  const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({ store, kcAdmin, body: validApplicationPayload() }));
+  assert.equal(res.statusCode, 502);
+  assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+});
+
+test('fix-969: legacy reads and caller activation requests remain provisioning', async () => {
+  const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload({ state: 'active' }))] });
+  const params = { workspaceId: 'ws-acme', applicationId: 'app_existing' };
+  for (const handler of ['getExternalApplication', 'listExternalApplications']) {
+    const res = await APPLICATION_HANDLERS[handler](ctx({ store, params }));
+    const application = res.body.items ? res.body.items[0] : res.body;
+    assert.equal(application.state, 'provisioning');
+    assert.equal(application.iamClient, undefined);
+  }
+  const update = await APPLICATION_HANDLERS.updateExternalApplication(ctx({
+    store, params, body: { displayName: 'Legacy updated', state: 'active', desiredState: 'active' },
+  }));
+  assert.equal(update.statusCode, 202);
+  assert.equal(update.body.desiredState, 'provisioning');
+  assert.equal(store.calls.find(([name]) => name === 'upsertExternalApplication')[1].state, 'provisioning');
+  const get = await APPLICATION_HANDLERS.getExternalApplication(ctx({ store, params }));
+  assert.equal(get.body.state, 'provisioning');
+  assert.equal(get.body.iamClient, undefined);
+});
+
+test('fix-969: realized IAM configuration and identity changes are rejected without writing', async () => {
+  for (const body of [
+    { iamClient: { realm: 'foreign-realm' } }, { iamClient: { clientId: 'other-client' } },
+    { iamClient: { clientType: 'confidential' } }, { protocol: 'saml' },
+    { redirectUris: ['https://changed.example.test/cb'] },
+    { login: { redirectUris: ['https://changed.example.test/cb'] } },
+    { iamClient: { redirectUris: ['https://changed.example.test/cb'] } },
+    { authenticationFlows: ['oidc_client_credentials'] },
+  ]) {
+    const store = fakeStore({ applications: [rowFromApplication(validApplicationPayload(), {
+      iam_realm: 'realm-acme', kc_client_id: 'acme-portal', kc_client_uuid: 'kc-app-uuid',
+    })] });
+    const kcAdmin = fakeKcAdmin();
+    const res = await APPLICATION_HANDLERS.updateExternalApplication(ctx({
+      store, kcAdmin, params: { workspaceId: 'ws-acme', applicationId: 'app_existing' }, body,
+    }));
+    assert.equal([409, 422].includes(res.statusCode), true, JSON.stringify(body));
+    assert.equal(store.calls.some(([name]) => name === 'upsertExternalApplication'), false);
+    assert.deepEqual(kcAdmin.calls, []);
+  }
+});
+
+test('fix-969: a foreign workspace is rejected before tenant resolution or client creation', async () => {
+  const store = fakeStore({ workspace: { id: 'ws-acme', tenant_id: 'ten-other' } });
+  const kcAdmin = fakeKcAdmin();
+  const res = await APPLICATION_HANDLERS.createExternalApplication(ctx({ store, kcAdmin, body: validApplicationPayload() }));
+  assert.equal(res.statusCode, 404);
+  assert.deepEqual(store.calls, [['getWorkspace', 'ws-acme']]);
+  assert.deepEqual(kcAdmin.calls, []);
 });

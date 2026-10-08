@@ -1,0 +1,76 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE } from '../../apps/control-plane/kc-admin.mjs';
+
+test('external OIDC clients configure declared flows, PKCE and redirect URIs without retrieving secrets', async () => {
+  const originalFetch = globalThis.fetch;
+  const clients = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (url.endsWith('/realms/master/protocol/openid-connect/token')) {
+      return new Response(JSON.stringify({ access_token: 'test-admin-token', expires_in: 300 }));
+    }
+    assert.ok(url.endsWith('/admin/realms/tenant%2Frealm/clients'), 'only the client creation endpoint is called');
+    assert.equal(init.method, 'POST');
+    clients.push(JSON.parse(init.body));
+    return new Response(null, { status: 201, headers: { location: `${url}/client-${clients.length}` } });
+  };
+  try {
+    for (const [clientType, authenticationFlows] of [
+      ['public', ['oidc_authorization_code_pkce']],
+      ['confidential', ['oidc_authorization_code_client_secret', 'oidc_client_credentials']],
+      ['confidential', ['oidc_client_credentials']],
+    ]) {
+      const uuid = await kcAdmin.createOidcAppClient('tenant/realm', {
+        clientId: 'registered-app', name: 'Registered app', clientType, authenticationFlows,
+        redirectUris: ['https://app.example.test/callback'], webOrigins: ['https://app.example.test'],
+        defaultClientScopes: ['openid', 'profile'], optionalClientScopes: ['email'],
+        postLogoutRedirectUris: ['https://app.example.test/logged-out'],
+      });
+      assert.equal(uuid, `client-${clients.length}`);
+      const client = clients.at(-1);
+      assert.equal(client.clientId, 'registered-app');
+      assert.equal(client.protocol, 'openid-connect');
+      assert.equal(client.enabled, true);
+      assert.equal(client.publicClient, clientType === 'public');
+      assert.equal(client.standardFlowEnabled, authenticationFlows.some((flow) => flow.startsWith('oidc_authorization_code_')));
+      assert.equal(client.serviceAccountsEnabled, authenticationFlows.includes('oidc_client_credentials'));
+      assert.equal(client.directAccessGrantsEnabled, false);
+      assert.equal(client.attributes['pkce.code.challenge.method'], clientType === 'public' ? 'S256' : undefined);
+      assert.equal(client.attributes['in-falcone.kind'], 'external-application');
+      assert.equal(client.attributes['post.logout.redirect.uris'], 'https://app.example.test/logged-out');
+      assert.deepEqual(client.redirectUris, ['https://app.example.test/callback']);
+      assert.deepEqual(client.webOrigins, ['https://app.example.test']);
+      assert.deepEqual(client.defaultClientScopes, ['openid', 'profile']);
+      assert.deepEqual(client.optionalClientScopes, ['email']);
+      assert.equal(client.secret, undefined);
+    }
+    await kcAdmin.createConfidentialClient('tenant/realm', { clientId: 'existing-service-account' });
+    assert.equal(clients.at(-1).attributes['in-falcone.kind'], 'service-account');
+    assert.equal(clients.at(-1).standardFlowEnabled, false);
+    assert.equal(clients.at(-1).serviceAccountsEnabled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('external OIDC client creation retains safe Keycloak error handling', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (url.endsWith('/realms/master/protocol/openid-connect/token')) {
+      return new Response(JSON.stringify({ access_token: 'test-admin-token', expires_in: 300 }));
+    }
+    return new Response(JSON.stringify({ secret: 'upstream-secret-canary' }), { status: 500 });
+  };
+  try {
+    await assert.rejects(kcAdmin.createOidcAppClient('tenant/realm', {
+      clientId: 'app', clientType: 'public', authenticationFlows: ['oidc_authorization_code_pkce'],
+    }), (error) => {
+      assert.equal(error.kcStatus, 500);
+      assert.equal(error.message, KEYCLOAK_ADMIN_SAFE_MESSAGE);
+      assert.doesNotMatch(JSON.stringify(error), /upstream-secret-canary|test-admin-token/);
+      return true;
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

@@ -430,15 +430,45 @@ export const kcAdmin = {
     const list = (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients?clientId=${encodeURIComponent(clientId)}`)).json ?? [];
     return list[0] ?? null;
   },
-  async createConfidentialClient(realm, { clientId, name, serviceAccountsEnabled = true }) {
+  async createConfidentialClient(realm, {
+    clientId, name, serviceAccountsEnabled = true, standardFlowEnabled = false,
+    redirectUris, webOrigins, defaultClientScopes, optionalClientScopes, protocolMappers,
+    frontchannelLogout, frontchannelLogoutUrl, attributes = { 'in-falcone.kind': 'service-account' },
+  }) {
     const created = await kc('POST', `/realms/${encodeURIComponent(realm)}/clients`, {
       clientId, name: name ?? clientId, enabled: true, protocol: 'openid-connect',
-      publicClient: false, serviceAccountsEnabled, standardFlowEnabled: false, directAccessGrantsEnabled: false,
-      attributes: { 'in-falcone.kind': 'service-account' }
+      publicClient: false, serviceAccountsEnabled, standardFlowEnabled, directAccessGrantsEnabled: false,
+      redirectUris, webOrigins, defaultClientScopes, optionalClientScopes, protocolMappers,
+      frontchannelLogout, frontchannelLogoutUrl, attributes,
     });
     let uuid = created.id;
     if (!uuid) { const c = await this.findClient(realm, clientId); uuid = c?.id; }
     return uuid;
+  },
+  // External OIDC applications: enable only their declared flows; never fetch a client secret.
+  async createOidcAppClient(realm, {
+    clientId, name, clientType, authenticationFlows = [], redirectUris = [], webOrigins = [],
+    defaultClientScopes = [], optionalClientScopes = [], postLogoutRedirectUris = [],
+    frontChannelLogoutUri, backChannelLogoutUri, protocolMappers = [],
+  }) {
+    const publicClient = clientType === 'public';
+    const configuration = {
+      clientId, name: name ?? clientId, enabled: true, protocol: 'openid-connect', publicClient,
+      standardFlowEnabled: authenticationFlows.some((flow) => flow.startsWith('oidc_authorization_code_')),
+      serviceAccountsEnabled: !publicClient && authenticationFlows.includes('oidc_client_credentials'),
+      directAccessGrantsEnabled: false,
+      redirectUris, webOrigins, defaultClientScopes, optionalClientScopes, protocolMappers,
+      ...(frontChannelLogoutUri ? { frontchannelLogout: true, frontchannelLogoutUrl: frontChannelLogoutUri } : {}),
+      attributes: {
+        'in-falcone.kind': 'external-application',
+        ...(publicClient ? { 'pkce.code.challenge.method': 'S256' } : {}),
+        ...(postLogoutRedirectUris.length ? { 'post.logout.redirect.uris': postLogoutRedirectUris.join('##') } : {}),
+        ...(backChannelLogoutUri ? { 'backchannel.logout.url': backChannelLogoutUri } : {}),
+      },
+    };
+    if (!publicClient) return this.createConfidentialClient(realm, configuration);
+    const created = await kc('POST', `/realms/${encodeURIComponent(realm)}/clients`, configuration);
+    return created.id ?? (await this.findClient(realm, clientId))?.id;
   },
   // Per-tenant app client in the tenant realm (fix-tenant-realm-token-issuance, A3): a public
   // client with the password (ROPC) + standard flows enabled, so tenant owners/users in the realm
