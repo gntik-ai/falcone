@@ -131,6 +131,9 @@ test('bbx-1026-005: untrusted tags are not interpolated into run scripts and no 
   }
   assert.equal(workflow.permissions?.contents, 'read');
   assert.equal(workflow.permissions?.packages, 'write');
-  assert.doesNotMatch(workflowText, /secrets\.(?!GITHUB_TOKEN)/);
+  // Only the GHCR token and the Docker Hub pull credentials (authenticated base-image pulls).
+  assert.doesNotMatch(workflowText, /secrets\.(?!(?:GITHUB_TOKEN|DOCKERHUB_USERNAME|DOCKERHUB_TOKEN)\b)/);
+  const dockerHubUses = workflowText.match(/secrets\.DOCKERHUB_(?:USERNAME|TOKEN)\b/g) ?? [];
+  assert.equal(dockerHubUses.length, 2, 'Docker Hub secrets are used once each, by the docker.io login');
   assert.doesNotMatch(workflowText, /(?:token|password)\s*:\s*.*\bPAT\b/i);
 });
