@@ -27,6 +27,7 @@ COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
      apps/control-plane/jwt-verify.mjs apps/control-plane/sa-revocation.mjs \
      apps/control-plane/kc-admin.mjs apps/control-plane/social-providers.mjs \
      apps/control-plane/tenant-store.mjs \
+     apps/control-plane/invitation-handlers.mjs apps/control-plane/tenant-user-handlers.mjs \
      apps/control-plane/b-handlers.mjs apps/control-plane/auth-handlers.mjs \
      apps/control-plane/saga.mjs apps/control-plane/dataplane.mjs \
      apps/control-plane/schema-retry.mjs apps/control-plane/tenant-scope.mjs \
