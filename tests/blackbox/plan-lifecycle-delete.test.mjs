@@ -92,7 +92,12 @@ function makePlanStore({ plans = [], assignments = [] } = {}) {
     async query(sqlText, params = []) {
       const sql = normalized(sqlText);
 
-      if (/^(BEGIN|COMMIT|ROLLBACK)\b/i.test(sql) || /^SET LOCAL\b/i.test(sql)) return { rows: [] };
+      if (/^(BEGIN|COMMIT|ROLLBACK)\b/i.test(sql) || /^SET LOCAL\b/i.test(sql) || sql.includes('pg_advisory_xact_lock')) return { rows: [] };
+
+      if (sql.startsWith('SELECT row_hash')) {
+        const head = auditEvents.filter((event) => event.params[3] === params[0]).at(-1);
+        return { rows: head ? [{ row_hash: head.params[10], created_at: head.params[8] }] : [] };
+      }
 
       if (/INSERT INTO plan_audit_events\b/i.test(sql)) {
         auditEvents.push({ sql, params });

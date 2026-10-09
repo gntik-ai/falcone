@@ -3,8 +3,9 @@
 // Each audit row is linked to its per-tenant predecessor by a hash chain:
 //   row_hash = SHA-256( canonical(row) || prev_hash )
 // where prev_hash is the previous row's row_hash for the same tenant (genesis '').
-// Altering any hashed field, or deleting/reordering a row, breaks the chain — so
-// the log is append-only / tamper-evident and a tenant can verify its own slice.
+// Altering hashed content or links, or deleting/reordering rows before a retained
+// successor, breaks the chain. A terminal suffix deletion needs a trusted head to
+// detect; a historical genesis reset can also hide earlier prefix deletion.
 //
 // These helpers are PURE (no I/O) and used on both sides: the writer
 // (audit-store.recordAuditEvent) computes the hash; verifyAuditChain re-derives it.
@@ -51,25 +52,22 @@ const rh = (row) => row.row_hash ?? row.rowHash ?? '';
 const ph = (row) => row.prev_hash ?? row.prevHash ?? '';
 
 /**
- * Verify a per-tenant chain of audit rows in ASCENDING (oldest-first) order.
- * For each row: (content) `row_hash` must re-derive from the row's content and its
- * stored `prev_hash`; (link) every row after the first in the window must carry a
- * `prev_hash` equal to the previous row's `row_hash`. This works on a contiguous
- * WINDOW (a paged read need not start at genesis); to additionally assert a full
- * log starts at the beginning, check `rows[0].prev_hash === ''` separately.
- * Returns the index of the first broken row, or `{ valid: true, brokenAt: null }`.
+ * Verify a per-scope chain in ASCENDING (oldest-first) order. Unhashed rows
+ * anywhere are invalid, including legacy rows. By default this is full-log mode:
+ * the first row must have the genesis prev_hash ''. For a contiguous window, pass
+ * { expectedAnchor } containing the trusted predecessor's row_hash. The first
+ * row must match that anchor; every later row must link to its predecessor.
+ * Content hashes are always re-derived. Returns the first broken row's index.
+ * This cannot detect deletion after the last retained row without a trusted head.
  */
-export function verifyAuditChain(rowsAscending = []) {
-  // Skip the pre-migration prefix: rows written before the hash chain existed have
-  // no row_hash. Verification covers the hashed suffix (all post-migration rows for
-  // a tenant are newer than any legacy row, so the un-hashed rows are a leading run).
-  let start = 0;
-  while (start < rowsAscending.length && !rh(rowsAscending[start])) start++;
-  for (let i = start; i < rowsAscending.length; i++) {
+export function verifyAuditChain(rowsAscending = [], { expectedAnchor = '' } = {}) {
+  for (let i = 0; i < rowsAscending.length; i++) {
     const row = rowsAscending[i];
+    if (!rh(row) || (row.prev_hash ?? row.prevHash) == null) return { valid: false, brokenAt: i };
+    if (i === 0 && ph(row) !== expectedAnchor) return { valid: false, brokenAt: i };
     const expectedHash = computeRowHash(auditCanonical(row), ph(row));
     if (expectedHash !== rh(row)) return { valid: false, brokenAt: i };
-    if (i > start && ph(row) !== rh(rowsAscending[i - 1])) return { valid: false, brokenAt: i };
+    if (i > 0 && ph(row) !== rh(rowsAscending[i - 1])) return { valid: false, brokenAt: i };
   }
   return { valid: true, brokenAt: null };
 }

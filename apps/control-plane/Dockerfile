@@ -76,6 +76,9 @@ COPY packages/webhook-engine            /repo/packages/webhook-engine
 # exits (server.mjs) -> CrashLoopBackOff on any build after v0.6.3.
 COPY packages/workspace-docs-service    /repo/packages/workspace-docs-service
 COPY apps/control-plane-executor                 /repo/apps/control-plane-executor
+# Orchestrator audit writers resolve their shared append seam relative to /repo.
+COPY apps/control-plane/audit-store.mjs           /repo/apps/control-plane/audit-store.mjs
+COPY apps/control-plane/audit-hash.mjs            /repo/apps/control-plane/audit-hash.mjs
 COPY apps/control-plane/kc-admin.mjs              /repo/apps/control-plane/kc-admin.mjs
 COPY apps/control-plane/social-providers.mjs      /repo/apps/control-plane/social-providers.mjs
 COPY scripts/backfill-tenant-realm-audience.mjs    /repo/scripts/backfill-tenant-realm-audience.mjs

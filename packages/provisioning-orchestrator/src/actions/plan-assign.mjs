@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { appendPlanAudit } from '../repositories/plan-audit-repository.mjs';
 import * as planRepository from '../repositories/plan-repository.mjs';
 import * as assignmentRepository from '../repositories/plan-assignment-repository.mjs';
 import * as effectiveEntitlementsRepository from '../repositories/effective-entitlements-repository.mjs';
@@ -26,14 +27,6 @@ async function ensureTenantExists(db, tenantId) {
     throw error;
   }
   return true;
-}
-
-async function insertAudit(db, input) {
-  await db.query(
-    `INSERT INTO plan_audit_events (action_type, actor_id, tenant_id, plan_id, previous_state, new_state, correlation_id)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
-    [input.actionType, input.actorId, input.tenantId ?? null, input.planId ?? null, input.previousState ? JSON.stringify(input.previousState) : null, JSON.stringify(input.newState), input.correlationId]
-  );
 }
 
 export async function main(params = {}, overrides = {}) {
@@ -77,11 +70,11 @@ export async function main(params = {}, overrides = {}) {
       capabilityImpacts
     });
     if (result.previousPlanId) {
-      await insertAudit(db, { actionType: 'assignment.superseded', actorId: actor.id, tenantId: params.tenantId, planId: result.previousPlanId, previousState: { tenantId: params.tenantId, planId: result.previousPlanId }, newState: { tenantId: params.tenantId, supersededByPlanId: params.planId }, correlationId });
+      await appendPlanAudit(db, { actionType: 'assignment.superseded', actorId: actor.id, tenantId: params.tenantId, planId: result.previousPlanId, previousState: { tenantId: params.tenantId, planId: result.previousPlanId }, newState: { tenantId: params.tenantId, supersededByPlanId: params.planId }, correlationId });
       await emitPlanEvent(producer, 'assignment.superseded', { correlationId, actorId: actor.id, tenantId: params.tenantId, planId: result.previousPlanId, previousState: { tenantId: params.tenantId, planId: result.previousPlanId }, newState: { tenantId: params.tenantId, supersededByPlanId: params.planId } });
     }
-    await insertAudit(db, { actionType: 'assignment.created', actorId: actor.id, tenantId: params.tenantId, planId: params.planId, previousState: result.previousPlanId ? { tenantId: params.tenantId, planId: result.previousPlanId } : null, newState: result.assignment, correlationId });
-    await insertAudit(db, { actionType: 'plan.change_impact_recorded', actorId: actor.id, tenantId: params.tenantId, planId: params.planId, previousState: result.previousPlanId ? { tenantId: params.tenantId, planId: result.previousPlanId } : null, newState: { historyEntryId: result.historyEntry?.historyEntryId, correlationId, changeDirection, overLimitDimensionCount }, correlationId });
+    await appendPlanAudit(db, { actionType: 'assignment.created', actorId: actor.id, tenantId: params.tenantId, planId: params.planId, previousState: result.previousPlanId ? { tenantId: params.tenantId, planId: result.previousPlanId } : null, newState: result.assignment, correlationId });
+    await appendPlanAudit(db, { actionType: 'plan.change_impact_recorded', actorId: actor.id, tenantId: params.tenantId, planId: params.planId, previousState: result.previousPlanId ? { tenantId: params.tenantId, planId: result.previousPlanId } : null, newState: { historyEntryId: result.historyEntry?.historyEntryId, correlationId, changeDirection, overLimitDimensionCount }, correlationId });
     await emitPlanEvent(producer, 'assignment.created', { correlationId, actorId: actor.id, tenantId: params.tenantId, planId: params.planId, previousState: result.previousPlanId ? { tenantId: params.tenantId, planId: result.previousPlanId } : null, newState: result.assignment });
     await emitChangeImpactRecorded(producer, { ...result.historyEntry, planAssignmentId: result.assignment.assignmentId });
     recordMetric(metricRecorder, plan_change_history_write_total, 1, { result: 'success' });

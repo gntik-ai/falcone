@@ -98,10 +98,12 @@ export function auditActionCategoryForType(actionType, explicitCategory = null) 
 // audit row either commit together or all roll back. HTTP callers continue to use
 // recordAuditEvent(), which owns the surrounding transaction below.
 export async function recordAuditEventInTransaction(client, {
-  actionType, actorId, tenantId = null, workspaceId = null, outcome = 'succeeded',
+  actionType, actorId, tenantId = null, planId = null, workspaceId = null, outcome = 'succeeded',
   previousState = null, newState = {}, correlationId = null
 } = {}, { id = randomUUID(), createdAt = new Date().toISOString() } = {}) {
-  const merged = workspaceId ? { ...(newState ?? {}), workspaceId } : (newState ?? {});
+  // Hash the JSON that will actually round-trip through JSONB: plan states can
+  // contain Date values and undefined optional properties.
+  const merged = JSON.parse(JSON.stringify(workspaceId ? { ...(newState ?? {}), workspaceId } : (newState ?? {})));
   const at = String(actionType ?? 'action').slice(0, 64);
   const actor = String(actorId ?? 'unknown');
   const tid = tenantId ?? null;
@@ -111,16 +113,23 @@ export async function recordAuditEventInTransaction(client, {
   // platform-global (tenant_id NULL) chain.
   await client.query('SELECT pg_advisory_xact_lock(hashtext($1)::int8)', [`audit:${tid ?? 'global'}`]);
   const prev = await client.query(
-    'SELECT row_hash FROM plan_audit_events WHERE tenant_id IS NOT DISTINCT FROM $1 ORDER BY created_at DESC, id DESC LIMIT 1',
+    'SELECT row_hash, created_at FROM plan_audit_events WHERE tenant_id IS NOT DISTINCT FROM $1 AND row_hash IS NOT NULL ORDER BY created_at DESC, id DESC LIMIT 1',
     [tid]
   );
   const prevHash = prev.rows[0]?.row_hash ?? '';
+  // The head/read order is (created_at, id). Equal millisecond timestamps plus
+  // random UUIDs, or a clock moving backwards while waiting for the lock, must
+  // not put the new row before its predecessor.
+  const previousTime = new Date(prev.rows[0]?.created_at).getTime();
+  if (Number.isFinite(previousTime) && new Date(createdAt).getTime() <= previousTime) {
+    createdAt = new Date(previousTime + 1).toISOString();
+  }
   const rowHash = computeRowHash(auditCanonical({ id, actionType: at, actorId: actor, tenantId: tid, outcome, createdAt, newState: merged }), prevHash);
   const res = await client.query(
     `INSERT INTO plan_audit_events (id, action_type, actor_id, tenant_id, plan_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash)
-     VALUES ($1,$2,$3,$4,NULL,$5::jsonb,$6::jsonb,$7,$8,$9,$10,$11)
-     RETURNING id, action_type, actor_id, tenant_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash`,
-    [id, at, actor, tid, previousState == null ? null : JSON.stringify(previousState), JSON.stringify(merged ?? {}), outcome, correlationId ?? null, createdAt, prevHash, rowHash]
+     VALUES ($1,$2,$3,$4,$12,$5::jsonb,$6::jsonb,$7,$8,$9,$10,$11)
+     RETURNING id, action_type, actor_id, tenant_id, plan_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash`,
+    [id, at, actor, tid, previousState == null ? null : JSON.stringify(previousState), JSON.stringify(merged ?? {}), outcome, correlationId ?? null, createdAt, prevHash, rowHash, planId]
   );
   return res.rows[0] ?? null;
 }
@@ -130,7 +139,10 @@ export async function recordAuditEventInTransaction(client, {
 // The durable platform-maintenance lifecycle instead calls the transactional seam
 // above directly and treats an audit failure as a transaction failure.
 export async function recordAuditEvent(db, event = {}) {
-  const usePooled = typeof db.connect === 'function';
+  // pg.Client and PoolClient also expose connect(), but reconnecting an already
+  // connected client fails. totalCount is the Pool's public connection counter;
+  // only check out and release a connection when this function owns the checkout.
+  const usePooled = typeof db.connect === 'function' && typeof db.totalCount === 'number';
   const client = usePooled ? await db.connect() : db;
   try {
     await client.query('BEGIN');

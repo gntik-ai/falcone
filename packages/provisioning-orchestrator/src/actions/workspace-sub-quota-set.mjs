@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { appendPlanAudit } from '../repositories/plan-audit-repository.mjs';
 import { validateSubQuotaValue } from '../models/workspace-sub-quota.mjs';
 import { dimensionKeyExists } from '../repositories/quota-dimension-catalog-repository.mjs';
 import { resolveUnifiedEntitlements } from '../repositories/effective-entitlements-repository.mjs';
@@ -23,14 +24,6 @@ function authorize(params) {
   throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
 }
 
-async function insertAudit(db, event) {
-  if (db._planAuditEvents !== undefined) {
-    db._planAuditEvents.push({ id: randomUUID(), created_at: new Date().toISOString(), ...event });
-    return;
-  }
-  await db.query(`INSERT INTO plan_audit_events (action_type, actor_id, tenant_id, plan_id, previous_state, new_state, correlation_id) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`, [event.action_type, event.actor_id, event.tenant_id, null, JSON.stringify(event.previous_state ?? null), JSON.stringify(event.new_state ?? {}), event.correlation_id ?? null]);
-}
-
 export async function main(params = {}, overrides = {}) {
   const db = overrides.db ?? params.db;
   const producer = overrides.producer ?? params.producer;
@@ -47,7 +40,7 @@ export async function main(params = {}, overrides = {}) {
     }
     const correlationId = params.correlationId ?? randomUUID();
     await emitSubQuotaSet({ tenantId: params.tenantId, workspaceId: params.workspaceId, dimensionKey: params.dimensionKey, previousValue: result.previousValue, newValue: params.allocatedValue, actor: actor.id, timestamp: new Date().toISOString() }, producer);
-    await insertAudit(db, { action_type: 'quota.sub_quota.set', actor_id: actor.id, tenant_id: params.tenantId, previous_state: result.previousValue === null ? null : { allocatedValue: result.previousValue }, new_state: { workspaceId: params.workspaceId, dimensionKey: params.dimensionKey, allocatedValue: params.allocatedValue }, correlation_id: correlationId });
+    await appendPlanAudit(db, { action_type: 'quota.sub_quota.set', actor_id: actor.id, tenant_id: params.tenantId, previous_state: result.previousValue === null ? null : { allocatedValue: result.previousValue }, new_state: { workspaceId: params.workspaceId, dimensionKey: params.dimensionKey, allocatedValue: params.allocatedValue }, correlation_id: correlationId });
     return { statusCode: result.isNew ? 201 : 200, body: { subQuotaId: result.subQuota.id, tenantId: result.subQuota.tenantId, workspaceId: result.subQuota.workspaceId, dimensionKey: result.subQuota.dimensionKey, allocatedValue: result.subQuota.allocatedValue, changed: true, createdBy: result.subQuota.createdBy, updatedBy: result.subQuota.updatedBy, createdAt: result.subQuota.createdAt, updatedAt: result.subQuota.updatedAt } };
   } catch (error) {
     error.statusCode = error.statusCode ?? ERROR_STATUS_CODES[error.code] ?? 500;

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { appendPlanAudit } from '../repositories/plan-audit-repository.mjs';
 import { Plan } from '../models/plan.mjs';
 import * as planRepository from '../repositories/plan-repository.mjs';
 import * as catalogRepository from '../repositories/boolean-capability-catalog-repository.mjs';
@@ -10,14 +11,6 @@ function requireSuperadmin(params) {
   const actor = params.callerContext?.actor;
   if (!actor?.id || actor.type !== 'superadmin') throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
   return actor;
-}
-
-async function insertAudit(db, { actionType, actorId, tenantId = null, planId = null, previousState = null, newState, correlationId }) {
-  await db.query(
-    `INSERT INTO plan_audit_events (action_type, actor_id, tenant_id, plan_id, previous_state, new_state, correlation_id)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
-    [actionType, actorId, tenantId, planId, previousState ? JSON.stringify(previousState) : null, JSON.stringify(newState), correlationId]
-  );
 }
 
 export async function main(params = {}, overrides = {}) {
@@ -39,7 +32,7 @@ export async function main(params = {}, overrides = {}) {
     }
     const created = await planRepository.create(db, plan);
     const correlationId = params.correlationId ?? randomUUID();
-    await insertAudit(db, { actionType: 'plan.created', actorId: actor.id, planId: created.id, newState: created, correlationId });
+    await appendPlanAudit(db, { actionType: 'plan.created', actorId: actor.id, planId: created.id, newState: created, correlationId });
     await emitPlanEvent(producer, 'plan.created', { correlationId, actorId: actor.id, planId: created.id, newState: created });
     return { statusCode: 201, body: created };
   } catch (error) {
