@@ -65,9 +65,14 @@ export const routes = [
   { method: 'POST', path: '/v1/tenants/{tenantId}/users', localHandler: 'createTenantUser', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/tenants/{tenantId}/users', localHandler: 'listTenantUsers', auth: 'authenticated' },
   // Invite-by-email members (#759): the public API route is tenant-addressed, while a workspace
-  // invite carries body.workspaceId. The local handler persists a masked/hash invitation record and
+  // invite carries body.workspaceId. The local handler persists keyed identifiers and a single-use token hash and
   // authorizes tenant owner/admin or workspace owner/admin for the verified target workspace.
   { method: 'POST', path: '/v1/tenants/{tenantId}/invitations', localHandler: 'createInvitation', auth: 'authenticated' },
+  { method: 'GET', path: '/v1/tenants/{tenantId}/invitations', localHandler: 'listInvitations', auth: 'authenticated' },
+  { method: 'GET', path: '/v1/tenants/{tenantId}/invitations/{invitationId}', localHandler: 'getInvitation', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance', localHandler: 'acceptInvitation', auth: 'public', optionalIdentity: true },
+  { method: 'POST', path: '/v1/tenants/{tenantId}/invitations/{invitationId}/revocation', localHandler: 'revokeInvitation', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/tenants/{tenantId}/invitations/{invitationId}/resend', localHandler: 'resendInvitation', auth: 'authenticated' },
 
   // project auth-config (#568): owner enables auth methods + social IdPs for THEIR OWN project's
   // realm (handler authorizes own-tenant; cross-tenant → 403). Were NO_ROUTE (KC-admin only).

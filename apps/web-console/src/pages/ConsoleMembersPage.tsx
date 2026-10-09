@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PermissionDeniedNotice } from '@/components/console/PermissionDeniedNotice'
 import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
+import { ConsoleInvitationList } from '@/components/console/ConsoleInvitationList'
 import { InviteUserWizard } from '@/components/console/wizards/InviteUserWizard'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError, getConsoleErrorStatus } from '@/lib/console-errors'
@@ -99,6 +100,7 @@ export function ConsoleMembersPage() {
   const [rolesReloadKey, setRolesReloadKey] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [invitationsReloadKey, setInvitationsReloadKey] = useState(0)
 
   const reloadUsers = useCallback(() => {
     setUsersReloadKey((current) => current + 1)
@@ -257,7 +259,9 @@ export function ConsoleMembersPage() {
         </div>
       </header>
 
-      {canManageMembers ? <InviteUserWizard open={inviteOpen} onOpenChange={setInviteOpen} /> : null}
+      {canManageMembers ? <InviteUserWizard open={inviteOpen} onOpenChange={open => { setInviteOpen(open); if (!open) setInvitationsReloadKey(value => value + 1) }} /> : null}
+
+      {canManageMembers ? <ConsoleInvitationList tenantId={activeTenant.tenantId} reloadKey={invitationsReloadKey} /> : null}
 
       {createOpen && canManageMembers ? (
         <CreateUserPanel

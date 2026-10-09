@@ -1,0 +1,55 @@
+// Run only against an isolated CI database; each test uses its own schema.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import * as store from '../../../apps/control-plane/tenant-store.mjs';
+
+async function isolatedDatabase(run) {
+  const { default: pg } = await import('pg');
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  const schema = `invitation_test_${randomUUID().replaceAll('-', '')}`;
+  try {
+    await client.query(`CREATE SCHEMA ${schema}`);
+    await client.query(`SET search_path TO ${schema}, public`);
+    await run(client, schema, pg);
+  } finally {
+    await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    await client.end();
+  }
+}
+
+test('975: legacy rows expire and masked emails are cleared on an idempotent migration', { skip: !process.env.DATABASE_URL && 'Isolated PostgreSQL DATABASE_URL is unavailable' }, async () => {
+  await isolatedDatabase(async client => {
+    await client.query(`CREATE TABLE tenant_invitations (
+      id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, workspace_id TEXT, email_hash TEXT NOT NULL,
+      masked_email TEXT, role TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', expires_at TIMESTAMPTZ NOT NULL,
+      metadata JSONB NOT NULL DEFAULT '{}', target_bindings JSONB NOT NULL DEFAULT '[]',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_by TEXT)`);
+    await client.query(`INSERT INTO tenant_invitations (id, tenant_id, email_hash, masked_email, role, expires_at, status)
+      VALUES ('legacy', 'tenant-test', 'old-unkeyed-digest', 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'pending'),
+             ('legacy-accepted', 'tenant-test', 'old-unkeyed-digest', 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'accepted')`);
+    await store.ensureSchema(client);
+    const first = await store.listInvitations(client, 'tenant-test');
+    assert.equal(first.length, 2);
+    assert.ok(first.every(row => row.status === 'expired' && row.masked_email === null && row.token_hash === null));
+    await store.ensureSchema(client);
+    assert.deepEqual(await store.listInvitations(client, 'tenant-test'), first);
+  });
+});
+
+test('975: PostgreSQL conditional claim admits exactly one concurrent acceptance', { skip: !process.env.DATABASE_URL && 'Isolated PostgreSQL DATABASE_URL is unavailable' }, async () => {
+  await isolatedDatabase(async (client, schema, pg) => {
+    await store.ensureSchema(client);
+    await store.insertInvitation(client, { id: 'inv-test', tenantId: 'tenant-test', role: 'tenant_viewer',
+      emailHash: 'a'.repeat(64), tokenHash: 'b'.repeat(64), emailHmacKeyId: 'test-key', expiresAt: '2099-01-01T00:00:00Z' });
+    const other = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await other.connect();
+    try {
+      await other.query(`SET search_path TO ${schema}, public`);
+      const results = await Promise.all([client, other].map(db => store.claimInvitation(db, 'tenant-test', 'inv-test', 'b'.repeat(64), 'a'.repeat(64), 'test-key')));
+      assert.equal(results.filter(Boolean).length, 1);
+      assert.equal((await store.getInvitation(client, 'tenant-test', 'inv-test')).status, 'accepted');
+    } finally { await other.end(); }
+  });
+});

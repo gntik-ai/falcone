@@ -149,7 +149,10 @@ export function buildFamilyDocument(document, taxonomy, familyId) {
   const paths = Object.fromEntries(
     Object.entries(document.paths ?? {}).flatMap(([path, pathItem]) => {
       const selectedOperations = Object.fromEntries(
-        Object.entries(pathItem ?? {}).filter(([, operation]) => operationFamily(operation) === familyId)
+        Object.entries(pathItem ?? {}).filter(([, operation]) => operationFamily(operation) === familyId
+          // Tenant-addressed invitations are also IAM discovery operations. Keep their tenant
+          // routing/authorization family while publishing them in the IAM contract.
+          || (familyId === 'iam' && operationFamily(operation) === 'tenants' && operation['x-resource-type'] === 'invitation'))
       );
 
       return Object.keys(selectedOperations).length > 0 ? [[path, selectedOperations]] : [];

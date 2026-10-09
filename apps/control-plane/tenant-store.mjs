@@ -109,7 +109,7 @@ export async function ensureSchema(pool) {
   await pool.query('CREATE INDEX IF NOT EXISTS external_applications_scope_idx ON external_applications (tenant_id, workspace_id, state)');
   // ---- identity: tenant/workspace invitations ------------------------------
   // POST /v1/tenants/{tenantId}/invitations is public-contract surface used by
-  // the web console. Persist masked email + hash only; never store the raw
+  // the web console. Persist keyed HMAC + token hash only; never store the raw
   // invitee address in the control-plane registry.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tenant_invitations (
@@ -126,6 +126,13 @@ export async function ensureSchema(pool) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_by TEXT
     )`);
+  for (const [column, type] of Object.entries({
+    token_hash: 'TEXT', email_hmac_key_id: 'TEXT', accepted_at: 'TIMESTAMPTZ',
+    accepted_by: 'TEXT', revoked_at: 'TIMESTAMPTZ', revoked_by: 'TEXT', resent_at: 'TIMESTAMPTZ'
+  })) await pool.query(`ALTER TABLE tenant_invitations ADD COLUMN IF NOT EXISTS ${column} ${type}`);
+  // Unverifiable legacy invitations fail closed. No recipient hints survive the migration.
+  await pool.query("UPDATE tenant_invitations SET status='expired' WHERE token_hash IS NULL AND status<>'expired'");
+  await pool.query('UPDATE tenant_invitations SET masked_email=NULL WHERE masked_email IS NOT NULL');
   await pool.query('CREATE INDEX IF NOT EXISTS tenant_invitations_scope_idx ON tenant_invitations (tenant_id, workspace_id, status, created_at DESC)');
   // ---- data plane: one provisioned database per workspace ------------------
   await pool.query(`
@@ -916,28 +923,58 @@ export async function getWorkspaceInTenant(pool, tenantId, idOrSlug) {
        ORDER BY (id = $1) DESC LIMIT 1`, [idOrSlug, tenantId]);
   return rows[0] ?? null;
 }
+export async function getInvitation(pool, tenantId, invitationId) {
+  const { rows } = await pool.query('SELECT * FROM tenant_invitations WHERE tenant_id = $1 AND id = $2', [tenantId, invitationId]);
+  return rows[0] ?? null;
+}
+export async function getInvitationByTokenHash(pool, tenantId, tokenHash) {
+  const { rows } = await pool.query('SELECT * FROM tenant_invitations WHERE tenant_id = $1 AND token_hash = $2', [tenantId, tokenHash]);
+  return rows.length === 1 ? rows[0] : null;
+}
+export async function listInvitations(pool, tenantId, workspaceIds = null) {
+  const { rows } = await pool.query(`SELECT * FROM tenant_invitations
+    WHERE tenant_id = $1 AND ($2::text[] IS NULL OR workspace_id = ANY($2)) ORDER BY created_at DESC`, [tenantId, workspaceIds]);
+  return rows;
+}
+export async function claimInvitation(pool, tenantId, invitationId, tokenHash, emailHash, keyId) {
+  const { rows } = await pool.query(`UPDATE tenant_invitations SET status='accepted', accepted_at=NOW()
+    WHERE tenant_id=$1 AND id=$2 AND status='pending' AND expires_at>now() AND token_hash=$3
+      AND email_hash=$4 AND email_hmac_key_id=$5 RETURNING *`, [tenantId, invitationId, tokenHash, emailHash, keyId]);
+  return rows[0] ?? null;
+}
+export async function completeInvitation(pool, tenantId, invitationId, userId) {
+  const { rows } = await pool.query(`UPDATE tenant_invitations SET accepted_by=$3
+    WHERE tenant_id=$1 AND id=$2 AND status='accepted' AND accepted_by IS NULL RETURNING *`, [tenantId, invitationId, userId]);
+  return rows[0] ?? null;
+}
+export async function failInvitation(pool, tenantId, invitationId) {
+  const { rows } = await pool.query(`UPDATE tenant_invitations SET status='failed', accepted_at=NULL, accepted_by=NULL
+    WHERE tenant_id=$1 AND id=$2 AND status='accepted' AND accepted_by IS NULL RETURNING *`, [tenantId, invitationId]);
+  return rows[0] ?? null;
+}
+export async function revokeInvitation(pool, tenantId, invitationId, actorId) {
+  const { rows } = await pool.query(`UPDATE tenant_invitations SET status='revoked', revoked_at=NOW(), revoked_by=$3
+    WHERE tenant_id=$1 AND id=$2 AND status='pending' RETURNING *`, [tenantId, invitationId, actorId]);
+  return rows[0] ?? null;
+}
+export async function resendInvitation(pool, tenantId, invitationId, { tokenHash, emailHash, keyId, expiresAt }) {
+  const { rows } = await pool.query(`UPDATE tenant_invitations SET status='pending', token_hash=$3, email_hash=$4,
+    email_hmac_key_id=$5, expires_at=$6, resent_at=NOW(), masked_email=NULL,
+    accepted_at=NULL, accepted_by=NULL, revoked_at=NULL, revoked_by=NULL
+    WHERE tenant_id=$1 AND id=$2 AND status IN ('pending','expired','revoked','failed') RETURNING *`,
+    [tenantId, invitationId, tokenHash, emailHash, keyId, expiresAt]);
+  return rows[0] ?? null;
+}
 export async function insertInvitation(pool, invitation) {
   const { rows } = await pool.query(
     `INSERT INTO tenant_invitations (
-       id, tenant_id, workspace_id, email_hash, masked_email, role, status,
-       expires_at, metadata, target_bindings, created_by
-     )
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11)
-     RETURNING id, tenant_id, workspace_id, email_hash, masked_email, role,
-       status, expires_at, metadata, target_bindings, created_at, created_by`,
-    [
-      invitation.id,
-      invitation.tenantId,
-      invitation.workspaceId ?? null,
-      invitation.emailHash,
-      invitation.maskedEmail ?? null,
-      invitation.role,
-      invitation.status ?? 'pending',
-      invitation.expiresAt,
-      JSON.stringify(invitation.metadata ?? {}),
-      JSON.stringify(invitation.targetBindings ?? []),
-      invitation.createdBy ?? null
-    ]);
+       id, tenant_id, workspace_id, email_hash, token_hash, email_hmac_key_id, role,
+       expires_at, created_by, masked_email, metadata, target_bindings
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,'{}'::jsonb,'[]'::jsonb)
+     RETURNING *`,
+    [invitation.id, invitation.tenantId, invitation.workspaceId ?? null,
+      invitation.emailHash, invitation.tokenHash, invitation.emailHmacKeyId,
+      invitation.role, invitation.expiresAt, invitation.createdBy ?? null]);
   return rows[0] ?? null;
 }
 // List a tenant's first-class environments (#503): one entry per environment, each with its

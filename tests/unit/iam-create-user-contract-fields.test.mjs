@@ -62,7 +62,7 @@ test('iamCreateUser applies documented attributes, realmRoles, and bootstrapCred
     password: 'CorrectHorse12',
     temporary: false,
     enabled: true,
-    emailVerified: true,
+    emailVerified: false,
     requiredActions: [],
     attributes: body.attributes,
   });

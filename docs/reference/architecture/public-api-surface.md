@@ -540,9 +540,11 @@ Tenant lifecycle, membership, invitation, quota, and tenant-level capability sur
 | POST | `/v1/tenants/{tenantId}/exports` | tenant | tenant_export | Create a recovery-oriented functional configuration export for one tenant |
 | PATCH | `/v1/tenants/{tenantId}/iam-access` | tenant | tenant | Suspend or reactivate all tenant-managed IAM access for users and service accounts. |
 | GET | `/v1/tenants/{tenantId}/inventory` | tenant | tenant_inventory | Fetch one tenant inventory snapshot covering workspaces, applications, service accounts, and managed resources |
-| POST | `/v1/tenants/{tenantId}/invitations` | tenant | invitation | Submit an invitation write request |
+| GET | `/v1/tenants/{tenantId}/invitations` | tenant | invitation | List invitations within the caller's tenant or workspace scope |
+| POST | `/v1/tenants/{tenantId}/invitations` | tenant | invitation | Create an expiring single-use invitation and return its proof once |
 | GET | `/v1/tenants/{tenantId}/invitations/{invitationId}` | tenant | invitation | Fetch one invitation record |
-| POST | `/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance` | tenant | invitation | Accept a tenant or workspace invitation while it is still pending. |
+| POST | `/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance` | tenant | invitation | Consume a body token to create an account or link the authenticated invitee |
+| POST | `/v1/tenants/{tenantId}/invitations/{invitationId}/resend` | tenant | invitation | Rotate proof and reset expiry; accepted invitations cannot be resent |
 | POST | `/v1/tenants/{tenantId}/invitations/{invitationId}/revocation` | tenant | invitation | Revoke a pending invitation before it is accepted or expires. |
 | POST | `/v1/tenants/{tenantId}/memberships` | tenant | tenant_membership | Submit a tenant membership write request |
 | GET | `/v1/tenants/{tenantId}/memberships/{tenantMembershipId}` | tenant | tenant_membership | Fetch one tenant membership record |

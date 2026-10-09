@@ -406,6 +406,8 @@ describe('ConsoleMembersPage invite-by-email wizard (#759)', () => {
           requestId: 'req_759',
           entityType: 'invitation',
           entityId: 'inv_759',
+          token: 'a'.repeat(43),
+          expiresAt: '2099-04-01T00:00:00.000Z',
           status: 'accepted',
           acceptedEventType: 'iam.invitation.created',
           desiredState: 'active',
@@ -455,6 +457,8 @@ describe('ConsoleMembersPage invite-by-email wizard (#759)', () => {
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(/inv_759/i)
+    expect(screen.getByLabelText('Enlace de un solo uso')).toHaveValue(`${window.location.origin}/invitations/ten_alpha/inv_759#token=${'a'.repeat(43)}`)
+    expect(screen.getByRole('button', { name: /confirmar/i })).toBeDisabled()
     expect(invitationBodies).toHaveLength(1)
     expect(invitationBodies[0]).toEqual({
       email: 'guest@example.com',

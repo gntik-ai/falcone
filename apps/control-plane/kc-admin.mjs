@@ -403,7 +403,7 @@ export const kcAdmin = {
     enabled = true,
     temporary = false,
     attributes,
-    emailVerified = true,
+    emailVerified = false,
     requiredActions = [],
   }) {
     const created = await kc('POST', `/realms/${encodeURIComponent(realm)}/users`, {
@@ -428,6 +428,12 @@ export const kcAdmin = {
   },
   async listUsers(realm, { max = 100 } = {}) {
     return (await kc('GET', `/realms/${encodeURIComponent(realm)}/users?max=${max}`)).json ?? [];
+  },
+  async findUsersByEmail(realm, email) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/users?email=${encodeURIComponent(email)}&exact=true`)).json ?? [];
+  },
+  async updateUser(realm, userId, patch) {
+    await kc('PUT', `/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}`, patch);
   },
   async getUser(realm, userId) {
     return (await kc('GET', `/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}`)).json ?? null;
