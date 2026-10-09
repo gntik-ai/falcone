@@ -45,12 +45,12 @@ describe('InviteUserWizard', () => {
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.selectOptions(screen.getByLabelText(/^rol$/i), 'workspace_admin')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.click(screen.getByRole('button', { name: /siguiente/i }))
     expect(screen.getByText(/user@example.com/i)).toBeInTheDocument()
     expect(screen.getByText(/workspace_admin/i)).toBeInTheDocument()
+    expect(screen.queryByText(/^mensaje$/i)).not.toBeInTheDocument()
   })
 
-  it('[RW-04] desde resumen vuelve al paso de mensaje — RF-UI-025 / T02-AC4', async () => {
+  it('[RW-04] desde resumen vuelve al paso de rol — RF-UI-025 / T02-AC4', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter><InviteUserWizard open onOpenChange={vi.fn()} /></MemoryRouter>)
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
@@ -58,9 +58,8 @@ describe('InviteUserWizard', () => {
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.selectOptions(screen.getByLabelText(/^rol$/i), 'workspace_admin')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /anterior/i }))
-    expect(screen.getByLabelText(/mensaje/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^rol$/i)).toHaveValue('workspace_admin')
     expect(screen.getByRole('button', { name: /siguiente/i })).toBeEnabled()
   })
 
@@ -73,10 +72,11 @@ describe('InviteUserWizard', () => {
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.selectOptions(screen.getByLabelText(/^rol$/i), 'workspace_admin')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
     expect(await screen.findByText(/invite failed/i)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /anterior/i }))
+    expect(requestMock).toHaveBeenCalledWith('/v1/tenants/ten_alpha/invitations', expect.objectContaining({
+      body: { email: 'user@example.com', role: 'workspace_admin', workspaceId: 'wrk_a1' }
+    }))
     await user.click(screen.getByRole('button', { name: /anterior/i }))
     expect(screen.getByLabelText(/^rol$/i)).toHaveValue('workspace_admin')
     await user.click(screen.getByRole('button', { name: /anterior/i }))

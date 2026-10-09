@@ -38,7 +38,9 @@ never expose email identifiers, token or token hash. Pending rows past expiresAt
 
 Acceptance SHALL compare token hashes and recipient HMACs in constant time, accept proof only in the
 request body, and atomically claim an unexpired pending row with its token hash before changing
-Keycloak. Valid acceptance SHALL create or link the invitee, set emailVerified true, grant the invited
+Keycloak. Acceptance SHALL require an active tenant; suspended, deleted or unknown tenant states
+SHALL return the same generic invalid-invitation response with no identity or invitation changes.
+Valid acceptance SHALL create or link the invitee, set emailVerified true, grant the invited
 realm role and workspace binding, and set status accepted. Existing-account linking SHALL require
 that account's authenticated tenant principal and SHALL NOT overwrite a foreign workspace binding.
 Keycloak failure SHALL compensate granted access and mark the claim failed for explicit resend;
@@ -68,12 +70,28 @@ no email or token. Identity-provider failure MAY additionally append `iam.invita
 - **THEN** the token rotates and expiry resets, with new proof returned once
 - **AND** accepted invitations cannot be revoked or resent
 
+#### Scenario: Reissue under a different HMAC key
+
+- **WHEN** an authorized admin resends a legacy or old-key invitation whose recipient cannot be verified
+- **THEN** the admin-supplied address becomes the recipient under the current HMAC key
+- **AND** the invited role and workspace binding remain unchanged
+- **AND** current-key invitations can only be resent to the matching recipient
+
+#### Scenario: Inactive tenant cannot accept
+
+- **WHEN** a valid pending invitation belongs to a tenant that is not active
+- **THEN** acceptance returns the generic invalid-invitation 400 response
+- **AND** no user is created or linked, no role is granted and the invitation remains unchanged
+
 #### Scenario: Legacy migration
 
 - **WHEN** schema setup migrates pending legacy invitations without token hashes
 - **THEN** those pending rows are expired and every row's masked_email is NULL
+- **AND** every row without email_hmac_key_id has email_hash replaced with an empty non-identifying placeholder
+- **AND** keyed HMACs, including those tagged with old key ids, remain unchanged
 - **AND** accepted and revoked rows retain their lifecycle state
 - **AND** repeated migration makes no further invitation changes
+- **AND** a final schema run after old writers drain scrubs any newly written legacy recipient hints
 
 #### Scenario: Console administration and acceptance
 
@@ -89,6 +107,10 @@ Invitation-only signup SHALL reject requests without valid invitation proof with
 exactly the same acceptance path for valid proof. Public signup SHALL always create unverified users
 and SHALL NOT grant roles from pending invitations. kc-admin createUser SHALL default emailVerified
 to false and existing callers SHALL pass the flag explicitly.
+
+The IAM admin create-user API SHALL treat emailVerified as opt-in (true only when explicitly
+requested). Tenant-owner bootstrap and tenant-user creation SHALL explicitly leave email
+unverified; the invitation path alone SHALL automatically verify ownership through proof.
 
 #### Scenario: Invitation-only deployment
 

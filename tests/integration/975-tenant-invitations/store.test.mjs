@@ -22,24 +22,35 @@ async function isolatedDatabase(run) {
   }
 }
 
-test('975: pending legacy rows expire and masked emails are cleared on an idempotent migration', { skip: !databaseAvailable && 'Isolated PostgreSQL connection is unavailable' }, async () => {
+test('975: pending legacy rows expire and all unkeyed recipient hints are scrubbed idempotently', { skip: !databaseAvailable && 'Isolated PostgreSQL connection is unavailable' }, async () => {
   await isolatedDatabase(async client => {
+    const legacyDigest = 'f8a007c08360846d297596d6664244b1abef84aa96a328b44e1699da2b1e62b3';
     await client.query(`CREATE TABLE tenant_invitations (
       id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, workspace_id TEXT, email_hash TEXT NOT NULL,
       masked_email TEXT, role TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', expires_at TIMESTAMPTZ NOT NULL,
       metadata JSONB NOT NULL DEFAULT '{}', target_bindings JSONB NOT NULL DEFAULT '[]',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_by TEXT)`);
     await client.query(`INSERT INTO tenant_invitations (id, tenant_id, email_hash, masked_email, role, expires_at, status)
-      VALUES ('legacy', 'tenant-test', 'old-unkeyed-digest', 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'pending'),
-             ('legacy-accepted', 'tenant-test', 'old-unkeyed-digest', 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'accepted'),
-             ('legacy-revoked', 'tenant-test', 'old-unkeyed-digest', 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'revoked')`);
+      VALUES ('legacy', 'tenant-test', $1, 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'pending'),
+             ('legacy-accepted', 'tenant-test', $1, 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'accepted'),
+             ('legacy-revoked', 'tenant-test', $1, 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'revoked'),
+             ('legacy-expired', 'tenant-test', $1, 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'expired')`, [legacyDigest]);
+    await store.ensureSchema(client);
+    await store.insertInvitation(client, { id: 'current', tenantId: 'tenant-test', role: 'tenant_viewer',
+      emailHash: 'a'.repeat(64), tokenHash: 'b'.repeat(64), emailHmacKeyId: 'current-key', expiresAt: '2099-01-01T00:00:00Z' });
     await store.ensureSchema(client);
     const first = await store.listInvitations(client, 'tenant-test');
-    assert.equal(first.length, 3);
+    assert.equal(first.length, 5);
     assert.deepEqual(Object.fromEntries(first.map(row => [row.id, row.status])), {
-      legacy: 'expired', 'legacy-accepted': 'accepted', 'legacy-revoked': 'revoked'
+      legacy: 'expired', 'legacy-accepted': 'accepted', 'legacy-revoked': 'revoked',
+      'legacy-expired': 'expired', current: 'pending'
     });
-    assert.ok(first.every(row => row.masked_email === null && row.token_hash === null));
+    assert.ok(first.every(row => row.masked_email === null && row.email_hash !== legacyDigest));
+    assert.ok(first.filter(row => row.email_hmac_key_id === null).every(row => row.email_hash === '' && row.token_hash === null));
+    assert.equal(first.find(row => row.id === 'current').email_hash, 'a'.repeat(64));
+    await store.ensureSchema(client);
+    assert.deepEqual(await store.listInvitations(client, 'tenant-test'), first);
+    await client.query(`UPDATE tenant_invitations SET email_hash=$1, masked_email='g***t@example.invalid' WHERE id='legacy-accepted'`, [legacyDigest]);
     await store.ensureSchema(client);
     assert.deepEqual(await store.listInvitations(client, 'tenant-test'), first);
   });

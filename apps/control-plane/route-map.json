@@ -1187,7 +1187,7 @@
     "method": "POST",
     "path": "/v1/tenants/{tenantId}/invitations",
     "family": "tenants",
-    "module": "apps/control-plane/b-handlers.mjs",
+    "module": "apps/control-plane/invitation-handlers.mjs",
     "export": "createInvitation",
     "invoke": "localHandler",
     "deps": [
@@ -1938,7 +1938,7 @@
     "method": "GET",
     "path": "/v1/tenants/{tenantId}/invitations",
     "family": "tenants",
-    "module": "apps/control-plane/b-handlers.mjs",
+    "module": "apps/control-plane/invitation-handlers.mjs",
     "export": "listInvitations",
     "invoke": "localHandler",
     "deps": [
@@ -1954,7 +1954,7 @@
     "method": "GET",
     "path": "/v1/tenants/{tenantId}/invitations/{invitationId}",
     "family": "tenants",
-    "module": "apps/control-plane/b-handlers.mjs",
+    "module": "apps/control-plane/invitation-handlers.mjs",
     "export": "getInvitation",
     "invoke": "localHandler",
     "deps": [
@@ -1970,7 +1970,7 @@
     "method": "POST",
     "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance",
     "family": "tenants",
-    "module": "apps/control-plane/b-handlers.mjs",
+    "module": "apps/control-plane/invitation-handlers.mjs",
     "export": "acceptInvitation",
     "invoke": "localHandler",
     "deps": [
@@ -1986,7 +1986,7 @@
     "method": "POST",
     "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/revocation",
     "family": "tenants",
-    "module": "apps/control-plane/b-handlers.mjs",
+    "module": "apps/control-plane/invitation-handlers.mjs",
     "export": "revokeInvitation",
     "invoke": "localHandler",
     "deps": [
@@ -2002,7 +2002,7 @@
     "method": "POST",
     "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/resend",
     "family": "tenants",
-    "module": "apps/control-plane/b-handlers.mjs",
+    "module": "apps/control-plane/invitation-handlers.mjs",
     "export": "resendInvitation",
     "invoke": "localHandler",
     "deps": [

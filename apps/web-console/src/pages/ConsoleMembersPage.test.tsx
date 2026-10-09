@@ -447,11 +447,10 @@ describe('ConsoleMembersPage invite-by-email wizard (#759)', () => {
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.selectOptions(screen.getByLabelText(/^rol$/i), 'workspace_admin')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.type(screen.getByLabelText(/mensaje/i), 'Invitación desde Members')
-    await user.click(screen.getByRole('button', { name: /siguiente/i }))
 
     expect(within(dialog).getByText('guest@example.com')).toBeInTheDocument()
     expect(within(dialog).getByText('workspace_admin')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/mensaje/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^contraseña$/i)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
@@ -463,7 +462,6 @@ describe('ConsoleMembersPage invite-by-email wizard (#759)', () => {
     expect(invitationBodies[0]).toEqual({
       email: 'guest@example.com',
       role: 'workspace_admin',
-      message: 'Invitación desde Members',
       workspaceId: 'wrk_a1'
     })
     expect(invitationBodies[0]).not.toHaveProperty('password')

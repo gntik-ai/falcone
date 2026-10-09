@@ -5,17 +5,15 @@ import { WizardShell } from '@/components/console/wizards/WizardShell'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { useConsoleContext } from '@/lib/console-context'
 import { createValidation, submitWizardRequest, useWizardPermissionCheck, useWizardQuotaCheck, type WizardStepProps } from '@/lib/console-wizards'
 
-interface InviteData { workspaceId: string; email: string; role: string; message: string }
+interface InviteData { workspaceId: string; email: string; role: string }
 interface InvitationAcceptedResponse { invitationId?: string; entityId?: string; commandId?: string; id: string; token: string; expiresAt: string }
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 function WorkspaceStep({ data }: WizardStepProps<InviteData>) { return <div><Label>Área de trabajo</Label><p className="mt-2 text-sm">{data.workspaceId || 'Sin área de trabajo activa'}</p></div> }
 function EmailStep({ data, onChange, validation }: WizardStepProps<InviteData>) { return <div className="space-y-2"><Label htmlFor="invite-email">Email</Label><Input id="invite-email" value={data.email ?? ''} onChange={(e) => onChange({ email: e.target.value })} />{validation.fieldErrors.email ? <p className="text-sm text-destructive">{validation.fieldErrors.email}</p> : null}</div> }
 function RoleStep({ data, onChange, validation }: WizardStepProps<InviteData>) { return <div className="space-y-2"><Label htmlFor="invite-role">Rol</Label><Select id="invite-role" value={data.role ?? ''} onChange={(e) => onChange({ role: e.target.value })}><option value="">Selecciona un rol</option><option value="workspace_viewer">Lector de área de trabajo</option><option value="workspace_developer">Desarrollador de área de trabajo</option><option value="workspace_admin">Administrador de área de trabajo</option></Select>{validation.fieldErrors.role ? <p className="text-sm text-destructive">{validation.fieldErrors.role}</p> : null}</div> }
-function MessageStep({ data, onChange }: WizardStepProps<InviteData>) { return <div className="space-y-2"><Label htmlFor="invite-message">Mensaje</Label><Textarea id="invite-message" value={data.message ?? ''} maxLength={500} onChange={(e) => onChange({ message: e.target.value })} /></div> }
 export function InviteUserWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [proof, setProof] = useState<InvitationAcceptedResponse | null>(null)
   const { activeTenantId, activeWorkspaceId } = useConsoleContext()
@@ -35,19 +33,17 @@ export function InviteUserWizard({ open, onOpenChange }: { open: boolean; onOpen
     steps={[
       { id: 'workspace', label: 'Área de trabajo', component: WorkspaceStep, validate: (data) => createValidation(!data.workspaceId ? { workspaceId: 'Selecciona un área de trabajo.' } : {}) },
       { id: 'email', label: 'Email', component: EmailStep, validate: (data) => createValidation(!emailRegex.test(data.email ?? '') ? { email: 'Introduce un email válido.' } : {}, quota.available ? undefined : quota.reason ?? 'Sin cuota disponible.') },
-      { id: 'role', label: 'Rol', component: RoleStep, validate: (data) => createValidation(!data.role ? { role: 'Selecciona un rol.' } : {}) },
-      { id: 'message', label: 'Mensaje', component: MessageStep, validate: () => createValidation() }
+      { id: 'role', label: 'Rol', component: RoleStep, validate: (data) => createValidation(!data.role ? { role: 'Selecciona un rol.' } : {}) }
     ]}
     buildSummary={(data) => [
       { label: 'Área de trabajo', value: data.workspaceId ?? '' },
       { label: 'Email', value: data.email ?? '' },
-      { label: 'Rol', value: data.role ?? '' },
-      { label: 'Mensaje', value: data.message ?? '' }
+      { label: 'Rol', value: data.role ?? '' }
     ]}
     onSubmit={async (data) => {
       const workspaceId = data.workspaceId || activeWorkspaceId || ''
       const response = await submitWizardRequest<InvitationAcceptedResponse>(`/v1/tenants/${activeTenantId}/invitations`, {
-        email: data.email ?? '', role: data.role ?? '', message: data.message ?? '', workspaceId
+        email: data.email ?? '', role: data.role ?? '', workspaceId
       })
       setProof(response)
       return { resourceId: response.id ?? response.invitationId ?? response.entityId ?? response.commandId ?? 'invitation', resourceUrl: '/console/members' }

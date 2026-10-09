@@ -132,6 +132,9 @@ export async function ensureSchema(pool) {
   })) await pool.query(`ALTER TABLE tenant_invitations ADD COLUMN IF NOT EXISTS ${column} ${type}`);
   // Unverifiable legacy invitations fail closed. No recipient hints survive the migration.
   await pool.query("UPDATE tenant_invitations SET status='expired' WHERE token_hash IS NULL AND status='pending'");
+  // Empty is a non-identifying sentinel for the NOT NULL column. Repeat this scrub
+  // after previous-image writers drain; preserve every keyed HMAC, including old keys.
+  await pool.query("UPDATE tenant_invitations SET email_hash='' WHERE email_hmac_key_id IS NULL AND email_hash<>''");
   await pool.query('UPDATE tenant_invitations SET masked_email=NULL WHERE masked_email IS NOT NULL');
   await pool.query('CREATE INDEX IF NOT EXISTS tenant_invitations_scope_idx ON tenant_invitations (tenant_id, workspace_id, status, created_at DESC)');
   // ---- data plane: one provisioned database per workspace ------------------

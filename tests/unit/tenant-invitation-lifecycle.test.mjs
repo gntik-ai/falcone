@@ -20,12 +20,13 @@ test('975: invitation lifecycle operations reach local handlers', () => {
 function database() {
   const rows = new Map();
   const audit = [];
-  return { rows, audit, async connect() { return { query: this.query.bind(this), release() {} }; },
+  const tenant = { id: 'ten_alpha', iam_realm: 'ten_alpha', status: 'active' };
+  return { rows, audit, tenant, async connect() { return { query: this.query.bind(this), release() {} }; },
     async query(sql, args = []) {
       if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql) || /pg_advisory_xact_lock/.test(sql)) return { rows: [] };
       if (/SELECT row_hash/.test(sql)) return { rows: [] };
       if (/INSERT INTO plan_audit_events/.test(sql)) { audit.push(JSON.parse(args[5])); return { rows: [{ id: args[0] }] }; }
-      if (/FROM tenants/.test(sql)) return { rows: args[0] === 'ten_alpha' ? [{ id: 'ten_alpha', iam_realm: 'ten_alpha' }] : [] };
+      if (/FROM tenants/.test(sql)) return { rows: args[0] === 'ten_alpha' ? [{ ...tenant }] : [] };
       if (/FROM workspaces/.test(sql)) return { rows: ['wrk_alpha', 'workspace-alpha'].includes(args[0]) ? [{ id: 'wrk_alpha', tenant_id: 'ten_alpha' }] : [] };
       if (/INSERT INTO tenant_invitations/.test(sql)) {
         const [id, tenant_id, workspace_id, email_hash, token_hash, email_hmac_key_id, role, expires_at, created_by] = args;
@@ -235,7 +236,7 @@ test('975: tenant user roles remain available within identity-provider concurren
   })));
 });
 
-for (const scenario of ['invalid', 'expired', 'revoked', 'reused', 'legacy', 'wrong-email', 'other-tenant', 'old-key', 'query-token']) {
+for (const scenario of ['invalid', 'expired', 'revoked', 'reused', 'legacy', 'wrong-email', 'other-tenant', 'old-key', 'query-token', 'suspended-tenant', 'deleted-tenant', 'unknown-tenant-status']) {
   test(`975: ${scenario} acceptance changes neither membership nor invitation`, async () => {
     const { INVITATION_HANDLERS: handlers } = await import('../../apps/control-plane/invitation-handlers.mjs');
     const ctx = context();
@@ -246,6 +247,9 @@ for (const scenario of ['invalid', 'expired', 'revoked', 'reused', 'legacy', 'wr
     if (scenario === 'reused') row.status = 'accepted';
     if (scenario === 'legacy') row.token_hash = null;
     if (scenario === 'old-key') row.email_hmac_key_id = 'retired-key';
+    if (scenario === 'suspended-tenant') ctx.pool.tenant.status = 'suspended';
+    if (scenario === 'deleted-tenant') ctx.pool.tenant.status = 'deleted';
+    if (scenario === 'unknown-tenant-status') delete ctx.pool.tenant.status;
     const before = structuredClone(row);
     const kc = identityProvider();
     const body = { token: scenario === 'invalid' ? 'x'.repeat(43) : created.body.token,
@@ -316,7 +320,9 @@ test('975: every invitation contract operation has a local route mapping and IAM
   assert.deepEqual(operations.map(({ op }) => op.operationId).sort(), ['acceptInvitation', 'createInvitation', 'getInvitation', 'listInvitations', 'resendInvitation', 'revokeInvitation']);
   for (const { path, method, op } of operations) {
     assert.equal(iam.paths[path]?.[method]?.operationId, op.operationId);
-    assert.ok(mapped.some(r => r.operationId === op.operationId && r.path === path && r.method === method.toUpperCase()));
+    const mapping = mapped.find(r => r.operationId === op.operationId && r.path === path && r.method === method.toUpperCase());
+    assert.ok(mapping);
+    assert.equal(mapping.module, 'apps/control-plane/invitation-handlers.mjs');
     const route = runtime.find(r => r.path === path && r.method === method.toUpperCase());
     assert.equal(route?.localHandler, op.operationId);
     assert.equal(typeof INVITATION_HANDLERS[route.localHandler], 'function');

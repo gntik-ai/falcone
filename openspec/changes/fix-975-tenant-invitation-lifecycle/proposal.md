@@ -17,6 +17,12 @@ open to offline enumeration.
   existing workspace isolation and pre-existing roles during compensation.
 - Route invitation-only signup through acceptance; public signup and default Keycloak creation
   leave email unverified. Tenant-user collections include realm roles.
+- Intentionally make IAM admin create-user verification opt-in: emailVerified is true only when
+  explicitly requested. Tenant-owner bootstrap and tenant-user creation explicitly pass false.
+  Administrative creation alone does not prove address ownership; invitation proof does. Existing
+  tenant realms keep verifyEmail false, so this changes the verification flag without changing login.
+- Reject invitation acceptance for every tenant state other than active, before any identity lookup
+  or mutation, using the generic invalid-invitation response.
 - Add additive schema migration, safe lifecycle IAM audit events, console invitation management,
   and a public acceptance page. Publish the tenant-addressed invitation operations in IAM discovery
   while preserving their tenant gateway/authorization family.
@@ -37,6 +43,10 @@ Managed ESO delivers these through post-install/post-upgrade hooks. Startup refe
 hook-created Secret must be optional (or delivery must precede the Deployment) so Helm --wait and
 --atomic can finish before the hook runs. Missing keys make invitation routes return 503, with no
 hash fallback. No hand-applied Secret or ExternalSecret is permitted as a rollout workaround.
+The chart uses safe OpenBao reference defaults when the override is absent so --reuse-values remains
+compatible; empty, malformed or key-material references must fail template validation. This replaces
+the original missing-override template-failure test expectation. An absent delivered key instead
+fails closed at the invitation routes, as permitted by the acceptance criteria.
 
 Lifecycle event types are persisted transactionally in `plan_audit_events`, as the IAM delta's
 durable audit-event stream requires. This source implementation does not publish invitation
@@ -45,6 +55,8 @@ events to Kafka; requiring Kafka delivery would need an explicit amendment and d
 ## Risks and Rollback
 
 Pending legacy rows without token hashes become expired and all masked emails are cleared.
+Every unkeyed email_hash (email_hmac_key_id IS NULL), in every lifecycle state, becomes an empty
+non-identifying placeholder compatible with the NOT NULL column; keyed HMACs remain unchanged.
 Accepted and revoked rows retain their lifecycle state and remain unacceptable without a token.
 During a rolling update, previous-image pods can still insert masked emails and tokenless pending
 rows after schema setup. Those rows cannot be accepted, but their recipient hints persist until
@@ -52,6 +64,9 @@ the next ensureSchema run after old pods stop (also on rollback to an older writ
 never writes recipient hints. The release gate must account for this rolling-update privacy limit
 and verify the final schema scrub after old writers have drained; no live migration is run here.
 Administrators re-enter the recipient when resending; after key rotation, old proofs cannot be
-accepted and must be explicitly reissued. Failed identity-provider compensation retains a consumed
+accepted and must be explicitly reissued. Resending legacy or old-key rows intentionally permits
+the authorized administrator to choose the recipient again, within their existing create rights;
+current-key rows require the original matching address. Role and workspace binding are preserved.
+Failed identity-provider compensation retains a consumed
 claim to prevent duplicate grants. Additive columns remain compatible with the previous image;
 expired legacy rows remain expired on rollback.

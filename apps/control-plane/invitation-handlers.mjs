@@ -140,7 +140,7 @@ async function acceptInvitation(ctx) {
     return invalidInvitation();
   }
   const tenant = await st.getTenant(ctx.pool, row.tenant_id);
-  if (!tenant?.iam_realm || !roles.has(row.role)) return invalidInvitation();
+  if (tenant?.status !== 'active' || !tenant.iam_realm || !roles.has(row.role)) return invalidInvitation();
   if (row.workspace_id) {
     const workspace = await st.getWorkspace(ctx.pool, row.workspace_id);
     if (!workspace || workspace.tenant_id !== tenant.id) return invalidInvitation();
