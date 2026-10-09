@@ -473,12 +473,10 @@ export const kcAdmin = {
     clientId, name, clientType, authenticationFlows = [], redirectUris = [], webOrigins = [],
     defaultClientScopes, optionalClientScopes, postLogoutRedirectUris = [],
     frontChannelLogoutUri, backChannelLogoutUri, attributes = {},
+    allowedScopes = OIDC_APP_CLIENT_SCOPE_NAMES,
   }) {
-    // Workspace IAM administrators may select scopes offered by their own realm.
+    // Callers that validate realm-offered scopes can supply that allowlist.
     // External applications keep the existing built-in scope restriction.
-    const allowedNames = attributes['in-falcone.kind'] === 'workspace-iam-client'
-      ? ['openid', ...(await this.listClientScopes(realm)).map((scope) => scope.name)]
-      : OIDC_APP_CLIENT_SCOPE_NAMES;
     const publicClient = clientType === 'public';
     const configuration = {
       clientId, name: name ?? clientId, enabled: true, protocol: 'openid-connect', publicClient,
@@ -486,8 +484,8 @@ export const kcAdmin = {
       serviceAccountsEnabled: !publicClient && authenticationFlows.includes('oidc_client_credentials'),
       directAccessGrantsEnabled: false,
       redirectUris, webOrigins,
-      defaultClientScopes: oidcAppClientScopes(defaultClientScopes, allowedNames),
-      optionalClientScopes: oidcAppClientScopes(optionalClientScopes, allowedNames),
+      defaultClientScopes: oidcAppClientScopes(defaultClientScopes, allowedScopes),
+      optionalClientScopes: oidcAppClientScopes(optionalClientScopes, allowedScopes),
       ...(frontChannelLogoutUri ? { frontchannelLogout: true, frontchannelLogoutUrl: frontChannelLogoutUri } : {}),
       attributes: {
         'in-falcone.kind': 'external-application',

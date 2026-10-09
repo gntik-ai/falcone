@@ -10,6 +10,8 @@ export function statusFromError(error, fallback = 502) {
 export function kcBackedErr(error, code) {
   return err(statusFromError(error), code, safeKeycloakAdminMessage(error));
 }
+// Returns the resolved workspace alongside authorization/realm errors so audit
+// records can identify the target tenant. Callers must check error before use.
 export async function resolveWorkspaceForManage(ctx) {
   const st = ctx.store ?? store;
   const ws = await st.getWorkspace(ctx.pool, ctx.params.workspaceId);

@@ -26,20 +26,28 @@ test('workspace IAM creation through the real API supports PKCE S256 and rejects
     const password = randomBytes(24).toString('base64url');
     const username = `owner-${slug}`;
     const created = await api('POST', '/v1/tenants', superToken, {
-      name: slug, slug, ownerUsername: username, ownerPassword: password,
+      name: slug, slug,
     });
     assert.equal(created.status, 201, 'test tenant creation');
     const id = created.body.tenantId;
     tenants.push(id);
     const workspace = await api('POST', `/v1/tenants/${id}/workspaces`, superToken, { name: 'IAM test workspace' });
     assert.equal(workspace.status, 201, 'test workspace creation');
+    // Bind the test owner through the supported API so workspace-context has a
+    // real stored attribute to map; tenant-level owners have no workspace claim.
+    const owner = await api('POST', `/v1/tenants/${id}/users`, superToken, {
+      username, password, firstName: 'Tenant', lastName: 'Owner', email: `${username}@example.test`,
+      workspaceId: workspace.body.workspaceId, roles: ['tenant_owner'],
+    });
+    assert.equal(owner.status, 201, 'workspace-bound tenant owner creation');
+    assert.equal(owner.body.workspaceId, workspace.body.workspaceId);
     const response = await fetch(`${kc}/realms/${created.body.iamRealm}/protocol/openid-connect/token`, {
       method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'password', client_id: `${slug}-app`, username, password }),
     });
     assert.equal(response.status, 200, 'test tenant owner authentication');
     const { access_token: token } = await response.json();
-    return { id, realm: created.body.iamRealm, workspaceId: workspace.body.workspaceId, token, username, password };
+    return { id, realm: created.body.iamRealm, workspaceId: workspace.body.workspaceId, userId: owner.body.userId, token, username, password };
   }
   try {
     const own = await tenantFixture();
@@ -47,7 +55,7 @@ test('workspace IAM creation through the real API supports PKCE S256 and rejects
     const path = `/v1/workspaces/${own.workspaceId}/iam/clients`;
     const clientId = 'wizard-pkce';
     const redirectUri = 'https://app.example.test/callback';
-    const payload = { clientType: 'public', clientId, redirectUris: [redirectUri], scopes: ['openid', 'profile', 'email'], permissions: [] };
+    const payload = { clientType: 'public', clientId, redirectUris: [redirectUri], scopes: [], permissions: [] };
     const created = await api('POST', path, own.token, payload);
     assert.equal(created.status, 201, 'wizard POST creates a client');
     assert.equal(created.body.realm, own.realm);
@@ -70,7 +78,7 @@ test('workspace IAM creation through the real API supports PKCE S256 and rejects
     const state = randomBytes(16).toString('hex');
     const authorize = new URL(`${oidc}/auth`);
     authorize.search = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri, response_type: 'code',
-      scope: 'openid profile email', state, code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' });
+      scope: 'openid', state, code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' });
     const cookies = new Map();
     function saveCookies(response) {
       for (const header of response.headers.getSetCookie()) {
@@ -103,7 +111,16 @@ test('workspace IAM creation through the real API supports PKCE S256 and rejects
       body: new URLSearchParams({ grant_type: 'authorization_code', client_id: clientId, code, redirect_uri: redirectUri, code_verifier: verifier }),
     });
     assert.equal(exchanged.status, 200, 'auth code exchanges with the S256 verifier');
-    assert.equal(typeof (await exchanged.json()).access_token, 'string');
+    const tokens = await exchanged.json();
+    assert.equal(typeof tokens.access_token, 'string');
+    const claims = JSON.parse(Buffer.from(tokens.access_token.split('.')[1], 'base64url').toString());
+    assert.equal(claims.sub, own.userId, 'basic scope retains the access-token subject');
+    assert.equal(claims.tenant_id, own.id, 'tenant identity is server-owned');
+    assert.equal(claims.workspace_id, own.workspaceId, 'realm defaults retain the workspace binding');
+    assert.ok(claims.realm_access?.roles?.includes('tenant_owner'), 'roles scope retains tenant authority');
+    for (const scope of ['tenant-context', 'workspace-context', 'plan-context', 'workspace-roles']) {
+      assert.ok(claims.scope?.split(' ').includes(scope), `realm default ${scope} retained`);
+    }
     const direct = await fetch(`${oidc}/token`, {
       method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'password', client_id: clientId, username: own.username, password: own.password }),

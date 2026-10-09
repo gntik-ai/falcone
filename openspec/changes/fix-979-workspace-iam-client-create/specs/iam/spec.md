@@ -33,11 +33,21 @@ loopback with 400 VALIDATION_ERROR. Public and confidential clients SHALL requir
 Web origins SHALL contain only an origin. Scopes SHALL be offered by the resolved realm; openid
 SHALL be accepted implicitly and omitted from Keycloak client scope mappings. Non-empty
 permissions SHALL return 400 UNSUPPORTED_FIELD. Unknown body fields SHALL never reach Keycloak.
+Requested scopes SHALL be additions to the resolved realm's default client scopes, including when
+the wizard selects no scopes. Creation and replay verification SHALL require the merged set.
+The client SHALL carry the existing server-owned hardcoded tenant_id mapper for the resolved
+realm; caller-defined protocol mappers SHALL never be forwarded.
 
 #### Scenario: Invalid redirect target
 
 - **WHEN** a caller submits a credential-bearing, wildcard or non-loopback HTTP URI
 - **THEN** validation fails before client creation
+
+#### Scenario: Wizard retains realm identity defaults
+
+- **WHEN** the wizard submits scopes: [] or selects profile/email already present in realm defaults
+- **THEN** the client retains the realm's basic, role and platform context scope mappings
+- **AND** an equivalent replay returns the same UUID without another client or secret
 
 ### Requirement: Owned idempotent creation
 
@@ -83,3 +93,6 @@ tests SHALL assert the request payload and consume iamClientId from the response
 
 - **WHEN** an authorized consumer creates its application client
 - **THEN** creation and authentication work using public APIs without operator realm access
+- **AND** the wizard's empty scope selection supports an openid auth-code request with S256
+- **AND** the access token retains sub, tenant_id, realm roles and the workspace_id of a
+  workspace-bound principal, plus the platform context scopes

@@ -9,6 +9,8 @@ Applications cannot provision their OIDC clients through the supported API.
 - Add the workspace-scoped creation route, handler, runtime map entry and image packaging.
 - Reuse workspace management authorization and derive the realm from workspace to tenant.
 - Validate identifiers, flows, redirect targets, web origins and realm-offered scopes.
+- Add requested scopes to realm defaults so identity, workspace and role mappings survive
+  the wizard's empty scope selection; install the existing server-owned tenant identity mapper.
 - Create and re-read public, confidential or service-account clients using kcAdmin.
 - Require ownership attributes for replay; return an equivalent client without another secret.
 - Normalize provider failures, compensate this attempt's client, and audit redacted configuration

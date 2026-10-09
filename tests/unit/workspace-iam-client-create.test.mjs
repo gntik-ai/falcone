@@ -27,18 +27,33 @@ async function keycloakBoundary(run, options = {}) {
     if (url.endsWith('/realms/master/protocol/openid-connect/token')) return Response.json({ access_token: 'fake-boundary-token', expires_in: 300 });
     assert.ok(url.includes('/admin/realms/realm-one/'), 'realm must come from the tenant');
     calls.push({ url, method, body: init.body && JSON.parse(init.body) });
-    if (url.endsWith('/client-scopes')) return Response.json([{ name: 'profile' }, { name: 'email' }, { name: 'custom-api' }]);
+    if (url.endsWith('/client-scopes')) return Response.json([{ name: 'profile' }, { name: 'email' }, { name: 'custom-api' }, ...(options.realmDefaults ?? []).map((name) => ({ name }))]);
+    if (url.endsWith('/default-default-client-scopes')) {
+      if (options.defaultScopesError) return Response.json({ secret: 'upstream-secret-canary' }, { status: 503 });
+      return Response.json((options.realmDefaults ?? []).map((name) => ({ name })));
+    }
     if (url.includes('/clients?')) return Response.json(client ? [options.briefList ? { id: client.id, clientId: client.clientId } : client] : []);
     if (method === 'GET' && url.endsWith('/clients/kc-client-one')) return Response.json(client);
+    if (url.endsWith('/clients/kc-client-one/protocol-mappers/models')) {
+      if (method === 'GET') return Response.json(client.protocolMappers ?? []);
+      if (options.mapperError) return Response.json({ secret: 'upstream-secret-canary' }, { status: 503 });
+      client.protocolMappers = [...(client.protocolMappers ?? []), JSON.parse(init.body)];
+      if (options.mapperMismatch) client.protocolMappers[0].config['claim.value'] = 'tenant-other';
+      return new Response(null, { status: 201 });
+    }
     if (method === 'POST' && url.endsWith('/clients')) {
       if (options.race) {
         client = { ...JSON.parse(init.body), id: 'kc-client-one' };
+        client.protocolMappers = [{ name: 'tenant_id', protocol: 'openid-connect', protocolMapper: 'oidc-hardcoded-claim-mapper',
+          config: { 'claim.name': 'tenant_id', 'claim.value': 'realm-one', 'jsonType.label': 'String',
+            'access.token.claim': 'true', 'id.token.claim': 'true', 'userinfo.token.claim': 'true' } }];
         if (options.race === 'foreign') client.attributes['in-falcone.workspace-id'] = 'ws-other';
         return Response.json({ error: 'already exists' }, { status: 409 });
       }
       if (options.createError) return Response.json({ secret: 'upstream-secret-canary' }, { status: options.createError });
       client = { ...JSON.parse(init.body), id: 'kc-client-one' };
       if (options.mismatch) client.directAccessGrantsEnabled = true;
+      if (options.dropDefaults) client.defaultClientScopes = client.defaultClientScopes.filter((scope) => scope !== 'basic');
       return new Response(null, { status: 201, headers: { location: `${url}/kc-client-one` } });
     }
     if (url.endsWith('/client-secret')) return Response.json({ value: 'one-time-secret-canary' });
@@ -62,9 +77,72 @@ test('public wizard payload creates a verified PKCE client in the workspace tena
       publicClient: true, standardFlowEnabled: true, serviceAccountsEnabled: false, directAccessGrantsEnabled: false,
       redirectUris: ['https://app.example/callback'], webOrigins: [], defaultClientScopes: ['profile'], optionalClientScopes: [],
       attributes: { 'in-falcone.kind': 'workspace-iam-client', 'in-falcone.workspace-id': 'ws-one', 'pkce.code.challenge.method': 'S256' },
+      protocolMappers: [{ name: 'tenant_id', protocol: 'openid-connect', protocolMapper: 'oidc-hardcoded-claim-mapper',
+        config: { 'claim.name': 'tenant_id', 'claim.value': 'realm-one', 'jsonType.label': 'String',
+          'access.token.claim': 'true', 'id.token.claim': 'true', 'userinfo.token.claim': 'true' } }],
     });
     assert.equal(calls.some((c) => c.url.endsWith('/client-secret')), false);
   });
+});
+
+test('unchecked wizard scopes retain realm identity defaults on creation and equivalent replay', async () => {
+  await keycloakBoundary(async ({ client, calls }) => {
+    const result = await handler(context({ scopes: [] }));
+    assert.equal(result.statusCode, 201);
+    assert.deepEqual(client().defaultClientScopes, [
+      'basic', 'email', 'plan-context', 'profile', 'roles', 'tenant-context', 'web-origins', 'workspace-context', 'workspace-roles',
+    ]);
+    const replay = await handler(context({ scopes: ['openid', 'profile', 'email'] }));
+    assert.equal(replay.statusCode, 200);
+    assert.equal(replay.body.iamClientId, result.body.iamClientId);
+    assert.equal(Object.hasOwn(replay.body, 'clientSecret'), false);
+    assert.equal(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/clients')).length, 1);
+    assert.equal(calls.filter((c) => c.url.endsWith('/client-scopes')).length, 2, 'validate offered scopes once per request');
+  }, { realmDefaults: ['profile', 'email', 'roles', 'web-origins', 'basic', 'tenant-context', 'workspace-context', 'plan-context', 'workspace-roles'] });
+});
+
+test('all workspace client types carry a server-owned tenant identity mapper', async () => {
+  for (const clientType of ['public', 'confidential', 'service_account']) {
+    await keycloakBoundary(async ({ client }) => {
+      const result = await handler(context({ clientType, redirectUris: clientType === 'service_account' ? [] : ['https://app.example/callback'],
+        protocolMappers: [{ name: 'caller-mapper', config: { 'claim.name': 'tenant_id', 'claim.value': 'tenant-other' } }] }));
+      assert.equal(result.statusCode, 201);
+      assert.deepEqual(client().protocolMappers, [{
+        name: 'tenant_id', protocol: 'openid-connect', protocolMapper: 'oidc-hardcoded-claim-mapper',
+        config: { 'claim.name': 'tenant_id', 'claim.value': 'realm-one', 'jsonType.label': 'String',
+          'access.token.claim': 'true', 'id.token.claim': 'true', 'userinfo.token.claim': 'true' },
+      }]);
+    });
+  }
+});
+
+test('requested scopes add to realm defaults for every client type without weakening verification', async () => {
+  for (const clientType of ['public', 'confidential', 'service_account']) {
+    await keycloakBoundary(async ({ client }) => {
+      const ctx = context({ clientType, redirectUris: clientType === 'service_account' ? [] : ['https://app.example/callback'], scopes: ['custom-api', 'openid', 'custom-api'] });
+      const result = await handler(ctx);
+      assert.equal(result.statusCode, 201);
+      assert.deepEqual(client().defaultClientScopes, ['basic', 'custom-api', 'roles', 'tenant-context', 'workspace-context']);
+      assert.equal((await handler(ctx)).statusCode, 200);
+      client().defaultClientScopes = client().defaultClientScopes.filter((scope) => scope !== 'basic');
+      assert.equal((await handler(ctx)).statusCode, 409, 'replay must retain default identity mappings');
+    }, { realmDefaults: ['roles', 'basic', 'tenant-context', 'workspace-context'] });
+  }
+});
+
+test('unavailable defaults and missing realized identity mappings fail closed with compensation', async () => {
+  for (const options of [{ defaultScopesError: true }, { dropDefaults: true }, { mapperError: true }, { mapperMismatch: true }]) {
+    await keycloakBoundary(async ({ client, calls }) => {
+      const result = await handler(context({ scopes: [] }));
+      assert.equal(result.statusCode, 502);
+      assert.equal(result.body.code, 'IAM_CREATE_CLIENT_FAILED');
+      assert.equal(client(), null);
+      assert.equal(calls.filter((c) => c.method === 'DELETE').length, options.defaultScopesError ? 0 : 1);
+      assert.equal(result.iamClientAudit.compensation, options.defaultScopesError ? 'none' : 'deleted');
+      assert.equal(calls.some((c) => c.url.endsWith('/client-secret')), false);
+      assert.doesNotMatch(JSON.stringify(result), /upstream-secret-canary|\/admin\/realms|clientSecret/);
+    }, { realmDefaults: ['basic', 'tenant-context'], ...options });
+  }
 });
 
 test('unauthorized and cross-tenant callers never reach Keycloak; missing workspace and realm fail closed', async () => {
@@ -97,7 +175,7 @@ test('invalid identifiers, client types, URI targets, scopes and permissions are
     }
     const unsupported = await handler(context({ permissions: ['manage_iam'] }));
     assert.equal(unsupported.statusCode, 400); assert.equal(unsupported.body.code, 'UNSUPPORTED_FIELD');
-    assert.equal(calls.filter((c) => c.method === 'POST').length, 0);
+    assert.equal(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/clients')).length, 0);
   });
 });
 
@@ -150,14 +228,14 @@ test('equivalent replay and concurrent duplicates return the same UUID with no r
       assert.equal(replay.statusCode, 200);
       assert.equal(replay.body.iamClientId, first.body.iamClientId);
       assert.equal(Object.hasOwn(replay.body, 'clientSecret'), false);
-      assert.equal(calls.filter((c) => c.method === 'POST').length, 1);
+      assert.equal(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/clients')).length, 1);
       assert.equal(calls.filter((c) => c.url.endsWith('/client-secret')).length, clientType === 'public' ? 0 : 1);
     });
   }
   await keycloakBoundary(async ({ calls }) => {
     const results = await Promise.all(Array.from({ length: 8 }, () => handler(context())));
     assert.deepEqual(results.map((r) => r.statusCode).sort(), [200, 200, 200, 200, 200, 200, 200, 201]);
-    assert.equal(calls.filter((c) => c.method === 'POST').length, 1);
+    assert.equal(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/clients')).length, 1);
   });
 });
 
@@ -181,7 +259,8 @@ test('Keycloak uniqueness races replay only an equivalent owned client and never
   }
 });
 
-test('Keycloak errors are normalized and redacted, and verification mismatch compensates only this attempt', async () => {
+test('Keycloak errors are normalized and redacted, and verification mismatch compensates only this attempt', async (t) => {
+  const logs = ['log', 'info', 'warn', 'error', 'debug'].map((method) => t.mock.method(console, method, () => {}));
   for (const status of [401, 404, 500, 503]) {
     await keycloakBoundary(async ({ calls }) => {
       const result = await handler(context());
@@ -203,9 +282,11 @@ test('Keycloak errors are normalized and redacted, and verification mismatch com
   const result = await handler(ctx);
   assert.equal(result.statusCode, 502);
   assert.doesNotMatch(JSON.stringify(result), /upstream-secret-canary/);
+  assert.doesNotMatch(JSON.stringify(logs.flatMap((log) => log.mock.calls.map((call) => call.arguments))), /upstream-secret-canary|\/admin\/realms|clientSecret/);
 });
 
-test('audit descriptors record redacted requested config, actor, target tenant and realized UUID on success and compensation failure', async () => {
+test('audit descriptors record redacted requested config, actor, target tenant and realized UUID on success and compensation failure', async (t) => {
+  const logs = ['log', 'info', 'warn', 'error', 'debug'].map((method) => t.mock.method(console, method, () => {}));
   const { auditEventForRoute } = await import('../../apps/control-plane/audit-writer.mjs');
   const route = { method: 'POST', path: '/v1/workspaces/{workspaceId}/iam/clients', localHandler: 'createWorkspaceIamClient' };
   for (const mismatch of [false, true]) {
@@ -230,6 +311,7 @@ test('audit descriptors record redacted requested config, actor, target tenant a
   const audit = auditEventForRoute(route, ctx, denied);
   assert.equal(audit.outcome, 'denied');
   assert.equal(audit.tenantId, 'tenant-one');
+  assert.doesNotMatch(JSON.stringify(logs.flatMap((log) => log.mock.calls.map((call) => call.arguments))), /one-time-secret-canary|request-secret-canary|query-secret-canary|upstream-secret-canary|\/admin\/realms/);
 });
 
 test('a client with a foreign workspace, missing ownership tag or divergent realized config cannot be replayed', async () => {
@@ -240,6 +322,9 @@ test('a client with a foreign workspace, missing ownership tag or divergent real
     (c) => { c.webOrigins = ['https://foreign.example']; },
     (c) => { c.defaultClientScopes = ['email']; },
     (c) => { c.optionalClientScopes = ['offline_access']; },
+    (c) => { c.protocolMappers = []; },
+    (c) => { c.protocolMappers[0].config['claim.value'] = 'tenant-other'; },
+    (c) => { c.protocolMappers[0].config['access.token.claim'] = 'false'; },
     (c) => { c.publicClient = false; },
     (c) => { c.standardFlowEnabled = false; },
     (c) => { c.serviceAccountsEnabled = true; },
@@ -253,7 +338,7 @@ test('a client with a foreign workspace, missing ownership tag or divergent real
       const result = await handler(context());
       assert.equal(result.statusCode, 409);
       assert.equal(result.body.code, 'IAM_CLIENT_EXISTS');
-      assert.equal(calls.filter((c) => c.method === 'POST').length, 1);
+      assert.equal(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/clients')).length, 1);
       assert.equal(calls.some((c) => c.method === 'DELETE'), false);
     });
   }

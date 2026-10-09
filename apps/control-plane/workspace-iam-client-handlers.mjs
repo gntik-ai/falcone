@@ -4,6 +4,8 @@ import { isIP } from 'node:net';
 
 const err = (code = 'VALIDATION_ERROR') => ({ statusCode: 400, body: { code, message: code === 'UNSUPPORTED_FIELD' ? 'permissions are unsupported' : 'Invalid IAM client configuration' } });
 const unique = (items) => [...new Set(items)].sort();
+const validClientId = (value) => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
+const validClientType = (value) => ['public', 'confidential', 'service_account'].includes(value);
 const pendingClients = new Map();
 async function serializeClient(key, task) {
   const previous = pendingClients.get(key);
@@ -17,10 +19,12 @@ async function serializeClient(key, task) {
     if (pendingClients.get(key) === pending) pendingClients.delete(key);
   }
 }
-function matchesClient(client, config, workspaceId) {
+function matchesClient(client, config, workspaceId, realm) {
   const attr = (key) => client?.attributes?.[key];
   const same = (actual, expected) => Array.isArray(actual)
     && JSON.stringify(unique(actual)) === JSON.stringify(unique(expected));
+  const tenantMappers = client?.protocolMappers?.filter((mapper) => mapper.config?.['claim.name'] === 'tenant_id') ?? [];
+  const tenantMapper = tenantMappers[0];
   return typeof client?.id === 'string' && !!client.id && client.clientId === config.clientId
     && client.enabled === true && client.protocol === 'openid-connect'
     && client.publicClient === (config.clientType === 'public')
@@ -28,6 +32,10 @@ function matchesClient(client, config, workspaceId) {
     && client.serviceAccountsEnabled === (config.clientType === 'service_account')
     && client.directAccessGrantsEnabled === false && client.implicitFlowEnabled !== true && client.bearerOnly !== true
     && attr('in-falcone.kind') === 'workspace-iam-client' && attr('in-falcone.workspace-id') === workspaceId
+    && tenantMappers.length === 1 && tenantMapper.protocol === 'openid-connect'
+    && tenantMapper.protocolMapper === 'oidc-hardcoded-claim-mapper'
+    && tenantMapper.config['claim.value'] === realm && tenantMapper.config['jsonType.label'] === 'String'
+    && ['access.token.claim', 'id.token.claim', 'userinfo.token.claim'].every((key) => tenantMapper.config[key] === 'true')
     && (config.clientType !== 'public' || attr('pkce.code.challenge.method') === 'S256')
     && same(client.redirectUris, config.redirectUris) && same(client.webOrigins, config.webOrigins)
     && same(client.defaultClientScopes, config.defaultClientScopes) && same(client.optionalClientScopes, []);
@@ -49,8 +57,7 @@ function validateBody(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return err();
   if (body.permissions !== undefined && (!Array.isArray(body.permissions) || body.permissions.length)) return err('UNSUPPORTED_FIELD');
   if (['realm', 'realmId', 'tenantId'].some((key) => Object.hasOwn(body, key))) return err();
-  if (typeof body.clientId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(body.clientId)) return err();
-  if (!['public', 'confidential', 'service_account'].includes(body.clientType)) return err();
+  if (!validClientId(body.clientId) || !validClientType(body.clientType)) return err();
   const redirects = body.redirectUris ?? [];
   const origins = body.webOrigins ?? [];
   const scopes = body.scopes ?? [];
@@ -69,8 +76,8 @@ function redactedRequest(body = {}) {
     return `${url.origin}${url.pathname}${url.search ? '?<REDACTED>' : ''}`;
   }) : [];
   return {
-    clientId: typeof body?.clientId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(body.clientId) ? body.clientId : '<REDACTED>',
-    clientType: ['public', 'confidential', 'service_account'].includes(body?.clientType) ? body.clientType : '<REDACTED>',
+    clientId: validClientId(body?.clientId) ? body.clientId : '<REDACTED>',
+    clientType: validClientType(body?.clientType) ? body.clientType : '<REDACTED>',
     redirectUris: redactUris(body?.redirectUris, false), webOrigins: redactUris(body?.webOrigins, true),
     scopes: Array.isArray(body?.scopes) ? body.scopes.map((s) => typeof s === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(s) ? s : '<REDACTED>') : [],
   };
@@ -105,20 +112,25 @@ export async function createWorkspaceIamClient(ctx) {
     try {
       const offered = await kc.listClientScopes(r.realm);
       if (scopes.some((scope) => !offered.some((entry) => entry.name === scope))) return err();
+      // Requested scopes add to the realm's identity/role defaults. An explicit
+      // selection must never remove the mappings needed by platform consumers.
+      const defaults = await kc.listRealmDefaultClientScopes(r.realm);
       const configuration = {
         clientId, clientType, redirectUris, webOrigins,
         authenticationFlows: ['oidc_authorization_code_pkce'],
         standardFlowEnabled: clientType !== 'service_account', serviceAccountsEnabled: clientType === 'service_account',
-        defaultClientScopes: scopes, optionalClientScopes: [],
+        defaultClientScopes: unique([...defaults.map((scope) => scope.name), ...scopes]), optionalClientScopes: [],
+        allowedScopes: offered.map((scope) => scope.name),
         attributes: { 'in-falcone.kind': 'workspace-iam-client', 'in-falcone.workspace-id': r.ws.id },
       };
       const responseBody = (id) => ({ iamClientId: id, clientId, clientType, realm: r.realm, workspaceId: r.ws.id });
+      const replay = (client) => matchesClient(client, configuration, r.ws.id, r.realm)
+        ? { statusCode: 200, body: responseBody(client.id), headers: { 'Cache-Control': 'no-store' } }
+        : clientExists();
       const found = await kc.findClient(r.realm, clientId);
       const existing = found ? await kc.getClient(r.realm, found.id) : null;
       realizedId = existing?.id ?? null;
-      if (existing) return matchesClient(existing, configuration, r.ws.id)
-        ? { statusCode: 200, body: responseBody(existing.id), headers: { 'Cache-Control': 'no-store' } }
-        : clientExists();
+      if (existing) return replay(existing);
       try {
         createdId = clientType === 'public'
           ? await kc.createOidcAppClient(r.realm, configuration)
@@ -131,13 +143,14 @@ export async function createWorkspaceIamClient(ctx) {
         if (!winner?.id) throw new Error(KEYCLOAK_ADMIN_SAFE_MESSAGE);
         const realized = await kc.getClient(r.realm, winner.id);
         realizedId = realized?.id ?? null;
-        return matchesClient(realized, configuration, r.ws.id)
-          ? { statusCode: 200, body: responseBody(realized.id), headers: { 'Cache-Control': 'no-store' } }
-          : clientExists();
+        return replay(realized);
       }
       realizedId = createdId ?? null;
+      // Tenant realms stamp tenant_id on each client, rather than on the realm
+      // context scope. Reuse the same server-owned mapper as the tenant app.
+      if (createdId) await kc.ensureTenantIdMapper(r.realm, createdId);
       const client = createdId ? await kc.getClient(r.realm, createdId) : null;
-      if (!createdId || client?.id !== createdId || !matchesClient(client, configuration, r.ws.id)) throw new Error(KEYCLOAK_ADMIN_SAFE_MESSAGE);
+      if (!createdId || client?.id !== createdId || !matchesClient(client, configuration, r.ws.id, r.realm)) throw new Error(KEYCLOAK_ADMIN_SAFE_MESSAGE);
       const body = responseBody(createdId);
       if (clientType !== 'public') {
         const secret = await kc.getClientSecret(r.realm, createdId);
