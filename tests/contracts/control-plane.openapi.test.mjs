@@ -619,10 +619,10 @@ test('control-plane contract enforces versioning, authorization, family metadata
   assert.equal(invitationParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
   assert.equal(acceptInvitation['x-family'], 'tenants');
   assert.equal(invitationAcceptanceParameters.some((parameter) => parameter.name === 'invitationId'), true);
-  assert.ok(acceptInvitation.responses['202']);
+  assert.ok(acceptInvitation.responses['201'], 'acceptance completes user creation/linking and grants the invited role');
   assert.equal(revokeInvitation['x-family'], 'tenants');
   assert.equal(invitationRevocationParameters.some((parameter) => parameter.name === 'invitationId'), true);
-  assert.ok(revokeInvitation.responses['202']);
+  assert.ok(revokeInvitation.responses['200'], 'revocation returns the completed invitation state');
   assert.equal(createTenantOwnershipTransfer['x-family'], 'tenants');
   assert.equal(tenantOwnershipTransferParameters.some((parameter) => parameter.name === 'tenantId'), true);
   assert.equal(tenantOwnershipTransferParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
