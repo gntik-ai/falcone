@@ -54,7 +54,7 @@ export function ConsoleInvitationList({ tenantId, reloadKey }: { tenantId: strin
     {loading ? <p>Cargando invitaciones…</p> : null}
     {error ? <p role="alert">{error}<Button onClick={() => setRevision(value => value + 1)}>Reintentar</Button></p> : null}
     {!loading && !error && items.length === 0 ? <p>No hay invitaciones.</p> : null}
-    <Table><TableHeader><TableRow><TableHead>Invitación</TableHead><TableHead>Rol</TableHead><TableHead>Área de trabajo</TableHead><TableHead>Estado</TableHead><TableHead>Caduca</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader>
+    <Table containerClassName="mt-4"><TableHeader><TableRow><TableHead>Invitación</TableHead><TableHead>Rol</TableHead><TableHead>Área de trabajo</TableHead><TableHead>Estado</TableHead><TableHead>Caduca</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader>
       <TableBody>{items.map(invitation => <TableRow key={invitation.id}>
         <TableCell>{invitation.id}</TableCell><TableCell>{invitation.role}</TableCell><TableCell>{invitation.workspaceId ?? 'Organización'}</TableCell><TableCell>{invitation.status}</TableCell><TableCell>{new Date(invitation.expiresAt).toLocaleString()}</TableCell>
         <TableCell>{invitation.status === 'pending' ? <Button disabled={busy} aria-label={`Revocar ${invitation.id}`} onClick={() => void revoke(invitation.id)}>Revocar</Button> : null}

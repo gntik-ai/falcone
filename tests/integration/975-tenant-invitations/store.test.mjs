@@ -39,7 +39,11 @@ test('975: pending legacy rows expire and all unkeyed recipient hints are scrubb
     await store.insertInvitation(client, { id: 'current', tenantId: 'tenant-test', role: 'tenant_viewer',
       emailHash: 'a'.repeat(64), tokenHash: 'b'.repeat(64), emailHmacKeyId: 'current-key', expiresAt: '2099-01-01T00:00:00Z' });
     await store.ensureSchema(client);
-    const first = await store.listInvitations(client, 'tenant-test');
+    // Seeded rows share created_at; migrations may change their physical order.
+    // Compare every persisted field by identity, independent of tied list ordering.
+    const readInvitations = async () => (await store.listInvitations(client, 'tenant-test'))
+      .sort((left, right) => left.id.localeCompare(right.id));
+    const first = await readInvitations();
     assert.equal(first.length, 5);
     assert.deepEqual(Object.fromEntries(first.map(row => [row.id, row.status])), {
       legacy: 'expired', 'legacy-accepted': 'accepted', 'legacy-revoked': 'revoked',
@@ -49,10 +53,10 @@ test('975: pending legacy rows expire and all unkeyed recipient hints are scrubb
     assert.ok(first.filter(row => row.email_hmac_key_id === null).every(row => row.email_hash === '' && row.token_hash === null));
     assert.equal(first.find(row => row.id === 'current').email_hash, 'a'.repeat(64));
     await store.ensureSchema(client);
-    assert.deepEqual(await store.listInvitations(client, 'tenant-test'), first);
+    assert.deepEqual(await readInvitations(), first);
     await client.query(`UPDATE tenant_invitations SET email_hash=$1, masked_email='g***t@example.invalid' WHERE id='legacy-accepted'`, [legacyDigest]);
     await store.ensureSchema(client);
-    assert.deepEqual(await store.listInvitations(client, 'tenant-test'), first);
+    assert.deepEqual(await readInvitations(), first);
   });
 });
 

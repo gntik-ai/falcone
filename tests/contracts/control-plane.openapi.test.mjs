@@ -430,7 +430,8 @@ test('control-plane contract enforces versioning, authorization, family metadata
   assert.deepEqual(document.components.schemas.ConsoleSignupRegistration.properties.activationMode.enum, [
     'self_service',
     'approval_required',
-    'auto_activate'
+    'auto_activate',
+    'invitation'
   ]);
 
   assert.equal(getConsoleSignupPolicy['x-family'], 'auth');

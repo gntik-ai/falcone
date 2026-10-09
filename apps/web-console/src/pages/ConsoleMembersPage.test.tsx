@@ -204,6 +204,10 @@ describe('ConsoleMembersPage', () => {
         return createJsonResponse(200, { items: [], page: {} })
       }
 
+      if (parsedUrl.pathname === '/v1/tenants/ten_alpha/invitations') {
+        return createJsonResponse(200, { items: [], total: 0 })
+      }
+
       if (parsedUrl.pathname === '/v1/iam/realms/realm-alpha/users') {
         if (usersShouldFail) {
           usersShouldFail = false
@@ -277,6 +281,10 @@ describe('ConsoleMembersPage', () => {
       // superadmin"}. The page must never render "requires superadmin" verbatim.
       if (parsedUrl.pathname === '/v1/iam/realms/realm-alpha/roles') {
         return createJsonResponse(403, { code: 'FORBIDDEN', message: 'requires superadmin' })
+      }
+
+      if (parsedUrl.pathname === '/v1/tenants/ten_alpha/invitations') {
+        return createJsonResponse(200, { items: [], total: 0 })
       }
 
       return createJsonResponse(404, { message: 'Not found' })
@@ -579,6 +587,10 @@ function stubMembersApi({
 
     if (parsedUrl.pathname === '/v1/tenants') {
       return createJsonResponse(200, { items: tenants, page: {} })
+    }
+
+    if (/^\/v1\/tenants\/[^/]+\/invitations$/.test(parsedUrl.pathname)) {
+      return createJsonResponse(200, { items: [], total: 0 })
     }
 
     // Own-scope singular lookup used by tenant OPERATORS (tenant_owner/tenant_admin — #569's
