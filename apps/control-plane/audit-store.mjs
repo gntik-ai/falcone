@@ -139,7 +139,10 @@ export async function recordAuditEventInTransaction(client, {
 // The durable platform-maintenance lifecycle instead calls the transactional seam
 // above directly and treats an audit failure as a transaction failure.
 export async function recordAuditEvent(db, event = {}) {
-  const usePooled = typeof db.connect === 'function';
+  // pg.Client and PoolClient also expose connect(), but reconnecting an already
+  // connected client fails. totalCount is the Pool's public connection counter;
+  // only check out and release a connection when this function owns the checkout.
+  const usePooled = typeof db.connect === 'function' && typeof db.totalCount === 'number';
   const client = usePooled ? await db.connect() : db;
   try {
     await client.query('BEGIN');

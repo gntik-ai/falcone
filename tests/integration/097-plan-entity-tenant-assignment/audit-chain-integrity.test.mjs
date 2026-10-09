@@ -8,6 +8,7 @@ import { verifyAuditChain } from '../../../apps/control-plane/audit-hash.mjs';
 import { main as createPlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-create.mjs';
 import { main as lifecyclePlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-lifecycle.mjs';
 import { main as assignPlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-assign.mjs';
+import { main as deletePlan } from '../../../packages/provisioning-orchestrator/src/actions/plan-delete.mjs';
 import { main as setSubQuota } from '../../../packages/provisioning-orchestrator/src/actions/workspace-sub-quota-set.mjs';
 import { main as removeSubQuota } from '../../../packages/provisioning-orchestrator/src/actions/workspace-sub-quota-remove.mjs';
 
@@ -27,13 +28,30 @@ test('978 PostgreSQL: legacy-safe guard and tenant/global orchestrator chains', 
     await client.query(`SET search_path TO ${schema}, public`);
     const migration = (name) => readFile(new URL(`../../../packages/provisioning-orchestrator/src/migrations/${name}.sql`, import.meta.url), 'utf8');
     await client.query(await migration('097-plan-entity-tenant-assignment'));
+    const legacyPlanId = randomUUID();
+    await client.query("INSERT INTO plans (id, slug, display_name, status, created_by, updated_by) VALUES ($1, 'legacy-draft-978', 'Legacy draft', 'draft', 'admin-978', 'admin-978')", [legacyPlanId]);
     await client.query("INSERT INTO plan_audit_events (action_type, actor_id, tenant_id, new_state) VALUES ('legacy', 'admin-978', 'legacy-scope', '{}')");
+    await client.query("INSERT INTO plan_audit_events (action_type, actor_id, tenant_id, plan_id, new_state) VALUES ('plan.created', 'admin-978', 'legacy-scope', $1, '{}')", [legacyPlanId]);
+    const legacyBefore = (await client.query('SELECT * FROM plan_audit_events WHERE plan_id = $1', [legacyPlanId])).rows[0];
+    // Upgrade from the previous attempt too: NOT VALID checks allow existing
+    // NULLs at startup but still reject their plan-reference detach on UPDATE.
+    await client.query('ALTER TABLE plan_audit_events ADD COLUMN prev_hash TEXT, ADD COLUMN row_hash TEXT');
+    await client.query('ALTER TABLE plan_audit_events ADD CONSTRAINT plan_audit_events_hashes_required CHECK (prev_hash IS NOT NULL AND row_hash IS NOT NULL) NOT VALID');
+    await assert.rejects(deletePlan({ ...admin, planId: legacyPlanId }, { db: client }), (error) => error.code === '23514' && error.constraint === 'plan_audit_events_hashes_required', 'the previous guard blocks legacy plan deletion');
     await ensureSchema(client);
     await ensureSchema(client); // Idempotent guard, without validating legacy NULLs.
     const legacy = await client.query("SELECT * FROM plan_audit_events WHERE action_type = 'legacy'");
     assert.equal(legacy.rows[0].row_hash, null);
     assert.equal(legacy.rows[0].prev_hash, null);
     await assert.rejects(client.query("INSERT INTO plan_audit_events (action_type, actor_id, new_state) VALUES ('raw', 'admin-978', '{}')"), (error) => error.code === '23514' && error.constraint === 'plan_audit_events_hashes_required');
+    const deleted = await deletePlan({ ...admin, planId: legacyPlanId }, { db: client });
+    assert.equal(deleted.statusCode, 200, 'an unassigned legacy draft remains deletable');
+    assert.deepEqual(deleted.body, { planId: legacyPlanId, deleted: true });
+    assert.equal((await client.query('SELECT * FROM plans WHERE id = $1', [legacyPlanId])).rowCount, 0);
+    const legacyAfter = (await client.query('SELECT * FROM plan_audit_events WHERE id = $1', [legacyBefore.id])).rows[0];
+    assert.deepEqual(legacyAfter, { ...legacyBefore, plan_id: null, prev_hash: null, row_hash: null, outcome: null }, 'only the unhashed plan reference is detached');
+    await assert.rejects(client.query('UPDATE plan_audit_events SET row_hash = NULL WHERE action_type = $1', ['plan.deleted']), (error) => error.code === '23514' && error.constraint === 'plan_audit_events_hashes_required');
+    await assert.rejects(client.query("INSERT INTO plan_audit_events (action_type, actor_id, new_state, prev_hash) VALUES ('partial', 'admin-978', '{}', '')"), (error) => error.code === '23514');
     await client.query(await migration('100-plan-change-impact-history'));
     await client.query(await migration('105-effective-limit-resolution'));
     await client.query("INSERT INTO quota_dimension_catalog (dimension_key, display_label, unit, default_value) VALUES ('max_workspaces', 'Workspaces', 'count', 10)");

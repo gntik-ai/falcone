@@ -9,7 +9,9 @@ order. Plan references and previous states remain stored but are outside the
 unchanged canonical field set.
 
 Callers inside a transaction must use `recordAuditEventInTransaction`; otherwise
-`recordAuditEvent` owns BEGIN/COMMIT. The orchestrator adapter preserves its
+`recordAuditEvent` owns BEGIN/COMMIT. Only a pool (identified by its public
+`totalCount` counter) is checked out and released; an already-connected client
+stays owned by its caller. The orchestrator adapter preserves its
 existing in-memory persistence seam with the same hashing implementation.
 
 `verifyAuditChain(rows)` requires oldest-first rows and genesis (`prev_hash = ''`)
@@ -29,16 +31,21 @@ are outside this change.
 
 ## Schema guard and image rollback
 
-Startup adds the deterministic constraint `plan_audit_events_hashes_required`
-idempotently with `CHECK (prev_hash IS NOT NULL AND row_hash IS NOT NULL) NOT VALID`.
-This enforces the check for new inserts and updates without scanning or rewriting
-legacy rows. An installation failure propagates through the existing fail-closed
-startup gate. Legacy rows themselves do not prevent startup.
+Startup installs the deterministic trigger `plan_audit_events_hashes_required`
+idempotently. It rejects inserts and updates of `prev_hash` or `row_hash` when
+either hash is NULL, without scanning or rewriting existing rows. Other updates
+can still detach a legacy row's `plan_id` when an unassigned plan is deleted.
+The previous `CHECK ... NOT VALID` also rejected that detach, since PostgreSQL
+enforces those checks on every update. Startup atomically installs the trigger
+before dropping the previous constraint. The trigger provides legacy-safe
+enforcement without constraint validation. An installation failure propagates
+through the existing fail-closed startup gate.
 
 Before or together with rolling back either image to a version with unhashed
 orchestrator writers, the operator must remove the guard:
 
 ```sql
+DROP TRIGGER IF EXISTS plan_audit_events_hashes_required ON plan_audit_events;
 ALTER TABLE plan_audit_events
   DROP CONSTRAINT IF EXISTS plan_audit_events_hashes_required;
 ```

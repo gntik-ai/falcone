@@ -134,7 +134,7 @@ function memPool() {
     return { rows: [] };
   };
   const client = { query, release() {} };
-  return { query, connect: async () => client, _audit: audit, _denials: denials };
+  return { query, connect: async () => client, totalCount: 1, _audit: audit, _denials: denials };
 }
 
 const IDENTITY_A = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, actorType: 'tenant_owner', roles: ['tenant_owner'], scopes: [] };

@@ -16,7 +16,7 @@ function memoryDb() {
 
 // Persistence boundary for the shared writer; the action and repository stay real.
 function auditClient(rows) {
-  return { async query(sql, params = []) {
+  return { async connect() { throw new Error('Client has already been connected'); }, async query(sql, params = []) {
     if (sql.includes('SELECT row_hash')) {
       const head = rows.filter((row) => row.tenant_id === params[0] && row.row_hash != null).at(-1);
       return { rows: head ? [head] : [] };
@@ -70,7 +70,12 @@ function sqlDb({ subQuotas = false } = {}) {
   let checkpoint = 0;
   let history;
   let subQuota;
-  return { audit, plan, async query(sql, params = []) {
+  return { audit, plan,
+    // pg.Client and checked-out PoolClient both expose connect(). Reconnecting
+    // them fails; release() belongs to the caller that checked out the client.
+    async connect() { throw new Error('Client has already been connected'); },
+    release() { throw new Error('Action must not release the caller connection'); },
+    async query(sql, params = []) {
     const text = sql.replace(/\s+/g, ' ').trim();
     if (text === 'BEGIN') { assert.equal(transaction, false, 'audit must not begin a nested transaction'); transaction = true; checkpoint = audit.length; return { rows: [] }; }
     if (text === 'COMMIT' || text === 'ROLLBACK') { assert.equal(transaction, true); if (text === 'ROLLBACK') audit.splice(checkpoint); transaction = false; return { rows: [] }; }

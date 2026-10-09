@@ -398,23 +398,38 @@ export async function ensureSchema(pool) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
   // Audit integrity (#644, #978): legacy rows retain NULL hashes/outcome and
-  // verify as invalid. The NOT VALID guard preserves startup on legacy data,
-  // while requiring hashes for every new row. Guard failures must abort startup.
+  // verify as invalid. An insert/hash-update guard does not scan legacy data or
+  // block its plan_id detach on plan deletion. Guard failures must abort startup.
   await pool.query("ALTER TABLE plan_audit_events ADD COLUMN IF NOT EXISTS outcome VARCHAR(32)");
   await pool.query("ALTER TABLE plan_audit_events ADD COLUMN IF NOT EXISTS prev_hash TEXT");
   await pool.query("ALTER TABLE plan_audit_events ADD COLUMN IF NOT EXISTS row_hash TEXT");
+  await pool.query(`CREATE OR REPLACE FUNCTION require_plan_audit_event_hashes()
+    RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.prev_hash IS NULL OR NEW.row_hash IS NULL THEN
+        RAISE EXCEPTION 'audit events require prev_hash and row_hash'
+          USING ERRCODE = '23514', CONSTRAINT = 'plan_audit_events_hashes_required';
+      END IF;
+      RETURN NEW;
+    END;
+  $$`);
   await pool.query(`DO $$
     BEGIN
       IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'plan_audit_events_hashes_required'
-          AND conrelid = 'plan_audit_events'::regclass
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'plan_audit_events_hashes_required'
+          AND tgrelid = 'plan_audit_events'::regclass
       ) THEN
-        ALTER TABLE plan_audit_events
-          ADD CONSTRAINT plan_audit_events_hashes_required
-          CHECK (prev_hash IS NOT NULL AND row_hash IS NOT NULL) NOT VALID;
+        CREATE TRIGGER plan_audit_events_hashes_required
+          BEFORE INSERT OR UPDATE OF prev_hash, row_hash ON plan_audit_events
+          FOR EACH ROW EXECUTE FUNCTION require_plan_audit_event_hashes();
       END IF;
-    END
+      -- A NOT VALID CHECK also enforces unrelated updates of legacy NULL rows.
+      -- Replace it atomically, after the trigger is installed, so no insert can
+      -- bypass hash enforcement while upgrading the previous implementation.
+      ALTER TABLE plan_audit_events
+        DROP CONSTRAINT IF EXISTS plan_audit_events_hashes_required;
+    END;
   $$`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_plan_audit_events_actor_created
     ON plan_audit_events (actor_id, created_at DESC)`);

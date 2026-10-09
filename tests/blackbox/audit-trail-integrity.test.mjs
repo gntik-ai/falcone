@@ -134,7 +134,7 @@ function chainPool() {
     return { rows: [] };
   };
   const client = { query: q, release() {} };
-  return { query: q, connect: async () => client, _audit: audit };
+  return { query: q, connect: async () => client, totalCount: 1, _audit: audit };
 }
 
 test('bbx-audit-store-chain: recordAuditEvent writes a verifiable per-tenant chain with outcomes', async () => {

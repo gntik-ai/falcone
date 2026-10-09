@@ -1,5 +1,5 @@
-import { appendPlanAudit } from '../repositories/plan-audit-repository.mjs';
 import { randomUUID } from 'node:crypto';
+import { appendPlanAudit } from '../repositories/plan-audit-repository.mjs';
 import * as planRepository from '../repositories/plan-repository.mjs';
 import * as catalogRepository from '../repositories/boolean-capability-catalog-repository.mjs';
 import { emitPlanEvent } from '../events/plan-events.mjs';
