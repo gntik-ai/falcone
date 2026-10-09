@@ -24,6 +24,7 @@ const AUDITABLE_LOCAL_HANDLERS = {
   createWorkspace: 'workspace.create',
   promoteWorkspace: 'workspace.promote',
   createServiceAccount: 'workspace.service-account.create',
+  createWorkspaceIamClient: 'workspace.iam-client.create',
   issueCredential: 'workspace.service-account.credential.issue',
   rotateCredential: 'workspace.service-account.credential.rotate',
   revokeCredential: 'workspace.service-account.credential.revoke',
@@ -107,6 +108,8 @@ export function auditEventForRoute(route, ctx, result) {
       method: route.method,
       path: route.path,
       status,
+      ...(actionType === 'workspace.iam-client.create' && result?.iamClientAudit
+        ? { iamClient: result.iamClientAudit } : {}),
       ...(safeEvidence ? { knative: safeEvidence } : {}),
       ...(actionType === 'workspace.function.activation.rerun' && result?.auditScope?.resourceId
         ? { resourceId: result.auditScope.resourceId } : {}),

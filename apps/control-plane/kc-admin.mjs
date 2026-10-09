@@ -37,9 +37,9 @@ export const OIDC_APP_CLIENT_SCOPE_NAMES = Object.freeze([
   'openid', 'profile', 'email', 'address', 'phone', 'roles', 'web-origins', 'basic', 'offline_access',
 ]);
 
-function oidcAppClientScopes(scopes) {
+function oidcAppClientScopes(scopes, allowedNames = OIDC_APP_CLIENT_SCOPE_NAMES) {
   if (scopes === undefined) return undefined; // Preserve the realm's configured defaults.
-  if (!Array.isArray(scopes) || scopes.some((scope) => !OIDC_APP_CLIENT_SCOPE_NAMES.includes(scope))) {
+  if (!Array.isArray(scopes) || scopes.some((scope) => !allowedNames.includes(scope))) {
     throw new Error(KEYCLOAK_ADMIN_SAFE_MESSAGE);
   }
   return scopes.filter((scope) => scope !== 'openid');
@@ -450,6 +450,9 @@ export const kcAdmin = {
     const list = (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients?clientId=${encodeURIComponent(clientId)}`)).json ?? [];
     return list[0] ?? null;
   },
+  async getClient(realm, clientUuid) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}`)).json;
+  },
   async createConfidentialClient(realm, {
     clientId, name, serviceAccountsEnabled = true, standardFlowEnabled = false,
     redirectUris, webOrigins, defaultClientScopes, optionalClientScopes, protocolMappers,
@@ -469,8 +472,13 @@ export const kcAdmin = {
   async createOidcAppClient(realm, {
     clientId, name, clientType, authenticationFlows = [], redirectUris = [], webOrigins = [],
     defaultClientScopes, optionalClientScopes, postLogoutRedirectUris = [],
-    frontChannelLogoutUri, backChannelLogoutUri,
+    frontChannelLogoutUri, backChannelLogoutUri, attributes = {},
   }) {
+    // Workspace IAM administrators may select scopes offered by their own realm.
+    // External applications keep the existing built-in scope restriction.
+    const allowedNames = attributes['in-falcone.kind'] === 'workspace-iam-client'
+      ? ['openid', ...(await this.listClientScopes(realm)).map((scope) => scope.name)]
+      : OIDC_APP_CLIENT_SCOPE_NAMES;
     const publicClient = clientType === 'public';
     const configuration = {
       clientId, name: name ?? clientId, enabled: true, protocol: 'openid-connect', publicClient,
@@ -478,11 +486,12 @@ export const kcAdmin = {
       serviceAccountsEnabled: !publicClient && authenticationFlows.includes('oidc_client_credentials'),
       directAccessGrantsEnabled: false,
       redirectUris, webOrigins,
-      defaultClientScopes: oidcAppClientScopes(defaultClientScopes),
-      optionalClientScopes: oidcAppClientScopes(optionalClientScopes),
+      defaultClientScopes: oidcAppClientScopes(defaultClientScopes, allowedNames),
+      optionalClientScopes: oidcAppClientScopes(optionalClientScopes, allowedNames),
       ...(frontChannelLogoutUri ? { frontchannelLogout: true, frontchannelLogoutUrl: frontChannelLogoutUri } : {}),
       attributes: {
         'in-falcone.kind': 'external-application',
+        ...attributes,
         ...(publicClient ? { 'pkce.code.challenge.method': 'S256' } : {}),
         ...(postLogoutRedirectUris.length ? { 'post.logout.redirect.uris': postLogoutRedirectUris.join('##') } : {}),
         ...(backChannelLogoutUri ? { 'backchannel.logout.url': backChannelLogoutUri } : {}),

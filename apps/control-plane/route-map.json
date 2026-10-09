@@ -920,13 +920,13 @@
     "method": "POST",
     "path": "/v1/workspaces/{workspaceId}/iam/clients",
     "family": "iam",
-    "module": "NONE",
-    "export": "",
-    "invoke": "UNKNOWN",
+    "module": "apps/control-plane/b-handlers.mjs",
+    "export": "LOCAL_HANDLERS.createWorkspaceIamClient",
+    "invoke": "ctx",
     "deps": ["keycloakAdmin", "pg"],
-    "auth": "workspace_admin (manage_iam)",
+    "auth": "superadmin or owning tenant owner/admin",
     "subroutes": "no",
-    "notes": "CreateIamClientWizard.tsx -> submitWizardRequest('/v1/workspaces/{ws}/iam/clients'). external-application-iam.mjs has only metadata helpers. GAP - Keycloak client creation.",
+    "notes": "CreateIamClientWizard.tsx -> submitWizardRequest('/v1/workspaces/{ws}/iam/clients'). Creates and verifies an owned client in the workspace tenant realm.",
     "consoleUsed": true
   },
   {
