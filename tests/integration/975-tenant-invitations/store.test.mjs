@@ -4,9 +4,12 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import * as store from '../../../apps/control-plane/tenant-store.mjs';
 
+const databaseAvailable = Boolean(process.env.DATABASE_URL || process.env.DB_URL || process.env.PGHOST);
+const connectionString = process.env.DATABASE_URL ?? process.env.DB_URL;
+
 async function isolatedDatabase(run) {
   const { default: pg } = await import('pg');
-  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  const client = new pg.Client({ connectionString });
   await client.connect();
   const schema = `invitation_test_${randomUUID().replaceAll('-', '')}`;
   try {
@@ -19,7 +22,7 @@ async function isolatedDatabase(run) {
   }
 }
 
-test('975: legacy rows expire and masked emails are cleared on an idempotent migration', { skip: !process.env.DATABASE_URL && 'Isolated PostgreSQL DATABASE_URL is unavailable' }, async () => {
+test('975: pending legacy rows expire and masked emails are cleared on an idempotent migration', { skip: !databaseAvailable && 'Isolated PostgreSQL connection is unavailable' }, async () => {
   await isolatedDatabase(async client => {
     await client.query(`CREATE TABLE tenant_invitations (
       id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, workspace_id TEXT, email_hash TEXT NOT NULL,
@@ -28,22 +31,26 @@ test('975: legacy rows expire and masked emails are cleared on an idempotent mig
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_by TEXT)`);
     await client.query(`INSERT INTO tenant_invitations (id, tenant_id, email_hash, masked_email, role, expires_at, status)
       VALUES ('legacy', 'tenant-test', 'old-unkeyed-digest', 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'pending'),
-             ('legacy-accepted', 'tenant-test', 'old-unkeyed-digest', 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'accepted')`);
+             ('legacy-accepted', 'tenant-test', 'old-unkeyed-digest', 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'accepted'),
+             ('legacy-revoked', 'tenant-test', 'old-unkeyed-digest', 'g***t@example.invalid', 'tenant_viewer', NOW()+interval '7 days', 'revoked')`);
     await store.ensureSchema(client);
     const first = await store.listInvitations(client, 'tenant-test');
-    assert.equal(first.length, 2);
-    assert.ok(first.every(row => row.status === 'expired' && row.masked_email === null && row.token_hash === null));
+    assert.equal(first.length, 3);
+    assert.deepEqual(Object.fromEntries(first.map(row => [row.id, row.status])), {
+      legacy: 'expired', 'legacy-accepted': 'accepted', 'legacy-revoked': 'revoked'
+    });
+    assert.ok(first.every(row => row.masked_email === null && row.token_hash === null));
     await store.ensureSchema(client);
     assert.deepEqual(await store.listInvitations(client, 'tenant-test'), first);
   });
 });
 
-test('975: PostgreSQL conditional claim admits exactly one concurrent acceptance', { skip: !process.env.DATABASE_URL && 'Isolated PostgreSQL DATABASE_URL is unavailable' }, async () => {
+test('975: PostgreSQL conditional claim admits exactly one concurrent acceptance', { skip: !databaseAvailable && 'Isolated PostgreSQL connection is unavailable' }, async () => {
   await isolatedDatabase(async (client, schema, pg) => {
     await store.ensureSchema(client);
     await store.insertInvitation(client, { id: 'inv-test', tenantId: 'tenant-test', role: 'tenant_viewer',
       emailHash: 'a'.repeat(64), tokenHash: 'b'.repeat(64), emailHmacKeyId: 'test-key', expiresAt: '2099-01-01T00:00:00Z' });
-    const other = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    const other = new pg.Client({ connectionString });
     await other.connect();
     try {
       await other.query(`SET search_path TO ${schema}, public`);

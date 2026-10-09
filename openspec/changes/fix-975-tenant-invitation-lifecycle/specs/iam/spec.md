@@ -70,8 +70,9 @@ no email or token. Identity-provider failure MAY additionally append `iam.invita
 
 #### Scenario: Legacy migration
 
-- **WHEN** schema setup migrates legacy invitations without token hashes
-- **THEN** they are expired and every row's masked_email is NULL
+- **WHEN** schema setup migrates pending legacy invitations without token hashes
+- **THEN** those pending rows are expired and every row's masked_email is NULL
+- **AND** accepted and revoked rows retain their lifecycle state
 - **AND** repeated migration makes no further invitation changes
 
 #### Scenario: Console administration and acceptance

@@ -7,7 +7,8 @@ import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, normalizeKeycloakAttributes, safe
 import * as store from './tenant-store.mjs';
 import { socialProviderView, validateSocialProvider, SocialProviderValidationError } from './social-providers.mjs';
 import { AUTH_HANDLERS } from './auth-handlers.mjs';
-import { INVITATION_HANDLERS, listTenantUsers } from './invitation-handlers.mjs';
+import { INVITATION_HANDLERS } from './invitation-handlers.mjs';
+import { listTenantUsers } from './tenant-user-handlers.mjs';
 import { startSaga } from './saga.mjs';
 import { provisionWorkspaceDatabase, rotateWorkspaceDatabaseCredential, dropWorkspaceDatabase } from './dataplane.mjs';
 import { deleteBucket } from './storage-handlers.mjs';

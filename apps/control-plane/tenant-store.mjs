@@ -131,7 +131,7 @@ export async function ensureSchema(pool) {
     accepted_by: 'TEXT', revoked_at: 'TIMESTAMPTZ', revoked_by: 'TEXT', resent_at: 'TIMESTAMPTZ'
   })) await pool.query(`ALTER TABLE tenant_invitations ADD COLUMN IF NOT EXISTS ${column} ${type}`);
   // Unverifiable legacy invitations fail closed. No recipient hints survive the migration.
-  await pool.query("UPDATE tenant_invitations SET status='expired' WHERE token_hash IS NULL AND status<>'expired'");
+  await pool.query("UPDATE tenant_invitations SET status='expired' WHERE token_hash IS NULL AND status='pending'");
   await pool.query('UPDATE tenant_invitations SET masked_email=NULL WHERE masked_email IS NOT NULL');
   await pool.query('CREATE INDEX IF NOT EXISTS tenant_invitations_scope_idx ON tenant_invitations (tenant_id, workspace_id, status, created_at DESC)');
   // ---- data plane: one provisioned database per workspace ------------------

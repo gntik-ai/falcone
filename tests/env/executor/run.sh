@@ -41,4 +41,5 @@ node --test "$HERE"/postgres-data-executor.test.mjs "$HERE"/postgres-ddl-executo
   "$HERE"/auto-embedding-write.test.mjs \
   "$HERE"/workspace-environment-promotion.test.mjs \
   "$HERE"/external-application-store.test.mjs \
-  "$HERE"/workspace-db-dedicated-credential.test.mjs
+  "$HERE"/workspace-db-dedicated-credential.test.mjs \
+  "$ENV_DIR"/../integration/975-tenant-invitations/store.test.mjs

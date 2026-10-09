@@ -116,7 +116,9 @@ function identityProvider({ existing = null, fail = false } = {}) {
   };
 }
 
-test('975: single-use acceptance grants the bound role once under concurrent requests', async () => {
+// This verifies handler outcomes at the mocked database boundary. The real-stack
+// PostgreSQL suite proves that the conditional claim is atomic across connections.
+test('975: single-use acceptance grants the bound role once when requests share a claim', async () => {
   const { INVITATION_HANDLERS: handlers } = await import('../../apps/control-plane/invitation-handlers.mjs');
   const ctx = context();
   const created = await handlers.createInvitation(ctx);
@@ -203,13 +205,34 @@ test('975: kc-admin createUser does not verify an email by default', async () =>
 });
 
 test('975: tenant user collection includes realm roles', async () => {
-  const { listTenantUsers } = await import('../../apps/control-plane/invitation-handlers.mjs');
+  const { listTenantUsers } = await import('../../apps/control-plane/tenant-user-handlers.mjs');
   const result = await listTenantUsers({ ...context(), kcAdmin: {
     async listUsers() { return [{ id: 'user-1', username: 'guest' }]; },
     async listUserRealmRoles() { return [{ name: 'tenant_developer' }, { name: 'custom_tenant_role' }, { name: 'default-roles-ten_alpha' }]; }
   } });
   assert.equal(result.statusCode, 200);
   assert.deepEqual(result.body.items[0].roles, ['tenant_developer', 'custom_tenant_role']);
+});
+
+test('975: tenant user roles remain available within identity-provider concurrency limits', async () => {
+  const { listTenantUsers } = await import('../../apps/control-plane/tenant-user-handlers.mjs');
+  const users = Array.from({ length: 24 }, (_, index) => ({ id: `user-${index}`, username: `member-${index}` }));
+  let active = 0;
+  const result = await listTenantUsers({ ...context(), kcAdmin: {
+    async listUsers() { return users; },
+    async listUserRealmRoles(_realm, userId) {
+      active += 1;
+      try {
+        if (active > 8) throw Object.assign(new Error('Identity provider concurrency limit'), { statusCode: 429 });
+        await new Promise(resolve => setImmediate(resolve));
+        return [{ name: userId === 'user-0' ? 'tenant_admin' : 'tenant_developer' }];
+      } finally { active -= 1; }
+    }
+  } });
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(result.body.items.map(user => ({ id: user.id, roles: user.roles })), users.map((user, index) => ({
+    id: user.id, roles: [index === 0 ? 'tenant_admin' : 'tenant_developer']
+  })));
 });
 
 for (const scenario of ['invalid', 'expired', 'revoked', 'reused', 'legacy', 'wrong-email', 'other-tenant', 'old-key', 'query-token']) {

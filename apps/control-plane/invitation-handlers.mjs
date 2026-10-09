@@ -1,19 +1,19 @@
 // Invitation HTTP seams are independent of unrelated data-plane SDKs.
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import * as store from './tenant-store.mjs';
-import { kcAdmin, TENANT_REALM_ROLES, safeKeycloakAdminMessage } from './kc-admin.mjs';
+import { kcAdmin, TENANT_REALM_ROLES } from './kc-admin.mjs';
 import { canManageTenant, isWorkspaceInviteOperator } from './tenant-scope.mjs';
 import { recordAuditEventInTransaction } from './audit-store.mjs';
 
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
-const invalid = () => err(400, 'INVITATION_INVALID', 'Invitation cannot be accepted');
+const invalidInvitation = () => err(400, 'INVITATION_INVALID', 'Invitation cannot be accepted');
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const roles = new Set(TENANT_REALM_ROLES);
 const aliases = new Map([['viewer', 'workspace_viewer'], ['editor', 'workspace_developer']]);
 const normalizeEmail = value => typeof value === 'string' ? value.trim().toLowerCase() : '';
-const digest = value => createHash('sha256').update(value).digest('hex');
-const hmac = (email, key) => createHmac('sha256', key).update(normalizeEmail(email)).digest('hex');
+const tokenDigest = value => createHash('sha256').update(value).digest('hex');
+const emailHmac = (email, key) => createHmac('sha256', key).update(normalizeEmail(email)).digest('hex');
 const expiresAt = () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
 // Shared with the public signup policy so invitations cannot bypass a stricter deployment policy.
@@ -91,7 +91,7 @@ async function createInvitation(ctx) {
   const row = await transaction(ctx.pool, async client => {
     const invitation = await st.insertInvitation(client, {
       id: `inv_${randomUUID().replaceAll('-', '')}`, tenantId: scope.tenant.id, workspaceId,
-      emailHash: hmac(email, key.key), emailHmacKeyId: key.id, tokenHash: digest(token),
+      emailHash: emailHmac(email, key.key), emailHmacKeyId: key.id, tokenHash: tokenDigest(token),
       role, expiresAt: expiresAt(), createdBy: ctx.identity.sub
     });
     await audit(client, ctx, invitation, 'created');
@@ -126,36 +126,48 @@ async function acceptInvitation(ctx) {
   if (!key) return keyError();
   const { token, password } = ctx.body ?? {};
   const email = normalizeEmail(ctx.body?.email ?? ctx.body?.primaryEmail);
-  if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token) || !emailPattern.test(email)) return invalid();
+  if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token) || !emailPattern.test(email)) {
+    return invalidInvitation();
+  }
   const st = ctx.store ?? store;
-  const tokenHash = digest(token);
+  const tokenHash = tokenDigest(token);
   const row = ctx.params.invitationId
     ? await st.getInvitation(ctx.pool, ctx.params.tenantId, ctx.params.invitationId)
     : await st.getInvitationByTokenHash(ctx.pool, ctx.params.tenantId, tokenHash);
-  const emailHash = hmac(email, key.key);
+  const emailHash = emailHmac(email, key.key);
   if (!row || row.status !== 'pending' || Date.parse(row.expires_at) <= Date.now()
-      || row.email_hmac_key_id !== key.id || !sameHash(row.token_hash, tokenHash) || !sameHash(row.email_hash, emailHash)) return invalid();
+      || row.email_hmac_key_id !== key.id || !sameHash(row.token_hash, tokenHash) || !sameHash(row.email_hash, emailHash)) {
+    return invalidInvitation();
+  }
   const tenant = await st.getTenant(ctx.pool, row.tenant_id);
-  if (!tenant?.iam_realm || !roles.has(row.role)) return invalid();
+  if (!tenant?.iam_realm || !roles.has(row.role)) return invalidInvitation();
   if (row.workspace_id) {
     const workspace = await st.getWorkspace(ctx.pool, row.workspace_id);
-    if (!workspace || workspace.tenant_id !== tenant.id) return invalid();
+    if (!workspace || workspace.tenant_id !== tenant.id) return invalidInvitation();
   }
   const kc = ctx.kcAdmin ?? ctx._kcAdmin ?? kcAdmin;
   let existing;
   try {
     const candidates = (await kc.findUsersByEmail(tenant.iam_realm, email)).filter(user => normalizeEmail(user.email) === email);
-    if (candidates.length > 1) return invalid();
+    if (candidates.length > 1) return invalidInvitation();
     existing = candidates[0] ? structuredClone(candidates[0]) : null;
-  } catch { return err(502, 'INVITATION_ACCEPT_FAILED', 'Invitation could not be completed'); }
+  } catch {
+    return err(502, 'INVITATION_ACCEPT_FAILED', 'Invitation could not be completed');
+  }
   // Linking an account requires its authenticated principal. An unverified public signup
   // cannot squat on an invited address and inherit the role when someone else consumes the link.
-  if (existing && (ctx.identity?.sub !== existing.id || ctx.identity?.tenantId !== tenant.id)) return invalid();
-  if (!existing && (typeof password !== 'string' || password.length < signupPasswordMinLength())) return invalid();
+  if (existing && (ctx.identity?.sub !== existing.id || ctx.identity?.tenantId !== tenant.id)) {
+    return invalidInvitation();
+  }
+  if (!existing && (typeof password !== 'string' || password.length < signupPasswordMinLength())) {
+    return invalidInvitation();
+  }
   const bindings = existing?.attributes?.workspace_id ?? [];
-  if (existing && row.workspace_id && [].concat(bindings).some(id => id !== row.workspace_id)) return invalid();
+  if (existing && row.workspace_id && [].concat(bindings).some(id => id !== row.workspace_id)) {
+    return invalidInvitation();
+  }
   const claimed = await st.claimInvitation(ctx.pool, tenant.id, row.id, tokenHash, emailHash, key.id);
-  if (!claimed) return invalid();
+  if (!claimed) return invalidInvitation();
   let userId;
   let grantAttempted = false;
   let hadRole = false;
@@ -227,7 +239,7 @@ async function resendInvitation(ctx) {
   const email = normalizeEmail(ctx.body?.email);
   if (!emailPattern.test(email)) return err(400, 'VALIDATION_ERROR', 'Re-enter the invitation email to resend');
   const key = keyFor(ctx);
-  const emailHash = hmac(email, key.key);
+  const emailHash = emailHmac(email, key.key);
   // A legacy row or an old key cannot be verified: the authorized admin explicitly reissues
   // it under the current key. Current-key invitations retain the same recipient.
   if (found.row.email_hmac_key_id === key.id && !sameHash(found.row.email_hash, emailHash))
@@ -235,7 +247,7 @@ async function resendInvitation(ctx) {
   const token = randomBytes(32).toString('base64url');
   const row = await transaction(ctx.pool, async client => {
     const resent = await (ctx.store ?? store).resendInvitation(client, found.row.tenant_id, found.row.id,
-      { tokenHash: digest(token), emailHash, keyId: key.id, expiresAt: expiresAt() });
+      { tokenHash: tokenDigest(token), emailHash, keyId: key.id, expiresAt: expiresAt() });
     if (resent) await audit(client, ctx, resent, 'resent');
     return resent;
   });
@@ -244,24 +256,3 @@ async function resendInvitation(ctx) {
 }
 
 export const INVITATION_HANDLERS = { createInvitation, getInvitation, listInvitations, acceptInvitation, revokeInvitation, resendInvitation };
-
-
-// The membership read model shares the same tenant/realm boundary as invitation acceptance.
-export async function listTenantUsers(ctx) {
-  const tenant = await (ctx.store ?? store).getTenant(ctx.pool, ctx.params.tenantId);
-  if (!tenant) return err(404, 'TENANT_NOT_FOUND', 'Tenant not found');
-  if (!canManageTenant(ctx.identity, tenant.id)) return err(403, 'FORBIDDEN', 'Requires a tenant owner or administrator');
-  const kc = ctx.kcAdmin ?? kcAdmin;
-  try {
-    const users = await kc.listUsers(tenant.iam_realm, { max: Number(ctx.params.max ?? ctx.query?.max ?? 100) });
-    const items = await Promise.all(users.map(async user => ({
-      id: user.id, username: user.username, email: user.email, enabled: user.enabled,
-      firstName: user.firstName, lastName: user.lastName, createdTimestamp: user.createdTimestamp,
-      roles: (await kc.listUserRealmRoles(tenant.iam_realm, user.id)).map(role => role.name).filter(name => name && !name.startsWith('default-roles'))
-    })));
-    return ok(200, { items, total: items.length, realm: tenant.iam_realm });
-  } catch (error) {
-    const status = Number(error?.statusCode ?? error?.kcStatus);
-    return err(status >= 400 && status < 500 ? status : 502, 'IAM_LIST_TENANT_USERS_FAILED', safeKeycloakAdminMessage(error));
-  }
-}
