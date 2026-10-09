@@ -204,6 +204,10 @@ describe('ConsoleMembersPage', () => {
         return createJsonResponse(200, { items: [], page: {} })
       }
 
+      if (parsedUrl.pathname === '/v1/tenants/ten_alpha/invitations') {
+        return createJsonResponse(200, { items: [], total: 0 })
+      }
+
       if (parsedUrl.pathname === '/v1/iam/realms/realm-alpha/users') {
         if (usersShouldFail) {
           usersShouldFail = false
@@ -277,6 +281,10 @@ describe('ConsoleMembersPage', () => {
       // superadmin"}. The page must never render "requires superadmin" verbatim.
       if (parsedUrl.pathname === '/v1/iam/realms/realm-alpha/roles') {
         return createJsonResponse(403, { code: 'FORBIDDEN', message: 'requires superadmin' })
+      }
+
+      if (parsedUrl.pathname === '/v1/tenants/ten_alpha/invitations') {
+        return createJsonResponse(200, { items: [], total: 0 })
       }
 
       return createJsonResponse(404, { message: 'Not found' })
@@ -406,6 +414,8 @@ describe('ConsoleMembersPage invite-by-email wizard (#759)', () => {
           requestId: 'req_759',
           entityType: 'invitation',
           entityId: 'inv_759',
+          token: 'a'.repeat(43),
+          expiresAt: '2099-04-01T00:00:00.000Z',
           status: 'accepted',
           acceptedEventType: 'iam.invitation.created',
           desiredState: 'active',
@@ -445,21 +455,21 @@ describe('ConsoleMembersPage invite-by-email wizard (#759)', () => {
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.selectOptions(screen.getByLabelText(/^rol$/i), 'workspace_admin')
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await user.type(screen.getByLabelText(/mensaje/i), 'Invitación desde Members')
-    await user.click(screen.getByRole('button', { name: /siguiente/i }))
 
     expect(within(dialog).getByText('guest@example.com')).toBeInTheDocument()
     expect(within(dialog).getByText('workspace_admin')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/mensaje/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^contraseña$/i)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(/inv_759/i)
+    expect(screen.getByLabelText('Enlace de un solo uso')).toHaveValue(`${window.location.origin}/invitations/ten_alpha/inv_759#token=${'a'.repeat(43)}`)
+    expect(screen.getByRole('button', { name: /confirmar/i })).toBeDisabled()
     expect(invitationBodies).toHaveLength(1)
     expect(invitationBodies[0]).toEqual({
       email: 'guest@example.com',
       role: 'workspace_admin',
-      message: 'Invitación desde Members',
       workspaceId: 'wrk_a1'
     })
     expect(invitationBodies[0]).not.toHaveProperty('password')
@@ -577,6 +587,10 @@ function stubMembersApi({
 
     if (parsedUrl.pathname === '/v1/tenants') {
       return createJsonResponse(200, { items: tenants, page: {} })
+    }
+
+    if (/^\/v1\/tenants\/[^/]+\/invitations$/.test(parsedUrl.pathname)) {
+      return createJsonResponse(200, { items: [], total: 0 })
     }
 
     // Own-scope singular lookup used by tenant OPERATORS (tenant_owner/tenant_admin — #569's

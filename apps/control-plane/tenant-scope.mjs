@@ -24,3 +24,14 @@ export function canManageTenant(identity, tenantId) {
   return ['tenant_owner', 'tenant_admin'].includes(identity.actorType)
     && tenantId != null && identity.tenantId === tenantId;
 }
+
+export function isWorkspaceInviteOperator(identity, workspaceId, tenantId) {
+  if (!identity || !workspaceId || identity.tenantId !== tenantId) return false;
+  const roles = new Set(identity.roles ?? []);
+  const isWorkspaceOperator = identity.actorType === 'workspace_admin'
+    || roles.has('workspace_owner')
+    || roles.has('workspace_admin');
+  if (!isWorkspaceOperator) return false;
+  const workspaceIds = new Set([identity.workspaceId, ...(identity.workspaceIds ?? [])].filter(Boolean).map(String));
+  return workspaceIds.has(workspaceId);
+}

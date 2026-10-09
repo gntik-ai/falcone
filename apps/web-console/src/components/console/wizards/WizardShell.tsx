@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -15,7 +15,9 @@ export function WizardShell<TData>({
   steps,
   initialData,
   buildSummary,
-  onSubmit
+  onSubmit,
+  successContent,
+  preventResubmit = false
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -25,6 +27,8 @@ export function WizardShell<TData>({
   steps: WizardStep<TData>[]
   initialData: Partial<TData>
   buildSummary: (data: Partial<TData>) => Array<{ label: string; value: string }>
+  successContent?: ReactNode
+  preventResubmit?: boolean
   onSubmit: (data: Partial<TData>) => Promise<{ resourceId: string; resourceUrl?: string }>
 }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
@@ -73,9 +77,10 @@ export function WizardShell<TData>({
         ) : (
           <WizardSummaryStep summary={buildSummary(formData)} submitState={submitState} />
         )}
+        {submitState.status === 'success' ? successContent : null}
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => (currentStepIndex === 0 ? close() : setCurrentStepIndex((value) => value - 1))}>
-            {currentStepIndex === 0 ? 'Cancelar' : 'Anterior'}
+          <Button type="button" variant="ghost" onClick={() => (currentStepIndex === 0 || (preventResubmit && submitState.status === 'success') ? close() : setCurrentStepIndex((value) => value - 1))}>
+            {preventResubmit && submitState.status === 'success' ? 'Cerrar' : currentStepIndex === 0 ? 'Cancelar' : 'Anterior'}
           </Button>
           {!isSummary ? (
             <Button type="button" onClick={() => setCurrentStepIndex((value) => value + 1)} disabled={!validation.valid || Boolean(validation.blockingError)}>
@@ -93,7 +98,7 @@ export function WizardShell<TData>({
                   setSubmitState({ status: 'error', message: error instanceof Error ? error.message : 'No se pudo completar la operación.' })
                 }
               }}
-              disabled={submitState.status === 'submitting'}
+              disabled={submitState.status === 'submitting' || (preventResubmit && submitState.status === 'success')}
             >
               {submitState.status === 'submitting' ? 'Confirmando…' : 'Confirmar'}
             </Button>

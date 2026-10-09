@@ -246,42 +246,6 @@
         ],
         "type": "object"
       },
-      "ConsoleInvitationWriteRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "email": {
-            "format": "email",
-            "maxLength": 255,
-            "minLength": 5,
-            "type": "string"
-          },
-          "message": {
-            "maxLength": 500,
-            "type": "string"
-          },
-          "role": {
-            "maxLength": 80,
-            "minLength": 3,
-            "type": "string"
-          },
-          "workspaceId": {
-            "maxLength": 128,
-            "minLength": 1,
-            "type": "string"
-          }
-        },
-        "required": [
-          "email",
-          "role",
-          "workspaceId"
-        ],
-        "type": "object"
-      },
-      "DurationString": {
-        "description": "Compact duration string used by in-falcone lifecycle policies.",
-        "pattern": "^[0-9]+(?:s|m|h|d)$",
-        "type": "string"
-      },
       "EffectiveCapabilityResolution": {
         "additionalProperties": false,
         "properties": {
@@ -576,175 +540,206 @@
         ],
         "type": "object"
       },
-      "ExpirationRule": {
-        "additionalProperties": false,
-        "properties": {
-          "allowOverride": {
-            "type": "boolean"
-          },
-          "defaultTtl": {
-            "$ref": "#/components/schemas/DurationString"
-          },
-          "gracePeriod": {
-            "$ref": "#/components/schemas/DurationString"
-          },
-          "maxTtl": {
-            "$ref": "#/components/schemas/DurationString"
-          }
-        },
-        "required": [
-          "defaultTtl",
-          "maxTtl",
-          "allowOverride"
-        ],
-        "type": "object"
-      },
       "Invitation": {
         "additionalProperties": false,
         "properties": {
-          "acceptedAt": {
+          "createdAt": {
             "format": "date-time",
             "type": "string"
-          },
-          "acceptedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
-            "type": "string"
-          },
-          "effectivePermissionRecalculation": {
-            "$ref": "#/components/schemas/EffectivePermissionRecalculationReference"
-          },
-          "emailHash": {
-            "maxLength": 64,
-            "minLength": 64,
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string"
-          },
-          "entityType": {
-            "const": "invitation",
-            "type": "string"
-          },
-          "expirationPolicy": {
-            "$ref": "#/components/schemas/ExpirationRule"
           },
           "expiresAt": {
             "format": "date-time",
             "type": "string"
           },
-          "invitationId": {
-            "pattern": "^inv_[0-9a-z]+$",
-            "type": "string"
-          },
-          "invitationStatus": {
-            "$ref": "#/components/schemas/InvitationStatus"
-          },
-          "issuedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
-            "type": "string"
-          },
-          "maskedEmail": {
-            "maxLength": 255,
-            "minLength": 5,
-            "type": "string"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/EntityMetadata"
-          },
-          "revokedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "revokedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
+          "id": {
             "type": "string"
           },
           "role": {
-            "maxLength": 80,
-            "minLength": 3,
             "type": "string"
           },
-          "state": {
-            "$ref": "#/components/schemas/EntityState"
-          },
-          "targetBindings": {
-            "items": {
-              "$ref": "#/components/schemas/InvitationTargetBinding"
-            },
-            "minItems": 1,
-            "type": "array"
-          },
-          "targetType": {
-            "$ref": "#/components/schemas/InvitationTargetType"
-          },
-          "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
-            "type": "string"
-          },
-          "timestamps": {
-            "$ref": "#/components/schemas/LifecycleTimestamps"
+          "status": {
+            "$ref": "#/components/schemas/InvitationStatus"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
-          "entityType",
-          "invitationId",
-          "tenantId",
-          "emailHash",
-          "targetType",
+          "id",
           "role",
-          "invitationStatus",
+          "workspaceId",
+          "status",
           "expiresAt",
-          "state",
-          "timestamps",
-          "metadata",
-          "issuedByUserId",
-          "targetBindings",
-          "expirationPolicy"
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "InvitationAcceptance": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "const": "accepted",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "status",
+          "role",
+          "workspaceId"
         ],
         "type": "object"
       },
       "InvitationAcceptanceRequest": {
         "additionalProperties": false,
         "properties": {
-          "acceptanceToken": {
-            "maxLength": 512,
-            "minLength": 12,
+          "email": {
+            "format": "email",
+            "maxLength": 255,
             "type": "string"
           },
-          "acceptedWorkspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
+          "firstName": {
             "type": "string"
           },
-          "actorUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
+          "lastName": {
+            "type": "string"
+          },
+          "password": {
+            "description": "Required for a new account. Existing accounts must authenticate as the same principal.",
+            "maxLength": 256,
+            "minLength": 8,
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 43,
+            "minLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 128,
+            "minLength": 1,
             "type": "string"
           }
         },
         "required": [
-          "acceptanceToken",
-          "actorUserId"
+          "token",
+          "email"
+        ],
+        "type": "object"
+      },
+      "InvitationCollection": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Invitation"
+            },
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object"
+      },
+      "InvitationProof": {
+        "additionalProperties": false,
+        "description": "The raw token is returned only by create or resend. Copy it for out-of-band delivery. The email is not retained.",
+        "properties": {
+          "acceptedEventType": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "entityType": {
+            "const": "invitation",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InvitationStatus"
+          },
+          "token": {
+            "maxLength": 43,
+            "minLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "workspaceId",
+          "status",
+          "expiresAt",
+          "createdAt",
+          "token"
+        ],
+        "type": "object"
+      },
+      "InvitationResendRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "description": "Re-enter the recipient: the control plane does not persist the address. Legacy/rotated-key invitations are explicitly reissued under the current key.",
+            "format": "email",
+            "maxLength": 255,
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
         ],
         "type": "object"
       },
       "InvitationRevocationRequest": {
         "additionalProperties": false,
-        "properties": {
-          "reason": {
-            "maxLength": 255,
-            "minLength": 3,
-            "type": "string"
-          },
-          "revokedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
-            "type": "string"
-          }
-        },
-        "required": [
-          "reason",
-          "revokedByUserId"
-        ],
+        "properties": {},
         "type": "object"
       },
       "InvitationStatus": {
@@ -756,107 +751,49 @@
         ],
         "type": "string"
       },
-      "InvitationTargetBinding": {
-        "additionalProperties": false,
-        "properties": {
-          "bindingRef": {
-            "maxLength": 160,
-            "minLength": 3,
-            "type": "string"
-          },
-          "bindingType": {
-            "enum": [
-              "tenant",
-              "workspace",
-              "user",
-              "group"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "bindingType",
-          "bindingRef"
-        ],
-        "type": "object"
-      },
-      "InvitationTargetType": {
-        "enum": [
-          "tenant",
-          "workspace"
-        ],
-        "type": "string"
-      },
       "InvitationWriteRequest": {
         "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "pattern": "^workspace_"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "workspaceId"
+              ]
+            }
+          }
+        ],
         "properties": {
-          "desiredState": {
-            "$ref": "#/components/schemas/EntityState"
-          },
-          "emailHash": {
-            "maxLength": 64,
-            "minLength": 64,
-            "pattern": "^[0-9A-Fa-f]{64}$",
-            "type": "string"
-          },
-          "entityType": {
-            "const": "invitation",
-            "type": "string"
-          },
-          "expirationPolicy": {
-            "$ref": "#/components/schemas/ExpirationRule"
-          },
-          "expiresAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "invitationStatus": {
-            "$ref": "#/components/schemas/InvitationStatus"
-          },
-          "issuedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
-            "type": "string"
-          },
-          "maskedEmail": {
+          "email": {
+            "format": "email",
             "maxLength": 255,
-            "minLength": 5,
             "type": "string"
           },
-          "metadata": {
-            "$ref": "#/components/schemas/EntityMetadata"
+          "message": {
+            "description": "Not persisted; no platform SMTP delivery is performed.",
+            "maxLength": 500,
+            "type": "string"
           },
           "role": {
             "maxLength": 80,
             "minLength": 3,
             "type": "string"
           },
-          "targetBindings": {
-            "items": {
-              "$ref": "#/components/schemas/InvitationTargetBinding"
-            },
-            "minItems": 1,
-            "type": "array"
-          },
-          "targetType": {
-            "$ref": "#/components/schemas/InvitationTargetType"
-          },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
+            "maxLength": 128,
+            "minLength": 1,
             "type": "string"
           }
         },
         "required": [
-          "entityType",
-          "emailHash",
-          "targetType",
-          "role",
-          "invitationStatus",
-          "expiresAt",
-          "desiredState",
-          "metadata",
-          "issuedByUserId",
-          "targetBindings",
-          "expirationPolicy"
+          "email",
+          "role"
         ],
         "type": "object"
       },
@@ -4881,8 +4818,8 @@
       }
     },
     "/v1/tenants/{tenantId}/invitations": {
-      "post": {
-        "operationId": "createInvitation",
+      "get": {
+        "operationId": "listInvitations",
         "parameters": [
           {
             "$ref": "#/components/parameters/XApiVersion"
@@ -4894,36 +4831,24 @@
             "$ref": "#/components/parameters/TenantId"
           },
           {
-            "$ref": "#/components/parameters/IdempotencyKey"
+            "in": "query",
+            "name": "workspaceId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/InvitationWriteRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConsoleInvitationWriteRequest"
-                  }
-                ]
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
-          "202": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MutationAccepted"
+                  "$ref": "#/components/schemas/InvitationCollection"
                 }
               }
             },
-            "description": "Mutation accepted."
+            "description": "Invitation collection."
           },
           "400": {
             "content": {
@@ -4955,6 +4880,157 @@
             },
             "description": "The requested entity was not found."
           },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invitation HMAC key is unavailable; service fails closed."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List invitations within the caller's tenant or workspace scope",
+        "tags": [
+          "Tenants",
+          "Invitations"
+        ],
+        "x-audiences": [
+          "developer_external",
+          "tenant_owner",
+          "tenant_admin",
+          "platform_team"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "invitation",
+        "x-scope": "tenant",
+        "x-visibility": "public"
+      },
+      "post": {
+        "operationId": "createInvitation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationProof"
+                }
+              }
+            },
+            "description": "Invitation created; deliver the one-time token out of band."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invitation cannot be changed in its current state."
+          },
           "413": {
             "content": {
               "application/json": {
@@ -4985,6 +5061,16 @@
             },
             "description": "Gateway rejected one or more invalid or oversized request headers."
           },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invitation HMAC key is unavailable; service fails closed."
+          },
           "504": {
             "content": {
               "application/json": {
@@ -5011,7 +5097,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Submit an invitation write request",
+        "summary": "Create an expiring single-use invitation and return its proof once",
         "tags": [
           "Tenants",
           "Invitations"
@@ -5060,7 +5146,7 @@
                 }
               }
             },
-            "description": "Entity returned."
+            "description": "Safe invitation view. Pending invitations past their expiry report expired."
           },
           "400": {
             "content": {
@@ -5111,6 +5197,16 @@
               }
             },
             "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invitation HMAC key is unavailable; service fails closed."
           },
           "504": {
             "content": {
@@ -5188,15 +5284,15 @@
           "required": true
         },
         "responses": {
-          "202": {
+          "201": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MutationAccepted"
+                  "$ref": "#/components/schemas/InvitationAcceptance"
                 }
               }
             },
-            "description": "Invitation acceptance accepted."
+            "description": "Invitation accepted and role granted."
           },
           "400": {
             "content": {
@@ -5268,6 +5364,179 @@
             },
             "description": "Gateway rejected one or more invalid or oversized request headers."
           },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invitation HMAC key is unavailable; service fails closed."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [],
+        "summary": "Consume a body token to create an account or link the authenticated invitee",
+        "tags": [
+          "Tenants",
+          "Invitations"
+        ],
+        "x-audiences": [
+          "developer_external",
+          "tenant_owner",
+          "tenant_admin",
+          "platform_team"
+        ],
+        "x-family": "tenants",
+        "x-optional-bearer-auth": true,
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "invitation",
+        "x-scope": "tenant",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/tenants/{tenantId}/invitations/{invitationId}/resend": {
+      "post": {
+        "operationId": "resendInvitation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/InvitationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationResendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationProof"
+                }
+              }
+            },
+            "description": "New proof returned once; old proof is invalid."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invitation cannot be changed in its current state."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invitation HMAC key is unavailable; service fails closed."
+          },
           "504": {
             "content": {
               "application/json": {
@@ -5294,13 +5563,12 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Accept a tenant or workspace invitation while it is still pending.",
+        "summary": "Rotate proof and reset expiry; accepted invitations cannot be resent",
         "tags": [
           "Tenants",
           "Invitations"
         ],
         "x-audiences": [
-          "developer_external",
           "tenant_owner",
           "tenant_admin",
           "platform_team"
@@ -5341,18 +5609,18 @@
               }
             }
           },
-          "required": true
+          "required": false
         },
         "responses": {
-          "202": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MutationAccepted"
+                  "$ref": "#/components/schemas/Invitation"
                 }
               }
             },
-            "description": "Invitation revocation accepted."
+            "description": "Pending invitation revoked."
           },
           "400": {
             "content": {
@@ -5392,7 +5660,7 @@
                 }
               }
             },
-            "description": "The request conflicts with current entity integrity or lifecycle state."
+            "description": "Invitation cannot be changed in its current state."
           },
           "413": {
             "content": {
@@ -5423,6 +5691,16 @@
               }
             },
             "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invitation HMAC key is unavailable; service fails closed."
           },
           "504": {
             "content": {

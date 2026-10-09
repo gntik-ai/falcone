@@ -608,7 +608,8 @@
         "enum": [
           "self_service",
           "approval_required",
-          "auto_activate"
+          "auto_activate",
+          "invitation"
         ],
         "type": "string"
       },
@@ -710,6 +711,15 @@
           "displayName": {
             "maxLength": 120,
             "minLength": 1,
+            "type": "string"
+          },
+          "invitationId": {
+            "type": "string"
+          },
+          "invitationToken": {
+            "maxLength": 43,
+            "minLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
             "type": "string"
           },
           "password": {

@@ -1187,13 +1187,15 @@
     "method": "POST",
     "path": "/v1/tenants/{tenantId}/invitations",
     "family": "tenants",
-    "module": "apps/control-plane/b-handlers.mjs",
+    "module": "apps/control-plane/invitation-handlers.mjs",
     "export": "createInvitation",
     "invoke": "localHandler",
-    "deps": ["pg"],
-    "auth": "authenticated; tenant_owner/tenant_admin or workspace_owner/workspace_admin for body.workspaceId",
+    "deps": [
+      "pg"
+    ],
+    "auth": "authenticated",
     "subroutes": "no",
-    "notes": "InviteUserWizard.tsx -> submitWizardRequest('/v1/tenants/{tenantId}/invitations') with body.workspaceId/email/role/message. Local handler persists tenant_invitations with masked email/hash and returns MutationAccepted.",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
     "consoleUsed": true
   },
   {
@@ -1930,5 +1932,85 @@
     "subroutes": "internal sub-routing by params.method + params.path (jobs, jobs/{id}, jobs/{id}/pause, config, summary)",
     "notes": "handler(params) with pg at params.pg. Reads params.query/params.body (NOT flattened). Matches /v1/scheduling(/.*)? - one route handles the whole family. Already in tests/env routes.mjs.",
     "consoleUsed": false
+  },
+  {
+    "operationId": "listInvitations",
+    "method": "GET",
+    "path": "/v1/tenants/{tenantId}/invitations",
+    "family": "tenants",
+    "module": "apps/control-plane/invitation-handlers.mjs",
+    "export": "listInvitations",
+    "invoke": "localHandler",
+    "deps": [
+      "pg"
+    ],
+    "auth": "authenticated",
+    "subroutes": "no",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
+    "consoleUsed": true
+  },
+  {
+    "operationId": "getInvitation",
+    "method": "GET",
+    "path": "/v1/tenants/{tenantId}/invitations/{invitationId}",
+    "family": "tenants",
+    "module": "apps/control-plane/invitation-handlers.mjs",
+    "export": "getInvitation",
+    "invoke": "localHandler",
+    "deps": [
+      "pg"
+    ],
+    "auth": "authenticated",
+    "subroutes": "no",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
+    "consoleUsed": true
+  },
+  {
+    "operationId": "acceptInvitation",
+    "method": "POST",
+    "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance",
+    "family": "tenants",
+    "module": "apps/control-plane/invitation-handlers.mjs",
+    "export": "acceptInvitation",
+    "invoke": "localHandler",
+    "deps": [
+      "pg"
+    ],
+    "auth": "public",
+    "subroutes": "no",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
+    "consoleUsed": true
+  },
+  {
+    "operationId": "revokeInvitation",
+    "method": "POST",
+    "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/revocation",
+    "family": "tenants",
+    "module": "apps/control-plane/invitation-handlers.mjs",
+    "export": "revokeInvitation",
+    "invoke": "localHandler",
+    "deps": [
+      "pg"
+    ],
+    "auth": "authenticated",
+    "subroutes": "no",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
+    "consoleUsed": true
+  },
+  {
+    "operationId": "resendInvitation",
+    "method": "POST",
+    "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/resend",
+    "family": "tenants",
+    "module": "apps/control-plane/invitation-handlers.mjs",
+    "export": "resendInvitation",
+    "invoke": "localHandler",
+    "deps": [
+      "pg"
+    ],
+    "auth": "authenticated",
+    "subroutes": "no",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
+    "consoleUsed": true
   }
 ]

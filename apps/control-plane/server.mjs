@@ -373,7 +373,9 @@ const server = http.createServer(async (req, res) => {
     const headers = lowercaseHeaders(req.headers);
     correlationId = headers['x-correlation-id'] ?? null;
 
-    if (route.auth !== 'public') {
+    // Invitation links allow anonymous account creation and authenticated account linking.
+    // A supplied credential is always verified; invalid credentials never fall back to anonymous.
+    if (route.auth !== 'public' || (route.optionalIdentity && headers.authorization)) {
       try { identity = await authenticate(headers); }
       catch (e) {
         console.error('[control-plane] token verification failed:', e);

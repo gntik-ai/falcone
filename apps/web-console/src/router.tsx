@@ -54,6 +54,7 @@ import { ConsoleRuntimePage } from '@/pages/ConsoleRuntimePage'
 import { ConsoleSecretsPage } from '@/pages/ConsoleSecretsPage'
 import { ConsoleSecretRotationPage } from '@/pages/ConsoleSecretRotationPage'
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
+import { InvitationAcceptancePage } from '@/pages/InvitationAcceptancePage'
 import { SignupPage } from '@/pages/SignupPage'
 import { consoleAuthConfig } from '@/lib/console-config'
 import { getConsolePermissions } from '@/lib/console-permissions'
@@ -205,6 +206,7 @@ export const appRoutes = [
         element: <PasswordRecoveryPage />,
         handle: { title: 'Recuperar contraseña · Consola In Falcone' }
       },
+      { path: '/invitations/:tenantId/:invitationId', element: <InvitationAcceptancePage />, handle: { title: 'Aceptar invitación · Consola In Falcone' } },
       {
         path: '/signup',
         element: <SignupPage />,

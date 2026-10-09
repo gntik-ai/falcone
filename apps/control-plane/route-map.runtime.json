@@ -400,7 +400,7 @@
     "path": "/v1/tenants/{tenantId}/invitations",
     "localHandler": "createInvitation",
     "auth": "authenticated",
-    "notes": "Console Members invite-by-email (#759). Public-contract tenant route; body.workspaceId scopes workspace invites. Handler persists tenant_invitations with masked email/hash and verifies tenant owner/admin or workspace owner/admin for the target workspace."
+    "notes": "975: single-use invitation lifecycle; keyed HMAC only, scoped management and body-only acceptance proof."
   },
   {
     "method": "GET",
@@ -683,5 +683,41 @@
     "deps": ["db"],
     "auth": "authenticated",
     "notes": "Wildcard (mirrors tests/env /v1/scheduling(/.*)? GET|POST|PATCH|DELETE) so the action's internal sub-router off params.method+params.path works (jobs, jobs/{id}, jobs/{id}/pause, config, summary). Reads params.pg + params.query/params.body objects (NO flatten). parseIdentity needs x-tenant-id AND x-workspace-id (401 otherwise)."
+  },
+  {
+    "method": "GET",
+    "path": "/v1/tenants/{tenantId}/invitations",
+    "localHandler": "listInvitations",
+    "auth": "authenticated",
+    "notes": "975: single-use invitation lifecycle; keyed HMAC only, scoped management and body-only acceptance proof."
+  },
+  {
+    "method": "GET",
+    "path": "/v1/tenants/{tenantId}/invitations/{invitationId}",
+    "localHandler": "getInvitation",
+    "auth": "authenticated",
+    "notes": "975: single-use invitation lifecycle; keyed HMAC only, scoped management and body-only acceptance proof."
+  },
+  {
+    "method": "POST",
+    "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/acceptance",
+    "localHandler": "acceptInvitation",
+    "auth": "public",
+    "notes": "975: single-use invitation lifecycle; keyed HMAC only, scoped management and body-only acceptance proof.",
+    "optionalIdentity": true
+  },
+  {
+    "method": "POST",
+    "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/revocation",
+    "localHandler": "revokeInvitation",
+    "auth": "authenticated",
+    "notes": "975: single-use invitation lifecycle; keyed HMAC only, scoped management and body-only acceptance proof."
+  },
+  {
+    "method": "POST",
+    "path": "/v1/tenants/{tenantId}/invitations/{invitationId}/resend",
+    "localHandler": "resendInvitation",
+    "auth": "authenticated",
+    "notes": "975: single-use invitation lifecycle; keyed HMAC only, scoped management and body-only acceptance proof."
   }
 ]

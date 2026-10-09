@@ -6,6 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { kcAdmin } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
+import { INVITATION_HANDLERS, signupPasswordMinLength } from './invitation-handlers.mjs';
 const KC_BASE = (process.env.KEYCLOAK_BASE_URL || 'http://falcone-keycloak:8080').replace(/\/+$/, '');
 const REALM = process.env.CONSOLE_AUTH_REALM || 'in-falcone-platform';
 const CLIENT = process.env.CONSOLE_AUTH_CLIENT_ID || 'in-falcone-console';
@@ -15,10 +16,7 @@ const SELF_SERVICE = (process.env.CONSOLE_SIGNUP_SELF_SERVICE ?? 'true') === 'tr
 // Fail-closed to 8 on missing/invalid config: if CONSOLE_SIGNUP_PASSWORD_MIN_LENGTH
 // is unset or garbage, Number(...) is NaN and `length < NaN` is always false, which
 // would silently DISABLE enforcement (fail-open) — so we fall back to 8, never NaN.
-const SIGNUP_PASSWORD_MIN_LENGTH = (() => {
-  const n = Number(process.env.CONSOLE_SIGNUP_PASSWORD_MIN_LENGTH);
-  return Number.isInteger(n) && n > 0 ? n : 8;
-})();
+const SIGNUP_PASSWORD_MIN_LENGTH = signupPasswordMinLength();
 const ok = (statusCode, body) => ({ statusCode, body });
 const errBody = (statusCode, code, message) => ({ statusCode, body: { code, message, statusView: 'login' } });
 
@@ -242,8 +240,18 @@ async function getConsoleAccountStatusView(ctx) {
 async function signup(ctx) {
   const { body, pool } = ctx;
   // Allow test injection via ctx._kcAdmin; fall back to the module-level singleton.
-  const kc = ctx._kcAdmin ?? kcAdmin;
-  if (!SELF_SERVICE) return errBody(403, 'SIGNUP_DISABLED', 'Self-service signup is disabled');
+  const kc = ctx.kcAdmin ?? ctx._kcAdmin ?? kcAdmin;
+  const invitationToken = body.invitationToken ?? body.token;
+  if (invitationToken) {
+    const result = await INVITATION_HANDLERS.acceptInvitation({ ...ctx, kcAdmin: kc,
+      params: { tenantId: body.tenantId, invitationId: body.invitationId },
+      body: { ...body, email: body.primaryEmail ?? body.email, token: invitationToken } });
+    if (result.statusCode >= 400 && result.statusCode < 500)
+      return errBody(403, 'SIGNUP_DISABLED', 'A valid invitation is required');
+    if (result.statusCode >= 500) return result;
+    return ok(201, { ...result.body, registrationId: randomUUID(), activationMode: 'invitation', state: 'active', statusView: 'login' });
+  }
+  if (!SELF_SERVICE) return errBody(403, 'SIGNUP_DISABLED', 'A valid invitation is required');
   const username = body.username ?? body.primaryEmail;
   if (!username || !body.password) return errBody(400, 'VALIDATION_ERROR', 'username and password are required');
   // Enforce the advertised minimum password length BEFORE the tenant lookup /
@@ -256,7 +264,7 @@ async function signup(ctx) {
   if (!body.tenantId) return errBody(400, 'VALIDATION_ERROR', 'tenantId is required');
 
   // Resolve the tenant and obtain its iam_realm (realm-per-tenant model).
-  const tenant = await store.getTenant(pool, body.tenantId);
+  const tenant = await (ctx.store ?? store).getTenant(pool, body.tenantId);
   if (!tenant) return errBody(404, 'TENANT_NOT_FOUND', `tenant ${body.tenantId} not found`);
   if (!tenant.iam_realm) return errBody(422, 'REALM_NOT_PROVISIONED', `tenant ${body.tenantId} has no iam_realm provisioned`);
 
@@ -282,7 +290,7 @@ async function signup(ctx) {
   // `default` to whichever tenant wins an arbitrary LIMIT 1 — which would refuse a tenant its OWN
   // workspace. The `tenant_id` re-check below is belt-and-braces on top of the scoped query.
   if (body.workspaceId) {
-    const workspace = await store.getWorkspaceInTenant(pool, tenant.id, body.workspaceId);
+    const workspace = await (ctx.store ?? store).getWorkspaceInTenant(pool, tenant.id, body.workspaceId);
     if (!workspace || workspace.tenant_id !== tenant.id) {
       return errBody(400, 'WORKSPACE_NOT_IN_TENANT', 'workspaceId does not identify a workspace of this tenant');
     }
@@ -294,7 +302,7 @@ async function signup(ctx) {
       username, email: body.primaryEmail ?? null,
       firstName: (body.displayName ?? username).split(' ')[0],
       lastName: (body.displayName ?? '').split(' ').slice(1).join(' ') || 'User',
-      password: body.password, enabled: true, temporary: false,
+      password: body.password, enabled: true, temporary: false, emailVerified: false,
       attributes
     });
     return ok(201, {
