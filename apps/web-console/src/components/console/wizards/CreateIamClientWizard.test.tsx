@@ -45,7 +45,10 @@ describe('CreateIamClientWizard', () => {
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
     await user.click(screen.getByRole('button', { name: /confirmar/i }))
 
-    expect(requestMock).toHaveBeenCalled()
+    expect(requestMock).toHaveBeenCalledWith('/v1/workspaces/wrk_a1/iam/clients', expect.objectContaining({
+      method: 'POST',
+      body: { clientType: 'public', clientId: 'falcone-console', redirectUris: ['https://app.example/callback'], scopes: [], permissions: [] }
+    }))
     expect(await screen.findByText(/recurso creado correctamente/i)).toBeInTheDocument()
     expect(screen.getByText(/client_new/i)).toBeInTheDocument()
   })

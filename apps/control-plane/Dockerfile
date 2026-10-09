@@ -29,6 +29,7 @@ COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
      apps/control-plane/tenant-store.mjs \
      apps/control-plane/invitation-handlers.mjs apps/control-plane/tenant-user-handlers.mjs \
      apps/control-plane/b-handlers.mjs apps/control-plane/auth-handlers.mjs \
+     apps/control-plane/workspace-iam-client-handlers.mjs apps/control-plane/workspace-iam-context.mjs \
      apps/control-plane/saga.mjs apps/control-plane/dataplane.mjs \
      apps/control-plane/schema-retry.mjs apps/control-plane/tenant-scope.mjs \
      apps/control-plane/governance-schema.mjs apps/control-plane/workspace-quota.mjs \

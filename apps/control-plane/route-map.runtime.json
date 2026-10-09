@@ -1,5 +1,12 @@
 [
   {
+    "method": "POST",
+    "path": "/v1/workspaces/{workspaceId}/iam/clients",
+    "localHandler": "createWorkspaceIamClient",
+    "auth": "authenticated",
+    "notes": "Creates and verifies a workspace-owned Keycloak client in the tenant realm; handler enforces tenant management authority."
+  },
+  {
     "method": "GET",
     "path": "/v1/auth/status-views/{statusViewId}",
     "localHandler": "getConsoleAccountStatusView",

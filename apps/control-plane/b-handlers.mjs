@@ -3,7 +3,9 @@
 // (workflows/wf-con-002.mjs). Each handler: async (ctx) => { statusCode, body }
 // where ctx = { params, query, body, identity, pool, callerContext }.
 import { randomUUID } from 'node:crypto';
-import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, normalizeKeycloakAttributes, safeKeycloakAdminMessage, TENANT_REALM_ROLES } from './kc-admin.mjs';
+import { resolveWorkspaceForManage, kcBackedErr, statusFromError } from './workspace-iam-context.mjs';
+import { createWorkspaceIamClient } from './workspace-iam-client-handlers.mjs';
+import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, normalizeKeycloakAttributes, TENANT_REALM_ROLES } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
 import { socialProviderView, validateSocialProvider, SocialProviderValidationError } from './social-providers.mjs';
 import { AUTH_HANDLERS } from './auth-handlers.mjs';
@@ -33,14 +35,6 @@ function slugify(s) {
 }
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
-function statusFromError(error, fallback = 502) {
-  const status = Number(error?.statusCode ?? error?.kcStatus);
-  return status >= 400 && status < 500 ? status : fallback;
-}
-function kcBackedErr(error, code) {
-  return err(statusFromError(error), code, safeKeycloakAdminMessage(error));
-}
-
 // A plan id in the catalog is a UUID; the console CreateTenantWizard sends a SLUG (e.g. "starter").
 // Detect so we can resolve a slug -> id before the real plan-assign action (which keys on the UUID).
 function isPlanUuid(id) {
@@ -760,15 +754,6 @@ async function deleteWorkspace(ctx) {
 }
 
 // ---- service accounts (= confidential Keycloak client in the tenant realm) --
-async function resolveWorkspaceForManage(ctx) {
-  const st = ctx.store ?? store;
-  const ws = await st.getWorkspace(ctx.pool, ctx.params.workspaceId);
-  if (!ws) return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
-  if (!canManageTenantId(ctx.identity, ws.tenant_id)) return { error: err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin') };
-  const tenant = await st.getTenant(ctx.pool, ws.tenant_id);
-  if (!tenant?.iam_realm) return { error: err(409, 'NO_REALM', 'tenant has no IAM realm') };
-  return { ws, realm: tenant.iam_realm };
-}
 // POST /v1/workspaces/{workspaceId}/service-accounts
 async function createServiceAccount(ctx) {
   const { body, identity, pool } = ctx;
@@ -1556,6 +1541,7 @@ export const LOCAL_HANDLERS = {
   getAuthConfig, setAuthConfig, setSocialProvider, deleteSocialProvider,
   createWorkspace, listWorkspaces, listTenantWorkspaces, getWorkspace, promoteWorkspace, cloneWorkspace, deleteWorkspace,
   exportTenantConfiguration,
+  createWorkspaceIamClient,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential, deleteServiceAccount,
   provisionDatabase, provisionDatabaseGeneric, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,

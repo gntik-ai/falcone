@@ -86,6 +86,7 @@ export const routes = [
   { method: 'GET',  path: '/v1/tenants/{tenantId}/workspaces', localHandler: 'listTenantWorkspaces', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces', localHandler: 'listWorkspaces', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces/{workspaceId}', localHandler: 'getWorkspace', auth: 'authenticated' },
+  { method: 'POST', path: '/v1/workspaces/{workspaceId}/iam/clients', localHandler: 'createWorkspaceIamClient', auth: 'authenticated' },
   // Workspace realtime config (#788): ConsoleRealtimePage calls this workspace-addressed route.
   // The handler verifies the workspace belongs to the caller's tenant and returns the exact
   // metadata shape the page consumes. An owned workspace with no realtime channel rows returns
