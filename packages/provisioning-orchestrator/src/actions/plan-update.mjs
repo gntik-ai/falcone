@@ -1,3 +1,4 @@
+import { appendPlanAudit } from '../repositories/plan-audit-repository.mjs';
 import { randomUUID } from 'node:crypto';
 import * as planRepository from '../repositories/plan-repository.mjs';
 import * as catalogRepository from '../repositories/boolean-capability-catalog-repository.mjs';
@@ -24,14 +25,6 @@ function diffCapabilities(previous = {}, current = {}) {
   });
 }
 
-async function insertAudit(db, input) {
-  await db.query(
-    `INSERT INTO plan_audit_events (action_type, actor_id, tenant_id, plan_id, previous_state, new_state, correlation_id)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
-    [input.actionType, input.actorId, input.tenantId ?? null, input.planId ?? null, JSON.stringify(input.previousState), JSON.stringify(input.newState), input.correlationId]
-  );
-}
-
 export async function main(params = {}, overrides = {}) {
   const db = overrides.db ?? params.db;
   const producer = overrides.producer ?? params.producer;
@@ -50,13 +43,13 @@ export async function main(params = {}, overrides = {}) {
     }
     const result = await planRepository.update(db, params.planId, updates);
     const correlationId = params.correlationId ?? randomUUID();
-    await insertAudit(db, { actionType: 'plan.updated', actorId: actor.id, planId: params.planId, previousState: result.previous, newState: result.current, correlationId });
+    await appendPlanAudit(db, { actionType: 'plan.updated', actorId: actor.id, planId: params.planId, previousState: result.previous, newState: result.current, correlationId });
     const capabilityChanges = updates.capabilities ? diffCapabilities(result.previous?.capabilities ?? {}, result.current?.capabilities ?? {}) : [];
     if (capabilityChanges.length > 0) {
       const catalog = await catalogRepository.listActiveCatalog(db);
       const labelMap = new Map(catalog.map((entry) => [entry.capabilityKey, entry.displayLabel]));
       for (const change of capabilityChanges) {
-        await insertAudit(db, {
+        await appendPlanAudit(db, {
           actionType: change.newState ? 'plan.capability.enabled' : 'plan.capability.disabled',
           actorId: actor.id,
           planId: params.planId,

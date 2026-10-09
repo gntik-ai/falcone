@@ -1,3 +1,4 @@
+import { appendPlanAudit } from '../repositories/plan-audit-repository.mjs';
 import { randomUUID } from 'node:crypto';
 import { Plan } from '../models/plan.mjs';
 import * as planRepository from '../repositories/plan-repository.mjs';
@@ -10,14 +11,6 @@ function requireSuperadmin(params) {
   const actor = params.callerContext?.actor;
   if (!actor?.id || actor.type !== 'superadmin') throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
   return actor;
-}
-
-async function insertAudit(db, input) {
-  await db.query(
-    `INSERT INTO plan_audit_events (action_type, actor_id, tenant_id, plan_id, previous_state, new_state, correlation_id)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
-    [input.actionType, input.actorId, null, input.planId, JSON.stringify(input.previousState), JSON.stringify(input.newState), input.correlationId]
-  );
 }
 
 export async function main(params = {}, overrides = {}) {
@@ -35,7 +28,7 @@ export async function main(params = {}, overrides = {}) {
     }
     const result = await planRepository.transitionStatus(db, params.planId, params.targetStatus);
     const correlationId = params.correlationId ?? randomUUID();
-    await insertAudit(db, { actionType: 'plan.lifecycle_transitioned', actorId: actor.id, planId: params.planId, previousState: { status: result.previous.status }, newState: { status: result.current.status }, correlationId });
+    await appendPlanAudit(db, { actionType: 'plan.lifecycle_transitioned', actorId: actor.id, planId: params.planId, previousState: { status: result.previous.status }, newState: { status: result.current.status }, correlationId });
     await emitPlanEvent(producer, 'plan.lifecycle_transitioned', { correlationId, actorId: actor.id, planId: params.planId, previousState: { status: result.previous.status }, newState: { status: result.current.status } });
     return { statusCode: 200, body: { planId: result.current.id, previousStatus: result.previous.status, newStatus: result.current.status, transitionedAt: result.current.updatedAt } };
   } catch (error) {

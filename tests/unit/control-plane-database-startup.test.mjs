@@ -117,3 +117,20 @@ test('server and handler source keep the global pool separate from webhook runti
   assert.match(handlerSource, /buildDb\(ctx\.webhookRuntimePool/);
   assert.doesNotMatch(handlerSource, /buildDb\(ctx\.pool/);
 });
+
+test('978: startup installs a named legacy-safe audit hash guard and fails closed', async () => {
+  const { ensureSchema } = await import('../../apps/control-plane/tenant-store.mjs');
+  const statements = [];
+  await ensureSchema({ async query(sql) { statements.push(sql); return { rows: [] }; } });
+  const guard = statements.find((sql) => sql.includes('ADD CONSTRAINT plan_audit_events_hashes_required'));
+  assert.ok(guard, 'startup must install the hash guard');
+  assert.match(guard, /CHECK\s*\(prev_hash IS NOT NULL AND row_hash IS NOT NULL\)\s*NOT VALID/);
+  assert.match(guard, /pg_constraint/);
+  assert.match(guard, /conrelid\s*=\s*'plan_audit_events'::regclass/);
+  assert.ok(!statements.some((sql) => /VALIDATE CONSTRAINT plan_audit_events_hashes_required/.test(sql)), 'legacy rows must remain unvalidated');
+  const migrationError = new Error('guard DDL rejected');
+  await assert.rejects(ensureSchema({ async query(sql) {
+    if (sql.includes('ADD CONSTRAINT plan_audit_events_hashes_required')) throw migrationError;
+    return { rows: [] };
+  } }), (error) => error === migrationError);
+});

@@ -53,11 +53,11 @@ function memPool() {
     // #644: recordAuditEvent now runs in a per-tenant transaction (advisory lock +
     // prev-hash read + chained INSERT). The stub honours those statements.
     if (/^\s*(BEGIN|COMMIT|ROLLBACK)/i.test(s) || s.includes('pg_advisory_xact_lock')) return { rows: [] };
-    if (s.includes('SELECT row_hash FROM plan_audit_events')) {
+    if (s.trim().startsWith('SELECT row_hash')) {
       const tenantId = params[0];
-      const rows = audit.filter((r) => r.tenant_id === tenantId);
+      const rows = audit.filter((r) => r.tenant_id === tenantId && r.row_hash != null);
       const last = rows[rows.length - 1];
-      return { rows: last ? [{ row_hash: last.row_hash }] : [] };
+      return { rows: last ? [last] : [] };
     }
     if (s.includes('INSERT INTO plan_audit_events')) {
       // #644 INSERT params: [id, action_type, actor_id, tenant_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash]

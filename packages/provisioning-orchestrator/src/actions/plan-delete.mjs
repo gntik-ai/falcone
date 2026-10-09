@@ -1,3 +1,4 @@
+import { appendPlanAudit } from '../repositories/plan-audit-repository.mjs';
 import { randomUUID } from 'node:crypto';
 import * as planRepository from '../repositories/plan-repository.mjs';
 import { emitPlanEvent } from '../events/plan-events.mjs';
@@ -16,22 +17,6 @@ function requireSuperadmin(params) {
   return actor;
 }
 
-async function insertAudit(db, input) {
-  await db.query(
-    `INSERT INTO plan_audit_events (action_type, actor_id, tenant_id, plan_id, previous_state, new_state, correlation_id)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
-    [
-      input.actionType,
-      input.actorId,
-      input.tenantId ?? null,
-      input.planId ?? null,
-      input.previousState ? JSON.stringify(input.previousState) : null,
-      JSON.stringify(input.newState),
-      input.correlationId
-    ]
-  );
-}
-
 export async function main(params = {}, overrides = {}) {
   const db = overrides.db ?? params.db;
   const producer = overrides.producer ?? params.producer;
@@ -42,7 +27,7 @@ export async function main(params = {}, overrides = {}) {
     const deleted = await planRepository.deleteNeverAssigned(db, params.planId);
     const correlationId = params.correlationId ?? randomUUID();
     const deletionState = { planId: deleted.id, deleted: true, deletedAt: new Date().toISOString() };
-    await insertAudit(db, {
+    await appendPlanAudit(db, {
       actionType: 'plan.deleted',
       actorId: actor.id,
       planId: null,

@@ -14,7 +14,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { auditCanonical, computeRowHash, verifyAuditChain } from '../../apps/control-plane/audit-hash.mjs';
-import { recordAuditEvent, queryAuditEvents, auditRowToRecord } from '../../apps/control-plane/audit-store.mjs';
+import { recordAuditEvent, recordAuditEventInTransaction, queryAuditEvents, auditRowToRecord } from '../../apps/control-plane/audit-store.mjs';
 import { auditEventForRoute, recordRouteAudit, AUDITABLE_LOCAL_HANDLERS } from '../../apps/control-plane/audit-writer.mjs';
 import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
 import { routes } from '../../apps/control-plane/routes.mjs';
@@ -76,17 +76,29 @@ test('bbx-audit-hash-per-tenant: verifying only one tenant\'s rows is unbroken b
   assert.deepEqual(verifyAuditChain(a), { valid: true, brokenAt: null });
 });
 
-test('bbx-audit-hash-legacy-prefix: pre-migration rows (no row_hash) are skipped, the hashed suffix verifies', () => {
-  // A real read window can mix legacy rows (NULL hash) before the hashed chain.
-  const legacy = [
-    { id: 'L1', action_type: 'x', actor_id: 'u', tenant_id: 't', outcome: 'unknown', created_at: '2026-06-19T00:00:00.000Z', new_state: {}, prev_hash: null, row_hash: null },
-    { id: 'L2', action_type: 'y', actor_id: 'u', tenant_id: 't', outcome: 'unknown', created_at: '2026-06-19T00:00:01.000Z', new_state: {}, prev_hash: null, row_hash: null },
-  ];
-  const window = [...legacy, ...chain('t', 3)];
-  assert.deepEqual(verifyAuditChain(window), { valid: true, brokenAt: null }, 'legacy prefix skipped, hashed suffix valid');
-  // tampering a hashed row in the suffix is still caught (index counts from window start)
-  window[3].outcome = 'TAMPERED';
-  assert.deepEqual(verifyAuditChain(window), { valid: false, brokenAt: 3 });
+test('bbx-audit-hash-legacy-prefix: an unhashed prefix never verifies', () => {
+  const legacy = { id: 'legacy', prev_hash: null, row_hash: null };
+  assert.deepEqual(verifyAuditChain([legacy, ...chain('t', 3)]), { valid: false, brokenAt: 0 });
+});
+
+test('bbx-audit-hash-full-log: deletion, reordering and resets identify the first break', () => {
+  const rows = chain('t', 6);
+  for (const [window, brokenAt] of [
+    [rows.slice(2), 0],
+    [[...rows.slice(0, 1), ...rows.slice(3)], 1],
+    [[...rows.slice(0, 3), rows[5]], 3],
+    [[rows[0], rows[2], rows[1], ...rows.slice(3)], 1],
+  ]) assert.deepEqual(verifyAuditChain(window), { valid: false, brokenAt });
+  const reset = chain('t', 1)[0];
+  assert.deepEqual(verifyAuditChain([rows[0], reset]), { valid: false, brokenAt: 1 });
+});
+
+test('bbx-audit-hash-window: explicit anchor must match, and every row must be hashed', () => {
+  const rows = chain('t', 4);
+  assert.deepEqual(verifyAuditChain(rows.slice(2), { expectedAnchor: rows[1].row_hash }), { valid: true, brokenAt: null });
+  assert.deepEqual(verifyAuditChain(rows.slice(2), { expectedAnchor: 'wrong-anchor' }), { valid: false, brokenAt: 0 });
+  assert.deepEqual(verifyAuditChain([rows[0], { prev_hash: null, row_hash: null }, rows[2]]), { valid: false, brokenAt: 1 });
+  assert.deepEqual(verifyAuditChain([{ ...rows[0], prev_hash: null }]), { valid: false, brokenAt: 0 });
 });
 
 // ---- store: recordAuditEvent writes a verifiable chain ---------------------
@@ -97,16 +109,18 @@ function chainPool() {
   const q = async (sql, params = []) => {
     const s = sql.replace(/\s+/g, ' ').trim();
     if (/^(BEGIN|COMMIT|ROLLBACK)/i.test(s) || s.includes('pg_advisory_xact_lock')) return { rows: [] };
-    if (s.includes('SELECT row_hash FROM plan_audit_events')) {
+    if (s.startsWith('SELECT row_hash')) {
       const tenantId = params[0];
-      const rows = audit.filter((r) => r.tenant_id === tenantId);
-      const last = rows[rows.length - 1];
-      return { rows: last ? [{ row_hash: last.row_hash }] : [] };
+      const rows = audit.filter((r) => r.tenant_id === tenantId && (!s.includes('row_hash IS NOT NULL') || r.row_hash != null));
+      const last = rows.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || String(a.id).localeCompare(String(b.id))).at(-1);
+      return { rows: last ? [last] : [] };
     }
     if (s.includes('INSERT INTO plan_audit_events')) {
-      // [id, action_type, actor_id, tenant_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash]
-      const [id, action_type, actor_id, tenant_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash] = params;
-      const row = { id, action_type, actor_id, tenant_id, previous_state: previous_state ? JSON.parse(previous_state) : null, new_state: new_state ? JSON.parse(new_state) : {}, outcome, correlation_id: correlation_id ?? null, created_at, prev_hash, row_hash };
+      // [id, action_type, actor_id, tenant_id, plan_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash]
+      const values = [...params];
+      values.splice(4, 0, s.includes('$4,NULL,') ? null : values.pop());
+      const [id, action_type, actor_id, tenant_id, plan_id, previous_state, new_state, outcome, correlation_id, created_at, prev_hash, row_hash] = values;
+      const row = { id, action_type, actor_id, tenant_id, plan_id, previous_state: previous_state ? JSON.parse(previous_state) : null, new_state: new_state ? JSON.parse(new_state) : {}, outcome, correlation_id: correlation_id ?? null, created_at, prev_hash, row_hash };
       audit.push(row);
       return { rows: [row] };
     }
@@ -135,6 +149,42 @@ test('bbx-audit-store-chain: recordAuditEvent writes a verifiable per-tenant cha
   assert.equal(rows[2].prev_hash, rows[1].row_hash, 'row 2 links to row 1');
   assert.deepEqual(rows.map((r) => r.outcome), ['succeeded', 'denied', 'failed']);
   assert.deepEqual(verifyAuditChain(rows), { valid: true, brokenAt: null }, 'the persisted chain verifies');
+});
+
+test('bbx-audit-store-null-head: an unhashed latest row cannot reset the chain', async () => {
+  const pool = chainPool();
+  await recordAuditEvent(pool, { actionType: 'tenant.create', actorId: 'owner', tenantId: 't' });
+  pool._audit.push({ id: 'legacy', tenant_id: 't', row_hash: null, prev_hash: null });
+  await recordAuditEvent(pool, { actionType: 'workspace.create', actorId: 'owner', tenantId: 't' });
+  assert.equal(pool._audit[2].prev_hash, pool._audit[0].row_hash);
+});
+
+test('bbx-audit-store-plan-id: hashed append preserves the plan reference and states', async () => {
+  const pool = chainPool();
+  const row = await recordAuditEvent(pool, { actionType: 'plan.updated', actorId: 'admin', planId: 'plan-1', previousState: { status: 'draft' }, newState: { status: 'active' }, correlationId: 'corr' });
+  assert.equal(row.plan_id, 'plan-1');
+  assert.deepEqual(row.previous_state, { status: 'draft' });
+  assert.deepEqual(row.new_state, { status: 'active' });
+  assert.deepEqual(verifyAuditChain([row]), { valid: true, brokenAt: null });
+});
+
+test('bbx-audit-store-json-state: hashes match persisted JSON including dates and optional fields', async () => {
+  const pool = chainPool();
+  await recordAuditEvent(pool, { actionType: 'plan.created', actorId: 'admin', newState: { createdAt: new Date('2026-10-09T00:00:00.000Z'), optional: undefined } });
+  assert.deepEqual(pool._audit[0].new_state, { createdAt: '2026-10-09T00:00:00.000Z' });
+  assert.deepEqual(verifyAuditChain(pool._audit), { valid: true, brokenAt: null });
+});
+
+test('bbx-audit-store-order: equal or backwards timestamps cannot fork the append order', async () => {
+  const pool = chainPool();
+  for (const [id, createdAt] of [
+    ['z', '2026-10-09T00:00:00.000Z'],
+    ['y', '2026-10-09T00:00:00.000Z'],
+    ['x', '2026-10-08T23:59:59.000Z'],
+  ]) await recordAuditEventInTransaction(pool, { actionType: 'plan.updated', actorId: 'admin' }, { id, createdAt });
+  const rows = pool._audit.slice().sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+  assert.deepEqual(rows.map((row) => row.id), ['z', 'y', 'x']);
+  assert.deepEqual(verifyAuditChain(rows), { valid: true, brokenAt: null });
 });
 
 test('bbx-audit-store-record: auditRowToRecord reads outcome from the row and exposes the hashes', () => {

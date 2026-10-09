@@ -21,6 +21,11 @@ export function createFakeDb() {
       const text = `${sql}`.trim().replace(/\s+/g, ' ');
 
       if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') return { rows: [] };
+      if (text.includes('pg_advisory_xact_lock')) return { rows: [] };
+      if (text.startsWith('SELECT row_hash')) {
+        const head = this.auditEvents.filter((row) => row.tenant_id === params[0] && row.row_hash != null).at(-1);
+        return { rows: head ? [head] : [] };
+      }
       if (text.startsWith('SET LOCAL lock_timeout')) return { rows: [] };
 
       if (text.includes('FROM quota_dimension_catalog') && text.includes('ORDER BY dimension_key ASC')) {
@@ -31,7 +36,7 @@ export function createFakeDb() {
         return { rows: this.catalog.has(params[0]) ? [deepClone(this.catalog.get(params[0]))] : [] };
       }
 
-      if (text.includes('SELECT id, status, slug, quota_dimensions FROM plans WHERE id = $1 FOR UPDATE') || text.includes('SELECT id, status, slug, quota_dimensions FROM plans WHERE id = $1')) {
+      if (text.includes('SELECT id, status, slug, quota_dimensions, quota_type_config FROM plans WHERE id = $1 FOR UPDATE') || text.includes('SELECT id, status, slug, quota_dimensions, quota_type_config FROM plans WHERE id = $1')) {
         const plan = this.plans.get(params[0]);
         return { rows: plan ? [deepClone(plan)] : [] };
       }
@@ -49,19 +54,13 @@ export function createFakeDb() {
       }
 
       if (text.startsWith('INSERT INTO plan_audit_events')) {
-        this.auditEvents.push({
-          action_type: params[0],
-          actor_id: params[1],
-          tenant_id: params[2],
-          plan_id: params[3],
-          previous_state: JSON.parse(params[4]),
-          new_state: JSON.parse(params[5]),
-          correlation_id: params[6]
-        });
+        const [id, action_type, actor_id, tenant_id, previous, next, outcome, correlation_id, created_at, prev_hash, row_hash, plan_id] = params;
+        const row = { id, action_type, actor_id, tenant_id, plan_id, previous_state: previous == null ? null : JSON.parse(previous), new_state: JSON.parse(next), outcome, correlation_id, created_at, prev_hash, row_hash };
+        this.auditEvents.push(row);
         return { rows: [] };
       }
 
-      if (text === 'SELECT quota_dimensions FROM plans WHERE id = $1') {
+      if (text === 'SELECT quota_dimensions, quota_type_config FROM plans WHERE id = $1') {
         const plan = this.plans.get(params[0]);
         return { rows: plan ? [{ quota_dimensions: deepClone(plan.quota_dimensions) }] : [] };
       }

@@ -1,3 +1,4 @@
+import { appendPlanAudit } from './plan-audit-repository.mjs';
 import { getDefaultValue } from './quota-dimension-catalog-repository.mjs';
 
 function resolveLockTimeoutMs(value = process.env.PLAN_LIMITS_LOCK_TIMEOUT_MS) {
@@ -19,12 +20,8 @@ async function rollbackQuietly(pgClient) {
   try { await pgClient.query('ROLLBACK'); } catch {}
 }
 
-async function insertAuditEvent(pgClient, { actionType, actorId, correlationId, planId, previousState, newState }) {
-  await pgClient.query(
-    `INSERT INTO plan_audit_events (action_type, actor_id, tenant_id, plan_id, previous_state, new_state, correlation_id)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
-    [actionType, actorId, null, planId, JSON.stringify(previousState), JSON.stringify(newState), correlationId ?? null]
-  );
+async function insertAuditEvent(client, event) {
+  return appendPlanAudit(client, event, { inTransaction: true });
 }
 
 export async function getPlanWithLock(pgClient, planId) {

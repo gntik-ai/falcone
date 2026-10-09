@@ -397,13 +397,25 @@ export async function ensureSchema(pool) {
       correlation_id VARCHAR(255),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
-  // Audit integrity (#644): the TRUE outcome + the per-tenant append-only hash chain
-  // (prev_hash/row_hash). Added idempotently so an existing install gains them on the
-  // next boot; legacy rows keep NULL (read as 'unknown'; the chain verifies from the
-  // first hashed row).
+  // Audit integrity (#644, #978): legacy rows retain NULL hashes/outcome and
+  // verify as invalid. The NOT VALID guard preserves startup on legacy data,
+  // while requiring hashes for every new row. Guard failures must abort startup.
   await pool.query("ALTER TABLE plan_audit_events ADD COLUMN IF NOT EXISTS outcome VARCHAR(32)");
   await pool.query("ALTER TABLE plan_audit_events ADD COLUMN IF NOT EXISTS prev_hash TEXT");
   await pool.query("ALTER TABLE plan_audit_events ADD COLUMN IF NOT EXISTS row_hash TEXT");
+  await pool.query(`DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'plan_audit_events_hashes_required'
+          AND conrelid = 'plan_audit_events'::regclass
+      ) THEN
+        ALTER TABLE plan_audit_events
+          ADD CONSTRAINT plan_audit_events_hashes_required
+          CHECK (prev_hash IS NOT NULL AND row_hash IS NOT NULL) NOT VALID;
+      END IF;
+    END
+  $$`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_plan_audit_events_actor_created
     ON plan_audit_events (actor_id, created_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_plan_audit_events_tenant_created
