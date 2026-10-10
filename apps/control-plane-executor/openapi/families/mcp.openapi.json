@@ -723,7 +723,7 @@
     "description": "Workspace-scoped MCP server publishing, version curation, and tool-call mediation through the control-plane executor. Generated from the unified public API contract for v1.",
     "summary": "Workspace-scoped MCP server publishing, version curation, and tool-call mediation through the control-plane executor.",
     "title": "In Falcone MCP API",
-    "version": "1.21.0"
+    "version": "1.22.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

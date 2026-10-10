@@ -22,19 +22,14 @@ import {
   validateImportBundle
 } from '../../apps/control-plane-executor/src/functions-admin.mjs';
 
-test('functions admin control-plane helper exposes CRUD, lifecycle versioning, rollback, invocation, activation, HTTP exposure, and trigger routes', () => {
+test('functions admin helper discovers served operations and withdraws unserved routes', () => {
   const routes = listFunctionsAdminRoutes();
   const actionRoute = getFunctionsAdminRoute('getFunctions');
   const invocationRoute = getFunctionsAdminRoute('invokeFunctionAction');
-  const exposureRoute = getFunctionsAdminRoute('createFunctionHttpExposure');
   const versionRoute = getFunctionsAdminRoute('listFunctionVersions');
   const rollbackRoute = getFunctionsAdminRoute('rollbackFunctionAction');
   const activationLogRoute = getFunctionsAdminRoute('getFunctionActivationLogs');
-  const storageTriggerRoute = getFunctionsAdminRoute('getFunctionStorageTrigger');
-  const cronTriggerRoute = getFunctionsAdminRoute('getFunctionCronTrigger');
   const inventoryRoute = getFunctionsAdminRoute('getFunctionInventory');
-  const tenantQuotaRoute = getFunctionsAdminRoute('getFunctionTenantQuota');
-  const workspaceQuotaRoute = getFunctionsAdminRoute('getFunctionWorkspaceQuota');
   const listSecretsRoute = getFunctionsAdminRoute('listFunctionWorkspaceSecrets');
   const createSecretRoute = getFunctionsAdminRoute('createFunctionWorkspaceSecret');
   const getSecretRoute = getFunctionsAdminRoute('getFunctionWorkspaceSecret');
@@ -52,29 +47,13 @@ test('functions admin control-plane helper exposes CRUD, lifecycle versioning, r
     'deleteFunctions',
     'invokeFunctionAction',
     'listFunctionVersions',
-    'getFunctionVersion',
     'rollbackFunctionAction',
     'listFunctionActivations',
     'getFunctionActivation',
     'getFunctionActivationLogs',
     'getFunctionActivationResult',
     'rerunFunctionActivation',
-    'createFunctionHttpExposure',
-    'getFunctionHttpExposure',
-    'updateFunctionHttpExposure',
-    'deleteFunctionHttpExposure',
-    'createFunctionStorageTrigger',
-    'getFunctionStorageTrigger',
-    'createFunctionCronTrigger',
-    'getFunctionCronTrigger',
-    'createFunctionKafkaTrigger',
-    'getFunctionKafkaTrigger',
-    'listFunctionPackages',
-    'listFunctionTriggers',
-    'listFunctionRules',
     'getFunctionInventory',
-    'getFunctionTenantQuota',
-    'getFunctionWorkspaceQuota',
     'listFunctionWorkspaceSecrets',
     'createFunctionWorkspaceSecret',
     'getFunctionWorkspaceSecret',
@@ -83,26 +62,53 @@ test('functions admin control-plane helper exposes CRUD, lifecycle versioning, r
     'exportFunctionDefinition',
     'exportFunctionPackageDefinition',
     'importFunctionDefinition',
-    'importFunctionPackageDefinition',
-    'listFunctionDeploymentAudit',
-    'listFunctionRollbackEvidence',
-    'listFunctionQuotaEnforcement',
-    'getFunctionAuditCoverage'
+    'importFunctionPackageDefinition'
   ]) {
     assert.ok(routes.some((route) => route.operationId === operationId), `missing ${operationId}`);
   }
 
+  assert.equal(routes.length, 23);
+  for (const operationId of [
+    'getFunctionAuditCoverage',
+    'createFunctionCronTrigger',
+    'getFunctionCronTrigger',
+    'deleteFunctionHttpExposure',
+    'getFunctionHttpExposure',
+    'updateFunctionHttpExposure',
+    'createFunctionHttpExposure',
+    'createFunctionKafkaTrigger',
+    'getFunctionKafkaTrigger',
+    'createFunctionStorageTrigger',
+    'getFunctionStorageTrigger',
+    'getFunctionVersion',
+    'getFunctionTenantQuota',
+    'listFunctionDeploymentAudit',
+    'listFunctionQuotaEnforcement',
+    'listFunctionRollbackEvidence',
+    'listFunctionPackages',
+    'createFunctionPackage',
+    'deleteFunctionPackage',
+    'getFunctionPackage',
+    'updateFunctionPackage',
+    'getFunctionWorkspaceQuota',
+    'listFunctionRules',
+    'createFunctionRule',
+    'deleteFunctionRule',
+    'getFunctionRule',
+    'updateFunctionRule',
+    'listFunctionTriggers',
+    'createFunctionTrigger',
+    'deleteFunctionTrigger',
+    'getFunctionTrigger',
+    'updateFunctionTrigger',
+  ]) assert.equal(getFunctionsAdminRoute(operationId), undefined);
+
   assert.equal(actionRoute.resourceType, 'function_action');
   assert.equal(invocationRoute.resourceType, 'function_invocation');
-  assert.equal(exposureRoute.resourceType, 'function_http_exposure');
   assert.equal(versionRoute.resourceType, 'function_version');
   assert.equal(rollbackRoute.resourceType, 'function_rollback');
   assert.equal(activationLogRoute.resourceType, 'function_activation_log');
-  assert.equal(storageTriggerRoute.resourceType, 'function_storage_trigger');
-  assert.equal(cronTriggerRoute.resourceType, 'function_cron_trigger');
   assert.equal(inventoryRoute.path, '/v1/functions/workspaces/{workspaceId}/inventory');
-  assert.equal(tenantQuotaRoute.resourceType, 'function_quota');
-  assert.equal(workspaceQuotaRoute.path, '/v1/functions/workspaces/{workspaceId}/quota');
   assert.equal(listSecretsRoute.resourceType, 'function_workspace_secret');
   assert.equal(createSecretRoute.resourceType, 'function_workspace_secret');
   assert.equal(getSecretRoute.resourceType, 'function_workspace_secret');
@@ -113,12 +119,12 @@ test('functions admin control-plane helper exposes CRUD, lifecycle versioning, r
   assert.equal(surface.find((entry) => entry.resourceKind === 'action').routeCount, 5);
   assert.equal(surface.find((entry) => entry.resourceKind === 'invocation').actions.includes('rerun'), true);
   assert.equal(surface.find((entry) => entry.resourceKind === 'activation').routeCount, 4);
-  assert.equal(surface.find((entry) => entry.resourceKind === 'version').routeCount, 2);
+  assert.equal(surface.find((entry) => entry.resourceKind === 'version').routeCount, 1);
   assert.equal(surface.find((entry) => entry.resourceKind === 'rollback').routeCount, 1);
-  assert.equal(surface.find((entry) => entry.resourceKind === 'http_exposure').routeCount, 4);
-  assert.equal(surface.find((entry) => entry.resourceKind === 'storage_trigger').routeCount, 2);
-  assert.equal(surface.find((entry) => entry.resourceKind === 'cron_trigger').routeCount, 2);
-  assert.equal(surface.find((entry) => entry.resourceKind === 'quota').routeCount, 2);
+  assert.equal(surface.find((entry) => entry.resourceKind === 'http_exposure').routeCount, 0);
+  assert.equal(surface.find((entry) => entry.resourceKind === 'storage_trigger').routeCount, 0);
+  assert.equal(surface.find((entry) => entry.resourceKind === 'cron_trigger').routeCount, 0);
+  assert.equal(surface.find((entry) => entry.resourceKind === 'quota').routeCount, 0);
   assert.deepEqual(surface.find((entry) => entry.resourceKind === 'workspace_secret').actions, ['list', 'create', 'get', 'update', 'delete']);
   assert.equal(surface.find((entry) => entry.resourceKind === 'workspace_secret').routeCount, 5);
   assert.deepEqual(surface.find((entry) => entry.resourceKind === 'function_definition_export').actions, ['export']);
@@ -126,11 +132,11 @@ test('functions admin control-plane helper exposes CRUD, lifecycle versioning, r
   assert.deepEqual(surface.find((entry) => entry.resourceKind === 'function_definition_import').actions, ['import']);
   assert.equal(surface.find((entry) => entry.resourceKind === 'function_definition_import').routeCount, 2);
   assert.deepEqual(surface.find((entry) => entry.resourceKind === 'function_deployment_audit').actions, ['list']);
-  assert.equal(surface.find((entry) => entry.resourceKind === 'function_deployment_audit').routeCount, 1);
+  assert.equal(surface.find((entry) => entry.resourceKind === 'function_deployment_audit').routeCount, 0);
   assert.deepEqual(surface.find((entry) => entry.resourceKind === 'function_rollback_evidence').actions, ['list']);
-  assert.equal(surface.find((entry) => entry.resourceKind === 'function_rollback_evidence').routeCount, 1);
+  assert.equal(surface.find((entry) => entry.resourceKind === 'function_rollback_evidence').routeCount, 0);
   assert.deepEqual(surface.find((entry) => entry.resourceKind === 'function_quota_enforcement_audit').actions, ['list']);
-  assert.equal(surface.find((entry) => entry.resourceKind === 'function_quota_enforcement_audit').routeCount, 1);
+  assert.equal(surface.find((entry) => entry.resourceKind === 'function_quota_enforcement_audit').routeCount, 0);
   assert.equal(AUDIT_ACTION_TYPES.ROLLBACK, 'function.rolled_back');
   assert.equal(AUDIT_SCOPE_ERROR_CODES.SCOPE_VIOLATION, 'AUDIT_SCOPE_VIOLATION');
 });

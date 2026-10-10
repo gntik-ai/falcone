@@ -109,3 +109,64 @@ fails closed: the API returns `202 cleanup_pending`, retains metadata and owners
 creates/reuses an owner-scoped durable obligation. Recovery is idempotent and never selects an
 adjacent owner's resource by an unscoped name. Hosted MCP state is the durable `falcone_mcp_state`
 snapshot, retained until it can be reconciled safely.
+
+## OpenAPI 1.22.0 contract correction (issue #992)
+
+The functions family now advertises only the 23 operations served by the merged control-plane
+runtime table. The previous contract contained 55 functions-family operations: 54 under
+`/v1/functions` and one admin audit coverage operation. The 32 operations below had no runtime
+route and returned `404 NO_ROUTE`; they are withdrawn rather than implemented in this change.
+
+This is a minor contract correction within `/v1`: no served request, response, authentication, or
+authorization behavior changes, so the existing policy requiring a new URI family for runtime
+breaking changes does not apply. Generated SDKs will lose methods for the withdrawn operations;
+clients must stop relying on those declarations. There is no deprecation replacement or coexistence
+window for operations that were never served.
+
+Functions support synchronous client invocation, manual activation rerun, lifecycle operations,
+definition export/import (including packages), and workspace secrets. Event-driven and scheduled
+invocation, trigger/rule management, HTTP exposure, package CRUD, quota queries, and audit queries
+require a separate implementation enhancement. Optional trigger fields in served action schemas
+and the console remain for compatibility; their presence does not enable automation.
+
+Edit `apps/control-plane-executor/openapi/families/functions.openapi.json` for functions changes,
+then run `npm run generate:public-api`. The generator merges that family source into the unified
+contract, removes schemas made unreachable by withdrawal, and refreshes family contracts, the
+route catalog, and public API docs. Other families still use the unified contract as their source.
+The functions parity contract test reads both the shipped runtime map and seed routes without
+network, cluster access, or credentials.
+
+| Withdrawn operationId | Method | Path |
+| --- | --- | --- |
+| getFunctionAuditCoverage | GET | `/v1/admin/functions/audit/coverage` |
+| createFunctionCronTrigger | POST | `/v1/functions/actions/{resourceId}/cron-triggers` |
+| getFunctionCronTrigger | GET | `/v1/functions/actions/{resourceId}/cron-triggers/{triggerId}` |
+| deleteFunctionHttpExposure | DELETE | `/v1/functions/actions/{resourceId}/http-exposure` |
+| getFunctionHttpExposure | GET | `/v1/functions/actions/{resourceId}/http-exposure` |
+| updateFunctionHttpExposure | PATCH | `/v1/functions/actions/{resourceId}/http-exposure` |
+| createFunctionHttpExposure | POST | `/v1/functions/actions/{resourceId}/http-exposure` |
+| createFunctionKafkaTrigger | POST | `/v1/functions/actions/{resourceId}/kafka-triggers` |
+| getFunctionKafkaTrigger | GET | `/v1/functions/actions/{resourceId}/kafka-triggers/{triggerId}` |
+| createFunctionStorageTrigger | POST | `/v1/functions/actions/{resourceId}/storage-triggers` |
+| getFunctionStorageTrigger | GET | `/v1/functions/actions/{resourceId}/storage-triggers/{triggerId}` |
+| getFunctionVersion | GET | `/v1/functions/actions/{resourceId}/versions/{versionId}` |
+| getFunctionTenantQuota | GET | `/v1/functions/tenants/{tenantId}/quota` |
+| listFunctionDeploymentAudit | GET | `/v1/functions/workspaces/{workspaceId}/audit` |
+| listFunctionQuotaEnforcement | GET | `/v1/functions/workspaces/{workspaceId}/audit/quota-enforcement` |
+| listFunctionRollbackEvidence | GET | `/v1/functions/workspaces/{workspaceId}/audit/rollback-evidence` |
+| listFunctionPackages | GET | `/v1/functions/workspaces/{workspaceId}/packages` |
+| createFunctionPackage | POST | `/v1/functions/workspaces/{workspaceId}/packages` |
+| deleteFunctionPackage | DELETE | `/v1/functions/workspaces/{workspaceId}/packages/{packageName}` |
+| getFunctionPackage | GET | `/v1/functions/workspaces/{workspaceId}/packages/{packageName}` |
+| updateFunctionPackage | PATCH | `/v1/functions/workspaces/{workspaceId}/packages/{packageName}` |
+| getFunctionWorkspaceQuota | GET | `/v1/functions/workspaces/{workspaceId}/quota` |
+| listFunctionRules | GET | `/v1/functions/workspaces/{workspaceId}/rules` |
+| createFunctionRule | POST | `/v1/functions/workspaces/{workspaceId}/rules` |
+| deleteFunctionRule | DELETE | `/v1/functions/workspaces/{workspaceId}/rules/{ruleName}` |
+| getFunctionRule | GET | `/v1/functions/workspaces/{workspaceId}/rules/{ruleName}` |
+| updateFunctionRule | PATCH | `/v1/functions/workspaces/{workspaceId}/rules/{ruleName}` |
+| listFunctionTriggers | GET | `/v1/functions/workspaces/{workspaceId}/triggers` |
+| createFunctionTrigger | POST | `/v1/functions/workspaces/{workspaceId}/triggers` |
+| deleteFunctionTrigger | DELETE | `/v1/functions/workspaces/{workspaceId}/triggers/{triggerName}` |
+| getFunctionTrigger | GET | `/v1/functions/workspaces/{workspaceId}/triggers/{triggerName}` |
+| updateFunctionTrigger | PATCH | `/v1/functions/workspaces/{workspaceId}/triggers/{triggerName}` |
