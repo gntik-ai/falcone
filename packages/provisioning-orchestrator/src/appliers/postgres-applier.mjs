@@ -6,6 +6,7 @@
 import { compareResources, resolveAction, buildDiff } from '../reprovision/diff.mjs';
 import { REDACTED_MARKER, zeroCounts } from '../reprovision/types.mjs';
 import { assertRegionSupported } from './region-guard.mjs';
+import { checkPostgresExtensionAvailable as _checkExtensionAvailable } from '../../../internal-contracts/src/postgres-extension-availability.mjs';
 
 const RESOURCE_TYPES = ['schemas', 'tables', 'views', 'extensions', 'grants'];
 const IGNORE_KEYS = ['oid', 'tableowner', 'schemaname'];
@@ -107,10 +108,7 @@ function _isSafeColumnDefault(value) {
  * @param {(sql: string, params: unknown[]) => Promise<unknown[]>} query injected query fn
  * @returns {Promise<boolean>} true if the extension is available on the instance
  */
-export async function _checkExtensionAvailable(name, query) {
-  const rows = await query('SELECT 1 FROM pg_available_extensions WHERE name = $1', [name]);
-  return Array.isArray(rows) && rows.length > 0;
-}
+export { _checkExtensionAvailable };
 
 /**
  * Build the actionable configuration-error message for an extension that the
