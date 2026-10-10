@@ -140,7 +140,7 @@
     "description": "Workspace-scoped PostgreSQL change-capture enablement and listing surfaces. Generated from the unified public API contract for v1.",
     "summary": "Workspace-scoped PostgreSQL change-capture enablement and listing surfaces.",
     "title": "In Falcone Pg Captures API",
-    "version": "1.21.0"
+    "version": "1.22.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

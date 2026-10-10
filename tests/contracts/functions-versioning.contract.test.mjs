@@ -8,21 +8,17 @@ import { OPENAPI_PATH, resolveParameters } from '../../scripts/lib/quality-gates
 test('functions versioning OpenAPI contract exposes lifecycle version and rollback routes', async () => {
   const document = await SwaggerParser.validate(OPENAPI_PATH);
   const listVersions = document.paths['/v1/functions/actions/{resourceId}/versions'].get;
-  const getVersion = document.paths['/v1/functions/actions/{resourceId}/versions/{versionId}'].get;
+  assert.equal(document.paths['/v1/functions/actions/{resourceId}/versions/{versionId}'], undefined);
   const rollback = document.paths['/v1/functions/actions/{resourceId}/rollback'].post;
   const listVersionsParameters = resolveParameters(document, listVersions);
-  const getVersionParameters = resolveParameters(document, getVersion);
   const rollbackParameters = resolveParameters(document, rollback);
 
   assert.ok(listVersions);
-  assert.ok(getVersion);
   assert.ok(rollback);
 
   assert.equal(listVersions['x-resource-type'], 'function_version');
-  assert.equal(getVersion['x-resource-type'], 'function_version');
   assert.equal(rollback['x-resource-type'], 'function_rollback');
   assert.equal(listVersionsParameters.some((parameter) => parameter.name === 'resourceId'), true);
-  assert.equal(getVersionParameters.some((parameter) => parameter.name === 'versionId'), true);
   assert.equal(rollbackParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
   assert.equal(rollbackParameters.some((parameter) => parameter.name === 'resourceId'), true);
   assert.ok(rollback.responses['202'].content['application/json'].schema.properties.requestedVersionId);
@@ -39,17 +35,13 @@ test('functions versioning OpenAPI contract exposes lifecycle version and rollba
 
 test('functions versioning routes are discoverable through the generated public route catalog', () => {
   const listVersions = getPublicRoute('listFunctionVersions');
-  const getVersion = getPublicRoute('getFunctionVersion');
+  assert.equal(getPublicRoute('getFunctionVersion'), undefined);
   const rollback = getPublicRoute('rollbackFunctionAction');
 
   assert.equal(listVersions.family, 'functions');
   assert.equal(listVersions.path, '/v1/functions/actions/{resourceId}/versions');
   assert.equal(listVersions.resourceType, 'function_version');
   assert.equal(listVersions.requiredHeaders.includes('X-API-Version'), true);
-
-  assert.equal(getVersion.family, 'functions');
-  assert.equal(getVersion.path, '/v1/functions/actions/{resourceId}/versions/{versionId}');
-  assert.equal(getVersion.resourceType, 'function_version');
 
   assert.equal(rollback.family, 'functions');
   assert.equal(rollback.path, '/v1/functions/actions/{resourceId}/rollback');

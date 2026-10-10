@@ -623,6 +623,14 @@ function collectDomainAndAuthorizationAlignmentViolations(document, taxonomy, vi
   const taxonomyResources = taxonomy.resource_taxonomy ?? [];
 
   for (const entity of domainModel.entities ?? []) {
+    if (entity.openapi?.withdrawn_in) {
+      for (const path of new Set([entity.openapi.read_path, entity.openapi.write_path])) {
+        if (document.paths?.[path]) {
+          violations.push(`Domain entity ${entity.id} must not publish withdrawn path ${path}.`);
+        }
+      }
+      continue;
+    }
     if (!document.paths?.[entity.openapi?.read_path]) {
       violations.push(`Domain entity ${entity.id} must preserve read path ${entity.openapi?.read_path}.`);
     }

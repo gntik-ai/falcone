@@ -5,18 +5,14 @@ import SwaggerParser from '@apidevtools/swagger-parser';
 import { OPENAPI_PATH } from '../../scripts/lib/quality-gates.mjs';
 import { getPublicRoute } from '../../packages/internal-contracts/src/index.mjs';
 
-test('functions quota contract exposes tenant and workspace quota routes and expanded scope-aware schemas', async () => {
+test('functions quota contract withdraws unserved quota routes while keeping schemas used by served inventory', async () => {
   const document = await SwaggerParser.validate(OPENAPI_PATH);
   const tenantQuota = document.paths['/v1/functions/tenants/{tenantId}/quota']?.get;
   const workspaceQuota = document.paths['/v1/functions/workspaces/{workspaceId}/quota']?.get;
   const quotaSchema = document.components.schemas.FunctionQuotaStatus;
 
-  assert.ok(tenantQuota);
-  assert.ok(workspaceQuota);
-  assert.equal(tenantQuota.operationId, 'getFunctionTenantQuota');
-  assert.equal(workspaceQuota.operationId, 'getFunctionWorkspaceQuota');
-  assert.equal(tenantQuota['x-resource-type'], 'function_quota');
-  assert.equal(workspaceQuota['x-resource-type'], 'function_quota');
+  assert.equal(tenantQuota, undefined);
+  assert.equal(workspaceQuota, undefined);
 
   assert.ok(document.components.schemas.FunctionQuotaScopeStatus);
   assert.ok(document.components.schemas.FunctionQuotaDimensionStatus);
@@ -31,6 +27,6 @@ test('functions quota contract exposes tenant and workspace quota routes and exp
   assert.equal(document.components.schemas.FunctionQuotaScopeStatus.required.includes('memoryMb'), true);
   assert.ok(document.components.schemas.FunctionInventory.properties.quotaStatus);
 
-  assert.equal(getPublicRoute('getFunctionTenantQuota')?.resourceType, 'function_quota');
-  assert.equal(getPublicRoute('getFunctionWorkspaceQuota')?.path, '/v1/functions/workspaces/{workspaceId}/quota');
+  assert.equal(getPublicRoute('getFunctionTenantQuota'), undefined);
+  assert.equal(getPublicRoute('getFunctionWorkspaceQuota'), undefined);
 });

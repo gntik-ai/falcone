@@ -871,7 +871,9 @@
         "read_schema": "AuditPage",
         "write_schema": "AuditPage",
         "read_path": "/v1/functions/workspaces/{workspaceId}/audit",
-        "write_path": "/v1/functions/workspaces/{workspaceId}/audit"
+        "write_path": "/v1/functions/workspaces/{workspaceId}/audit",
+        "withdrawn_in": "1.22.0",
+        "withdrawal_reason": "Issue #992: audit query operations were never served; retain internal entities without publishing function audit routes."
       }
     },
     {
@@ -913,7 +915,9 @@
         "read_schema": "DeploymentAuditEntry",
         "write_schema": "DeploymentAuditEntry",
         "read_path": "/v1/functions/workspaces/{workspaceId}/audit",
-        "write_path": "/v1/functions/workspaces/{workspaceId}/audit"
+        "write_path": "/v1/functions/workspaces/{workspaceId}/audit",
+        "withdrawn_in": "1.22.0",
+        "withdrawal_reason": "Issue #992: audit query operations were never served; retain internal entities without publishing function audit routes."
       }
     },
     {
@@ -955,7 +959,9 @@
         "read_schema": "AdminActionAuditEntry",
         "write_schema": "AdminActionAuditEntry",
         "read_path": "/v1/functions/workspaces/{workspaceId}/audit",
-        "write_path": "/v1/functions/workspaces/{workspaceId}/audit"
+        "write_path": "/v1/functions/workspaces/{workspaceId}/audit",
+        "withdrawn_in": "1.22.0",
+        "withdrawal_reason": "Issue #992: audit query operations were never served; retain internal entities without publishing function audit routes."
       }
     },
     {
@@ -997,7 +1003,9 @@
         "read_schema": "RollbackEvidenceRecord",
         "write_schema": "RollbackEvidenceRecord",
         "read_path": "/v1/functions/workspaces/{workspaceId}/audit/rollback-evidence",
-        "write_path": "/v1/functions/workspaces/{workspaceId}/audit/rollback-evidence"
+        "write_path": "/v1/functions/workspaces/{workspaceId}/audit/rollback-evidence",
+        "withdrawn_in": "1.22.0",
+        "withdrawal_reason": "Issue #992: audit query operations were never served; retain internal entities without publishing function audit routes."
       }
     },
     {
@@ -1039,7 +1047,9 @@
         "read_schema": "QuotaEnforcementRecord",
         "write_schema": "QuotaEnforcementRecord",
         "read_path": "/v1/functions/workspaces/{workspaceId}/audit/quota-enforcement",
-        "write_path": "/v1/functions/workspaces/{workspaceId}/audit/quota-enforcement"
+        "write_path": "/v1/functions/workspaces/{workspaceId}/audit/quota-enforcement",
+        "withdrawn_in": "1.22.0",
+        "withdrawal_reason": "Issue #992: audit query operations were never served; retain internal entities without publishing function audit routes."
       }
     }
   ],

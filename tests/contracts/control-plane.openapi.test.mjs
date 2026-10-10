@@ -127,13 +127,13 @@ test('control-plane OpenAPI document remains structurally valid', async () => {
   assert.ok(document.paths['/v1/functions/actions/{resourceId}/activations/{activationId}/logs']);
   assert.ok(document.paths['/v1/functions/actions/{resourceId}/activations/{activationId}/result']);
   assert.ok(document.paths['/v1/functions/actions/{resourceId}/activations/{activationId}/rerun']);
-  assert.ok(document.paths['/v1/functions/actions/{resourceId}/http-exposure']);
-  assert.ok(document.paths['/v1/functions/actions/{resourceId}/kafka-triggers']);
-  assert.ok(document.paths['/v1/functions/actions/{resourceId}/kafka-triggers/{triggerId}']);
-  assert.ok(document.paths['/v1/functions/actions/{resourceId}/storage-triggers']);
-  assert.ok(document.paths['/v1/functions/actions/{resourceId}/storage-triggers/{triggerId}']);
-  assert.ok(document.paths['/v1/functions/actions/{resourceId}/cron-triggers']);
-  assert.ok(document.paths['/v1/functions/actions/{resourceId}/cron-triggers/{triggerId}']);
+  assert.equal(document.paths['/v1/functions/actions/{resourceId}/http-exposure'], undefined);
+  assert.equal(document.paths['/v1/functions/actions/{resourceId}/kafka-triggers'], undefined);
+  assert.equal(document.paths['/v1/functions/actions/{resourceId}/kafka-triggers/{triggerId}'], undefined);
+  assert.equal(document.paths['/v1/functions/actions/{resourceId}/storage-triggers'], undefined);
+  assert.equal(document.paths['/v1/functions/actions/{resourceId}/storage-triggers/{triggerId}'], undefined);
+  assert.equal(document.paths['/v1/functions/actions/{resourceId}/cron-triggers'], undefined);
+  assert.equal(document.paths['/v1/functions/actions/{resourceId}/cron-triggers/{triggerId}'], undefined);
   assert.ok(document.paths['/v1/storage/buckets/{resourceId}']);
   assert.ok(document.paths['/v1/metrics/workspaces/{workspaceId}/series']);
   assert.ok(document.paths['/v1/metrics/workspaces/{workspaceId}/gateway-streams']);
@@ -254,20 +254,11 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const getFunctionActivationLogs = document.paths['/v1/functions/actions/{resourceId}/activations/{activationId}/logs'].get;
   const getFunctionActivationResult = document.paths['/v1/functions/actions/{resourceId}/activations/{activationId}/result'].get;
   const rerunFunctionActivation = document.paths['/v1/functions/actions/{resourceId}/activations/{activationId}/rerun'].post;
-  const createFunctionHttpExposure = document.paths['/v1/functions/actions/{resourceId}/http-exposure'].post;
-  const getFunctionHttpExposure = document.paths['/v1/functions/actions/{resourceId}/http-exposure'].get;
-  const updateFunctionHttpExposure = document.paths['/v1/functions/actions/{resourceId}/http-exposure'].patch;
-  const createFunctionStorageTrigger = document.paths['/v1/functions/actions/{resourceId}/storage-triggers'].post;
-  const getFunctionStorageTrigger = document.paths['/v1/functions/actions/{resourceId}/storage-triggers/{triggerId}'].get;
-  const createFunctionCronTrigger = document.paths['/v1/functions/actions/{resourceId}/cron-triggers'].post;
-  const getFunctionCronTrigger = document.paths['/v1/functions/actions/{resourceId}/cron-triggers/{triggerId}'].get;
-  const createFunctionKafkaTrigger = document.paths['/v1/functions/actions/{resourceId}/kafka-triggers'].post;
-  const getFunctionKafkaTrigger = document.paths['/v1/functions/actions/{resourceId}/kafka-triggers/{triggerId}'].get;
   const getGatewayStreamMetrics = document.paths['/v1/metrics/workspaces/{workspaceId}/gateway-streams'].get;
   const createWebSocketSession = document.paths['/v1/websockets/sessions'].post;
 
   assert.deepEqual(collectContractViolations(document), []);
-  assert.equal(document.info.version, '1.21.0');
+  assert.equal(document.info.version, '1.22.0');
   assert.equal(document.components.parameters.XApiVersion.schema.const, '2026-03-26');
   assert.deepEqual(document.components.schemas.ErrorResponse.required, [
     'status',
@@ -370,15 +361,6 @@ test('control-plane contract enforces versioning, authorization, family metadata
   const getFunctionActivationLogsParameters = resolveParameters(document, getFunctionActivationLogs);
   const getFunctionActivationResultParameters = resolveParameters(document, getFunctionActivationResult);
   const rerunFunctionActivationParameters = resolveParameters(document, rerunFunctionActivation);
-  const createFunctionHttpExposureParameters = resolveParameters(document, createFunctionHttpExposure);
-  const getFunctionHttpExposureParameters = resolveParameters(document, getFunctionHttpExposure);
-  const updateFunctionHttpExposureParameters = resolveParameters(document, updateFunctionHttpExposure);
-  const createFunctionStorageTriggerParameters = resolveParameters(document, createFunctionStorageTrigger);
-  const getFunctionStorageTriggerParameters = resolveParameters(document, getFunctionStorageTrigger);
-  const createFunctionCronTriggerParameters = resolveParameters(document, createFunctionCronTrigger);
-  const getFunctionCronTriggerParameters = resolveParameters(document, getFunctionCronTrigger);
-  const createFunctionKafkaTriggerParameters = resolveParameters(document, createFunctionKafkaTrigger);
-  const getFunctionKafkaTriggerParameters = resolveParameters(document, getFunctionKafkaTrigger);
   const gatewayMetricParameters = resolveParameters(document, getGatewayStreamMetrics);
   const websocketParameters = resolveParameters(document, createWebSocketSession);
 
@@ -918,17 +900,6 @@ test('control-plane contract enforces versioning, authorization, family metadata
   assert.equal(getFunctionActivationResult['x-resource-type'], 'function_activation_result');
   assert.equal(getFunctionActivationResultParameters.some((parameter) => parameter.name === 'activationId'), true);
   assert.equal(rerunFunctionActivationParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
-  assert.equal(createFunctionHttpExposure['x-resource-type'], 'function_http_exposure');
-  assert.equal(getFunctionHttpExposureParameters.some((parameter) => parameter.name === 'resourceId'), true);
-  assert.equal(updateFunctionHttpExposureParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
-  assert.equal(createFunctionStorageTrigger['x-resource-type'], 'function_storage_trigger');
-  assert.equal(createFunctionStorageTriggerParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
-  assert.equal(getFunctionStorageTriggerParameters.some((parameter) => parameter.name === 'triggerId'), true);
-  assert.equal(createFunctionCronTrigger['x-resource-type'], 'function_cron_trigger');
-  assert.equal(createFunctionCronTriggerParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
-  assert.equal(getFunctionCronTriggerParameters.some((parameter) => parameter.name === 'triggerId'), true);
-  assert.equal(createFunctionKafkaTriggerParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
-  assert.equal(getFunctionKafkaTriggerParameters.some((parameter) => parameter.name === 'triggerId'), true);
 
   assert.equal(getGatewayStreamMetrics['x-family'], 'metrics');
   assert.equal(gatewayMetricParameters.some((parameter) => parameter.name === 'window'), true);

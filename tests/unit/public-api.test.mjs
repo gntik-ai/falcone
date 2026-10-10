@@ -25,7 +25,7 @@ test('public API taxonomy, gateway routing, and generated route catalog remain a
 
   assert.equal(taxonomy.release.path_version, 'v1');
   assert.equal(taxonomy.release.header_version, '2026-03-26');
-  assert.equal(taxonomy.release.openapi_semver, '1.21.0');
+  assert.equal(taxonomy.release.openapi_semver, '1.22.0');
   assert.equal(listFamilyDocumentPaths().length, taxonomy.families.length);
   assert.deepEqual(routeCatalog.routes, regeneratedCatalog.routes);
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/events/topics'));
@@ -37,8 +37,8 @@ test('public API taxonomy, gateway routing, and generated route catalog remain a
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/events/topics/{resourceId}/metadata'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/events/workspaces/{workspaceId}/bridges'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/events/workspaces/{workspaceId}/bridges/{bridgeId}'));
-  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/functions/actions/{resourceId}/kafka-triggers'));
-  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/functions/actions/{resourceId}/kafka-triggers/{triggerId}'));
+  assert.equal(routeCatalog.routes.some((route) => route.path === '/v1/functions/actions/{resourceId}/kafka-triggers'), false);
+  assert.equal(routeCatalog.routes.some((route) => route.path === '/v1/functions/actions/{resourceId}/kafka-triggers/{triggerId}'), false);
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/metrics/workspaces/{workspaceId}/gateway-streams'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/metrics/workspaces/{workspaceId}/kafka-topics'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/metrics/workspaces/{workspaceId}/event-dashboards'));
@@ -46,12 +46,12 @@ test('public API taxonomy, gateway routing, and generated route catalog remain a
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/auth/login-sessions'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/auth/signups'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/auth/password-recovery-requests'));
-  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/packages'));
-  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/packages/{packageName}'));
-  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/triggers'));
-  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/triggers/{triggerName}'));
-  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/rules'));
-  assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/rules/{ruleName}'));
+  assert.equal(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/packages'), false);
+  assert.equal(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/packages/{packageName}'), false);
+  assert.equal(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/triggers'), false);
+  assert.equal(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/triggers/{triggerName}'), false);
+  assert.equal(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/rules'), false);
+  assert.equal(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/rules/{ruleName}'), false);
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/functions/workspaces/{workspaceId}/inventory'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/postgres/roles'));
   assert.ok(routeCatalog.routes.some((route) => route.path === '/v1/postgres/users/{postgresUserName}'));
