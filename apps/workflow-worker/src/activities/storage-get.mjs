@@ -1,9 +1,9 @@
 // storage.get activity (change: add-flows-activity-catalog / #360).
 //
-// Downloads an object from a workspace-scoped bucket via the `downloadStorageObject` route
-//   GET /v1/storage/buckets/{resourceId}/objects/{objectKey}/download
-// carrying the tenant-scoped credential. The body is returned base64-encoded in the output
-// envelope. A missing object → 404 → non-retryable OBJECT_NOT_FOUND.
+// Reads an object from a workspace-scoped bucket via the `storageGetObject` route
+//   GET /v1/storage/buckets/{bucketId}/objects/{objectKey}
+// carrying the tenant-scoped credential. The JSON envelope contains base64 object bytes.
+// A missing object → 404 → non-retryable OBJECT_NOT_FOUND.
 import { assertPayloadSize, MAX_OUTPUT_BYTES } from './limits.mjs';
 import { toNonRetryable, toRetryable, isTransientNetworkError } from './errors.mjs';
 
@@ -27,7 +27,7 @@ export async function storageGet(input, deps = {}) {
   const http = deps.http;
   if (typeof http !== 'function') throw toNonRetryable('CAPABILITY_UNAVAILABLE', 'storage http client not wired');
   const base = (deps.baseUrl ?? credential.baseUrl ?? '').replace(/\/$/, '');
-  const url = `${base}${STORAGE_BASE}/${encodeURIComponent(params.bucketId)}/objects/${encodeURIComponent(params.objectKey)}/download`;
+  const url = `${base}${STORAGE_BASE}/${encodeURIComponent(params.bucketId)}/objects/${encodeURIComponent(params.objectKey)}`;
 
   const headers = { ...(credential.apiKey ? { authorization: `Bearer ${credential.apiKey}` } : {}) };
 
@@ -45,12 +45,18 @@ export async function storageGet(input, deps = {}) {
   if (status === 429 || status === 503) throw toRetryable('UPSTREAM_UNAVAILABLE', 'storage temporarily unavailable');
   if (typeof status === 'number' && status >= 400) throw toNonRetryable('UPSTREAM_ERROR', `storage.get failed with status ${status}`);
 
-  const contentType = res.headers?.get?.('content-type') ?? res.headers?.['content-type'] ?? 'application/octet-stream';
-  const arrayBuf = typeof res.arrayBuffer === 'function' ? await res.arrayBuffer() : res.body;
-  const buf = Buffer.isBuffer(arrayBuf) ? arrayBuf : Buffer.from(arrayBuf ?? '');
-  const bodyB64 = buf.toString('base64');
+  let envelope;
+  try {
+    envelope = await res.json();
+  } catch {
+    throw toNonRetryable('UPSTREAM_ERROR', 'storage.get received an invalid object response');
+  }
+  if (typeof envelope?.contentBase64 !== 'string') {
+    throw toNonRetryable('UPSTREAM_ERROR', 'storage.get received an invalid object response');
+  }
+  const contentType = typeof envelope.contentType === 'string' ? envelope.contentType : 'application/octet-stream';
 
-  const output = { status: 'success', objectKey: params.objectKey, body: bodyB64, contentType };
+  const output = { status: 'success', objectKey: params.objectKey, body: envelope.contentBase64, contentType };
   assertPayloadSize(output, 'output', MAX_OUTPUT_BYTES);
   return output;
 }

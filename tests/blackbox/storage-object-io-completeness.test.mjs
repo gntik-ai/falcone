@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import { routes } from '../../apps/control-plane/routes.mjs';
 import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
+import { storageGet } from '../../apps/workflow-worker/src/activities/storage-get.mjs';
 import { load as loadQuota } from '../helpers/live-quota-fixture.mjs';
 
 const {
@@ -118,6 +119,67 @@ const NEW_ROUTES = [
   ['POST', '/v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}/complete', 'storageMultipartComplete'],
   ['DELETE', '/v1/storage/buckets/{bucketId}/objects/{objectKey}/multipart/{uploadId}', 'storageMultipartAbort']
 ];
+
+// Adapt the real control-plane handler response into the worker's HTTP boundary.
+// Only PostgreSQL and S3 are doubled, as in the other handler scenarios below.
+async function readThroughActivity(identity, objectKey, pool, observe = () => {}) {
+  const route = routes.find((r) => r.method === 'GET' && r.localHandler === 'storageGetObject');
+  const pattern = new RegExp('^' + route.path.replace(/\{([a-zA-Z0-9_]+)\}/g, '(?<$1>[^/]+)') + '/?$');
+  return storageGet(
+    { params: { bucketId: BUCKET_A, objectKey }, tenant: identity },
+    {
+      baseUrl: 'http://control-plane',
+      http: async (url, options) => {
+        assert.equal(options.method, route.method);
+        const match = pattern.exec(new URL(url).pathname);
+        assert.ok(match, 'activity must call the canonical object handler route');
+        const ctx = ctxFor(match.groups, { identity, pool });
+        ctx.req.headers = options.headers;
+        const response = await storageGetObject(ctx);
+        observe(response);
+        return Response.json(response.body, { status: response.statusCode });
+      },
+    },
+  );
+}
+
+test('bbx-storage-get-activity: canonical handler envelope round-trips binary bytes and content type', async () => {
+  const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0xff, 0xfe, 0x80]);
+  await withFetch((_url, options) => {
+    assert.equal(options.method, 'GET');
+    assert.equal(options.headers.range, undefined);
+    return s3Response({ headers: { 'content-type': 'image/png', 'content-length': String(bytes.length) }, body: bytes });
+  }, async () => {
+    const output = await readThroughActivity(tenantAIdentity, 'uploads/image one.png', makeMockPool());
+    assert.equal(output.status, 'success');
+    assert.equal(output.objectKey, 'uploads/image one.png');
+    assert.equal(output.contentType, 'image/png');
+    assert.deepEqual(Buffer.from(output.body, 'base64'), bytes);
+  });
+});
+
+test('bbx-storage-get-activity-idor: tenant B receives a non-retryable failure without object metadata', async () => {
+  await withFetch(() => {
+    assert.fail('a cross-tenant request must not reach S3');
+  }, async () => {
+    await assert.rejects(
+      () => readThroughActivity(tenantBIdentity, 'private/image.png', makeMockPool(), (response) => {
+        assert.equal(response.statusCode, 404);
+        assert.equal(response.body.code, 'BUCKET_NOT_FOUND');
+        for (const field of ['contentBase64', 'objectKey', 'bucketName', 'contentType', 'sizeBytes']) {
+          assert.equal(response.body[field], undefined);
+        }
+      }),
+      (error) => {
+        assert.equal(error.type, 'OBJECT_NOT_FOUND');
+        assert.equal(error.nonRetryable, true);
+        assert.equal(error.message, 'storage.get object key does not exist');
+        assert.deepEqual(error.details ?? [], []);
+        return true;
+      },
+    );
+  });
+});
 
 // ===========================================================================
 // Wiring: every new route is registered, requires auth, and has a handler
