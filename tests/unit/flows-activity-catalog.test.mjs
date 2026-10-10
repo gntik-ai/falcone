@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { dbQuery } from '../../apps/workflow-worker/src/activities/db-query.mjs';
 import { storagePut } from '../../apps/workflow-worker/src/activities/storage-put.mjs';
 import { storageGet } from '../../apps/workflow-worker/src/activities/storage-get.mjs';
+import { MAX_OUTPUT_BYTES } from '../../apps/workflow-worker/src/activities/limits.mjs';
 import { functionsInvoke } from '../../apps/workflow-worker/src/activities/functions-invoke.mjs';
 import { eventsPublish } from '../../apps/workflow-worker/src/activities/events-publish.mjs';
 import { httpRequest } from '../../apps/workflow-worker/src/activities/http-request.mjs';
@@ -116,27 +117,133 @@ test('storage.put: network error → retryable', async () => {
   }
 });
 
-test('storage.get: 200 returns base64 body + contentType', async () => {
+test('storage.get: canonical GET returns binary envelope bytes + contentType', async () => {
+  const requests = [];
   const out = await storageGet(
-    { params: { bucketId: 'b1', objectKey: 'k' }, tenant, credential: {} },
-    { http: async () => ({ status: 200, headers: new Map([['content-type', 'text/plain']]), arrayBuffer: async () => Buffer.from('hello') }) },
+    { params: { bucketId: 'bucket /one', objectKey: 'uploads/image one.png' }, tenant, credential: { apiKey: 'fixture-key', baseUrl: 'http://cp/' } },
+    {
+      http: async (url, options) => {
+        requests.push({ url, options });
+        return Response.json({
+          objectKey: 'uploads/image one.png', bucketName: 'bucket /one',
+          contentBase64: 'AP+AAQ==', encoding: 'base64', contentType: 'image/png', sizeBytes: 4,
+        });
+      },
+    },
   );
-  assert.equal(out.status, 'success');
-  assert.equal(Buffer.from(out.body, 'base64').toString('utf8'), 'hello');
-  assert.equal(out.contentType, 'text/plain');
+  assert.deepEqual(requests, [{
+    url: 'http://cp/v1/storage/buckets/bucket%20%2Fone/objects/uploads%2Fimage%20one.png',
+    options: { method: 'GET', headers: { authorization: 'Bearer fixture-key' } },
+  }]);
+  assert.deepEqual(out, {
+    status: 'success', objectKey: 'uploads/image one.png', body: 'AP+AAQ==', contentType: 'image/png',
+  });
+  assert.deepEqual(Buffer.from(out.body, 'base64'), Buffer.from([0, 255, 128, 1]));
+});
+
+test('storage.get: non-JSON success fails non-retryably without exposing the raw body', async () => {
+  await assert.rejects(
+    () => storageGet(
+      { params: { bucketId: 'b1', objectKey: 'k' }, tenant },
+      { http: async () => new Response('private-object-bytes', { status: 200 }) },
+    ),
+    (err) => {
+      assert.equal(err.type, 'UPSTREAM_ERROR');
+      assert.equal(err.nonRetryable, true);
+      assert.doesNotMatch(err.message, /private-object-bytes/);
+      return true;
+    },
+  );
+});
+
+test('storage.get: success requires a string contentBase64', async () => {
+  for (const envelope of [{ objectKey: 'private-key', sizeBytes: 1 }, { contentBase64: 123 }, null]) {
+    await assert.rejects(
+      () => storageGet(
+        { params: { bucketId: 'b1', objectKey: 'k' }, tenant },
+        { http: async () => Response.json(envelope) },
+      ),
+      (err) => {
+        assert.equal(err.type, 'UPSTREAM_ERROR');
+        assert.equal(err.nonRetryable, true);
+        assert.doesNotMatch(err.message, /private-key|sizeBytes|123/);
+        return true;
+      },
+    );
+  }
+});
+
+test('storage.get: optional contentType defaults to a schema-valid binary type', async () => {
+  for (const contentType of [undefined, null, 123]) {
+    const out = await storageGet(
+      { params: { bucketId: 'b1', objectKey: 'k' }, tenant },
+      { http: async () => Response.json({ contentBase64: 'AP+AAQ==', contentType }) },
+    );
+    assert.equal(out.body, 'AP+AAQ==');
+    assert.equal(out.contentType, 'application/octet-stream');
+    assert.deepEqual(Buffer.from(out.body, 'base64'), Buffer.from([0, 255, 128, 1]));
+  }
 });
 
 test('storage.get: 404 → non-retryable OBJECT_NOT_FOUND', async () => {
   try {
     await storageGet(
       { params: { bucketId: 'b1', objectKey: 'missing' }, tenant, credential: {} },
-      { http: async () => ({ status: 404 }) },
+      { http: async () => Response.json({ code: 'OBJECT_NOT_FOUND', message: 'object not found' }, { status: 404 }) },
     );
     assert.fail('expected throw');
   } catch (err) {
     assert.equal(err.type, 'OBJECT_NOT_FOUND');
     assert.equal(err.nonRetryable, true);
   }
+});
+
+test('storage.get: binary content type and empty objects pass through', async () => {
+  for (const contentBase64 of ['AP+AAQ==', '']) {
+    const out = await storageGet(
+      { params: { bucketId: 'b1', objectKey: 'k' }, tenant },
+      { http: async () => Response.json({ contentBase64, contentType: 'application/octet-stream' }) },
+    );
+    assert.equal(out.body, contentBase64);
+    assert.equal(out.contentType, 'application/octet-stream');
+  }
+});
+
+test('storage.get: upstream status classifications are preserved without reading error bodies', async () => {
+  for (const [status, type, nonRetryable] of [
+    [403, 'FORBIDDEN', true],
+    [429, 'UPSTREAM_UNAVAILABLE', false],
+    [503, 'UPSTREAM_UNAVAILABLE', false],
+    [400, 'UPSTREAM_ERROR', true],
+    [500, 'UPSTREAM_ERROR', true],
+    [502, 'UPSTREAM_ERROR', true],
+    [504, 'UPSTREAM_ERROR', true],
+  ]) {
+    await assert.rejects(
+      () => storageGet(
+        { params: { bucketId: 'b1', objectKey: 'k' }, tenant },
+        { http: async () => Response.json({ message: 'private-upstream-details' }, { status }) },
+      ),
+      (err) => {
+        assert.equal(err.type, type);
+        assert.equal(err.nonRetryable, nonRetryable);
+        assert.doesNotMatch(err.message, /private-upstream-details/);
+        return true;
+      },
+    );
+  }
+});
+
+test('storage.get: the serialized output remains bounded by MAX_OUTPUT_BYTES', async () => {
+  const input = { params: { bucketId: 'b1', objectKey: 'k' }, tenant };
+  const out = await storageGet(input, {
+    http: async () => Response.json({ contentBase64: 'A'.repeat(MAX_OUTPUT_BYTES - 1024) }),
+  });
+  assert.equal(out.status, 'success');
+  await assert.rejects(
+    () => storageGet(input, { http: async () => Response.json({ contentBase64: 'A'.repeat(MAX_OUTPUT_BYTES) }) }),
+    (err) => err.type === 'PAYLOAD_TOO_LARGE' && err.nonRetryable === true,
+  );
 });
 
 // -- functions.invoke --------------------------------------------------------------------
