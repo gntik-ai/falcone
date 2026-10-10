@@ -12,6 +12,7 @@ import { issueBucketIdentity, revokeBucketIdentity, revokeIdentityByName, worksp
 import { checkBucketQuota, checkTenantByteQuota, tenantByteLimit, usageLimits, dimensionStatus, STORAGE_QUOTA_EXCEEDED } from './storage-quota.mjs';
 import { quotaDenial } from './dimension-quota.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
+import { can } from './model-authz.mjs';
 import { isJsonBody } from './request-body.mjs';
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, or any
@@ -701,8 +702,9 @@ async function storageProvisionBucket(ctx) {
   if (!isSuperOrInternal(ctx.identity) && ws.tenant_id !== ctx.identity.tenantId) {
     return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
   }
-  const roleDeny = denyUnlessStructuralAdmin(ctx, ws.tenant_id);
-  if (roleDeny) return roleDeny;
+  if (!can(ctx.identity, 'bucket.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
+    return err(403, 'FORBIDDEN', 'caller may not administer buckets in this workspace');
+  }
   // Per-workspace bucket-count quota admission (#674). Count THIS workspace's buckets (the
   // same tenant-scoped read the usage handler uses) and deny a provision that would exceed
   // the effective limit (STORAGE_MAX_BUCKETS, default 8). Runs AFTER the ownership 404 gate

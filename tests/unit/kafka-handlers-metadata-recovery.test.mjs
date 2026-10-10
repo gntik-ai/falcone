@@ -60,7 +60,7 @@ function makeKafka({ producers = [], admins = [] } = {}) {
 function tenantOwnerContext(overrides = {}) {
   return {
     pool: {},
-    identity: { actorType: 'tenant_owner', tenantId: 'ten_1' },
+    identity: { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: 'ten_1' },
     params: {},
     body: {},
     ...overrides
