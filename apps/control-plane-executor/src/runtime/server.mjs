@@ -327,14 +327,20 @@ function requiredDataScope(method, pathname) {
 }
 
 const BROAD_STRUCTURAL_ADMIN_ROLES = new Set(['tenant_owner', 'tenant_admin', 'platform_admin', 'superadmin']);
+const WORKSPACE_SCOPED_ROLES = new Set(['workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_viewer']);
 
 function hasBroadStructuralAdminRole(roles) {
   return Array.isArray(roles) && roles.some((r) => BROAD_STRUCTURAL_ADMIN_ROLES.has(r));
 }
 
 function workspaceScopeDeniesStructuralWrite(identity, workspaceId) {
-  if (!workspaceId || !Array.isArray(identity?.workspaceIds)) return false;
-  if (hasBroadStructuralAdminRole(identity.roles)) return false;
+  if (!workspaceId) return false;
+  if (hasBroadStructuralAdminRole(identity?.roles)) return false;
+  if (!Array.isArray(identity?.workspaceIds)) {
+    // A trusted singular credential binding counts; the workspaceId path fallback does not.
+    return Array.isArray(identity?.roles) && identity.roles.some((role) => WORKSPACE_SCOPED_ROLES.has(role))
+      && identity.credentialWorkspaceId !== workspaceId;
+  }
   return !identity.workspaceIds.includes(workspaceId);
 }
 

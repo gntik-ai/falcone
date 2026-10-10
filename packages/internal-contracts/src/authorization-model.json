@@ -825,12 +825,12 @@
           "tenant.quota.read",
           "tenant.overview.read",
           "workspace.quota.read",
-          "workspace.overview.read"
-        ],
-        "denied_actions": [
+          "workspace.overview.read",
           "database.admin",
           "bucket.admin",
-          "topic.admin",
+          "topic.admin"
+        ],
+        "denied_actions": [
           "function.admin",
           "function.deploy",
           "function.invoke",
@@ -874,14 +874,14 @@
           "tenant.quota.read",
           "tenant.overview.read",
           "workspace.quota.read",
-          "workspace.overview.read"
+          "workspace.overview.read",
+          "database.admin",
+          "bucket.admin",
+          "topic.admin"
         ],
         "denied_actions": [
           "tenant.suspend",
           "tenant.ownership.transfer",
-          "database.admin",
-          "bucket.admin",
-          "topic.admin",
           "function.admin",
           "function.deploy",
           "function.invoke",

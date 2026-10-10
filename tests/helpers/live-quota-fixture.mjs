@@ -5,7 +5,8 @@ export const load = async () => ({ resolveEffectiveLimit, evaluateQuotaDecision 
 export const defaults = { max_kafka_topics: 10, max_mongo_databases: 2, max_functions: 50, max_storage_bytes: 5368709120 };
 export const tenantId = 'tenant-a';
 export const workspace = { id: 'ws-a', tenant_id: tenantId, slug: 'app' };
-export const identity = { tenantId, actorType: 'tenant_owner', sub: 'owner', roles: ['workspace_admin'], workspaceId: workspace.id };
+// Model-gated creates require an explicit binding for this workspace-admin fixture.
+export const identity = { tenantId, actorType: 'tenant_owner', sub: 'owner', roles: ['workspace_admin'], workspaceId: workspace.id, workspaceIds: [workspace.id] };
 
 export function governancePool({ plan = {}, overrides = {}, usage = 0, mongoNames = [], buckets = [], ownerTenant = tenantId, failLog = false } = {}) {
   const logs = [], queries = [];

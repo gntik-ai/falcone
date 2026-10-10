@@ -13,6 +13,7 @@ import { Kafka, logLevel } from 'kafkajs';
 import * as store from './tenant-store.mjs';
 import { resolveKafkaSecurity } from './transport-security.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
+import { can } from './model-authz.mjs';
 import { checkDimensionQuota, quotaDenial } from './dimension-quota.mjs';
 
 const BROKERS = (process.env.KAFKA_BROKERS || 'falcone-kafka:9092').split(',').map((s) => s.trim());
@@ -377,8 +378,8 @@ async function eventsInventory(ctx) {
 async function eventsProvisionTopic(ctx) {
   const rw = await resolveOwnedWorkspace(ctx); if (rw.error) return rw.error;
   const ws = rw.ws;
-  if (!canManageTenant(ctx.identity, ws.tenant_id)) {
-    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+  if (!can(ctx.identity, 'topic.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
+    return err(403, 'FORBIDDEN', 'caller may not administer topics in this workspace');
   }
   const topicName = slug(ctx.body?.name);
   if (!topicName) return err(400, 'VALIDATION_ERROR', 'topic name is required');

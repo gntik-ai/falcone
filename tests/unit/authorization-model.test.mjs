@@ -53,7 +53,7 @@ test('permission matrix preserves tenant and workspace boundaries', () => {
   assert.equal(tenantRoles.get('tenant_admin').allowed_actions.includes('workspace.members.manage'), true);
   assert.equal(tenantRoles.get('tenant_admin').allowed_actions.includes('workspace.effective_permissions.recalculate'), true);
   assert.equal(tenantRoles.get('tenant_admin').denied_actions.includes('tenant.ownership.transfer'), true);
-  assert.equal(tenantRoles.get('tenant_admin').denied_actions.includes('database.admin'), true);
+  assert.equal(tenantRoles.get('tenant_admin').denied_actions.includes('database.admin'), false);
   assert.equal(tenantRoles.get('tenant_admin').denied_actions.includes('database.admin_sql.execute'), true);
   assert.equal(tenantRoles.get('tenant_developer').allowed_actions.includes('tenant.effective_permissions.read'), true);
   assert.equal(tenantRoles.get('tenant_developer').allowed_actions.includes('app.templates.read'), true);
@@ -63,4 +63,14 @@ test('permission matrix preserves tenant and workspace boundaries', () => {
   assert.equal(tenantRoles.get('tenant_viewer').allowed_actions.includes('tenant.effective_permissions.read'), true);
   assert.equal(tenantRoles.get('tenant_viewer').denied_actions.includes('bucket.write'), true);
   assert.equal(tenantRoles.get('tenant_viewer').denied_actions.includes('service_account.credentials.issue'), true);
+});
+
+test('tenant owners/admins retain database, bucket and topic administration', () => {
+  const tenantRoles = new Map(listPermissionMatrix('tenant').map((entry) => [entry.role, entry]));
+  for (const role of ['tenant_owner', 'tenant_admin']) {
+    for (const action of ['database.admin', 'bucket.admin', 'topic.admin']) {
+      assert.equal(tenantRoles.get(role).allowed_actions.includes(action), true);
+      assert.equal(tenantRoles.get(role).denied_actions.includes(action), false);
+    }
+  }
 });

@@ -3,6 +3,7 @@
 // (workflows/wf-con-002.mjs). Each handler: async (ctx) => { statusCode, body }
 // where ctx = { params, query, body, identity, pool, callerContext }.
 import { randomUUID } from 'node:crypto';
+import { can } from './model-authz.mjs';
 import { resolveWorkspaceForManage, kcBackedErr, statusFromError } from './workspace-iam-context.mjs';
 import { createWorkspaceIamClient } from './workspace-iam-client-handlers.mjs';
 import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, normalizeKeycloakAttributes, TENANT_REALM_ROLES } from './kc-admin.mjs';
@@ -478,7 +479,10 @@ async function getWorkspace(ctx) {
   const { params, identity, pool } = ctx;
   const ws = await store.getWorkspace(pool, params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${params.workspaceId} not found`);
-  if (!canManageTenantId(identity, ws.tenant_id)) return err(403, 'FORBIDDEN', 'cannot read another tenant workspace');
+  if (!can(identity, 'workspace.read', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
+    return err(403, 'FORBIDDEN', identity?.tenantId !== ws.tenant_id
+      ? 'cannot read another tenant workspace' : 'caller may not read this workspace');
+  }
   return ok(200, { workspace: workspaceOut(ws), ...workspaceOut(ws) });
 }
 
@@ -1261,11 +1265,16 @@ async function runWorkspaceDbProvisionSaga(pool, { ws, tenant, identity, callerC
 
 async function provisionDatabase(ctx) {
   const { pool, identity } = ctx;
-  const r = await resolveWorkspaceForManage(ctx); if (r.error) return r.error;
-  if (await store.getWorkspaceDatabase(pool, r.ws.id)) return err(409, 'DB_ALREADY_PROVISIONED', 'workspace already has a database');
-  const tenant = await store.getTenant(pool, r.ws.tenant_id);
+  const ws = await store.getWorkspace(pool, ctx.params.workspaceId);
+  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  if (!can(identity, 'database.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
+    return err(403, 'FORBIDDEN', 'caller may not administer this workspace database');
+  }
+  const tenant = await store.getTenant(pool, ws.tenant_id);
+  if (!tenant?.iam_realm) return err(409, 'NO_REALM', 'tenant has no IAM realm');
+  if (await store.getWorkspaceDatabase(pool, ws.id)) return err(409, 'DB_ALREADY_PROVISIONED', 'workspace already has a database');
   try {
-    const out = await runWorkspaceDbProvisionSaga(pool, { ws: r.ws, tenant, identity, callerContext: ctx.callerContext });
+    const out = await runWorkspaceDbProvisionSaga(pool, { ws, tenant, identity, callerContext: ctx.callerContext });
     // The role password is surfaced ONCE here (not persisted); rotate to re-issue.
     return ok(201, { database: out.database, connection: out.connection, sagaId: out.sagaId });
   } catch (e) {
