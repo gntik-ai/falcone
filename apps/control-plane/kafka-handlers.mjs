@@ -216,13 +216,15 @@ function hasOwn(obj, key) {
 function publishValueFromBody(body = {}) {
   if (hasOwn(body, 'payload')) {
     const payload = body.payload;
-    return typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});
+    if (payload == null) return undefined;
+    return typeof payload === 'string' ? payload : JSON.stringify(payload);
   }
   if (hasOwn(body, 'value')) {
     const value = body.value;
-    return typeof value === 'string' ? value : JSON.stringify(value ?? {});
+    if (value == null) return undefined;
+    return typeof value === 'string' ? value : JSON.stringify(value);
   }
-  return JSON.stringify({});
+  return undefined;
 }
 
 async function publishToTopicRecord(ctx, t) {
@@ -231,6 +233,7 @@ async function publishToTopicRecord(ctx, t) {
   }
   const body = ctx.body ?? {};
   const value = publishValueFromBody(body);
+  if (value == null) return err(400, 'VALIDATION_ERROR', 'payload (or value) must be present and non-null');
   try {
     const headers = {};
     if (body.eventType) headers.eventType = String(body.eventType);
