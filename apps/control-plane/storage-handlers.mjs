@@ -1045,6 +1045,20 @@ function validateImportEntryInline(entry, targetTenantId) {
   return { valid: true, reason: null, key: decoded.key };
 }
 
+// Resolve an inline import body before any S3 call. Use the object-write decoder so corrupt or
+// coerced base64 cannot be reported as a successful restore with bytes the client never supplied.
+function resolveImportEntryBody(ref) {
+  if (!ref || typeof ref !== 'object' || Array.isArray(ref)) return { reason: 'MISSING_BODY_PAYLOAD' };
+  if (ref.inlineBase64 != null) {
+    if (typeof ref.inlineBase64 !== 'string') return { reason: 'INVALID_BODY_PAYLOAD' };
+    const bytes = decodeBase64Exact(ref.inlineBase64);
+    return bytes === null ? { reason: 'INVALID_BODY_PAYLOAD' } : { bytes };
+  }
+  if (ref.encoding === 'base64' || ref.inline == null) return { reason: 'MISSING_BODY_PAYLOAD' };
+  if (typeof ref.inline !== 'string') return { reason: 'INVALID_BODY_PAYLOAD' };
+  return { bytes: Buffer.from(ref.inline, 'utf8') };
+}
+
 // Acting-principal projection for a manifest (no secrets — just the verified identity).
 function actingPrincipalOf(identity) {
   return {
@@ -1166,10 +1180,11 @@ async function storageBucketImport(ctx) {
       outcomes.push({ entityType: 'storage_import_entry_outcome', objectKey: entry?.objectKey ?? null, status: 'failed', reason: verdict.reason, sizeBytes: 0 });
       continue;
     }
-    const ref = entry.bodyReference ?? {};
-    const bytes = ref.encoding === 'base64' || ref.inlineBase64
-      ? Buffer.from(String(ref.inlineBase64 ?? ''), 'base64')
-      : Buffer.from(String(ref.inline ?? ''), 'utf8');
+    const { bytes, reason } = resolveImportEntryBody(entry.bodyReference);
+    if (reason) {
+      outcomes.push({ entityType: 'storage_import_entry_outcome', objectKey: verdict.key, status: 'failed', reason, sizeBytes: 0 });
+      continue;
+    }
     if (bytes.length > EXPORT_MAX_OBJECT_BYTES) {
       outcomes.push({ entityType: 'storage_import_entry_outcome', objectKey: verdict.key, status: 'failed', reason: 'OBJECT_TOO_LARGE', sizeBytes: bytes.length });
       continue;

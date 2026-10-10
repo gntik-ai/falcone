@@ -182,15 +182,103 @@ test('bbx-683-catalog: the published catalog advertises all 15 operations (the c
 // ===========================================================================
 // STORAGE family
 // ===========================================================================
+test('bbx-1004-storage-invalid-base64: corrupt or non-string payloads fail before any S3 call', async (t) => {
+  const cases = [
+    ['corrupt', '!!!!not-base64!!!!'],
+    ['boolean', true],
+    ['number', 123],
+    ['array', ['SEVMTE8=']],
+    ['object', {}]
+  ];
+  for (const [name, inlineBase64] of cases) {
+    await t.test(name, async () => {
+      for (const conflictPolicy of ['overwrite', 'skip', 'fail']) {
+        await withS3({}, async (calls) => {
+          const manifest = { formatVersion: 1, entries: [
+            { objectKey: 'rejected.bin', bodyReference: { encoding: 'base64', inlineBase64, inline: 'do not fall back' } }
+          ] };
+          const res = await STORAGE_HANDLERS.storageBucketImport(ctx({ workspaceId: WS_A, bucketId: BUCKET_A }, { pool: makePool(), body: { manifest, conflictPolicy } }));
+          assert.equal(res.statusCode, 200);
+          assert.deepEqual(res.body.outcomes, [{ entityType: 'storage_import_entry_outcome', objectKey: 'rejected.bin', status: 'failed', reason: 'INVALID_BODY_PAYLOAD', sizeBytes: 0 }]);
+          assert.equal(res.body.importedCount, 0);
+          assert.equal(res.body.failedCount, 1);
+          assert.equal(res.body.totalBytesImported, 0);
+          assert.deepEqual(calls, [], 'payload rejection precedes HEAD and PUT');
+        });
+      }
+    });
+  }
+});
+
+test('bbx-1004-storage-missing-body: absent payloads fail instead of importing an empty object', async (t) => {
+  const cases = [
+    ['no reference', undefined],
+    ['null reference', null],
+    ['string reference', 'x'],
+    ['boolean reference', true],
+    ['number reference', 123],
+    ['array reference', []],
+    ['empty reference', {}],
+    ['base64 declaration', { encoding: 'base64' }],
+    ['base64 declaration with inline', { encoding: 'base64', inline: 'not base64' }],
+    ['null base64 payload', { encoding: 'base64', inlineBase64: null }]
+  ];
+  for (const [name, bodyReference] of cases) {
+    await t.test(name, async () => {
+      for (const conflictPolicy of ['overwrite', 'skip', 'fail']) {
+        await withS3({}, async (calls) => {
+          const entry = { objectKey: 'missing.bin' };
+          if (bodyReference !== undefined) entry.bodyReference = bodyReference;
+          const manifest = { formatVersion: 1, entries: [entry] };
+          const res = await STORAGE_HANDLERS.storageBucketImport(ctx({ workspaceId: WS_A, bucketId: BUCKET_A }, { pool: makePool(), body: { manifest, conflictPolicy } }));
+          assert.equal(res.statusCode, 200);
+          assert.deepEqual(res.body.outcomes, [{ entityType: 'storage_import_entry_outcome', objectKey: 'missing.bin', status: 'failed', reason: 'MISSING_BODY_PAYLOAD', sizeBytes: 0 }]);
+          assert.equal(res.body.importedCount, 0);
+          assert.equal(res.body.failedCount, 1);
+          assert.equal(res.body.totalBytesImported, 0);
+          assert.deepEqual(calls, [], 'missing payload rejection precedes HEAD and PUT');
+        });
+      }
+    });
+  }
+});
+
+test('bbx-1004-storage-invalid-inline: legacy UTF-8 payloads must be strings', async (t) => {
+  for (const [name, inline] of [['boolean', true], ['number', 123], ['array', ['hello']], ['object', {}]]) {
+    await t.test(name, async () => {
+      for (const conflictPolicy of ['overwrite', 'skip', 'fail']) {
+        await withS3({}, async (calls) => {
+          const manifest = { formatVersion: 1, entries: [
+            { objectKey: 'invalid.txt', bodyReference: { inline } }
+          ] };
+          const res = await STORAGE_HANDLERS.storageBucketImport(ctx({ workspaceId: WS_A, bucketId: BUCKET_A }, { pool: makePool(), body: { manifest, conflictPolicy } }));
+          assert.equal(res.statusCode, 200);
+          assert.deepEqual(res.body.outcomes, [{ entityType: 'storage_import_entry_outcome', objectKey: 'invalid.txt', status: 'failed', reason: 'INVALID_BODY_PAYLOAD', sizeBytes: 0 }]);
+          assert.equal(res.body.importedCount, 0);
+          assert.equal(res.body.failedCount, 1);
+          assert.equal(res.body.totalBytesImported, 0);
+          assert.deepEqual(calls, [], 'invalid UTF-8 payload rejection precedes HEAD and PUT');
+        });
+      }
+    });
+  }
+});
+
 test('bbx-683-storage-roundtrip: export -> import round-trips objects with byte fidelity (owner)', async () => {
-  const srcStore = { [`${BUCKET_A}/a.txt`]: { body: Buffer.from('HELLO-A'), contentType: 'text/plain' }, [`${BUCKET_A}/b.bin`]: { body: Buffer.from([0, 1, 2, 255]), contentType: 'application/octet-stream' } };
+  const originals = {
+    [`${BUCKET_A}/a.txt`]: { body: Buffer.from('HELLO-A'), contentType: 'text/plain' },
+    [`${BUCKET_A}/b.bin`]: { body: Buffer.from(Array.from({ length: 256 }, (_, i) => i)), contentType: 'application/octet-stream' },
+    [`${BUCKET_A}/empty.bin`]: { body: Buffer.alloc(0), contentType: 'application/octet-stream' }
+  };
+  const srcStore = { ...originals };
   let manifest;
   await withS3(srcStore, async () => {
     const res = await STORAGE_HANDLERS.storageBucketExport(ctx({ workspaceId: WS_A, bucketId: BUCKET_A }, { pool: makePool() }));
     assert.equal(res.statusCode, 200, JSON.stringify(res.body));
     manifest = res.body;
     assert.equal(manifest.entityType, 'storage_export_manifest');
-    assert.equal(manifest.totalObjects, 2);
+    assert.equal(manifest.totalObjects, 3);
+    assert.equal(manifest.totalBytes, 263);
     assert.equal(manifest.sourceTenantId, TENANT_A);
     // a reserved manifest object was persisted to the bucket
     assert.ok(Object.keys(srcStore).some((k) => k.includes('.falcone/exports/')), 'manifest persisted as a reserved object');
@@ -204,10 +292,98 @@ test('bbx-683-storage-roundtrip: export -> import round-trips objects with byte 
   await withS3(dstStore, async () => {
     const res = await STORAGE_HANDLERS.storageBucketImport(ctx({ workspaceId: WS_A, bucketId: BUCKET_A }, { pool: makePool(), body: { manifest } }));
     assert.equal(res.statusCode, 200, JSON.stringify(res.body));
-    assert.equal(res.body.importedCount, 2);
+    assert.equal(res.body.importedCount, 3);
     assert.equal(res.body.failedCount, 0);
-    assert.deepEqual(dstStore[`${BUCKET_A}/a.txt`].body, Buffer.from('HELLO-A'));
-    assert.deepEqual(dstStore[`${BUCKET_A}/b.bin`].body, Buffer.from([0, 1, 2, 255]));
+    assert.equal(res.body.totalBytesImported, 263);
+    assert.equal(Object.keys(dstStore).length, 3);
+    for (const [key, original] of Object.entries(originals)) {
+      assert.ok(dstStore[key].body.equals(original.body), 'restored object is byte-identical');
+      const outcome = res.body.outcomes.find((o) => `${BUCKET_A}/${o.objectKey}` === key);
+      assert.equal(outcome.status, 'imported');
+      assert.equal(outcome.sizeBytes, original.body.length);
+    }
+  });
+});
+
+test('bbx-1004-storage-valid-body: empty, base64 variants, and legacy UTF-8 import exact bytes', async (t) => {
+  const cases = [
+    ['empty base64', { encoding: 'base64', inlineBase64: '' }, Buffer.alloc(0)],
+    ['empty base64 takes precedence', { inlineBase64: '', inline: 'ignored' }, Buffer.alloc(0)],
+    ['wrapped base64', { inlineBase64: ' \tSEVM\nTE8=\r\f ' }, Buffer.from('HELLO')],
+    ['unpadded base64', { inlineBase64: 'SGk' }, Buffer.from('Hi')],
+    ['URL-safe base64', { inlineBase64: '-_8=' }, Buffer.from([0xfb, 0xff])],
+    ['base64 takes precedence', { encoding: 'utf8', inlineBase64: 'SEVMTE8=', inline: 'ignored' }, Buffer.from('HELLO')],
+    ['legacy UTF-8', { inline: 'héllo' }, Buffer.from([0x68, 0xc3, 0xa9, 0x6c, 0x6c, 0x6f])],
+    ['empty legacy UTF-8', { inline: '' }, Buffer.alloc(0)],
+    ['null base64 falls back to UTF-8', { inlineBase64: null, inline: 'hello' }, Buffer.from('hello')]
+  ];
+  for (const [name, bodyReference, expected] of cases) {
+    await t.test(name, async () => {
+      const store = {};
+      await withS3(store, async () => {
+        if (typeof bodyReference.inlineBase64 === 'string') {
+          const single = await STORAGE_HANDLERS.storagePutObject(ctx({ bucketId: BUCKET_A, objectKey: 'single.bin' }, { pool: makePool(), body: { contentBase64: bodyReference.inlineBase64 } }));
+          assert.equal(single.statusCode, 201);
+          assert.ok(store[`${BUCKET_A}/single.bin`].body.equals(expected), 'single-object write stores the known bytes');
+        }
+        const manifest = { formatVersion: 1, entries: [{ objectKey: 'imported.bin', bodyReference }] };
+        const res = await STORAGE_HANDLERS.storageBucketImport(ctx({ workspaceId: WS_A, bucketId: BUCKET_A }, { pool: makePool(), body: { manifest } }));
+        assert.equal(res.statusCode, 200);
+        assert.deepEqual(res.body.outcomes, [{ entityType: 'storage_import_entry_outcome', objectKey: 'imported.bin', status: 'imported', reason: null, sizeBytes: expected.length }]);
+        assert.equal(res.body.importedCount, 1);
+        assert.equal(res.body.failedCount, 0);
+        assert.equal(res.body.totalBytesImported, expected.length);
+        assert.ok(store[`${BUCKET_A}/imported.bin`].body.equals(expected), 'import stores the known bytes');
+        if (store[`${BUCKET_A}/single.bin`]) {
+          assert.ok(store[`${BUCKET_A}/imported.bin`].body.equals(store[`${BUCKET_A}/single.bin`].body), 'import and single-object write agree');
+        }
+      });
+    });
+  }
+});
+
+test('bbx-1004-storage-mixed-manifest: only written bytes count while corrupt entries fail under HTTP 200', async () => {
+  const store = {};
+  await withS3(store, async (calls) => {
+    const manifest = { formatVersion: 1, entries: [
+      { objectKey: 'valid.txt', bodyReference: { inlineBase64: 'YWJj' } },
+      { objectKey: 'corrupt.bin', bodyReference: { encoding: 'base64', inlineBase64: '!!!!not-base64!!!!' } }
+    ] };
+    const res = await STORAGE_HANDLERS.storageBucketImport(ctx({ workspaceId: WS_A, bucketId: BUCKET_A }, { pool: makePool(), body: { manifest } }));
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.importedCount, 1);
+    assert.equal(res.body.failedCount, 1);
+    assert.equal(res.body.totalBytesImported, 3);
+    assert.deepEqual(res.body.outcomes, [
+      { entityType: 'storage_import_entry_outcome', objectKey: 'valid.txt', status: 'imported', reason: null, sizeBytes: 3 },
+      { entityType: 'storage_import_entry_outcome', objectKey: 'corrupt.bin', status: 'failed', reason: 'INVALID_BODY_PAYLOAD', sizeBytes: 0 }
+    ]);
+    assert.ok(store[`${BUCKET_A}/valid.txt`].body.equals(Buffer.from('abc')));
+    assert.deepEqual(calls.map(({ method, path }) => ({ method, key: path.split('/').at(-1) })), [{ method: 'PUT', key: 'valid.txt' }]);
+  });
+});
+
+test('bbx-1004-storage-size-guard: valid payloads still obey the per-object size limit before S3', async () => {
+  const originalLimit = process.env.STORAGE_EXPORT_MAX_OBJECT_BYTES;
+  let handlers;
+  try {
+    process.env.STORAGE_EXPORT_MAX_OBJECT_BYTES = '3';
+    ({ STORAGE_HANDLERS: handlers } = await import('../../apps/control-plane/storage-handlers.mjs?bbx-1004-size-guard'));
+  } finally {
+    if (originalLimit === undefined) delete process.env.STORAGE_EXPORT_MAX_OBJECT_BYTES;
+    else process.env.STORAGE_EXPORT_MAX_OBJECT_BYTES = originalLimit;
+  }
+  await withS3({}, async (calls) => {
+    const manifest = { formatVersion: 1, entries: [
+      { objectKey: 'too-large.bin', bodyReference: { inlineBase64: 'YWJjZA==' } }
+    ] };
+    const res = await handlers.storageBucketImport(ctx({ workspaceId: WS_A, bucketId: BUCKET_A }, { pool: makePool(), body: { manifest, conflictPolicy: 'skip' } }));
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body.outcomes, [{ entityType: 'storage_import_entry_outcome', objectKey: 'too-large.bin', status: 'failed', reason: 'OBJECT_TOO_LARGE', sizeBytes: 4 }]);
+    assert.equal(res.body.importedCount, 0);
+    assert.equal(res.body.failedCount, 1);
+    assert.equal(res.body.totalBytesImported, 0);
+    assert.deepEqual(calls, [], 'oversized payload rejection precedes HEAD and PUT');
   });
 });
 
