@@ -75,6 +75,13 @@ values are sent unchanged, and object values are JSON encoded. The existing
 `POST /v1/events/topics/{resourceId}/publish` route still accepts `payload`; the shared helper also
 accepts `value` as an additive compatibility path.
 
+Both publish routes require an own `payload` or `value` field with a non-null value.
+`payload` takes precedence when both fields are present. Missing bodies, missing fields, and
+null or undefined selected values return `400 VALIDATION_ERROR` naming `payload`, before a
+Kafka producer is allocated. Callers that want an empty JSON event must explicitly send
+`payload: {}` (or `value: {}`); an empty body no longer publishes a synthesized `{}`.
+Strings, including raw text and the empty string, are still sent unchanged.
+
 Message polling returns parsed values when the Kafka value is JSON and raw strings otherwise:
 
 ```json
