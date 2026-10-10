@@ -33,7 +33,7 @@ import '@xyflow/react/dist/style.css'
 
 import { FlowYamlEditor, type FlowEditorValidity } from '@/components/flows/FlowYamlEditor'
 import { FLOW_PALETTE_DRAG_MIME, FlowPalette } from '@/components/flows/FlowPalette'
-import { FlowProblemsPanel } from '@/components/flows/FlowProblemsPanel'
+import { FlowProblemsPanel, type FlowProblem } from '@/components/flows/FlowProblemsPanel'
 import { FlowRunTriggerButton } from '@/components/flows/FlowRunTriggerButton'
 import { FlowStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { evaluateConnection } from '@/components/flows/connectionRules'
@@ -138,7 +138,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
   const [edges, setEdges] = useState<Edge[]>([])
   const [taskTypes, setTaskTypes] = useState<TaskTypeDescriptor[]>([])
   const [serverErrors, setServerErrors] = useState<ValidationError[]>([])
-  const [interactionProblems, setInteractionProblems] = useState<ValidationError[]>([])
+  const [interactionProblems, setInteractionProblems] = useState<FlowProblem[]>([])
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -311,7 +311,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
         // entry so the rejection is explained rather than silent.
         setInteractionProblems((current) => [
           ...current.slice(-4),
-          { code: verdict.code ?? 'CONNECTION_REJECTED', nodeId: connection.source, message: verdict.message ?? 'Conexión rechazada.' }
+          { source: 'interaction', code: verdict.code ?? 'CONNECTION_REJECTED', nodeId: connection.source, message: verdict.message ?? 'Conexión rechazada.' }
         ])
         return
       }
