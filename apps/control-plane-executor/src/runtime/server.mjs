@@ -14,6 +14,7 @@ import { recordHttp, recordMcpDependency, renderMetrics, setHttpRouteTemplates, 
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
 import { publicErrorCode } from './errors.mjs';
+import { requireVectorCapability, mapVectorRouteError, VECTOR_UNAVAILABLE_MESSAGE } from './vector-capability.mjs';
 import { handleMcpMessage } from '../mcp-official-server.mjs';
 import { BASE_SCOPE } from '../mcp-official-catalog.mjs';
 import { mcpConfigStore } from '../mcp-config.mjs';
@@ -590,9 +591,9 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // Vector index management → the same DDL executor (structural index plan with
     // indexMethod hnsw|ivfflat + metric → opclass). Create + delete.
     ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/vector-indexes$`), `${templates.ddl}/{schema}/tables/{table}/vector-indexes`, ([db, s, t], c) =>
-      runDdl(registry, 'index', { databaseName: db, schemaName: s, tableName: t, indexMethod: c.body.indexType ?? c.body.indexMethod ?? 'hnsw', ...c.body }, c)],
+      runDdl(registry, 'index', { databaseName: db, schemaName: s, tableName: t, indexMethod: c.body.indexType ?? c.body.indexMethod ?? 'hnsw', ...c.body }, c, true)],
     ['DELETE', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/vector-indexes/([^/]+)$`), `${templates.ddl}/{schema}/tables/{table}/vector-indexes/{indexId}`, ([db, s, t, idx], c) =>
-      runDdlAction(registry, 'index', 'delete', { databaseName: db, schemaName: s, tableName: t, indexName: idx }, c)],
+      runDdlAction(registry, 'index', 'delete', { databaseName: db, schemaName: s, tableName: t, indexName: idx }, c, true)],
     ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/policies$`), `${templates.ddl}/{schema}/tables/{table}/policies`, ([db, s, t], c) =>
       runDdl(registry, 'policy', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
     ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/security$`), `${templates.ddl}/{schema}/tables/{table}/security`, ([db, s, t], c) =>
@@ -668,11 +669,11 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // the record by (tenant_id, workspace_id, schema, table, target_column) — never trusting a
     // tenantId in the request body.
     ['PUT', new RegExp(`${data}/embedding-mapping$`), `${templates.data}/embedding-mapping`, ([w, db, s, t], c) =>
-      runEmbeddingMapping(mappingStore, 'set', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, config: c.body }, 200)],
+      runVectorEmbeddingMapping(registry, mappingStore, 'set', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, config: c.body }, 200)],
     ['GET', new RegExp(`${data}/embedding-mapping$`), `${templates.data}/embedding-mapping`, ([w, db, s, t], c) =>
       runEmbeddingMapping(mappingStore, 'get', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, targetColumn: c.url.searchParams.get('targetColumn') ?? undefined }, 200)],
     ['DELETE', new RegExp(`${data}/embedding-mapping$`), `${templates.data}/embedding-mapping`, ([w, db, s, t], c) =>
-      runEmbeddingMapping(mappingStore, 'remove', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, targetColumn: c.url.searchParams.get('targetColumn') ?? undefined }, 200)],
+      runVectorEmbeddingMapping(registry, mappingStore, 'remove', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, targetColumn: c.url.searchParams.get('targetColumn') ?? undefined }, 200)],
 
     // ---- Realtime: subscribe to tenant-scoped changes (SSE stream) ----
     // Mongo collection change stream:
@@ -1134,17 +1135,17 @@ async function run(registry, fn, params, successStatus) {
   return { status: successStatus, body: result };
 }
 
-async function runDdl(registry, resourceKind, payload, c) {
+async function runDdl(registry, resourceKind, payload, c, vectorSearch = false) {
   const result = await executePostgresDdl(registry, {
-    resourceKind, action: 'create', payload, identity: c.identity,
+    resourceKind, action: 'create', payload, identity: c.identity, vectorSearch,
     executionMode: c.url.searchParams.get('mode') === 'preview' || payload.dryRun ? 'preview' : 'execute',
   });
   return { status: result.executed === false ? 200 : 201, body: result };
 }
 
-async function runDdlAction(registry, resourceKind, action, payload, c) {
+async function runDdlAction(registry, resourceKind, action, payload, c, vectorSearch = false) {
   const result = await executePostgresDdl(registry, {
-    resourceKind, action, payload, identity: c.identity,
+    resourceKind, action, payload, identity: c.identity, vectorSearch,
     executionMode: c.url.searchParams.get('mode') === 'preview' || payload.dryRun ? 'preview' : 'execute',
   });
   return { status: 200, body: result };
@@ -1269,6 +1270,18 @@ async function resolveSingleTargetColumn(store, { workspaceId, tenantId, schemaN
   if (targetColumn) return targetColumn;
   const mappings = await store.getMappings(workspaceId, { tenantId, schemaName, tableName });
   return mappings.length > 0 ? mappings[0].targetColumn : undefined;
+}
+
+async function runVectorEmbeddingMapping(registry, mappingStore, action, params, successStatus) {
+  requireMappingStore(mappingStore);
+  return registry.withAdminClient(params.workspaceId, async (client) => {
+    await requireVectorCapability(registry, client);
+    try {
+      return await runEmbeddingMapping(mappingStore, action, params, successStatus);
+    } catch (error) {
+      throw mapVectorRouteError(error, true);
+    }
+  });
 }
 
 async function runEmbeddingMapping(mappingStore, action, params, successStatus) {
@@ -1492,6 +1505,10 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
         code: publicErrorCode(err, 'CONTROL_PLANE_ERROR'),
         message: statusCode >= 500 ? 'Internal server error' : err.message,
       };
+      if (statusCode === 501 && envelope.code === 'CAPABILITY_UNAVAILABLE' && err.capability === 'vector_search') {
+        envelope.capability = 'vector_search';
+        envelope.message = VECTOR_UNAVAILABLE_MESSAGE;
+      }
       // Flow validation failures carry a node-scoped error array (FLW-E codes + nodeId) — surface
       // it on the 422 envelope so the console can highlight the offending canvas nodes.
       if (Array.isArray(err.errors) && statusCode < 500) envelope.errors = err.errors;

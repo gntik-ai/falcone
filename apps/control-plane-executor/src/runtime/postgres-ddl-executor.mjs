@@ -17,8 +17,17 @@ import {
   POSTGRES_GOVERNANCE_RESOURCE_KINDS,
 } from '../../../../packages/adapters/src/postgresql-governance-admin.mjs';
 import { clientError, mapPgError } from './errors.mjs';
+import { requireVectorCapability, mapVectorRouteError } from './vector-capability.mjs';
 
 const IDENT = /^[a-z_][a-z0-9_]*$/;
+
+function declaresVector(payload) {
+  const type = payload.dataType ?? payload.type;
+  const typeName = type && typeof type === 'object' ? type.typeName ?? type.name ?? type.fullName : type;
+  return /^(?:[a-z_][a-z0-9_]*\.)?vector(?:\s*\(|\s*\[|$)/i.test(String(typeName ?? '').trim()) ||
+    ['hnsw', 'ivfflat'].includes(String(payload.indexMethod ?? payload.method ?? '').trim().toLowerCase()) ||
+    (Array.isArray(payload.columns) && payload.columns.some((column) => column && typeof column === 'object' && declaresVector(column)));
+}
 
 function quoteIdent(name, what) {
   if (typeof name !== 'string' || !IDENT.test(name)) {
@@ -75,12 +84,8 @@ function buildDdlPlan({ resourceKind, action, payload }) {
 
   // Surface the pgvector `vector` type in the allowed type catalog when this DDL declares
   // a vector column or a vector index (add-vector-search). The structural builder gates
-  // the `vector` type on enabledExtensions; if the extension is not actually installed the
-  // CREATE will fail at execution and be mapped by mapPgError. Vector currentTable column
-  // types let the index validator confirm the target column is a vector.
-  const declaresVector =
-    /vector/i.test(String(payload.dataType ?? payload.type ?? '')) ||
-    ['hnsw', 'ivfflat'].includes(String(payload.indexMethod ?? payload.method ?? '').toLowerCase());
+  // the `vector` type on enabledExtensions; execution probes availability before
+  // issuing DDL, with a safe error backstop if the type/operator disappears.
   // The public create-table body names the table `name`; the structural adapter accepts
   // either, but the isolation statements below quote the table name directly — resolve the
   // alias once so a `{ name }` body does not throw "Invalid tableName identifier".
@@ -88,7 +93,7 @@ function buildDdlPlan({ resourceKind, action, payload }) {
     databaseName: payload.databaseName,
     schemaName: payload.schemaName,
     tableName: payload.tableName ?? payload.name,
-    ...(declaresVector ? { clusterFeatures: { enabledExtensions: ['vector'] } } : {}),
+    ...(declaresVector(payload) ? { clusterFeatures: { enabledExtensions: ['vector'] } } : {}),
   };
 
   try {
@@ -125,6 +130,7 @@ function buildDdlPlan({ resourceKind, action, payload }) {
 export async function executePostgresDdl(registry, params) {
   const { resourceKind, action = 'create', payload = {}, identity = {} } = params;
   const workspaceId = params.workspaceId ?? identity.workspaceId;
+  const vectorRequest = params.vectorSearch || declaresVector(payload);
   if (!identity.tenantId) throw clientError('Missing tenant identity', 401, 'IDENTITY_MISSING');
   if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
 
@@ -145,6 +151,9 @@ export async function executePostgresDdl(registry, params) {
   // touch the shared platform database `in_falcone`, even via a forged trust-header
   // request naming an unprovisioned workspace (fix-executor-ddl-db-ownership-guard).
   return registry.withAdminClient(workspaceId, async (client) => {
+    if (vectorRequest) {
+      await requireVectorCapability(registry, client);
+    }
     try {
       await client.query('BEGIN');
       for (const statement of statements) {
@@ -153,7 +162,7 @@ export async function executePostgresDdl(registry, params) {
       await client.query('COMMIT');
     } catch (error) {
       try { await client.query('ROLLBACK'); } catch { /* surface original */ }
-      throw mapPgError(error);
+      throw mapVectorRouteError(error, vectorRequest, mapPgError);
     }
     return { executed: true, executionMode: 'execute', statementCount: statements.length, statements };
   }, { requireDedicatedDatabase: true });

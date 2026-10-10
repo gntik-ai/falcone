@@ -71,6 +71,7 @@ COPY packages/webhook-engine/src /app/packages/webhook-engine/src
 # resolution guard below turns any future omission into a build failure instead.
 COPY apps/control-plane-executor/src/runtime/connection-registry.mjs \
      apps/control-plane-executor/src/runtime/postgres-data-executor.mjs \
+     apps/control-plane-executor/src/runtime/vector-capability.mjs \
      apps/control-plane-executor/src/runtime/workspace-dsn-resolver.mjs \
      apps/control-plane-executor/src/runtime/llm-executor.mjs \
      apps/control-plane-executor/src/runtime/byok-provider-guard.mjs \
@@ -80,6 +81,7 @@ COPY packages/adapters/src/postgresql-data-api.mjs \
      packages/adapters/src/postgresql-governance-admin.mjs \
      /app/packages/adapters/src/
 COPY packages/internal-contracts/src/transport-security.mjs \
+     packages/internal-contracts/src/postgres-extension-availability.mjs \
      /app/packages/internal-contracts/src/
 
 # Build-time module-completeness guard (#660; mirrors the route-module check in

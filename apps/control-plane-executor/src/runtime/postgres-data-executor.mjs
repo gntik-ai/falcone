@@ -10,6 +10,7 @@
 // per-workspace RLS context (app.tenant_id/app.workspace_id) as a non-superuser role.
 import { buildPostgresDataApiPlan, serializePostgresDataApiCursor } from '../../../../packages/adapters/src/postgresql-data-api.mjs';
 import { clientError, mapPgError } from './errors.mjs';
+import { requireVectorCapability, mapVectorRouteError } from './vector-capability.mjs';
 
 const DEFAULT_DATA_ROLE = 'falcone_app';
 const TENANT_COLUMN = 'tenant_id';
@@ -187,6 +188,7 @@ export async function executePostgresData(registry, params) {
   const identity = params.identity ?? {};
   const tenantId = identity.tenantId;
   const workspaceId = params.workspaceId ?? identity.workspaceId;
+  let vectorRequest = params.operation === 'knn_search';
   if (!tenantId) throw clientError('Missing tenant identity', 401, 'IDENTITY_MISSING');
   if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
 
@@ -202,6 +204,7 @@ export async function executePostgresData(registry, params) {
   // identity.dbRole (set by the API-key auth path: anon/service) is assumed via SET LOCAL
   // ROLE so RLS is enforced against it; the gateway-header path leaves the role unchanged.
   return registry.withWorkspaceClient(workspaceId, { tenantId, workspaceId, role: identity.dbRole }, async (client) => {
+    if (params.operation === 'knn_search') await requireVectorCapability(registry, client);
     const table = await introspectTable(client, params.schemaName, params.tableName);
 
     // KNN with queryText: resolve the in-platform embedding (workspace-scoped provider)
@@ -229,6 +232,10 @@ export async function executePostgresData(registry, params) {
         tenantId, schemaName: params.schemaName, tableName: params.tableName,
       });
       if (mappings.length > 0) {
+        if (mappings.some((mapping) => table.vectorColumns.includes(mapping.targetColumn))) {
+          vectorRequest = true;
+          await requireVectorCapability(registry, client);
+        }
         const ctxEmbed = {
           client, schemaName: params.schemaName, tableName: params.tableName,
           workspaceId, tenantId, embeddingExecutor: params.embeddingExecutor,
@@ -270,7 +277,7 @@ export async function executePostgresData(registry, params) {
       result = await client.query(plan.sql.text, plan.sql.values);
       count = await runCount(client, plan.response?.count);
     } catch (error) {
-      throw mapPgError(error);
+      throw mapVectorRouteError(error, vectorRequest, mapPgError);
     }
 
     if (plan.operation === 'knn_search') {
@@ -303,5 +310,7 @@ export async function executePostgresData(registry, params) {
       count,
       access: plan.access,
     };
+  }).catch((error) => {
+    throw mapVectorRouteError(error, vectorRequest);
   });
 }
