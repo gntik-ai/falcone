@@ -10,7 +10,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import { randomUUID } from 'node:crypto';
-import { recordHttp, recordMcpDependency, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
+import { recordHttp, recordMcpDependency, renderMetrics, setHttpRouteTemplates, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
 import { publicErrorCode } from './errors.mjs';
@@ -461,7 +461,7 @@ async function runWorkspaceDocs(workspaceDocsDb, c, capabilities, pathWorkspaceI
   return { status: result.statusCode ?? 200, body: result.body, headers: result.headers ?? {} };
 }
 
-// Route table: [method, RegExp(pathname) with capture groups, handler(groups, {url, identity, body, registry})].
+// Route table: [method, RegExp(pathname) with capture groups, static metric template, handler, options?].
 // Data routes are workspace/data-scoped; DDL routes are database-scoped (workspace via header).
 function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig, workspaceDocsDb, knativeRuntime, mcpRuntimeCleaner) {
   const data = '^/v1/postgres/workspaces/([^/]+)/data/([^/]+)/schemas/([^/]+)/tables/([^/]+)';
@@ -498,34 +498,55 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
   // The MCP runtime/engine is internal-only; all tenant access goes through these control-plane
   // routes, which derive the tenant from the verified identity exactly like every other route.
   const mcp = '^/v1/mcp/workspaces/([^/]+)/servers';
+  // Metric prefixes are static definitions; request captures never enter the label.
+  const templates = {
+    data: '/v1/postgres/workspaces/{workspaceId}/data/{db}/schemas/{schema}/tables/{table}',
+    ddl: '/v1/postgres/databases/{db}/schemas',
+    keys: '/v1/workspaces/{workspaceId}/api-keys',
+    emb: '/v1/workspaces/{workspaceId}/embedding-provider',
+    wdocs: '/v1/workspaces/{workspaceId}/docs',
+    llmp: '/v1/workspaces/{workspaceId}/llm-provider',
+    llmc: '/v1/workspaces/{workspaceId}/llm/completions',
+    llmu: '/v1/workspaces/{workspaceId}/llm-usage',
+    mdoc: '/v1/mongo/workspaces/{workspaceId}/data/{db}/collections/{collection}/documents',
+    evt: '/v1/events/workspaces/{workspaceId}/topics',
+    fn: '/v1/functions/workspaces/{workspaceId}/actions',
+    rt: '/v1/realtime/workspaces/{workspaceId}/data/{db}/collections/{collection}/changes',
+    pgrt: '/v1/realtime/workspaces/{workspaceId}/data/{db}/schemas/{schema}/tables/{table}/changes',
+    fl: '/v1/flows/workspaces/{workspaceId}/flows',
+    fls: '/v1/flows/workspaces/{workspaceId}/schedules',
+    flt: '/v1/flows/workspaces/{workspaceId}/task-types',
+    fwh: '/v1/flows/workspaces/{workspaceId}/triggers/webhooks/{triggerId}',
+    mcp: '/v1/mcp/workspaces/{workspaceId}/servers',
+  };
   return [
-    ['GET', /^\/(healthz|readyz)$/, () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
+    ['GET', /^\/(healthz|readyz)$/, 'health', () => ({ status: 200, body: { status: 'ok' } }), { noAuth: true }],
 
     // ---- Workspace API keys (issue/list/rotate/revoke) — admin (JWT) identity ----
-    ['POST', new RegExp(`${keys}$`), ([w], c) =>
+    ['POST', new RegExp(`${keys}$`), templates.keys, ([w], c) =>
       requireStore(apiKeyStore).issueKey({ tenantId: c.identity.tenantId, workspaceId: w, keyType: c.body.keyType, scopes: c.body.scopes }).then((r) => ({ status: 201, body: r }))],
-    ['GET', new RegExp(`${keys}$`), ([w]) =>
+    ['GET', new RegExp(`${keys}$`), templates.keys, ([w]) =>
       requireStore(apiKeyStore).listKeys(w).then((items) => ({ status: 200, body: { items } }))],
-    ['POST', new RegExp(`${keys}/([^/]+)/rotations$`), ([w, id], c) =>
+    ['POST', new RegExp(`${keys}/([^/]+)/rotations$`), `${templates.keys}/{keyId}/rotations`, ([w, id], c) =>
       requireStore(apiKeyStore).rotateKey({ id, workspaceId: w }).then((r) => ({ status: 201, body: r }))],
-    ['DELETE', new RegExp(`${keys}/([^/]+)$`), ([w, id]) =>
+    ['DELETE', new RegExp(`${keys}/([^/]+)$`), `${templates.keys}/{keyId}`, ([w, id]) =>
       requireStore(apiKeyStore).revokeKey({ id, workspaceId: w }).then((r) => ({ status: 200, body: r }))],
 
     // ---- Workspace documentation (console docs page + custom notes) ----
     // The docs page is a control-plane route, not a data-plane route; keep it in the runtime route
     // table so deployed executor images do not fall through to NO_ROUTE when the gateway forwards
     // /v1/workspaces/{workspaceId}/docs here (#795).
-    ['GET', new RegExp(`${wdocs}$`), ([w], c) =>
+    ['GET', new RegExp(`${wdocs}$`), templates.wdocs, ([w], c) =>
       runWorkspaceDocs(workspaceDocsDb, c, { mongoExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor }, w)],
-    ['POST', new RegExp(`${wdocs}/notes$`), ([w], c) =>
+    ['POST', new RegExp(`${wdocs}/notes$`), `${templates.wdocs}/notes`, ([w], c) =>
       runWorkspaceDocs(workspaceDocsDb, c, { mongoExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor }, w)],
-    ['PUT', new RegExp(`${wdocs}/notes/([^/]+)$`), ([w], c) =>
+    ['PUT', new RegExp(`${wdocs}/notes/([^/]+)$`), `${templates.wdocs}/notes/{noteId}`, ([w], c) =>
       runWorkspaceDocs(workspaceDocsDb, c, { mongoExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor }, w)],
-    ['DELETE', new RegExp(`${wdocs}/notes/([^/]+)$`), ([w], c) =>
+    ['DELETE', new RegExp(`${wdocs}/notes/([^/]+)$`), `${templates.wdocs}/notes/{noteId}`, ([w], c) =>
       runWorkspaceDocs(workspaceDocsDb, c, { mongoExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor }, w)],
 
     // ---- Postgres data rows (CRUD + bulk) ----
-    ['GET', new RegExp(`${data}/rows$`), ([w, db, s, t], c) =>
+    ['GET', new RegExp(`${data}/rows$`), `${templates.data}/rows`, ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'list',
         select: c.url.searchParams.get('select') ?? undefined,
         order: c.url.searchParams.get('order') ?? undefined,
@@ -534,22 +555,22 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
         countMode: c.url.searchParams.get('countMode') ?? undefined }, 200)],
     // Insert/bulk-insert/update thread embeddingExecutor + mappingStore so the write-path
     // auto-embed hook fires when a per-collection mapping is configured (no-op otherwise).
-    ['POST', new RegExp(`${data}/rows$`), ([w, db, s, t], c) =>
+    ['POST', new RegExp(`${data}/rows$`), `${templates.data}/rows`, ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'insert', values: c.body.row ?? c.body.values ?? c.body, embeddingExecutor, mappingStore }, 201)],
     // The public route catalog documents bulk insert at `.../tables/{t}/bulk/insert`; accept both
     // that and the `.../rows/bulk/insert` form so a gateway-proxied catalog path does not 404.
-    ['POST', new RegExp(`${data}/(?:rows/)?bulk/insert$`), ([w, db, s, t], c) =>
+    ['POST', new RegExp(`${data}/(?:rows/)?bulk/insert$`), `${templates.data}/bulk/insert`, ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'bulk_insert', rows: c.body.rows ?? c.body.items, embeddingExecutor, mappingStore }, 201)],
-    ['GET', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
+    ['GET', new RegExp(`${data}/rows/by-primary-key$`), `${templates.data}/rows/by-primary-key`, ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'get', primaryKey: primaryKeyFromQuery(c.url.searchParams) }, 200)],
-    ['PATCH', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
+    ['PATCH', new RegExp(`${data}/rows/by-primary-key$`), `${templates.data}/rows/by-primary-key`, ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'update', primaryKey: primaryKeyFromQuery(c.url.searchParams), changes: c.body.changes ?? c.body, embeddingExecutor, mappingStore }, 200)],
-    ['DELETE', new RegExp(`${data}/rows/by-primary-key$`), ([w, db, s, t], c) =>
+    ['DELETE', new RegExp(`${data}/rows/by-primary-key$`), `${templates.data}/rows/by-primary-key`, ([w, db, s, t], c) =>
       run(registry, executePostgresData, { workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'delete', primaryKey: primaryKeyFromQuery(c.url.searchParams) }, 200)],
 
     // ---- Vector search (KNN over a vector(N) column) ----
     // queryVector OR queryText (in-platform embedding); RLS-scoped under falcone_app.
-    ['POST', new RegExp(`${data}/search$`), ([w, db, s, t], c) =>
+    ['POST', new RegExp(`${data}/search$`), `${templates.data}/search`, ([w, db, s, t], c) =>
       run(registry, executePostgresData, {
         workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'knn_search',
         queryVector: c.body.queryVector, queryText: c.body.queryText, vectorColumn: c.body.vectorColumn,
@@ -558,107 +579,107 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       }, 200)],
 
     // ---- Postgres DDL (schema/table/column/index) ----
-    ['POST', new RegExp(`${ddl}$`), ([db], c) =>
+    ['POST', new RegExp(`${ddl}$`), templates.ddl, ([db], c) =>
       runDdl(registry, 'schema', { databaseName: db, schemaName: c.body.schemaName ?? c.body.name }, c)],
-    ['POST', new RegExp(`${ddl}/([^/]+)/tables$`), ([db, s], c) =>
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables$`), `${templates.ddl}/{schema}/tables`, ([db, s], c) =>
       runDdl(registry, 'table', { databaseName: db, schemaName: s, ...c.body }, c)],
-    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/columns$`), ([db, s, t], c) =>
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/columns$`), `${templates.ddl}/{schema}/tables/{table}/columns`, ([db, s, t], c) =>
       runDdl(registry, 'column', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
-    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/indexes$`), ([db, s, t], c) =>
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/indexes$`), `${templates.ddl}/{schema}/tables/{table}/indexes`, ([db, s, t], c) =>
       runDdl(registry, 'index', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
     // Vector index management → the same DDL executor (structural index plan with
     // indexMethod hnsw|ivfflat + metric → opclass). Create + delete.
-    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/vector-indexes$`), ([db, s, t], c) =>
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/vector-indexes$`), `${templates.ddl}/{schema}/tables/{table}/vector-indexes`, ([db, s, t], c) =>
       runDdl(registry, 'index', { databaseName: db, schemaName: s, tableName: t, indexMethod: c.body.indexType ?? c.body.indexMethod ?? 'hnsw', ...c.body }, c)],
-    ['DELETE', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/vector-indexes/([^/]+)$`), ([db, s, t, idx], c) =>
+    ['DELETE', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/vector-indexes/([^/]+)$`), `${templates.ddl}/{schema}/tables/{table}/vector-indexes/{indexId}`, ([db, s, t, idx], c) =>
       runDdlAction(registry, 'index', 'delete', { databaseName: db, schemaName: s, tableName: t, indexName: idx }, c)],
-    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/policies$`), ([db, s, t], c) =>
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/policies$`), `${templates.ddl}/{schema}/tables/{table}/policies`, ([db, s, t], c) =>
       runDdl(registry, 'policy', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
-    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/security$`), ([db, s, t], c) =>
+    ['POST', new RegExp(`${ddl}/([^/]+)/tables/([^/]+)/security$`), `${templates.ddl}/{schema}/tables/{table}/security`, ([db, s, t], c) =>
       runDdl(registry, 'table_security', { databaseName: db, schemaName: s, tableName: t, ...c.body }, c)],
 
     // ---- MongoDB documents (CRUD) ----
-    ['GET', new RegExp(`${mdoc}$`), ([w, db, coll], c) =>
+    ['GET', new RegExp(`${mdoc}$`), templates.mdoc, ([w, db, coll], c) =>
       runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'list',
         filter: jsonQueryParam(c.url.searchParams, 'filter'),
         sort: jsonQueryParam(c.url.searchParams, 'sort'),
         page: pageFromQuery(c.url.searchParams) }, 200)],
-    ['POST', new RegExp(`${mdoc}$`), ([w, db, coll], c) =>
+    ['POST', new RegExp(`${mdoc}$`), templates.mdoc, ([w, db, coll], c) =>
       runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'insert', payload: { document: c.body.document ?? c.body } }, 201)],
-    ['GET', new RegExp(`${mdoc}/([^/]+)$`), ([w, db, coll, id], c) =>
+    ['GET', new RegExp(`${mdoc}/([^/]+)$`), `${templates.mdoc}/{documentId}`, ([w, db, coll, id], c) =>
       runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'get', documentId: id }, 200)],
-    ['PATCH', new RegExp(`${mdoc}/([^/]+)$`), ([w, db, coll, id], c) =>
+    ['PATCH', new RegExp(`${mdoc}/([^/]+)$`), `${templates.mdoc}/{documentId}`, ([w, db, coll, id], c) =>
       runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'update', documentId: id, payload: { update: c.body.update ?? c.body } }, 200)],
-    ['PUT', new RegExp(`${mdoc}/([^/]+)$`), ([w, db, coll, id], c) =>
+    ['PUT', new RegExp(`${mdoc}/([^/]+)$`), `${templates.mdoc}/{documentId}`, ([w, db, coll, id], c) =>
       runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'replace', documentId: id, payload: { document: c.body.document ?? c.body } }, 200)],
-    ['DELETE', new RegExp(`${mdoc}/([^/]+)$`), ([w, db, coll, id], c) =>
+    ['DELETE', new RegExp(`${mdoc}/([^/]+)$`), `${templates.mdoc}/{documentId}`, ([w, db, coll, id], c) =>
       runMongo(mongoExecutor, { workspaceId: w, databaseName: db, collectionName: coll, identity: c.identity, operation: 'delete', documentId: id }, 200)],
 
     // ---- Events (Kafka): topics + publish + consume (workspace-scoped) ----
-    ['GET', new RegExp(`${evt}$`), ([w], c) =>
+    ['GET', new RegExp(`${evt}$`), templates.evt, ([w], c) =>
       runEvents(eventsExecutor, { workspaceId: w, identity: c.identity, operation: 'list_topics' }, 200)],
-    ['POST', new RegExp(`${evt}$`), ([w], c) =>
+    ['POST', new RegExp(`${evt}$`), templates.evt, ([w], c) =>
       runEvents(eventsExecutor, { workspaceId: w, identity: c.identity, operation: 'create_topic', topic: c.body.name ?? c.body.topic, payload: c.body }, 201)],
-    ['POST', new RegExp(`${evt}/([^/]+)/publish$`), ([w, topic], c) =>
+    ['POST', new RegExp(`${evt}/([^/]+)/publish$`), `${templates.evt}/{topic}/publish`, ([w, topic], c) =>
       runEvents(eventsExecutor, { workspaceId: w, identity: c.identity, operation: 'publish', topic, payload: c.body }, 202)],
-    ['GET', new RegExp(`${evt}/([^/]+)/messages$`), ([w, topic], c) =>
+    ['GET', new RegExp(`${evt}/([^/]+)/messages$`), `${templates.evt}/{topic}/messages`, ([w, topic], c) =>
       runEvents(eventsExecutor, { workspaceId: w, identity: c.identity, operation: 'consume', topic, payload: { maxMessages: Number(c.url.searchParams.get('maxMessages') ?? 10), timeoutMs: Number(c.url.searchParams.get('timeoutMs') ?? 3000) } }, 200)],
 
     // ---- Functions: deploy / list / get / invoke / activations (workspace-scoped) ----
-    ['GET', new RegExp(`${fn}$`), ([w], c) =>
+    ['GET', new RegExp(`${fn}$`), templates.fn, ([w], c) =>
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'list' }, 200)],
-    ['POST', new RegExp(`${fn}$`), ([w], c) =>
+    ['POST', new RegExp(`${fn}$`), templates.fn, ([w], c) =>
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'deploy', name: c.body.name, payload: c.body }, 201)],
-    ['GET', new RegExp(`${fn}/([^/]+)$`), ([w, name], c) =>
+    ['GET', new RegExp(`${fn}/([^/]+)$`), `${templates.fn}/{actionId}`, ([w, name], c) =>
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'get', name }, 200)],
-    ['POST', new RegExp(`${fn}/([^/]+)/invocations$`), ([w, name], c) =>
+    ['POST', new RegExp(`${fn}/([^/]+)/invocations$`), `${templates.fn}/{actionId}/invocations`, ([w, name], c) =>
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'invoke', name, payload: c.body }, 200)],
-    ['GET', new RegExp(`${fn}/([^/]+)/activations$`), ([w, name], c) =>
+    ['GET', new RegExp(`${fn}/([^/]+)/activations$`), `${templates.fn}/{actionId}/activations`, ([w, name], c) =>
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'activations', name }, 200)],
 
     // ---- Embedding provider (workspace-scoped): set / remove (structural admin) ----
     // The verified identity's tenantId is injected so the Postgres-backed store keys the
     // record by (tenant_id, workspace_id) — never trusting a tenantId in the request body.
-    ['PUT', new RegExp(`${emb}$`), ([w], c) =>
+    ['PUT', new RegExp(`${emb}$`), templates.emb, ([w], c) =>
       runEmbeddingProvider(embeddingExecutor, 'set', { workspaceId: w, tenantId: c.identity.tenantId, config: c.body }, 200)],
-    ['GET', new RegExp(`${emb}$`), ([w], c) =>
+    ['GET', new RegExp(`${emb}$`), templates.emb, ([w], c) =>
       runEmbeddingProvider(embeddingExecutor, 'get', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
-    ['DELETE', new RegExp(`${emb}$`), ([w], c) =>
+    ['DELETE', new RegExp(`${emb}$`), templates.emb, ([w], c) =>
       runEmbeddingProvider(embeddingExecutor, 'remove', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
 
     // ---- BYOK LLM provider config + completion + usage (workspace-scoped) — change #640 ----
     // The verified identity's tenantId is injected so the store keys the record by
     // (tenant_id, workspace_id) and usage is metered per tenant — never trusting a body tenantId.
-    ['PUT', new RegExp(`${llmp}$`), ([w], c) =>
+    ['PUT', new RegExp(`${llmp}$`), templates.llmp, ([w], c) =>
       runLlmProvider(llmExecutor, 'set', { workspaceId: w, tenantId: c.identity.tenantId, config: c.body }, 200)],
-    ['GET', new RegExp(`${llmp}$`), ([w], c) =>
+    ['GET', new RegExp(`${llmp}$`), templates.llmp, ([w], c) =>
       runLlmProvider(llmExecutor, 'get', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
-    ['DELETE', new RegExp(`${llmp}$`), ([w], c) =>
+    ['DELETE', new RegExp(`${llmp}$`), templates.llmp, ([w], c) =>
       runLlmProvider(llmExecutor, 'remove', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
-    ['GET', new RegExp(`${llmu}$`), ([w], c) =>
+    ['GET', new RegExp(`${llmu}$`), templates.llmu, ([w], c) =>
       runLlmUsage(llmExecutor, { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
     // The completion route OWNS the response so it can stream SSE when `stream:true` and otherwise
     // write a single JSON body. { sse: true } routes the dispatcher to pass (req,res) to the handler.
-    ['POST', new RegExp(`${llmc}$`), ([w], c) =>
+    ['POST', new RegExp(`${llmc}$`), templates.llmc, ([w], c) =>
       runLlmComplete(llmExecutor, { workspaceId: w, tenantId: c.identity.tenantId }, c), { sse: true }],
 
     // ---- Per-collection embedding mapping (table-scoped): set / get / remove (structural
     // admin). The verified identity's tenantId is injected so the Postgres-backed store keys
     // the record by (tenant_id, workspace_id, schema, table, target_column) — never trusting a
     // tenantId in the request body.
-    ['PUT', new RegExp(`${data}/embedding-mapping$`), ([w, db, s, t], c) =>
+    ['PUT', new RegExp(`${data}/embedding-mapping$`), `${templates.data}/embedding-mapping`, ([w, db, s, t], c) =>
       runEmbeddingMapping(mappingStore, 'set', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, config: c.body }, 200)],
-    ['GET', new RegExp(`${data}/embedding-mapping$`), ([w, db, s, t], c) =>
+    ['GET', new RegExp(`${data}/embedding-mapping$`), `${templates.data}/embedding-mapping`, ([w, db, s, t], c) =>
       runEmbeddingMapping(mappingStore, 'get', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, targetColumn: c.url.searchParams.get('targetColumn') ?? undefined }, 200)],
-    ['DELETE', new RegExp(`${data}/embedding-mapping$`), ([w, db, s, t], c) =>
+    ['DELETE', new RegExp(`${data}/embedding-mapping$`), `${templates.data}/embedding-mapping`, ([w, db, s, t], c) =>
       runEmbeddingMapping(mappingStore, 'remove', { workspaceId: w, tenantId: c.identity.tenantId, schemaName: s, tableName: t, targetColumn: c.url.searchParams.get('targetColumn') ?? undefined }, 200)],
 
     // ---- Realtime: subscribe to tenant-scoped changes (SSE stream) ----
     // Mongo collection change stream:
-    ['GET', new RegExp(`${rt}$`), ([w, db, coll], c) =>
+    ['GET', new RegExp(`${rt}$`), templates.rt, ([w, db, coll], c) =>
       runRealtimeSse(realtimeExecutor, { workspaceId: w, databaseName: db, collectionName: coll }, c), { sse: true }],
     // Postgres table change capture (trigger + LISTEN/NOTIFY):
-    ['GET', new RegExp(`${pgrt}$`), ([w, db, s, t], c) =>
+    ['GET', new RegExp(`${pgrt}$`), templates.pgrt, ([w, db, s, t], c) =>
       runRealtimeSse(pgRealtimeExecutor, { workspaceId: w, databaseName: db, schemaName: s, tableName: t }, c), { sse: true }],
 
     // ---- Flows (Temporal-backed authoring + execution) — only when flowExecutor is wired ----
@@ -667,31 +688,31 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // tenant authority.
     ...(flowExecutor ? [
       // Task-type catalog — the designer palette source (driven by the activity registry).
-      ['GET', new RegExp(`${flt}$`), ([w], c) =>
+      ['GET', new RegExp(`${flt}$`), templates.flt, ([w], c) =>
         runFlows(flowExecutor, { operation: 'list_task_types', identity: c.identity }, 200)],
-      ['GET', new RegExp(`${fl}$`), ([w], c) =>
+      ['GET', new RegExp(`${fl}$`), templates.fl, ([w], c) =>
         runFlows(flowExecutor, { operation: 'list_definitions', identity: c.identity }, 200)],
-      ['POST', new RegExp(`${fl}$`), ([w], c) =>
+      ['POST', new RegExp(`${fl}$`), templates.fl, ([w], c) =>
         runFlows(flowExecutor, { operation: 'create_definition', identity: c.identity, body: c.body, correlationId: c.headers['x-correlation-id'] }, 201)],
-      ['GET', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
+      ['GET', new RegExp(`${fl}/([^/]+)$`), `${templates.fl}/{flowId}`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'get_definition', identity: c.identity, flowId: f }, 200)],
-      ['PATCH', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
+      ['PATCH', new RegExp(`${fl}/([^/]+)$`), `${templates.fl}/{flowId}`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'update_definition', identity: c.identity, flowId: f, body: c.body, correlationId: c.headers['x-correlation-id'] }, 200)],
-      ['DELETE', new RegExp(`${fl}/([^/]+)$`), ([w, f], c) =>
+      ['DELETE', new RegExp(`${fl}/([^/]+)$`), `${templates.fl}/{flowId}`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'delete_definition', identity: c.identity, flowId: f, correlationId: c.headers['x-correlation-id'] }, 200)],
-      ['POST', new RegExp(`${fl}/([^/]+)/validate$`), ([w, f], c) =>
+      ['POST', new RegExp(`${fl}/([^/]+)/validate$`), `${templates.fl}/{flowId}/validate`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'validate', identity: c.identity, flowId: f }, 200)],
-      ['POST', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
+      ['POST', new RegExp(`${fl}/([^/]+)/versions$`), `${templates.fl}/{flowId}/versions`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'publish_version', identity: c.identity, flowId: f, correlationId: c.headers['x-correlation-id'] }, 201)],
-      ['GET', new RegExp(`${fl}/([^/]+)/versions$`), ([w, f], c) =>
+      ['GET', new RegExp(`${fl}/([^/]+)/versions$`), `${templates.fl}/{flowId}/versions`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'list_versions', identity: c.identity, flowId: f }, 200)],
-      ['GET', new RegExp(`${fl}/([^/]+)/versions/([^/]+)$`), ([w, f, v], c) =>
+      ['GET', new RegExp(`${fl}/([^/]+)/versions/([^/]+)$`), `${templates.fl}/{flowId}/versions/{version}`, ([w, f, v], c) =>
         runFlows(flowExecutor, { operation: 'get_version', identity: c.identity, flowId: f, version: Number(v) }, 200)],
 
       // Execution lifecycle (data-control class).
-      ['POST', new RegExp(`${fl}/([^/]+)/executions$`), ([w, f], c) =>
+      ['POST', new RegExp(`${fl}/([^/]+)/executions$`), `${templates.fl}/{flowId}/executions`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'start_execution', identity: c.identity, flowId: f, version: c.body.version, input: c.body.input }, 201)],
-      ['GET', new RegExp(`${fl}/([^/]+)/executions$`), ([w, f], c) =>
+      ['GET', new RegExp(`${fl}/([^/]+)/executions$`), `${templates.fl}/{flowId}/executions`, ([w, f], c) =>
         runFlows(flowExecutor, {
           operation: 'list_executions', identity: c.identity, flowId: f,
           status: c.url.searchParams.get('status') ?? undefined,
@@ -699,13 +720,13 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
           // strips any tenantId/workspaceId clause and AND-joins its own tenant boundary (D2).
           query: c.url.searchParams.get('query') ?? c.url.searchParams.get('filter') ?? undefined,
         }, 200)],
-      ['GET', new RegExp(`${fl}/([^/]+)/executions/([^/]+)$`), ([w, f, e], c) =>
+      ['GET', new RegExp(`${fl}/([^/]+)/executions/([^/]+)$`), `${templates.fl}/{flowId}/executions/{executionId}`, ([w, f, e], c) =>
         runFlows(flowExecutor, { operation: 'get_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 200)],
-      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/cancellations$`), ([w, f, e], c) =>
+      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/cancellations$`), `${templates.fl}/{flowId}/executions/{executionId}/cancellations`, ([w, f, e], c) =>
         runFlows(flowExecutor, { operation: 'cancel_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 202)],
-      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/retries$`), ([w, f, e], c) =>
+      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/retries$`), `${templates.fl}/{flowId}/executions/{executionId}/retries`, ([w, f, e], c) =>
         runFlows(flowExecutor, { operation: 'retry_execution', identity: c.identity, flowId: f, executionId: decodeURIComponent(e) }, 201)],
-      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/signals/([^/]+)$`), ([w, f, e, s], c) =>
+      ['POST', new RegExp(`${fl}/([^/]+)/executions/([^/]+)/signals/([^/]+)$`), `${templates.fl}/{flowId}/executions/{executionId}/signals/{signalName}`, ([w, f, e, s], c) =>
         runFlows(flowExecutor, { operation: 'send_signal', identity: c.identity, flowId: f, executionId: decodeURIComponent(e), signalName: decodeURIComponent(s), payload: c.body }, 202)],
 
       // ---- Flow schedule management (change: add-flow-schedule-management-api / #680) ----
@@ -716,15 +737,15 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       // builds the schedule id from the verified tenant + validated workspace, so a foreign flowId
       // resolves to a non-existent id -> 404 SCHEDULE_NOT_FOUND (no cross-tenant exposure). The
       // list op filters Temporal's namespace-wide listing by the `{tenant}:{ws}:` id prefix.
-      ['GET', new RegExp(`${fls}$`), ([w], c) =>
+      ['GET', new RegExp(`${fls}$`), templates.fls, ([w], c) =>
         runFlows(flowExecutor, { operation: 'list_schedules', identity: c.identity }, 200)],
-      ['GET', new RegExp(`${fl}/([^/]+)/schedule$`), ([w, f], c) =>
+      ['GET', new RegExp(`${fl}/([^/]+)/schedule$`), `${templates.fl}/{flowId}/schedule`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'get_schedule', identity: c.identity, flowId: f }, 200)],
-      ['POST', new RegExp(`${fl}/([^/]+)/schedule/pause$`), ([w, f], c) =>
+      ['POST', new RegExp(`${fl}/([^/]+)/schedule/pause$`), `${templates.fl}/{flowId}/schedule/pause`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'pause_schedule', identity: c.identity, flowId: f }, 200)],
-      ['POST', new RegExp(`${fl}/([^/]+)/schedule/resume$`), ([w, f], c) =>
+      ['POST', new RegExp(`${fl}/([^/]+)/schedule/resume$`), `${templates.fl}/{flowId}/schedule/resume`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'resume_schedule', identity: c.identity, flowId: f }, 200)],
-      ['POST', new RegExp(`${fl}/([^/]+)/schedule/trigger$`), ([w, f], c) =>
+      ['POST', new RegExp(`${fl}/([^/]+)/schedule/trigger$`), `${templates.fl}/{flowId}/schedule/trigger`, ([w, f], c) =>
         runFlows(flowExecutor, { operation: 'trigger_schedule', identity: c.identity, flowId: f }, 202)],
 
       // ---- Inbound webhook trigger ingestion (HMAC-authenticated) ----
@@ -732,7 +753,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       // invalid/missing signature is 401 (no run started). A valid signature starts the bound flow
       // (202); a replayed delivery id is an idempotent 202 (no second run). { webhook:true } makes
       // the dispatcher read the raw body + signature/delivery headers instead of the JSON path.
-      ['POST', new RegExp(`${fwh}$`), ([w, t], c) =>
+      ['POST', new RegExp(`${fwh}$`), templates.fwh, ([w, t], c) =>
         runFlows(flowExecutor, {
           operation: 'webhook_trigger', identity: c.identity, triggerId: decodeURIComponent(t),
           rawBody: c.rawBody, signatureHeader: c.signatureHeader, deliveryId: c.deliveryId, payload: c.payload,
@@ -746,7 +767,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // executor (workflow-id prefix check) BEFORE any history is fetched — see runFlowMonitoringSse.
     // The path mirrors the addressing under /v1/flows/workspaces/{ws}/executions/{executionId}.
     ...(flowMonitoringExecutor ? [
-      ['GET', /^\/v1\/flows\/workspaces\/([^/]+)\/executions\/([^/]+)\/events$/, ([w, e], c) =>
+      ['GET', /^\/v1\/flows\/workspaces\/([^/]+)\/executions\/([^/]+)\/events$/, '/v1/flows/workspaces/{workspaceId}/executions/{executionId}/events', ([w, e], c) =>
         runFlowMonitoringSse(flowMonitoringExecutor, { workspaceId: w, executionId: decodeURIComponent(e) }, c), { sse: true }],
     ] : []),
 
@@ -755,21 +776,21 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // verified identity (resolveIdentity), never from tool arguments; the engine keys all state by
     // identity.tenantId so a cross-tenant read/call/audit resolves to 404 / empty.
     ...(mcpEngine ? [
-      ['GET', new RegExp(`${mcp}$`), ([w], c) =>
+      ['GET', new RegExp(`${mcp}$`), templates.mcp, ([w], c) =>
         runMcp(mcpEngine, { operation: 'list_servers', identity: c.identity, workspaceId: w }, 200, knativeRuntime, mcpRuntimeCleaner)],
-      ['POST', new RegExp(`${mcp}$`), ([w], c) =>
+      ['POST', new RegExp(`${mcp}$`), templates.mcp, ([w], c) =>
         runMcp(mcpEngine, { operation: 'create_server', identity: c.identity, workspaceId: w, body: c.body, correlationId: c.headers['x-correlation-id'] }, 202, knativeRuntime, mcpRuntimeCleaner)],
-      ['GET', new RegExp(`${mcp}/([^/]+)$`), ([w, s], c) =>
+      ['GET', new RegExp(`${mcp}/([^/]+)$`), `${templates.mcp}/{serverId}`, ([w, s], c) =>
         runMcp(mcpEngine, { operation: 'get_server', identity: c.identity, workspaceId: w, serverId: s }, 200, knativeRuntime, mcpRuntimeCleaner)],
-      ['DELETE', new RegExp(`${mcp}/([^/]+)$`), ([w, s], c) =>
+      ['DELETE', new RegExp(`${mcp}/([^/]+)$`), `${templates.mcp}/{serverId}`, ([w, s], c) =>
         runMcp(mcpEngine, { operation: 'delete_server', identity: c.identity, workspaceId: w, serverId: s, correlationId: c.headers['x-correlation-id'] }, 200, knativeRuntime, mcpRuntimeCleaner)],
-      ['POST', new RegExp(`${mcp}/([^/]+)/curations$`), ([w, s], c) =>
+      ['POST', new RegExp(`${mcp}/([^/]+)/curations$`), `${templates.mcp}/{serverId}/curations`, ([w, s], c) =>
         runMcp(mcpEngine, { operation: 'curate_server', identity: c.identity, workspaceId: w, serverId: s, body: c.body }, 200, knativeRuntime, mcpRuntimeCleaner)],
-      ['POST', new RegExp(`${mcp}/([^/]+)/versions$`), ([w, s], c) =>
+      ['POST', new RegExp(`${mcp}/([^/]+)/versions$`), `${templates.mcp}/{serverId}/versions`, ([w, s], c) =>
         runMcp(mcpEngine, { operation: 'publish_version', identity: c.identity, workspaceId: w, serverId: s, version: c.body.version, body: { ...c.body, correlationId: c.headers['x-correlation-id'] }, correlationId: c.headers['x-correlation-id'] }, 201, knativeRuntime, mcpRuntimeCleaner)],
-      ['POST', new RegExp(`${mcp}/([^/]+)/versions/([^/]+)/approval$`), ([w, s, v], c) =>
+      ['POST', new RegExp(`${mcp}/([^/]+)/versions/([^/]+)/approval$`), `${templates.mcp}/{serverId}/versions/{version}/approval`, ([w, s, v], c) =>
         runMcp(mcpEngine, { operation: 'approve_version', identity: c.identity, workspaceId: w, serverId: s, version: decodeURIComponent(v), correlationId: c.headers['x-correlation-id'] }, 200, knativeRuntime, mcpRuntimeCleaner)],
-      ['POST', new RegExp(`${mcp}/([^/]+)/tool-calls$`), ([w, s], c) =>
+      ['POST', new RegExp(`${mcp}/([^/]+)/tool-calls$`), `${templates.mcp}/{serverId}/tool-calls`, ([w, s], c) =>
         runMcp(mcpEngine, {
           operation: 'call_tool', identity: c.identity, workspaceId: w, serverId: s,
           body: c.body, correlationId: c.headers['x-correlation-id'], authorization: c.authorization,
@@ -779,12 +800,12 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       // resolved from the credential-derived identity + the URL serverId (cross-tenant → 404 in the
       // engine). Distinct from the REST tool-calls route above; covered by the same gateway
       // /v1/mcp/* route, so no APISIX change is needed.
-      ['POST', new RegExp(`${mcp}/([^/]+)/rpc$`), ([w, s], c) =>
+      ['POST', new RegExp(`${mcp}/([^/]+)/rpc$`), `${templates.mcp}/{serverId}/rpc`, ([w, s], c) =>
         runMcpRpc(mcpEngine, {
           identity: c.identity, workspaceId: w, serverId: s, message: c.body,
           correlationId: c.headers['x-correlation-id'], authorization: c.authorization,
         }, knativeRuntime)],
-      ['GET', new RegExp(`${mcp}/([^/]+)/audit$`), ([w, s], c) =>
+      ['GET', new RegExp(`${mcp}/([^/]+)/audit$`), `${templates.mcp}/{serverId}/audit`, ([w, s], c) =>
         runMcp(mcpEngine, { operation: 'list_audit', identity: c.identity, workspaceId: w, serverId: s }, 200, knativeRuntime, mcpRuntimeCleaner)],
     ] : []),
 
@@ -799,7 +820,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // through one path. The tenant is credential-derived (resolveIdentity) — NEVER from tool
     // arguments. Distinct from the workspace MCP-hosting routes (/v1/mcp/workspaces/...).
     ...(controlPlaneUpstream ? [
-      ['POST', /^\/v1\/mcp\/rpc$/, (_groups, c) => runPlatformMcp(c, mcpSelfBaseUrl ?? controlPlaneUpstream, mcpConfig ?? mcpConfigStore)],
+      ['POST', /^\/v1\/mcp\/rpc$/, '/v1/mcp/rpc', (_groups, c) => runPlatformMcp(c, mcpSelfBaseUrl ?? controlPlaneUpstream, mcpConfig ?? mcpConfigStore)],
     ] : []),
   ];
 }
@@ -1299,6 +1320,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
     canServeWorkloads: () => true,
   };
   const routes = buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelf, mcpConfig, workspaceDocsDb, hostedRuntime, mcpRuntimeCleaner);
+  setHttpRouteTemplates(routes.map(([, , template]) => template));
 
   return http.createServer(async (req, res) => {
     const method = (req.method ?? 'GET').toUpperCase();
@@ -1313,16 +1335,16 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
     res.on('finish', () => recordHttp({ ...metric, status: res.statusCode, durationSeconds: Number(process.hrtime.bigint() - startNs) / 1e9 }));
     try {
       const url = new URL(req.url, 'http://control-plane.local');
-      metric.route = normalizeRoute(url.pathname);
-
       const match = routes.find(([m, re]) => m === method && re.test(url.pathname));
       if (!match) {
+        metric.route = url.pathname === '/' ? 'root' : (upstream ? 'proxied' : 'unmatched');
         // Not part of the executor's data-plane/DDL slice → fall through to the control-plane
         // (browse/inventory/management routes under the same prefixes) when an upstream is set.
         if (upstream) return proxyRequest(req, res, upstream, logger);
         return sendJson(res, 404, { code: 'NO_ROUTE', message: `No route for ${method} ${url.pathname}` });
       }
-      const [, re, handler, opts] = match;
+      const [, re, template, handler, opts] = match;
+      metric.route = template;
       const groups = re.exec(url.pathname).slice(1);
       // The gateway requires this header, but direct/internal Flow callers may omit it.
       // Generate a caller-visible ID in that case, and bound supplied IDs before persisting
