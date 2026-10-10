@@ -51,6 +51,16 @@ POST /v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/imports
 - The export response is a `storage_export_manifest` (`manifestId`, `sourceBucketId`,
   `sourceTenantId`, `totalObjects`, `totalBytes`, `entries[]`). Each entry carries the object body
   inline under `bodyReference` (`{ tenantId, encoding: "base64", inlineBase64 }`).
+- Import requires an object `bodyReference` with a string `inlineBase64`, or a legacy string
+  `inline` containing UTF-8 text. A non-null `inlineBase64` takes precedence and must decode as
+  base64; ASCII whitespace, unpadded base64, and URL-safe base64 are accepted exactly as for
+  single-object writes. With `encoding: "base64"`, omitting `inlineBase64` is a missing payload,
+  even if `inline` is present. An explicit empty string is a valid zero-byte object.
+  Missing payloads fail per entry with `MISSING_BODY_PAYLOAD`; non-string or undecodable payloads
+  fail with `INVALID_BODY_PAYLOAD`. Both report `sizeBytes: 0` and cause no S3 calls for that entry.
+  Manifests previously accepted through silent decoding or coercion now report these failures;
+  valid entries still import, the response remains HTTP `200`, and `totalBytesImported` counts
+  only bytes actually written.
 - The manifest is also **persisted** as a reserved `.falcone/exports/<manifestId>.json` object in the
   same bucket, so `GET .../exports/{manifestId}` reads it back. Reserved keys (`.falcone/…`,
   `_platform/…`) are hidden from the object listing, excluded from usage/quota accounting, and refused
