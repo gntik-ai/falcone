@@ -78,7 +78,7 @@ test('the eleven-request issue matrix preserves responses and records every deni
     ...[TEN_A, TEN_B].map((tenant) => [`/v1/tenants/${tenant}/backup/scope`,
       'FORBIDDEN', 'authenticated', '/v1/tenants/{tenantId}/backup/scope']),
     [`/v1/tenants/${TEN_B}`, 'cannot read another tenant', 'authenticated', '/v1/tenants/{tenantId}'],
-    [`/v1/tenants/${TEN_B}/users`, 'requires superadmin or tenant owner/admin of this tenant',
+    [`/v1/tenants/${TEN_B}/users`, 'Requires a tenant owner or administrator',
       'authenticated', '/v1/tenants/{tenantId}/users'],
     [`/v1/workspaces/${WS_B}`, 'cannot read another tenant workspace', 'authenticated', '/v1/workspaces/{workspaceId}'],
     [`/v1/workspaces/${WS_B}/service-accounts`, 'requires superadmin or tenant owner/admin',

@@ -12,6 +12,8 @@ import * as metrics from '../../../apps/control-plane/metrics-registry.mjs';
 import * as requestBody from '../../../apps/control-plane/request-body.mjs';
 import * as knative from '../../../apps/control-plane/knative-runtime-handlers.mjs';
 import * as sa from '../../../apps/control-plane/sa-revocation.mjs';
+import { listTenantUsers } from '../../../apps/control-plane/tenant-user-handlers.mjs';
+import { resolveWorkspaceForManage } from '../../../apps/control-plane/workspace-iam-context.mjs';
 import { createRuntimeCleanupRepository } from '../../../apps/control-plane/runtime-cleanup-repository.mjs';
 import { createMultiRealmVerifier } from '../../../apps/control-plane/jwt-verify.mjs';
 
@@ -70,13 +72,15 @@ export async function startDenialServer({ insert = null, extraRoutes = [] } = {}
     const content = `${header}.${payload}`;
     return `${content}.${sign('sha256', Buffer.from(content), privateKey).toString('base64url')}`;
   };
-  const localNames = ['getTenant', 'listTenantUsers', 'getWorkspace', 'listServiceAccountsHandler'];
-  const locals = new Function('store', [
+  // Handlers that b-handlers.mjs imports from sibling modules are passed in as
+  // the real module exports; only declarations local to b-handlers.mjs are extracted.
+  const localNames = ['getTenant', 'getWorkspace', 'listServiceAccountsHandler'];
+  const locals = new Function('store', 'listTenantUsers', 'resolveWorkspaceForManage', [
     localSource.match(/^const ok = .*$/m)[0], localSource.match(/^const err = .*$/m)[0],
     ...['tenantOut', 'workspaceOut', 'canManageTenant', 'canManageTenantId',
-      'resolveWorkspaceForManage', ...localNames].map((name) => declaration(localSource, name)),
+      ...localNames].map((name) => declaration(localSource, name)),
     `return { getTenant, listTenantUsers, getWorkspace, listServiceAccounts: listServiceAccountsHandler };`
-  ].join('\n'))(store);
+  ].join('\n'))(store, listTenantUsers, resolveWorkspaceForManage);
   const remap = (route) => ({ ...route,
     ...(route.module ? { module: fileURLToPath(new URL(`../../../${route.module.replace('/repo/', '')}`, import.meta.url)) } : {})
   });
