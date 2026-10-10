@@ -75,6 +75,9 @@ jobs:
             tests/blackbox/postgres-gateway-route.test.mjs \
             tests/blackbox/structural-write-role-gates-executor.test.mjs
 
+      - name: Authorization denial audit harness
+        run: node --test tests/blackbox/authorization-denial-audit.test.mjs
+
       - name: Console E2E scaffolding
         run: pnpm test:e2e:console
 
