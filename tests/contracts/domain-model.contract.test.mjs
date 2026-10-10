@@ -33,8 +33,13 @@ test('domain model aligns with public OpenAPI schemas and paths', () => {
   for (const entity of controlPlaneDomainEntities) {
     assert.ok(openapi.components.schemas[entity.openapi.read_schema], `missing schema ${entity.openapi.read_schema}`);
     assert.ok(openapi.components.schemas[entity.openapi.write_schema], `missing schema ${entity.openapi.write_schema}`);
-    assert.ok(openapi.paths[entity.openapi.read_path], `missing path ${entity.openapi.read_path}`);
-    assert.ok(openapi.paths[entity.openapi.write_path], `missing path ${entity.openapi.write_path}`);
+    if (entity.openapi.withdrawn_in) {
+      assert.equal(openapi.paths[entity.openapi.read_path], undefined, `withdrawn read path ${entity.openapi.read_path} must stay absent`);
+      assert.equal(openapi.paths[entity.openapi.write_path], undefined, `withdrawn write path ${entity.openapi.write_path} must stay absent`);
+    } else {
+      assert.ok(openapi.paths[entity.openapi.read_path], `missing path ${entity.openapi.read_path}`);
+      assert.ok(openapi.paths[entity.openapi.write_path], `missing path ${entity.openapi.write_path}`);
+    }
   }
 
   const resolutionDescriptor = getEffectiveCapabilityResolutionDescriptor();
