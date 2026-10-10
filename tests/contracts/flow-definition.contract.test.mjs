@@ -4,11 +4,42 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import Ajv from 'ajv';
+import { validateFlowDefinition } from '../../packages/internal-contracts/src/flow-definition-validator.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(__dirname, '../../packages/internal-contracts/src');
 const SCHEMA_PATH = resolve(SRC, 'flow-definition.json');
 const FIXTURE_DIR = resolve(SRC, 'fixtures/flows');
+
+test('invalid semantic fixtures preserve codes and node IDs with English messages and localization params', () => {
+  const expected = [
+    ['flw-e001-duplicate-id.json', 'FLW-E001', 'step-1', { nodeId: 'step-1' }],
+    ['flw-e002-cycle.json', 'FLW-E002', 'a', { nodeId: 'a' }],
+    ['flw-e003-dangling-ref.json', 'FLW-E003', 'start', { nodeId: 'start', target: 'ghost-node' }],
+    ['flw-e004-unresolved-sub-flow.json', 'FLW-E004', 'call-child', { flowId: 'does-not-exist', flowVersion: 'v9.9' }],
+    ['flw-e005-bad-expression.json', 'FLW-E005', 'decide', { expression: 'amount > > 100', engine: 'cel' }],
+    ['flw-e006-unknown-task-type.json', 'FLW-E006', 'step-1', { taskType: 'not-in-catalog' }],
+    ['flw-e007-bad-cron.json', 'FLW-E007', 'triggers[0]', { schedule: '0 9' }],
+    ['flw-e008-bad-duration.json', 'FLW-E008', 'pause', { duration: '30 seconds', nodeId: 'pause' }],
+    ['flw-e009-branch-arity.json', 'FLW-E009', 'decide', { nodeId: 'decide' }]
+  ];
+  assert.deepEqual(readdirSync(resolve(FIXTURE_DIR, 'invalid')).filter((name) => /^flw-e00[1-9].*\.json$/.test(name)).sort(), expected.map(([name]) => name));
+  for (const [name, code, nodeId, params] of expected) {
+    const definition = JSON.parse(readFileSync(resolve(FIXTURE_DIR, 'invalid', name), 'utf8'));
+    const result = validateFlowDefinition(definition, {
+      resolveSubFlow: () => false,
+      ...(code === 'FLW-E006' ? { taskTypeCatalog: ['known-type'] } : {})
+    });
+    assert.equal(result.ok, false, name);
+    assert.deepEqual(result.errors.map((error) => [error.code, error.nodeId]), [[code, nodeId]], name);
+    const error = result.errors[0];
+    assert.deepEqual(Object.keys(error).sort(), ['code', 'message', 'nodeId', 'params']);
+    assert.equal(typeof error.message, 'string');
+    assert.deepEqual(error.params, params);
+    assert.doesNotMatch(error.message, /\b(?:nodo|flujo|rama)\b|[áéíóúñü¿¡]/i);
+    for (const value of Object.values(params)) assert.ok(error.message.includes(value), `${name}: missing ${value}`);
+  }
+});
 
 const schema = JSON.parse(readFileSync(SCHEMA_PATH, 'utf8'));
 const mapping = JSON.parse(readFileSync(resolve(SRC, 'flow-definition-mapping.json'), 'utf8'));

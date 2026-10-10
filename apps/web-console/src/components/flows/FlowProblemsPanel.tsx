@@ -4,10 +4,17 @@
 // flow-level), and interaction-time connection-rule rejections. Hidden when empty.
 import { AlertTriangle } from 'lucide-react'
 
+import { describeFlowValidationError } from '@/lib/flows/validation-errors'
 import type { ValidationError } from '@/types/flows'
 
+// Only console-created connection rejections carry this source. Validator and
+// server entries use the formatter, including unknown codes and missing params.
+export interface FlowProblem extends ValidationError {
+  source?: 'interaction'
+}
+
 interface FlowProblemsPanelProps {
-  problems: ValidationError[]
+  problems: FlowProblem[]
   onSelectNode?: (nodeId: string) => void
 }
 
@@ -45,7 +52,9 @@ export function FlowProblemsPanel({ problems, onSelectNode }: FlowProblemsPanelP
             ) : (
               <span className="shrink-0 font-mono text-muted-foreground">flow</span>
             )}
-            <span className="text-muted-foreground">{problem.message}</span>
+            <span className="text-muted-foreground">
+              {problem.source === 'interaction' ? problem.message : describeFlowValidationError(problem)}
+            </span>
           </li>
         ))}
       </ul>

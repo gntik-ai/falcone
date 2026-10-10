@@ -55,9 +55,12 @@ Issue #803 is covered by focused tests in the shell, Observability page, and MCP
 - `ConsoleMcpServerDetailPage.test.tsx` and `McpServerPlayground.test.tsx` check that MCP
   detail/playground tabs, scope badges, headings, helper labels, and empty states render in Spanish
   while technical identifiers stay unchanged.
-- `flow-definition-validator.test.mjs`, `FlowSemanticValidation.test.ts`, and
-  `FlowProblemsPanel.test.tsx` check that shared `FLW-E` semantic validation messages render in
-  Spanish while preserving codes, node IDs, task type identifiers, cron strings, and durations.
+- `flow-definition-validator.test.mjs` and `FlowSemanticValidation.test.ts` check that the shared
+  `FLW-E` validator returns English messages and additive localization `params`.
+  The console-only `apps/web-console/src/lib/flows/validation-errors.ts` formatter produces Spanish
+  copy for the Problems panel, canvas tooltips, and YAML markers. Its tests, `FlowProblemsPanel.test.tsx`,
+  and `FlowSemanticMarkers.test.ts` check that codes, node IDs, task types, cron strings, and durations
+  stay unchanged, and missing params or unknown codes use Spanish fallbacks without raw server messages.
 
 Issue #743 (never echo the raw transport message) is covered by `console-errors.test.ts` (the
 `describeConsoleError` mapping table plus the two raw-string invariants: a 403 `FORBIDDEN`/

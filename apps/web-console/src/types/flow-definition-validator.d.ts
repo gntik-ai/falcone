@@ -8,6 +8,7 @@ declare module '@in-falcone/internal-contracts/src/flow-definition-validator.mjs
     code: string
     nodeId: string | null
     message: string
+    params?: Record<string, unknown>
   }
 
   export interface FlowExpressionEngine {

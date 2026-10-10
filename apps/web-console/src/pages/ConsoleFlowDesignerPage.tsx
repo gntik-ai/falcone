@@ -33,7 +33,7 @@ import '@xyflow/react/dist/style.css'
 
 import { FlowYamlEditor, type FlowEditorValidity } from '@/components/flows/FlowYamlEditor'
 import { FLOW_PALETTE_DRAG_MIME, FlowPalette } from '@/components/flows/FlowPalette'
-import { FlowProblemsPanel } from '@/components/flows/FlowProblemsPanel'
+import { FlowProblemsPanel, type FlowProblem } from '@/components/flows/FlowProblemsPanel'
 import { FlowRunTriggerButton } from '@/components/flows/FlowRunTriggerButton'
 import { FlowStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { evaluateConnection } from '@/components/flows/connectionRules'
@@ -138,7 +138,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
   const [edges, setEdges] = useState<Edge[]>([])
   const [taskTypes, setTaskTypes] = useState<TaskTypeDescriptor[]>([])
   const [serverErrors, setServerErrors] = useState<ValidationError[]>([])
-  const [interactionProblems, setInteractionProblems] = useState<ValidationError[]>([])
+  const [interactionProblems, setInteractionProblems] = useState<FlowProblem[]>([])
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -311,7 +311,7 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
         // entry so the rejection is explained rather than silent.
         setInteractionProblems((current) => [
           ...current.slice(-4),
-          { code: verdict.code ?? 'CONNECTION_REJECTED', nodeId: connection.source, message: verdict.message ?? 'Conexión rechazada.' }
+          { source: 'interaction', code: verdict.code ?? 'CONNECTION_REJECTED', nodeId: connection.source, message: verdict.message ?? 'Conexión rechazada.' }
         ])
         return
       }
@@ -397,15 +397,14 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
 
   const applyServerRejection = useCallback((error: unknown): string => {
     if (isFlowApiError(error)) {
-      // The per-node entries below (`code`/`nodeId`/`message`) are the console-owned, structured
-      // FLOW_VALIDATION_FAILED payload the Problems panel is built to display — a legitimate
-      // user-facing message, not a raw transport string (see #743's proposal for this
-      // distinction).
+      // Preserve structured localization params. Render sites use the console formatter
+      // and never echo the shared validator's English message (console policy #743).
       setServerErrors(
         error.body.errors.map((entry) => ({
           code: entry.code,
           nodeId: entry.nodeId ?? null,
-          message: entry.message
+          message: entry.message,
+          ...(entry.params ? { params: entry.params } : {})
         }))
       )
       // The flow-level banner text, however, is NOT guaranteed to be validation-owned copy —
