@@ -47,8 +47,11 @@ and tenant_admin. Shared management resolvers SHALL retain their existing gates.
 ### Requirement: Unbound workspace roles fail closed on executor writes
 
 Structural writes SHALL deny workspace_owner, workspace_admin, workspace_developer
-and workspace_viewer when workspaceIds is absent or empty. Broad tenant/platform
-administrators and the earlier API-key identity denial SHALL remain unchanged.
+and workspace_viewer without an explicit matching workspace binding. When plural
+workspaceIds is absent, a matching trusted credentialWorkspaceId SHALL count as a
+binding; the URL-path workspaceId fallback SHALL NOT. An explicit empty or different
+plural binding SHALL still deny. Broad tenant/platform administrators and the earlier
+API-key identity denial SHALL remain unchanged.
 
 #### Scenario: Consistent reads and writes
 
@@ -61,3 +64,11 @@ administrators and the earlier API-key identity denial SHALL remain unchanged.
 - **WHEN** an unbound or differently bound workspace role attempts API-key issue/
   revoke or LLM/embedding-provider PUT/DELETE
 - **THEN** it receives 403 before a structural side effect
+
+#### Scenario: Singular trusted bindings retain administrator access
+
+- **WHEN** workspace_admin presents a matching trusted x-workspace-id credential
+  binding without a plural binding
+- **THEN** API-key issue/revoke and LLM/embedding-provider PUT/DELETE succeed
+- **AND** another workspace or tenant, an empty or different explicit plural binding,
+  or a role without administration authority still returns 403

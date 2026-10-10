@@ -53,7 +53,7 @@ test('permission matrix preserves tenant and workspace boundaries', () => {
   assert.equal(tenantRoles.get('tenant_admin').allowed_actions.includes('workspace.members.manage'), true);
   assert.equal(tenantRoles.get('tenant_admin').allowed_actions.includes('workspace.effective_permissions.recalculate'), true);
   assert.equal(tenantRoles.get('tenant_admin').denied_actions.includes('tenant.ownership.transfer'), true);
-  assert.equal(tenantRoles.get('tenant_admin').denied_actions.includes('database.admin'), true);
+  assert.equal(tenantRoles.get('tenant_admin').denied_actions.includes('database.admin'), false);
   assert.equal(tenantRoles.get('tenant_admin').denied_actions.includes('database.admin_sql.execute'), true);
   assert.equal(tenantRoles.get('tenant_developer').allowed_actions.includes('tenant.effective_permissions.read'), true);
   assert.equal(tenantRoles.get('tenant_developer').allowed_actions.includes('app.templates.read'), true);

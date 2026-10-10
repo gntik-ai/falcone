@@ -337,7 +337,9 @@ function workspaceScopeDeniesStructuralWrite(identity, workspaceId) {
   if (!workspaceId) return false;
   if (hasBroadStructuralAdminRole(identity?.roles)) return false;
   if (!Array.isArray(identity?.workspaceIds)) {
-    return Array.isArray(identity?.roles) && identity.roles.some((role) => WORKSPACE_SCOPED_ROLES.has(role));
+    // A trusted singular credential binding counts; the workspaceId path fallback does not.
+    return Array.isArray(identity?.roles) && identity.roles.some((role) => WORKSPACE_SCOPED_ROLES.has(role))
+      && identity.credentialWorkspaceId !== workspaceId;
   }
   return !identity.workspaceIds.includes(workspaceId);
 }

@@ -53,3 +53,43 @@
       socket access are unavailable.
 - [ ] Build the control-plane image and run normal PR CI/image/release gates.
       Docker/container and network checks belong to publication CI.
+
+## Checker Follow-up
+
+- [x] Verify the clean assigned branch at prior attempt HEAD
+      60ae44442010a7e8a38be260fe26ead20a0fe146; preserve that work and Hermes pins.
+- [x] Invert the stale tenant_admin database.admin denial assertion to match the
+      approved grant. Search unit tests for database.admin/bucket.admin/topic.admin:
+      no other old-denial assertion remains; the flow-role suite asserts no such grant.
+- [x] Reproduce the singular trusted-header issue twice before changing source:
+      node --test --experimental-test-isolation=none --test-name-pattern='explicit singular'
+      tests/unit/executor-workspace-binding.test.mjs.
+      API-key issue returned 403 instead of 201. The matching plural-binding control
+      passed. Confirmed cause: the absent-array branch ignored credentialWorkspaceId.
+      The public seam is real HTTP parsing through createControlPlaneServer.
+- [x] Recognize matching singular credentials only in that absent-array branch.
+      Preserve role checks, explicit plural restrictions, API-key denial precedence,
+      tenant isolation and broad-admin behavior. Encode an empty plural header as
+      comma-only CSV so HTTP whitespace trimming does not turn the fixture into an
+      absent header. Document the trusted singular binding in the OpenSpec.
+- [x] Run the executor cases with --test-name-pattern='executor': 114/114 pass,
+      including 34 new singular-binding/role/isolation regressions.
+      Run model-authz.test.mjs: 144/144 pass. API-key scope-ceiling: 8/8 pass.
+- [x] Run the real authorization-model validator using a temporary resolution hook
+      for cached YAML 2.9.1 from /opt/engineering-cli/node_modules (no parsing stub):
+      node --import /tmp/falcone-1008-revision-yaml-hook.mjs
+      scripts/validate-authorization-model.mjs. Internally consistent.
+- [x] Retain the route-local database lookup: widening the shared management helper
+      would affect out-of-scope routes and violate the implementation constraint.
+- [x] OpenSpec strict validation, source/test syntax checks and git diff --check pass.
+- [ ] Native authorization-model.test.mjs and flow-write-role-gate.test.mjs cannot
+      import missing yaml. Retrying the contract with cached YAML then hits missing
+      cel-js. Native validator likewise cannot import yaml. Leave these native checks
+      to CI; dependency manifests and lockfiles do not need changes.
+- [ ] Native workspace-model-authz and write-implies-GET invariant tests cannot
+      import missing kafkajs. Existing handler regression imports also need database
+      clients unavailable here. Leave dependency-backed handler checks to CI.
+- [ ] Executor #624 regression cannot import missing pg; #773 structural regression
+      cannot listen on 127.0.0.1 (EPERM). These are environment skips, not assertions.
+- [ ] Live runtime matrix and image/release checks remain the handoff above: no
+      isolated fixture/database or container/network access, and no runtime artifact.

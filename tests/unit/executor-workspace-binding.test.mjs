@@ -39,7 +39,8 @@ function serverFor({ role, binding, transport = 'jwt', foreignTenant = false }) 
   });
   const headers = transport === 'jwt' ? { authorization: 'Bearer fixture' }
     : { 'x-tenant-id': identity.tenantId, 'x-actor-roles': role, 'x-auth-subject': identity.actorId,
-      ...(binding.workspaceIds === undefined ? {} : { 'x-actor-workspace-ids': binding.workspaceIds.length ? binding.workspaceIds.join(',') : ' ' }) };
+      ...(binding.credentialWorkspaceId === undefined ? {} : { 'x-workspace-id': binding.credentialWorkspaceId }),
+      ...(binding.workspaceIds === undefined ? {} : { 'x-actor-workspace-ids': binding.workspaceIds.length ? binding.workspaceIds.join(',') : ',' }) };
   return { server, headers };
 }
 
@@ -79,6 +80,42 @@ for (const transport of ['jwt', 'headers']) for (const role of roles) for (const
     }
   });
 }
+
+test('executor accepts an explicit singular trusted workspace binding for workspace_admin', async () => {
+  const { server, headers } = serverFor({ role: 'workspace_admin', transport: 'headers',
+    binding: { credentialWorkspaceId: workspaceId } });
+  for (const [method, path, success] of routes) {
+    assert.equal((await request(server, headers, method, path)).status, success, `${method} ${path}`);
+  }
+});
+
+for (const role of roles) for (const binding of [
+  { name: 'singular match', credentialWorkspaceId: workspaceId },
+  { name: 'singular mismatch', credentialWorkspaceId: 'fixture-other' },
+  { name: 'singular match with empty plural', credentialWorkspaceId: workspaceId, workspaceIds: [] },
+  { name: 'singular match with different plural', credentialWorkspaceId: workspaceId, workspaceIds: ['fixture-other'] },
+]) {
+  test(`executor singular binding preserves role and plural restrictions: ${role}, ${binding.name}`, async () => {
+    const { server, headers } = serverFor({ role, binding, transport: 'headers' });
+    const allowed = binding.name !== 'singular mismatch' && (['tenant_owner', 'tenant_admin'].includes(role)
+      || (['workspace_admin', 'workspace_owner'].includes(role) && binding.name === 'singular match'));
+    for (const [method, path, success] of routes) {
+      const result = await request(server, headers, method, path);
+      assert.equal(result.status, allowed ? success : 403, `${method} ${path}`);
+      if (!allowed) assert.equal(result.body.code, 'FORBIDDEN');
+    }
+  });
+}
+
+test('executor singular workspace binding cannot bypass tenant isolation', async () => {
+  const { server, headers } = serverFor({ role: 'workspace_admin', transport: 'headers', foreignTenant: true,
+    binding: { credentialWorkspaceId: workspaceId } });
+  for (const [method, path] of routes) {
+    const result = await request(server, headers, method, path);
+    assert.equal(result.status, 403);
+    assert.equal(result.body.code, 'CROSS_TENANT_VIOLATION');
+  }
+});
 
 for (const role of roles) {
   test(`executor cross-tenant structural routes deny ${role}`, async () => {

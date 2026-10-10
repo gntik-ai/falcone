@@ -18,10 +18,11 @@ configure providers through the executor, although GET is denied.
   local to its route; do not widen canManageTenant or resolveWorkspaceForManage.
 - Move only database.admin, bucket.admin and topic.admin from denied_actions to
   allowed_actions for tenant_owner and tenant_admin, preserving their creates.
-- Deny absent workspaceIds on executor structural writes by workspace_owner,
-  workspace_admin, workspace_developer and workspace_viewer. Empty or different
-  bindings remain denied. Preserve broad tenant/platform admin exemptions and
-  the earlier API-key identity denial.
+- Deny unbound executor structural writes by workspace_owner, workspace_admin,
+  workspace_developer and workspace_viewer. When workspaceIds is absent, a matching
+  trusted singular credentialWorkspaceId counts as an explicit binding; a URL-path
+  fallback does not. Empty or different plural bindings remain denied. Preserve
+  broad tenant/platform admin exemptions and the earlier API-key identity denial.
 - Preserve 404 no-leak paths, response shapes and error codes. Same-tenant GET
   denials identify insufficient workspace authority instead of another tenant.
 - Package the new helper in the control-plane image.
