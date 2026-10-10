@@ -397,15 +397,14 @@ function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; flowId:
 
   const applyServerRejection = useCallback((error: unknown): string => {
     if (isFlowApiError(error)) {
-      // The per-node entries below (`code`/`nodeId`/`message`) are the console-owned, structured
-      // FLOW_VALIDATION_FAILED payload the Problems panel is built to display — a legitimate
-      // user-facing message, not a raw transport string (see #743's proposal for this
-      // distinction).
+      // Preserve structured localization params. Render sites use the console formatter
+      // and never echo the shared validator's English message (console policy #743).
       setServerErrors(
         error.body.errors.map((entry) => ({
           code: entry.code,
           nodeId: entry.nodeId ?? null,
-          message: entry.message
+          message: entry.message,
+          ...(entry.params ? { params: entry.params } : {})
         }))
       )
       // The flow-level banner text, however, is NOT guaranteed to be validation-owned copy —

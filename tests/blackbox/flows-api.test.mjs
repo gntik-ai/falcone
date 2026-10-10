@@ -138,6 +138,36 @@ async function withFlowsServer(fn, { temporal } = {}) {
 
 const flowsBase = (ws = WS) => `/v1/flows/workspaces/${ws}/flows`;
 
+test('duplicate-ID validate and publish 422 bodies are English and independent of Accept-Language', async () => {
+  await withFlowsServer(async (baseUrl) => {
+    const { body } = await createFlow(baseUrl, {
+      apiVersion: 'v1.0', name: 'duplicate-id',
+      nodes: [{ id: 'dup', type: 'task', taskType: 't' }, { id: 'dup', type: 'task', taskType: 't' }]
+    });
+    let baseline;
+    for (const action of ['validate', 'versions']) {
+      for (const language of [undefined, 'en-US', 'en-US,en;q=0.9', 'en', 'fr-FR', 'de-DE']) {
+        const response = await fetch(`${baseUrl}${flowsBase()}/${body.flowId}/${action}`, {
+          method: 'POST', headers: { ...authHeaders, ...(language ? { 'Accept-Language': language } : {}) }
+        });
+        assert.equal(response.status, 422);
+        const text = await response.text();
+        const payload = JSON.parse(text);
+        assert.equal(payload.code, 'FLOW_VALIDATION_FAILED');
+        assert.equal(payload.message, 'Flow definition is invalid');
+        assert.deepEqual(payload.errors, [{
+          code: 'FLW-E001', nodeId: 'dup',
+          message: 'Duplicate node ID "dup"; node IDs must be unique within the flow.',
+          params: { nodeId: 'dup' }
+        }]);
+        assert.doesNotMatch(text, /\b(?:nodo|flujo|rama)\b|[áéíóúñü¿¡]/i);
+        baseline ??= text;
+        assert.equal(text, baseline, `${action}: ${language ?? 'absent'}`);
+      }
+    }
+  });
+});
+
 async function createFlow(baseUrl, def = MINIMAL_DEF, name = 'My Flow') {
   const res = await fetch(`${baseUrl}${flowsBase()}`, {
     method: 'POST', headers: authHeaders, body: JSON.stringify({ name, definition: def }),

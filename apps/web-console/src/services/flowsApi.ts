@@ -53,6 +53,7 @@ export interface FlowServerError {
   code: string
   nodeId?: string | null
   message: string
+  params?: Record<string, unknown>
 }
 
 // Normalised rejection a caller can map onto canvas nodes. `body.errors` mirrors the spec
@@ -90,7 +91,10 @@ function toFlowApiError(rawError: unknown): FlowApiError {
     .map((entry) => ({
       code: typeof entry.code === 'string' ? entry.code : 'FLW-EUNKNOWN',
       nodeId: typeof entry.nodeId === 'string' ? entry.nodeId : null,
-      message: typeof entry.message === 'string' ? entry.message : 'Validation error'
+      message: typeof entry.message === 'string' ? entry.message : 'Validation error',
+      ...(typeof entry.params === 'object' && entry.params !== null && !Array.isArray(entry.params)
+        ? { params: entry.params as Record<string, unknown> }
+        : {})
     }))
   return {
     status: typeof error.status === 'number' ? error.status : 0,

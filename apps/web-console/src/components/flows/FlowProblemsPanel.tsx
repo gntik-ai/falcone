@@ -4,6 +4,7 @@
 // flow-level), and interaction-time connection-rule rejections. Hidden when empty.
 import { AlertTriangle } from 'lucide-react'
 
+import { describeFlowValidationError } from '@/lib/flows/validation-errors'
 import type { ValidationError } from '@/types/flows'
 
 interface FlowProblemsPanelProps {
@@ -45,7 +46,7 @@ export function FlowProblemsPanel({ problems, onSelectNode }: FlowProblemsPanelP
             ) : (
               <span className="shrink-0 font-mono text-muted-foreground">flow</span>
             )}
-            <span className="text-muted-foreground">{problem.message}</span>
+            <span className="text-muted-foreground">{describeFlowValidationError(problem)}</span>
           </li>
         ))}
       </ul>

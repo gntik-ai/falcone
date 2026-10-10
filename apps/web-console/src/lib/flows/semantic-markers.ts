@@ -12,6 +12,7 @@
 
 import { parseDocument, isMap, isScalar } from 'yaml'
 
+import { describeFlowValidationError } from '@/lib/flows/validation-errors'
 import type { ValidationError } from '@/types/flows'
 
 export type MarkerSeverity = 'error' | 'warning'
@@ -75,10 +76,10 @@ export function toFlowMarkers(errors: ValidationError[], yaml = ''): FlowMarker[
   const lineIndex = yaml ? buildNodeLineIndex(yaml) : new Map<string, number>()
   return errors.map((error) => {
     const line = (error.nodeId && lineIndex.get(error.nodeId)) || 1
-    const nodeSuffix = error.nodeId ? ` (node "${error.nodeId}")` : ''
+    const nodeSuffix = error.nodeId ? ` (nodo "${error.nodeId}")` : ''
     return {
       code: error.code,
-      message: `${error.code}: ${error.message}${nodeSuffix}`,
+      message: `${error.code}: ${describeFlowValidationError(error)}${nodeSuffix}`,
       nodeId: error.nodeId ?? null,
       line,
       column: 1,

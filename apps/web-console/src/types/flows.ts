@@ -106,11 +106,12 @@ export interface FlowDefinition {
 }
 
 // A node-scoped semantic error (matches the shared validator's shape
-// { code, nodeId, message } and the server 422 error entries).
+// { code, nodeId, message, params? } and the server 422 error entries).
 export interface ValidationError {
   code: string
   nodeId: string | null
   message: string
+  params?: Record<string, unknown>
 }
 
 // Per-DSL-construct descriptor returned by the task-type catalog endpoint

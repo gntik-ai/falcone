@@ -32,7 +32,7 @@ test('error-code table publishes FLW-E001 through FLW-E009 with descriptions', (
   assert.equal(keys.length, 9);
 });
 
-test('error output is node-scoped {code, nodeId, message}', () => {
+test('error output adds only params to {code, nodeId, message}', () => {
   const result = validateFlowDefinition({
     apiVersion: 'v1.0',
     name: 'shape',
@@ -40,7 +40,7 @@ test('error output is node-scoped {code, nodeId, message}', () => {
   });
   assert.equal(result.ok, false);
   const err = result.errors[0];
-  assert.deepEqual(Object.keys(err).sort(), ['code', 'message', 'nodeId']);
+  assert.deepEqual(Object.keys(err).sort(), ['code', 'message', 'nodeId', 'params']);
   assert.equal(err.nodeId, 'start');
   assert.match(err.code, /^FLW-E00\d$/);
 });
@@ -57,7 +57,8 @@ test('FLW-E001: duplicate node IDs are reported, unique IDs are not', () => {
   assert.ok(codes(dup).includes('FLW-E001'));
   const e001 = dup.errors.find((e) => e.code === 'FLW-E001');
   assert.equal(e001.nodeId, 'step-1');
-  assert.equal(e001.message, 'ID de nodo duplicado "step-1"; los ID de nodo deben ser únicos dentro del flujo.');
+  assert.equal(e001.message, 'Duplicate node ID "step-1"; node IDs must be unique within the flow.');
+  assert.deepEqual(e001.params, { nodeId: 'step-1' });
 
   const unique = validateFlowDefinition({
     apiVersion: 'v1.0',
@@ -88,7 +89,8 @@ test('FLW-E002: a self-loop is reported', () => {
   });
   assert.ok(codes(result).includes('FLW-E002'));
   const e002 = result.errors.find((e) => e.code === 'FLW-E002');
-  assert.equal(e002.message, 'El grafo de nodos contiene un ciclo alcanzable desde el nodo "a".');
+  assert.equal(e002.message, 'The node graph contains a cycle reachable from node "a".');
+  assert.deepEqual(e002.params, { nodeId: 'a' });
 });
 
 test('FLW-E002: a longer cycle through sequence/branch edges is reported', () => {
@@ -130,7 +132,8 @@ test('FLW-E003: a dangling reference is reported and a cycle is not invented fro
   assert.ok(codes(result).includes('FLW-E003'));
   assert.ok(!codes(result).includes('FLW-E002'));
   const e003 = result.errors.find((e) => e.code === 'FLW-E003');
-  assert.equal(e003.message, 'El nodo "start" referencia el nodo desconocido "ghost-node".');
+  assert.equal(e003.message, 'Node "start" references unknown node "ghost-node".');
+  assert.deepEqual(e003.params, { nodeId: 'start', target: 'ghost-node' });
 });
 
 test('FLW-E004: sub-flow references are checked only when a resolver is supplied', () => {
@@ -142,7 +145,8 @@ test('FLW-E004: sub-flow references are checked only when a resolver is supplied
   const withResolver = validateFlowDefinition(doc, { resolveSubFlow: () => false });
   assert.ok(codes(withResolver).includes('FLW-E004'));
   const e004 = withResolver.errors.find((e) => e.code === 'FLW-E004');
-  assert.equal(e004.message, 'La referencia de subflujo does-not-exist@v9.9 no pudo resolverse.');
+  assert.equal(e004.message, 'Sub-flow reference does-not-exist@v9.9 could not be resolved.');
+  assert.deepEqual(e004.params, { flowId: 'does-not-exist', flowVersion: 'v9.9' });
 
   const resolved = validateFlowDefinition(doc, { resolveSubFlow: () => true });
   assert.ok(!codes(resolved).includes('FLW-E004'));
@@ -163,7 +167,8 @@ test('FLW-E005: an unparseable CEL expression is reported via the default engine
   const result = validateFlowDefinition(loadInvalid('flw-e005-bad-expression.json'));
   assert.ok(codes(result).includes('FLW-E005'));
   const e005 = result.errors.find((e) => e.code === 'FLW-E005');
-  assert.equal(e005.message, 'La expresión "amount > > 100" no puede analizarse con el motor cel.');
+  assert.equal(e005.message, 'Expression "amount > > 100" cannot be parsed by the cel engine.');
+  assert.deepEqual(e005.params, { expression: 'amount > > 100', engine: 'cel' });
 });
 
 test('FLW-E005: a well-formed CEL expression is accepted by the default engine', () => {
@@ -213,6 +218,8 @@ test('FLW-E005: the expression engine is an injectable seam', () => {
   }, { expressionEngine: rejectAll });
   assert.deepEqual(calls, ['a', 'b']);
   assert.equal(codes(result).filter((c) => c === 'FLW-E005').length, 2);
+  assert.equal(result.errors[0].message, 'Expression "a" cannot be parsed by the stub engine.');
+  assert.deepEqual(result.errors[0].params, { expression: 'a', engine: 'stub' });
 });
 
 test('defaultExpressionEngine wraps CEL and reports parse success/failure', () => {
@@ -230,7 +237,8 @@ test('FLW-E006: unknown taskType is reported only when a catalog is supplied', (
   const withCatalog = validateFlowDefinition(doc, { taskTypeCatalog: ['known-type'] });
   assert.ok(codes(withCatalog).includes('FLW-E006'));
   const e006 = withCatalog.errors.find((e) => e.code === 'FLW-E006');
-  assert.equal(e006.message, 'Tipo de tarea desconocido "not-in-catalog"; no está presente en el catálogo de tipos de tarea.');
+  assert.equal(e006.message, 'Unknown task type "not-in-catalog"; it is not in the task-type catalog.');
+  assert.deepEqual(e006.params, { taskType: 'not-in-catalog' });
 
   const known = validateFlowDefinition(doc, { taskTypeCatalog: ['not-in-catalog'] });
   assert.ok(!codes(known).includes('FLW-E006'));
@@ -240,7 +248,8 @@ test('FLW-E007: an invalid cron schedule is reported, 5- and 6-field schedules p
   const bad = validateFlowDefinition(loadInvalid('flw-e007-bad-cron.json'));
   assert.ok(codes(bad).includes('FLW-E007'));
   const e007 = bad.errors.find((e) => e.code === 'FLW-E007');
-  assert.equal(e007.message, 'La programación cron "0 9" no es una expresión cron POSIX válida (5 o 6 campos).');
+  assert.equal(e007.message, 'Cron schedule "0 9" is not a valid POSIX cron expression (5 or 6 fields).');
+  assert.deepEqual(e007.params, { schedule: '0 9' });
 
   const fiveField = validateFlowDefinition({
     apiVersion: 'v1.0',
@@ -263,7 +272,8 @@ test('FLW-E008: an invalid wait duration is reported, ISO 8601 durations pass', 
   const bad = validateFlowDefinition(loadInvalid('flw-e008-bad-duration.json'));
   assert.ok(codes(bad).includes('FLW-E008'));
   const e008 = bad.errors.find((e) => e.code === 'FLW-E008');
-  assert.equal(e008.message, 'La duración "30 seconds" del nodo de espera "pause" no es una duración ISO 8601 válida.');
+  assert.equal(e008.message, 'Duration "30 seconds" of wait node "pause" is not a valid ISO 8601 duration.');
+  assert.deepEqual(e008.params, { duration: '30 seconds', nodeId: 'pause' });
 
   for (const duration of ['PT30S', 'PT5M', 'P1D', 'P1DT2H30M', 'PT0.5S']) {
     const ok = validateFlowDefinition({
@@ -282,7 +292,8 @@ test('FLW-E009: a branch with one arm and no default is reported', () => {
   const result = validateFlowDefinition(loadInvalid('flw-e009-branch-arity.json'));
   assert.ok(codes(result).includes('FLW-E009'));
   const e009 = result.errors.find((e) => e.code === 'FLW-E009');
-  assert.equal(e009.message, 'La rama "decide" necesita al menos dos brazos, o un brazo más una conexión predeterminada.');
+  assert.equal(e009.message, 'Branch "decide" needs at least two arms, or one arm plus a default edge.');
+  assert.deepEqual(e009.params, { nodeId: 'decide' });
 });
 
 test('FLW-E009: one arm plus a default is sufficient', () => {

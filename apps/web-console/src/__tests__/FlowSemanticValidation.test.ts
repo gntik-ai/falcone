@@ -24,7 +24,9 @@ describe('validateFlowSemantics (shared FLW rule set)', () => {
     const e001 = errors.filter((error) => error.code === 'FLW-E001')
     expect(e001).toHaveLength(1)
     expect(e001[0]?.nodeId).toBe('step-1')
-    expect(e001[0]?.message).toBe('ID de nodo duplicado "step-1"; los ID de nodo deben ser únicos dentro del flujo.')
+    expect(e001[0]?.message).toBe('Duplicate node ID "step-1"; node IDs must be unique within the flow.')
+
+    expect(e001[0]?.params).toEqual({ nodeId: 'step-1' })
 
     const byNode = groupErrorsByNode(errors)
     expect(byNode.get('step-1')?.some((error) => error.code === 'FLW-E001')).toBe(true)
@@ -56,7 +58,7 @@ describe('validateFlowSemantics (shared FLW rule set)', () => {
     )
     const e006 = errors.find((error) => error.code === 'FLW-E006' && error.nodeId === 'a')
     expect(e006?.message).toBe(
-      'Tipo de tarea desconocido "not-in-catalog"; no está presente en el catálogo de tipos de tarea.'
+      'Unknown task type "not-in-catalog"; it is not in the task-type catalog.'
     )
   })
 
@@ -68,7 +70,8 @@ describe('validateFlowSemantics (shared FLW rule set)', () => {
       ])
     )
     const e005 = errors.find((error) => error.code === 'FLW-E005' && error.nodeId === 'br')
-    expect(e005?.message).toBe('La expresión "input.total >" no puede analizarse con el motor cel.')
+    expect(e005?.params).toEqual({ expression: 'input.total >', engine: 'cel' })
+    expect(e005?.message).toBe('Expression "input.total >" cannot be parsed by the cel engine.')
   })
 
   it('returns an empty list for a clean graph', () => {

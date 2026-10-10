@@ -5,6 +5,7 @@
 import type { LucideIcon } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
+import { describeFlowValidationError } from '@/lib/flows/validation-errors'
 import { cn } from '@/lib/utils'
 import type { ValidationError } from '@/types/flows'
 
@@ -40,7 +41,7 @@ export function NodeShell({
       {errorCount > 0 ? (
         <span
           data-testid="flow-node-error-badge"
-          title={validationErrors.map((error) => `${error.code}: ${error.message}`).join('\n')}
+          title={validationErrors.map((error) => `${error.code}: ${describeFlowValidationError(error)}`).join('\n')}
           className="absolute -right-2 -top-2 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground"
         >
           {errorCount}

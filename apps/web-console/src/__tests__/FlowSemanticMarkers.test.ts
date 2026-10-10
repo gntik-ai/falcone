@@ -35,6 +35,7 @@ describe('semantic markers: FLW-E001 duplicate node id', () => {
     expect(e001?.nodeId).toBe('same')
     expect(e001?.message).toContain('FLW-E001')
     expect(e001?.message).toContain('same')
+    expect(e001?.message).toContain('ID de nodo duplicado "same"')
     // The duplicate id appears twice; the marker line must point at a real id line (>1).
     const lineIndex = buildNodeLineIndex(yaml)
     expect(lineIndex.get('same')).toBeGreaterThan(1)
@@ -96,7 +97,19 @@ describe('semantic markers: degradation + anchoring details', () => {
     const yaml = yamlOf(def)
     const withCatalog = runFlowSemantics({ yaml, taskTypeCatalog: ['known-task'] })
     expect(withCatalog.markers.some((m) => m.code === 'FLW-E006')).toBe(true)
+    expect(withCatalog.markers[0].message).toContain('Tipo de tarea desconocido "unknown-task"')
     const withoutCatalog = runFlowSemantics({ yaml })
     expect(withoutCatalog.markers.some((m) => m.code === 'FLW-E006')).toBe(false)
+  })
+
+  it('localizes server-shaped errors and never echoes unknown or legacy messages', () => {
+    const markers = toFlowMarkers([
+      { code: 'FLW-E008', nodeId: 'pause', message: 'Invalid duration', params: { nodeId: 'pause', duration: '30 seconds' } },
+      { code: 'FLW-E007', nodeId: 'triggers[0]', message: 'Raw English cron message' },
+      { code: 'FLW-E999', nodeId: null, message: 'Internal server failure' }
+    ])
+    expect(markers[0].message).toBe('FLW-E008: La duración "30 seconds" del nodo de espera "pause" no es una duración ISO 8601 válida. (nodo "pause")')
+    expect(markers[1].message).toBe('FLW-E007: La programación cron no es válida (5 o 6 campos). (nodo "triggers[0]")')
+    expect(markers[2].message).toBe('FLW-E999: La validación del flujo encontró un error.')
   })
 })
