@@ -16,6 +16,7 @@ import { listTenantUsers } from '../../../apps/control-plane/tenant-user-handler
 import { resolveWorkspaceForManage } from '../../../apps/control-plane/workspace-iam-context.mjs';
 import { createRuntimeCleanupRepository } from '../../../apps/control-plane/runtime-cleanup-repository.mjs';
 import { createMultiRealmVerifier } from '../../../apps/control-plane/jwt-verify.mjs';
+import { can } from '../../../apps/control-plane/model-authz.mjs';
 
 export const TEN_A = '11111111-1111-1111-1111-111111111111';
 export const TEN_B = '22222222-2222-2222-2222-222222222222';
@@ -75,12 +76,12 @@ export async function startDenialServer({ insert = null, extraRoutes = [] } = {}
   // Handlers that b-handlers.mjs imports from sibling modules are passed in as
   // the real module exports; only declarations local to b-handlers.mjs are extracted.
   const localNames = ['getTenant', 'getWorkspace', 'listServiceAccountsHandler'];
-  const locals = new Function('store', 'listTenantUsers', 'resolveWorkspaceForManage', [
+  const locals = new Function('store', 'listTenantUsers', 'resolveWorkspaceForManage', 'can', [
     localSource.match(/^const ok = .*$/m)[0], localSource.match(/^const err = .*$/m)[0],
     ...['tenantOut', 'workspaceOut', 'canManageTenant', 'canManageTenantId',
       ...localNames].map((name) => declaration(localSource, name)),
     `return { getTenant, listTenantUsers, getWorkspace, listServiceAccounts: listServiceAccountsHandler };`
-  ].join('\n'))(store, listTenantUsers, resolveWorkspaceForManage);
+  ].join('\n'))(store, listTenantUsers, resolveWorkspaceForManage, can);
   const remap = (route) => ({ ...route,
     ...(route.module ? { module: fileURLToPath(new URL(`../../../${route.module.replace('/repo/', '')}`, import.meta.url)) } : {})
   });

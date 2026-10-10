@@ -93,3 +93,57 @@
       cannot listen on 127.0.0.1 (EPERM). These are environment skips, not assertions.
 - [ ] Live runtime matrix and image/release checks remain the handoff above: no
       isolated fixture/database or container/network access, and no runtime artifact.
+
+## Quota and CI Harness Follow-up
+
+- [x] Verify the clean assigned branch at prior attempt HEAD
+      c9911a6fc1dd0c73e123041286b3c9245f1b0dbd; preserve source gates and Hermes pins.
+- [x] Reproduce all five checker-reported quota assertion failures before editing:
+      node --import /tmp/falcone-1008-quota-boundaries.mjs --test
+      --experimental-test-isolation=none
+      tests/blackbox/live-resource-quota-enforcement.test.mjs
+      tests/blackbox/storage-quota-handlers.test.mjs.
+      Four topic cases returned 403 instead of 402/201; bucket admission returned
+      403 instead of 409 STORAGE_QUOTA_EXCEEDED. Public seams are KAFKA_HANDLERS
+      and STORAGE_HANDLERS responses. The shared workspace-admin fixture lacked
+      workspaceIds; the bucket fixture lacked verified tenant_owner roles.
+- [x] Add the explicit plural binding to the shared workspace-admin quota fixture;
+      its eight topic/Mongo tests pass. Then add the verified tenant_owner role to
+      the bucket fixture; its four quota/ownership/usage tests pass. Keep every
+      existing quota assertion and production authorization decision unchanged.
+- [x] Run every explicit blackbox test in ci.yml. The denial-audit harness also
+      reproduced a real failure: its eleven-request matrix returned 500 on workspace
+      GET instead of 403. Repeat with --test-name-pattern='eleven-request' on
+      tests/blackbox/authorization-denial-audit.test.mjs, then supply the real can
+      import when evaluating the extracted handler. All twelve audit tests pass.
+- [x] Run the five executable CI quota suites plus denial-audit: 59/59 pass.
+      Suites: live-resource-quota-enforcement, live-storage-function-quotas,
+      workspace-quota-enforcement, storage-quota-enforcement,
+      storage-quota-handlers, authorization-denial-audit.
+      Use the import hook above: cached real YAML, with unused Kafka/Mongo/PG/CEL
+      exports that throw if called; existing test fixtures inject backend I/O.
+      Run in one process because subprocess-isolated hook runs do not complete
+      correctly in this sandbox. No timeout wrapper was used.
+- [x] Run mongo-gateway-route and postgres-gateway-route natively with
+      FALCONE_CHART_PATH pointing at the assigned deployment chart: 11/11 pass,
+      including Helm rendering and both immutable workflow pins.
+- [x] Run scoped units with the hook: model-authz, workspace-model-authz,
+      executor-workspace-binding, api-keys-scope-ceiling, workspace-list-tenant-scope,
+      kafka-handlers-workspace-routes, kafka-handlers-metadata-recovery,
+      storage-handlers-xml-parsing: 497/497 pass.
+- [x] Run pg-browse-tenant-scope, events-topic-tenant-scope,
+      storage-bucket-tenant-scope, executor-apikey-scope-ceiling and
+      postgres-ddl-table-isolation with the hook: 23/23 pass.
+- [x] Authorization-model validator passes using cached real YAML. OpenSpec strict
+      validation and git diff --check pass. Retain the route-local database lookup
+      to avoid widening the shared resolver's out-of-scope authorization behavior.
+- [ ] Native authorization-model and flow-write-role-gate units: SKIPPED, missing
+      yaml; the cached-YAML hook gets as far as missing ajv. Native validator:
+      SKIPPED, missing yaml. Existing dependency declarations need no changes.
+- [ ] CI storage-object-io-completeness: SKIPPED, missing @temporalio/activity.
+      CI structural-write-role-gates-executor: SKIPPED, listen EPERM on 127.0.0.1.
+      These are environment limits, not code assertion failures. PR CI must run
+      both suites and the native dependency-backed checks above.
+- [ ] Live RUNTIME_REQUIRED matrix and control-plane image build remain release
+      obligations: no isolated live fixture/database, network or container images
+      are available here. No runtime artifact is claimed.
