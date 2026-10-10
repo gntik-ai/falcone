@@ -28,7 +28,7 @@ import { resolveWebhookKeyBeforeServing, sanitizedWebhookBootstrapError } from '
 import { setWebhookKeyContext } from './webhook-handlers.mjs';
 import { tenantIdentitiesEnabled } from './storage-handlers.mjs';
 import { cleanupLegacyWorkspaceIdentities } from './seaweedfs-identity.mjs';
-import { recordHttp, recordKnativeDependencyEvent, renderMetrics, normalizeRoute, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
+import { recordHttp, recordKnativeDependencyEvent, renderMetrics, setHttpRouteTemplates, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { recordRouteAudit, recordRouteDenial } from './audit-writer.mjs';
 import { recordAuditEvent } from './audit-store.mjs';
 import { withPostgresSsl } from './transport-security.mjs';
@@ -167,6 +167,7 @@ function loadRoutes(extra = []) {
   // Most-specific first: more path segments win; wildcard routes sink.
   ROUTES.sort((a, b) => (b.path.split('/').length - a.path.split('/').length)
     || ((a.path.includes('*') ? 1 : 0) - (b.path.includes('*') ? 1 : 0)));
+  setHttpRouteTemplates(ROUTES.map((route) => route.path));
 }
 
 function matchRoute(method, path) {
@@ -357,17 +358,20 @@ const server = http.createServer(async (req, res) => {
   try {
     const parsed = new URL(req.url, `http://localhost:${PORT}`);
     const path = parsed.pathname;
-    metric.route = normalizeRoute(path);
-
     if (method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
     if (path === '/healthz' || path === '/readyz') {
+      metric.route = 'health';
       return respondHealth(res, { pool, secretBackendHealth, sendJson });
     }
-    if (path === '/') return sendJson(res, 200, { service: 'in-falcone-control-plane', routes: ROUTES.length });
+    if (path === '/') {
+      metric.route = 'root';
+      return sendJson(res, 200, { service: 'in-falcone-control-plane', routes: ROUTES.length });
+    }
 
     const matched = matchRoute(method, path);
     if (!matched) return sendJson(res, 404, { code: 'NO_ROUTE', message: `No action mapped for ${method} ${path}` });
     route = matched.route;
+    metric.route = route.path;
     routeParams = matched.params;
 
     const headers = lowercaseHeaders(req.headers);

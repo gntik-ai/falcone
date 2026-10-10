@@ -16,6 +16,29 @@ In Falcone ships a Prometheus-based observability stack (chart alias `observabil
 
 The repository enforces the schema and presence of these via `npm run validate:observability-*` checks (metrics stack, dashboards, health checks, business metrics, usage/consumption, quota policies, threshold alerts, hard-limit enforcement, console alerts, audit pipeline/event-schema/query/export/correlation surfaces).
 
+## HTTP request metrics
+
+Both control-plane services expose `falcone_http_requests_total` (counter) and
+`falcone_http_request_duration_seconds` (histogram) at `/metrics`. The `route` label is the
+matched server-side template, including on responses rejected before authentication. Templates
+remain stable across restarts, so the Grafana p95 latency panel can continue to group by `route`.
+Resource names, keys, request queries and credentials are excluded from these labels.
+
+The fixed route sentinels are `unmatched` for a missing route, `proxied` for executor fall-through
+to the control-plane, `health` for health/readiness endpoints, `root` for `/`, and `overflow` for
+registry saturation. Methods are restricted to `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`,
+`OPTIONS` and `OTHER`; custom methods use `OTHER`.
+
+Each HTTP registry Map has a hard cap of 16,384 distinct keys, with one slot reserved for a
+global overflow series. This accommodates about 191 templates × 8 methods × 10 statuses.
+Further new keys aggregate under `method="OTHER",route="overflow"` (counter status `0`);
+existing keys continue counting. Overflow preserves counts and latency observations while
+discarding their individual route/method/status attribution. HTTP metrics have no tenant label.
+
+The template labels replace the previous path-derived labels; historical series remain in the
+TSDB until retention removes them. Scrape sample and label-length limits are configured in the
+separate deployment chart repository.
+
 ## Per-tenant visibility
 
 Metrics, usage and audit are **tenant-keyed**, so the console can show one tenant's consumption and operations without exposing another's. Operations records (with detail views) track governed actions and their outcomes.

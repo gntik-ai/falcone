@@ -1,10 +1,8 @@
 // Zero-dependency Prometheus metrics registry (add-falcone-metrics-scrape-and-dashboards, #499).
 //
 // In-process counters + a latency histogram for HTTP requests, rendered in the Prometheus text
-// exposition format at GET /metrics (scraped by the in-cluster Prometheus). Labels are bounded:
-// `route` is the path with id-like segments collapsed to {id} (so cardinality is per-route, not
-// per-resource), plus method/status and the tenant when known. No external deps — the kind
-// runtime images bundle no metrics library.
+// exposition format at GET /metrics. HTTP labels come only from the server's static route
+// templates or fixed sentinels. No external dependencies.
 
 const requestsTotal = new Map();   // "method|route|status" -> count
 const durationByRoute = new Map(); // "method|route" -> { buckets:number[], sum, count }
@@ -14,29 +12,33 @@ const startedAtMs = Date.now();
 
 const esc = (v) => String(v ?? '').replace(/[\\"\n]/g, '_');
 
-// Collapse id-like path segments so the `route` label is bounded (a UUID, a long token/key, or a
-// purely numeric segment becomes {id}). Keeps the structural shape (/v1/tenants/{id}/workspaces).
-export function normalizeRoute(path) {
-  const raw = (path || '/').split('?')[0];
-  if (/^\/v1\/functions\/actions\/[^/]+/.test(raw)) return '/v1/functions/actions/:id';
-  if (/^\/v1\/mcp\/workspaces\/[^/]+\/servers\/[^/]+/.test(raw)) return '/v1/mcp/workspaces/:id/servers/:id';
-  const norm = raw.split('/').map((seg) => {
-    if (!seg) return seg;
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/i.test(seg)) return '{id}';
-    if (/^[0-9]+$/.test(seg)) return '{id}';
-    if (seg.length > 24) return '{id}';
-    return seg;
-  }).join('/');
-  return norm || '/';
+// Each HTTP Map has at most 16,384 keys, including a reserved global overflow key.
+// This allows roughly 191 templates x 8 methods x 10 statuses before aggregation.
+const HTTP_METRIC_KEY_CAP = 16_384;
+const HTTP_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'OTHER']);
+const HTTP_ROUTE_SENTINELS = new Set(['unmatched', 'proxied', 'health', 'root', 'overflow']);
+let httpRouteTemplates = new Set();
+
+// Configure once from the server-side route table, never from an incoming request.
+export function setHttpRouteTemplates(templates) {
+  httpRouteTemplates = new Set(templates);
 }
 
 // Record one handled request. durationSeconds is the wall-clock handler time.
 export function recordHttp({ method = 'GET', route = 'unmatched', status = 0, durationSeconds = 0 }) {
-  route = normalizeRoute(route);
-  const rk = `${method}|${route}|${status}`;
+  if (!HTTP_METHODS.has(method)) method = 'OTHER';
+  if (!httpRouteTemplates.has(route) && !HTTP_ROUTE_SENTINELS.has(route)) route = 'unmatched';
+  let rk = `${method}|${route}|${status}`;
+  let dk = `${method}|${route}`;
+  // Reserve one slot in BOTH maps. A single global overflow series cannot itself grow
+  // with method/status combinations, and counters/histograms retain every observation.
+  if ((!requestsTotal.has(rk) && requestsTotal.size >= HTTP_METRIC_KEY_CAP - 1)
+      || (!durationByRoute.has(dk) && durationByRoute.size >= HTTP_METRIC_KEY_CAP - 1)) {
+    rk = 'OTHER|overflow|0';
+    dk = 'OTHER|overflow';
+  }
   requestsTotal.set(rk, (requestsTotal.get(rk) ?? 0) + 1);
 
-  const dk = `${method}|${route}`;
   let h = durationByRoute.get(dk);
   if (!h) { h = { buckets: new Array(LE.length).fill(0), sum: 0, count: 0 }; durationByRoute.set(dk, h); }
   h.sum += durationSeconds;

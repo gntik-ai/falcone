@@ -75,13 +75,11 @@ test('bbx-933-metrics-nondisclosure-23: /metrics exposes no tenant-controlled or
  * OpenSpec #### Scenario: Unavailable deploy has correlated evidence
  * OpenSpec #### Scenario: Hosted-server outage is correlated without secrets
  */
-test('bbx-933-metrics-cardinality-24: resource-bearing HTTP paths collapse to bounded route templates', () => {
+test('bbx-933-metrics-cardinality-24: raw HTTP paths are rejected in favour of a bounded sentinel', () => {
   for (const registry of [controlMetrics, executorMetrics]) {
     recordResourceBearingRequests(registry);
     const labels = routeLabels(registry.renderMetrics());
-    assert.ok(labels.has('/v1/functions/actions/:id'), `missing bounded Function route in ${JSON.stringify([...labels])}`);
-    assert.ok(labels.has('/v1/mcp/workspaces/:id/servers/:id'), `missing bounded MCP route in ${JSON.stringify([...labels])}`);
-    assert.ok(labels.size <= 2, `expected at most two bounded route series, got ${labels.size}`);
+    assert.deepEqual(labels, new Set(['unmatched']));
   }
 });
 
