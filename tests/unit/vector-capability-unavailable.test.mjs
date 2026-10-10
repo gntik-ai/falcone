@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { executePostgresDdl } from '../../apps/control-plane-executor/src/runtime/postgres-ddl-executor.mjs';
 import { createEmbeddingMappingStore, createEmbeddingExecutor, localMockEmbeddingBackend } from '../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
 
 const data = '/v1/postgres/workspaces/ws_vector/data/appdb/schemas/public/tables/docs';
@@ -107,6 +108,42 @@ test('embedding mapping writes report unavailable and leave the mapping absent',
   assertUnavailable(await request(db, 'DELETE', `${data}/embedding-mapping?targetColumn=embedding`, {}, options), db);
 });
 
+test('unavailable mapping deletion preserves the existing mapping and reads stay accessible', async () => {
+  const db = database();
+  const mappingStore = createEmbeddingMappingStore();
+  await mappingStore.deployMapping('ws_vector', {
+    tenantId: 'ten_vector', schemaName: 'public', tableName: 'docs',
+    sourceColumn: 'body', targetColumn: 'embedding',
+  });
+  const path = `${data}/embedding-mapping?targetColumn=embedding`;
+  assertUnavailable(await request(db, 'DELETE', path, {}, { mappingStore }), db);
+  const read = await request(db, 'GET', path, {}, { mappingStore });
+  assert.equal(read.status, 200);
+  assert.equal(read.body.sourceColumn, 'body');
+  assert.equal(read.body.targetColumn, 'embedding');
+  assert.equal(db.queries.length, 1);
+});
+
+test('mapping writes fail closed on unresolved workspace databases before changing metadata', async () => {
+  const mappingStore = createEmbeddingMappingStore();
+  const db = { registry: {
+    async withAdminClient() {
+      throw Object.assign(new Error('No database is provisioned for this workspace'), {
+        code: 'WORKSPACE_DB_UNRESOLVED', statusCode: 503,
+      });
+    },
+  } };
+  for (const method of ['PUT', 'DELETE']) {
+    const response = await request(db, method, `${data}/embedding-mapping?targetColumn=embedding`, {
+      sourceColumn: 'body', targetColumn: 'embedding',
+    }, { mappingStore });
+    assert.equal(response.status, 503);
+    assert.equal(response.body.code, 'WORKSPACE_DB_UNRESOLVED');
+  }
+  const read = await request(db, 'GET', `${data}/embedding-mapping?targetColumn=embedding`, {}, { mappingStore });
+  assert.equal(read.status, 404);
+});
+
 async function autoEmbedOptions() {
   const mappingStore = createEmbeddingMappingStore();
   await mappingStore.deployMapping('ws_vector', {
@@ -166,6 +203,19 @@ test('positive probes are reused per resolved host and port, never across instan
   assertUnavailable(await search(), db);
 });
 
+test('missing pgvector access methods after a successful probe report capability unavailable', async () => {
+  for (const indexType of ['hnsw', 'ivfflat']) {
+    const db = database({ available: true, sqlError: Object.assign(
+      new Error(`access method "${indexType}" does not exist`), { code: '42704' },
+    ) });
+    const response = await request(db, 'POST', `${ddl}/vector-indexes`, {
+      indexName: 'docs_embedding_idx', indexType, keys: [{ columnName: 'embedding' }],
+    });
+    assert.equal(response.status, 501);
+    assert.deepEqual(response.body, unavailable);
+  }
+});
+
 test('qualified and descriptor vector column declarations, including table creation, cannot bypass the gate', async () => {
   for (const [path, body] of [
     [`${ddl}/columns`, { columnName: 'embedding', dataType: 'public.vector(3)' }],
@@ -223,6 +273,29 @@ test('probe connection, permission and catalog failures keep database errors and
       assert.equal(response.body.code, expectedCode);
       assert.deepEqual(db.queries.map(({ sql }) => sql), ['SELECT 1 FROM pg_available_extensions WHERE name = $1']);
       assert.ok(!JSON.stringify(response.body).includes('private'));
+    }
+  }
+});
+
+test('missing tenant objects with vector-like identifiers keep their SQL error mapping', async () => {
+  for (const [code, message] of [
+    ['42704', 'index "vector_idx" does not exist'],
+    ['42704', 'index "vector" does not exist'],
+    ['42704', 'type "vector_custom" does not exist'],
+    ['42704', 'access method "vector" does not exist'],
+    ['42704', 'access method "btree" does not exist'],
+    ['42883', 'function custom_vector(integer) does not exist'],
+    ['42883', 'operator does not exist: vector_custom = integer'],
+  ]) {
+    for (const [method, path, body] of [
+      ['DELETE', `${ddl}/vector-indexes/vector_idx`, {}],
+      ['POST', `${data}/search`, { queryVector: [1, 0, 0], vectorColumn: 'embedding' }],
+    ]) {
+      const db = database({ available: true, sqlError: Object.assign(new Error(message), { code }) });
+      const response = await request(db, method, path, body);
+      assert.equal(response.status, 400, `${method}: ${message}`);
+      assert.equal(response.body.code, 'SYNTAX_OR_ACCESS');
+      assert.ok(!('capability' in response.body));
     }
   }
 });
@@ -311,16 +384,28 @@ test('available instances retain search, vector DDL, mapping and auto-embed beha
   assert.ok(db.queries.some(({ sql }) => /^INSERT/.test(sql)));
 });
 
-test('vector DDL previews also report unavailable without executing statements', async () => {
-  const db = database();
-  assertUnavailable(await request(db, 'POST', `${ddl}/columns?mode=preview`, {
-    columnName: 'embedding', dataType: 'vector(3)',
-  }), db);
-  const availableDb = database({ available: true });
-  const preview = await request(availableDb, 'POST', `${ddl}/columns?mode=preview`, {
-    columnName: 'embedding', dataType: 'vector(3)',
+test('vector DDL previews stay in memory even when the workspace database cannot be resolved', async () => {
+  const registry = {
+    async withAdminClient() { throw new Error('No database is provisioned for this workspace'); },
+  };
+  for (const [path, body] of [
+    [`${ddl}/columns?mode=preview`, { columnName: 'embedding', dataType: 'vector(3)' }],
+    [`${ddl}/columns`, { columnName: 'embedding', dataType: 'vector(3)', dryRun: true }],
+    [`${ddl}/vector-indexes?mode=preview`, { indexName: 'docs_embedding_idx', keys: [{ columnName: 'embedding' }] }],
+  ]) {
+    const preview = await request({ registry }, 'POST', path, body);
+    assert.equal(preview.status, 200);
+    assert.equal(preview.body.executed, false);
+    assert.equal(preview.body.executionMode, 'preview');
+    assert.ok(preview.body.statements.length > 0);
+  }
+});
+
+test('an empty vector DDL preview retains preview mode without a database connection', async () => {
+  const preview = await executePostgresDdl(null, {
+    resourceKind: 'table', action: 'update', executionMode: 'preview', vectorSearch: true,
+    identity: { tenantId: 'ten_vector', workspaceId: 'ws_vector' },
+    payload: { databaseName: 'appdb', schemaName: 'public', tableName: 'docs' },
   });
-  assert.equal(preview.status, 200);
-  assert.equal(preview.body.executed, false);
-  assert.equal(availableDb.queries.length, 1);
+  assert.deepEqual(preview, { executed: false, executionMode: 'preview', statements: [] });
 });

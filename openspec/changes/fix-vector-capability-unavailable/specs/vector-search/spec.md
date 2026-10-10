@@ -27,9 +27,21 @@ The executor SHALL check whether the resolved workspace Postgres instance advert
 
 #### Scenario: Probe race or missing vector operator/type
 
-- **WHEN** vector execution raises SQLSTATE 42704 or 42883 with a vector-related message
+- **WHEN** vector execution raises SQLSTATE 42704 or 42883 identifying a missing vector type, operator, operator class, function, or hnsw/ivfflat access method
 - **THEN** the same capability-unavailable envelope is returned
-- **AND** unrelated SQL errors retain their existing mapping
+- **AND** unrelated SQL errors, including missing tenant indexes named `vector` or `vector_idx`, retain their existing mapping
+
+#### Scenario: DDL preview
+
+- **WHEN** a tenant requests vector DDL with `mode=preview` or `dryRun`
+- **THEN** the executor returns the in-memory plan with `executed: false` and `executionMode: preview`, including an empty plan
+- **AND** no database connection is resolved or probed and no SQL executes
+
+#### Scenario: Mapping writes and reads
+
+- **WHEN** vector is unavailable or the workspace database cannot be resolved
+- **THEN** mapping PUT and DELETE fail before changing metadata, preserving existing mappings
+- **AND** mapping GET does not require a workspace database connection or vector probe
 
 #### Scenario: Probe failure
 

@@ -10,7 +10,7 @@
 // per-workspace RLS context (app.tenant_id/app.workspace_id) as a non-superuser role.
 import { buildPostgresDataApiPlan, serializePostgresDataApiCursor } from '../../../../packages/adapters/src/postgresql-data-api.mjs';
 import { clientError, mapPgError } from './errors.mjs';
-import { requireVectorCapability, vectorCapabilityError } from './vector-capability.mjs';
+import { requireVectorCapability, mapVectorRouteError } from './vector-capability.mjs';
 
 const DEFAULT_DATA_ROLE = 'falcone_app';
 const TENANT_COLUMN = 'tenant_id';
@@ -277,7 +277,7 @@ export async function executePostgresData(registry, params) {
       result = await client.query(plan.sql.text, plan.sql.values);
       count = await runCount(client, plan.response?.count);
     } catch (error) {
-      throw (vectorRequest && vectorCapabilityError(error)) || mapPgError(error);
+      throw mapVectorRouteError(error, vectorRequest, mapPgError);
     }
 
     if (plan.operation === 'knn_search') {
@@ -311,6 +311,6 @@ export async function executePostgresData(registry, params) {
       access: plan.access,
     };
   }).catch((error) => {
-    throw (vectorRequest && vectorCapabilityError(error)) || error;
+    throw mapVectorRouteError(error, vectorRequest);
   });
 }

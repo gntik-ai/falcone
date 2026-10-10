@@ -17,7 +17,7 @@ import {
   POSTGRES_GOVERNANCE_RESOURCE_KINDS,
 } from '../../../../packages/adapters/src/postgresql-governance-admin.mjs';
 import { clientError, mapPgError } from './errors.mjs';
-import { requireVectorCapability, vectorCapabilityError } from './vector-capability.mjs';
+import { requireVectorCapability, mapVectorRouteError } from './vector-capability.mjs';
 
 const IDENT = /^[a-z_][a-z0-9_]*$/;
 
@@ -138,7 +138,7 @@ export async function executePostgresDdl(registry, params) {
   const statements = plan?.statements ?? [];
   const executionMode = params.executionMode ?? (payload.dryRun ? 'preview' : 'execute');
 
-  if (executionMode === 'preview' && !vectorRequest) {
+  if (executionMode === 'preview') {
     return { executed: false, executionMode: 'preview', statements };
   }
   if (statements.length === 0) {
@@ -154,9 +154,6 @@ export async function executePostgresDdl(registry, params) {
     if (vectorRequest) {
       await requireVectorCapability(registry, client);
     }
-    if (executionMode === 'preview') {
-      return { executed: false, executionMode: 'preview', statements };
-    }
     try {
       await client.query('BEGIN');
       for (const statement of statements) {
@@ -165,7 +162,7 @@ export async function executePostgresDdl(registry, params) {
       await client.query('COMMIT');
     } catch (error) {
       try { await client.query('ROLLBACK'); } catch { /* surface original */ }
-      throw (vectorRequest && vectorCapabilityError(error)) || mapPgError(error);
+      throw mapVectorRouteError(error, vectorRequest, mapPgError);
     }
     return { executed: true, executionMode: 'execute', statementCount: statements.length, statements };
   }, { requireDedicatedDatabase: true });

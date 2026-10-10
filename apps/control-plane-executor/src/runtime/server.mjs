@@ -14,7 +14,7 @@ import { recordHttp, recordMcpDependency, renderMetrics, setHttpRouteTemplates, 
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
 import { publicErrorCode } from './errors.mjs';
-import { requireVectorCapability, vectorCapabilityError, VECTOR_UNAVAILABLE_MESSAGE } from './vector-capability.mjs';
+import { requireVectorCapability, mapVectorRouteError, VECTOR_UNAVAILABLE_MESSAGE } from './vector-capability.mjs';
 import { handleMcpMessage } from '../mcp-official-server.mjs';
 import { BASE_SCOPE } from '../mcp-official-catalog.mjs';
 import { mcpConfigStore } from '../mcp-config.mjs';
@@ -1279,7 +1279,7 @@ async function runVectorEmbeddingMapping(registry, mappingStore, action, params,
     try {
       return await runEmbeddingMapping(mappingStore, action, params, successStatus);
     } catch (error) {
-      throw vectorCapabilityError(error) ?? error;
+      throw mapVectorRouteError(error, true);
     }
   });
 }

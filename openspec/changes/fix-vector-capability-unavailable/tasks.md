@@ -10,7 +10,7 @@
 - [ ] PR CI: run socket-based executor error, authorization, mapping, and gateway suites with installed dependencies.
 - [ ] Integration: run unchanged KNN/RLS and auto-embedding suites against the existing pgvector fixture.
 - [ ] Integration: point the existing DB_URL/PG* fixture settings at `bitnamilegacy/postgresql:17.2.0` and run the new negative case (the standard pgvector fixture intentionally skips it).
-- [ ] Deployment maker: correct only the two specified comment blocks and compare default, staging, and kind-vector Helm renders byte for byte.
+- [x] Deployment maker: correct only the two specified comment blocks and compare default, staging, and kind-vector Helm renders byte for byte. Completed at `e3f3b04ff384fce6fe9a84ea3b0b317777b468a9` per the supplied independent checker evidence; not rerun by this source maker.
 
 ## Assignment and evidence
 
@@ -30,3 +30,15 @@ PASS: `node --check` for every changed/new JavaScript module and test, `bash -n 
 - Existing worker Dockerfile suite was attempted. SKIPPED: its fixture refers to missing `services/workflow-worker/src/worker-deps.mjs` after the repository's app-path migration (`ENOENT`), before any assertions. The new image-import checks exercise the current app paths; the stale suite requires a separate fixture update.
 - Full container builds and image scans need dependency/image downloads outside this offline source task. Defer to publication CI and release gates.
 - Helm parity belongs to the separately assigned deployment worktree and maker; no chart changes are made here.
+
+## Checker follow-up on 33f02604
+
+- [x] Reproduce the missing `vector_idx` DELETE error twice at the HTTP listener before editing source; both runs returned 501 rather than the required existing 400 mapping.
+- [x] Narrow the race backstop to missing pgvector object message shapes; cover unrelated 42704/42883 errors with vector-like tenant identifiers on DELETE-vector-index and KNN routes.
+- [x] Reproduce and fix missing hnsw/ivfflat access-method mapping, and restore database-independent previews after watching the preview regression fail.
+- [x] Confirm mapping PUT/DELETE gating is required by the write acceptance criterion; cover blocked deletion preserving an existing mapping and unresolved-workspace errors preserving metadata. GET remains available.
+- [x] Share vector error selection across data, DDL, and mapping handlers while retaining each existing fallback.
+- [x] Run the scoped suite: 101/101 tests pass, including 22 capability tests and the unchanged vector, adapter, isolation, mapping, public-error, image-import, and applier tests. The earlier 90-test command also includes `tests/unit/embedding-mapping-store.test.mjs` in this follow-up.
+- [x] Retry the three real-stack executor suites. SKIPPED: each fails module loading with `ERR_MODULE_NOT_FOUND` for the existing `pg` package, before any database assertion. No manifest change or dependency resolution is needed; network is unavailable.
+
+The PR CI and integration items above remain pending. Container builds/scans and full dependency-backed checks remain deferred to PR CI and release gates. The Hermes chart pins, dependency manifests, lockfiles, deployment files, and credential wiring are unchanged in this follow-up.

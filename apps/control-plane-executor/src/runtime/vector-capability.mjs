@@ -11,16 +11,31 @@ export function vectorCapabilityUnavailable() {
   });
 }
 
-// Only vector-related undefined types/operators qualify. Other SQLSTATEs and
-// unrelated undefined objects retain the caller's existing error mapping.
+// Match missing pgvector objects, not a vector token in an arbitrary tenant
+// identifier (for example a missing index named "vector_idx").
+const MISSING_VECTOR_OBJECT = [
+  /^type "(?:[a-z_][a-z0-9_]*\.)?vector(?:\[\])?" does not exist$/i,
+  /^operator does not exist:.*\s(?:[a-z_][a-z0-9_]*\.)?vector(?:\[\])?(?=\s|$)/i,
+  /^operator class "(?:[a-z_][a-z0-9_]*\.)?vector_[a-z0-9_]+_ops" does not exist(?: for access method "[^"]+")?$/i,
+  /^function (?:[a-z_][a-z0-9_]*\.)?vector_[a-z0-9_]+\([^)]*\) does not exist$/i,
+  /^access method "(?:hnsw|ivfflat)" does not exist$/i,
+];
+
+// Other SQLSTATEs and unrelated undefined objects keep the existing mapping.
 export function vectorCapabilityError(error) {
-  if (['42704', '42883'].includes(error?.code) && /\bvector(?:\b|_)/i.test(error?.message ?? '')) {
+  if (['42704', '42883'].includes(error?.code) && MISSING_VECTOR_OBJECT.some((pattern) => pattern.test(error?.message ?? ''))) {
     return vectorCapabilityUnavailable();
   }
   return undefined;
 }
 
-// Probe the borrowed workspace connection, never the platform/bootstrap database.
+// Callers with raw SQL errors supply mapPgError; outer catches and mapping
+// writes preserve their existing classified errors when the backstop does not apply.
+export function mapVectorRouteError(error, vectorRequest, fallback = (cause) => cause) {
+  return (vectorRequest && vectorCapabilityError(error)) || fallback(error);
+}
+
+// Probe the borrowed connection selected by the existing workspace resolver.
 // Reuse the reprovision catalog query; a failed probe must not permit vector SQL.
 export async function requireVectorCapability(registry, client) {
   const { host, port } = client.connectionParameters ?? {};
