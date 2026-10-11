@@ -149,11 +149,16 @@ test('executor: invalid query key returns 401 without logging it', async () => {
 });
 
 test('log-capture transport: terminal SSE completes on a keep-alive connection', async () => {
-  // Match the real flow route's HTTP framing without database/Temporal dependencies.
-  const server = http.createServer((_req, res) => {
+  // Match deferred Temporal history delivery and the real flow route's HTTP framing,
+  // without database/Temporal dependencies. The client must await the terminal frame.
+  const server = http.createServer(async (_req, res) => {
+    await Promise.resolve();
     res.writeHead(200, { 'content-type': 'text/event-stream', connection: 'keep-alive' });
+    res.write('retry: 3000\n\n');
     res.write('event: node-status\ndata: {"status":"completed"}\n\n');
-    res.end('event: stream-end\ndata: {"status":"Completed"}\n\n');
+    await Promise.resolve();
+    res.write('event: stream-end\ndata: {"status":"Completed"}\n\n');
+    res.end();
   });
   const response = await request(server);
   assert.equal(response.status, 200);
