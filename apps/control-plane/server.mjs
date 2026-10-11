@@ -412,7 +412,7 @@ export const server = http.createServer(async (req, res) => {
 
     const query = Object.fromEntries(parsed.searchParams.entries());
     const rawBody = await readBody(req);
-    idempotency = await reserveHttpRequest({ pool, key: headers['idempotency-key'], method, url: parsed.href, rawBody, tenantId: identity?.tenantId, principalId: identity?.sub ? `subject:${identity.sub}` : undefined, route });
+    idempotency = await reserveHttpRequest({ pool, key: headers['idempotency-key'], method, url: parsed.href, rawBody, identity, route });
     if (idempotency?.response) {
       const replay = idempotency.response;
       return sendJson(res, replay.statusCode, replay.body, replay.headers);

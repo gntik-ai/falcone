@@ -35,10 +35,23 @@ function response(statusCode, code, headers = {}) {
   return { statusCode, body: { code, message: code }, headers };
 }
 
+export function invalidIdempotencyKeyResponse(method, key) {
+  if (!MUTATIONS.has(method) || key === undefined) return null;
+  return typeof key !== 'string' || !KEY_PATTERN.test(key)
+    ? response(400, 'INVALID_IDEMPOTENCY_KEY') : null;
+}
+
 /** Reserve before dispatch. All durable state is Postgres-backed and shared by HTTP replicas. */
-export async function reserveHttpRequest({ pool, key, method, url, rawBody, tenantId, principalId, route = {}, maxResponseBytes = process.env.IDEMPOTENCY_MAX_RESPONSE_BYTES } = {}) {
-  if (!MUTATIONS.has(method) || key === undefined || route.stream || route.sse || route.noAuth || route.auth === 'public' || route.proxy) return null;
-  if (typeof key !== 'string' || !KEY_PATTERN.test(key)) return { response: response(400, 'INVALID_IDEMPOTENCY_KEY') };
+export async function reserveHttpRequest({ pool, key, method, url, rawBody, identity, tenantId, principalId, route = {}, maxResponseBytes = process.env.IDEMPOTENCY_MAX_RESPONSE_BYTES } = {}) {
+  if (route.proxy) return null;
+  const invalidKey = invalidIdempotencyKeyResponse(method, key);
+  if (invalidKey) return { response: invalidKey };
+  if (!MUTATIONS.has(method) || key === undefined || route.stream || route.sse || route.noAuth || route.auth === 'public' || route.webhook) return null;
+  // Callers pass their already-verified identity. Keep both HTTP planes' subject and
+  // API credential namespaces consistent without admitting unverified request fields.
+  tenantId ??= identity?.tenantId;
+  const subject = identity?.sub ?? identity?.actorId;
+  principalId ??= identity?.keyId ? `apikey:${identity.keyId}` : subject ? `subject:${subject}` : undefined;
   if (!pool || !principalId) return { response: response(503, 'IDEMPOTENCY_UNAVAILABLE') };
   const scope = [tenantId ?? '', principalId, key];
   const token = randomUUID();

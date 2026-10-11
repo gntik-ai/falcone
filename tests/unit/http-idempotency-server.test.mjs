@@ -39,6 +39,16 @@ test('browsers can read the replay marker on executor responses', async () => {
   assert.match(result.headers['access-control-expose-headers'] ?? '', /X-Idempotency-Replayed/i);
 });
 
+test('streaming mutations reject malformed keys before invoking the streaming handler', async () => {
+  const server = createControlPlaneServer({ registry: {}, logger: { error() {} } });
+  const result = await request(server, {
+    path: '/v1/workspaces/fixture-workspace/llm/completions',
+    headers: { ...headers, 'idempotency-key': 'bad key' },
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'INVALID_IDEMPOTENCY_KEY');
+});
+
 test('verified API-key identities include their stable credential ID', async () => {
   const store = createApiKeyStore({ pool: { async query() { return { rowCount: 1, rows: [{ id: 'credential-1', tenant_id: 'tenant-a', workspace_id: 'ws', key_type: 'service', scopes: ['data:write'] }] }; } } });
   assert.equal((await store.verifyKey('flc_service_fixture')).keyId, 'credential-1');
@@ -117,7 +127,7 @@ test('executor HTTP: same key for another tenant or subject is independent', asy
 test('real flow creation retries do not create another flow', async t => {
   let createFlowExecutor;
   try { ({ createFlowExecutor } = await import('../../apps/control-plane-executor/src/runtime/flow-executor.mjs')); }
-  catch (error) { if (error.code === 'ERR_MODULE_NOT_FOUND') return t.skip('yaml/ajv dependencies are absent'); throw error; }
+  catch (error) { if (error.code === 'ERR_MODULE_NOT_FOUND' && process.env.HTTP_IDEMPOTENCY_TEST_REQUIRED !== '1') return t.skip('yaml/ajv dependencies are absent'); throw error; }
   const server = createControlPlaneServer({ registry: {}, flowExecutor: createFlowExecutor(), idempotencyPool: idempotencyDatabase() });
   const input = { path: '/v1/flows/workspaces/fixture-workspace/flows', headers, body: '{"name":"draft"}' };
   const first = await request(server, input);
@@ -132,7 +142,7 @@ test('real flow creation retries do not create another flow', async t => {
 test('real Kafka executor retries publish only one message', async t => {
   let createEventsExecutor;
   try { ({ createEventsExecutor } = await import('../../apps/control-plane-executor/src/runtime/events-executor.mjs')); }
-  catch (error) { if (error.code === 'ERR_MODULE_NOT_FOUND') return t.skip('kafkajs dependency is absent'); throw error; }
+  catch (error) { if (error.code === 'ERR_MODULE_NOT_FOUND' && process.env.HTTP_IDEMPOTENCY_TEST_REQUIRED !== '1') return t.skip('kafkajs dependency is absent'); throw error; }
   const messages = [];
   const kafkaClient = { producer: () => ({ async connect() {}, async send(input) { messages.push(...input.messages); return [{ baseOffset: String(messages.length - 1) }]; } }) };
   const server = createControlPlaneServer({ registry: {}, eventsExecutor: createEventsExecutor({ brokers: 'fixture:9092', kafkaClient }), idempotencyPool: idempotencyDatabase() });

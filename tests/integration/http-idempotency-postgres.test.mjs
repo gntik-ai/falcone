@@ -7,10 +7,13 @@ import { purgeTenant } from '../../apps/control-plane/tenant-store.mjs';
 
 test('Postgres: concurrent reservations, expiry, stale owners and tenant purge', async t => {
   const dsn = process.env.HTTP_IDEMPOTENCY_TEST_DATABASE_URL ?? process.env.TEST_DATABASE_URL;
-  if (!dsn) return t.skip('HTTP_IDEMPOTENCY_TEST_DATABASE_URL and TEST_DATABASE_URL are absent; a dedicated real Postgres is required');
+  if (!dsn) {
+    assert.notEqual(process.env.HTTP_IDEMPOTENCY_TEST_REQUIRED, '1', 'CI requires a dedicated real Postgres');
+    return t.skip('HTTP_IDEMPOTENCY_TEST_DATABASE_URL and TEST_DATABASE_URL are absent; a dedicated real Postgres is required');
+  }
   let pg;
   try { pg = (await import('pg')).default; }
-  catch (error) { if (error.code === 'ERR_MODULE_NOT_FOUND') return t.skip('pg dependency is not installed'); throw error; }
+  catch (error) { if (error.code === 'ERR_MODULE_NOT_FOUND' && process.env.HTTP_IDEMPOTENCY_TEST_REQUIRED !== '1') return t.skip('pg dependency is not installed'); throw error; }
   const pool = new pg.Pool({ connectionString: dsn });
   const tenantId = `http-idempotency-test-${randomUUID()}`;
   const otherTenant = `${tenantId}-other`;

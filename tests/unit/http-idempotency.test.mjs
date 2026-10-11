@@ -32,6 +32,17 @@ test('invalid keys are rejected before dispatch, while no key, GET, public and s
   assert.equal(pool.records.size, 0);
 });
 
+test('excluded mutations still reject malformed keys without reserving them', async () => {
+  const pool = idempotencyDatabase();
+  for (const route of [{ auth: 'public' }, { noAuth: true }, { stream: true }, { sse: true }, { webhook: true }]) {
+    const result = await reserveHttpRequest(args(pool, { key: 'bad key', route }));
+    assert.equal(result?.response?.statusCode, 400);
+    assert.equal(result.response.body.code, 'INVALID_IDEMPOTENCY_KEY');
+    assert.equal(await reserveHttpRequest(args(pool, { route })), null);
+  }
+  assert.equal(pool.records.size, 0);
+});
+
 test('completed success and client-error responses replay exact status and body with only safe headers', async () => {
   for (const statusCode of [201, 422]) {
     const pool = idempotencyDatabase();
@@ -70,6 +81,21 @@ test('different tenants and verified principals never cross-replay', async () =>
     assert.equal((await reserveHttpRequest(args(pool, overrides))).response.body.id, 'independent-flow');
   }
   assert.equal((await reserveHttpRequest(args(pool))).response.body.id, 'flow-1');
+});
+
+test('both HTTP identity shapes share subject scope and API credentials have independent scope', async () => {
+  const pool = idempotencyDatabase();
+  const input = args(pool, { tenantId: undefined, principalId: undefined });
+  const first = await reserveHttpRequest({ ...input, identity: { tenantId: 'tenant-a', sub: 'user-a' } });
+  assert.equal(typeof first.complete, 'function');
+  await first.complete({ statusCode: 201, body: { id: 'flow-1' } });
+  const replay = await reserveHttpRequest({ ...input, identity: { tenantId: 'tenant-a', actorId: 'user-a' } });
+  assert.equal(replay.response.body.id, 'flow-1');
+  for (const identity of [{ tenantId: 'tenant-b', sub: 'user-a' }, { tenantId: 'tenant-a', sub: 'user-b' }, { tenantId: 'tenant-a', actorId: 'user-a', keyId: 'user-a' }]) {
+    const independent = await reserveHttpRequest({ ...input, identity });
+    assert.equal(typeof independent.complete, 'function');
+    await independent.release();
+  }
 });
 
 test('5xx responses and thrown attempts release reservations for a new execution', async () => {

@@ -714,6 +714,84 @@ describe('ConsoleFunctionsPage', () => {
     expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/functions/workspaces/wrk_alpha/inventory', expect.any(Object))
   })
 
+  it.each([403, 404])('reintenta DELETE después de una respuesta final %s con una clave nueva', async (status) => {
+    const keys: string[] = []
+    let deleted = false
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, options?: { method?: string; headers?: Record<string, string> }) => {
+      if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory({ actions: deleted ? [] : inventory().actions })
+      if (url === '/v1/functions/actions/res_fn_1' && options?.method === 'DELETE') {
+        const key = options.headers?.['Idempotency-Key'] ?? ''
+        keys.push(key)
+        // Model the external API's retained 4xx: only a fresh request can succeed.
+        if (keys.length === 1 || key === keys[0]) throw { status, code: status === 403 ? 'FORBIDDEN' : 'NOT_FOUND' }
+        deleted = true
+        return { status: 'accepted', resourceId: 'res_fn_1' }
+      }
+      if (url === '/v1/functions/actions/res_fn_1') return detail()
+      throw new Error(`Unexpected URL ${url}`)
+    })
+
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    await screen.findByText('Tiempo de espera (ms)')
+    await userEvent.click(screen.getByRole('button', { name: /eliminar función/i }))
+    const dialog = await screen.findByRole('alertdialog', { name: /eliminar función/i })
+    await userEvent.type(within(dialog).getByPlaceholderText('hello-fn'), 'hello-fn')
+    await userEvent.click(within(dialog).getByRole('button', { name: /^eliminar$/i }))
+    await within(dialog).findByRole('alert')
+    await userEvent.click(within(dialog).getByRole('button', { name: /^eliminar$/i }))
+
+    expect(await screen.findByText(/función hello-fn eliminada/i)).toBeInTheDocument()
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toMatch(/^[A-Za-z0-9._:-]{8,128}$/)
+    expect(keys[1]).not.toBe(keys[0])
+  })
+
+  it.each([false, true])('limita la clave del reintento de red al mismo recurso (cambiar función: %s)', async (changeTarget) => {
+    const actions = [inventory().actions[0], { ...inventory().actions[0], resourceId: 'res_fn_2', actionName: 'other-fn' }]
+    const keys: string[] = []
+    let deletedId: string | null = null
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, options?: { method?: string; headers?: Record<string, string> }) => {
+      if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory({ actions: actions.filter(action => action.resourceId !== deletedId) })
+      if (options?.method === 'DELETE') {
+        const key = options.headers?.['Idempotency-Key'] ?? ''
+        keys.push(key)
+        if (keys.length === 1) throw new TypeError('Network error')
+        deletedId = url.split('/').at(-1) ?? null
+        return { status: 'accepted', resourceId: deletedId }
+      }
+      if (url === '/v1/functions/actions/res_fn_1') return detail()
+      if (url === '/v1/functions/actions/res_fn_2') return detail(actions[1])
+      throw new Error(`Unexpected URL ${url}`)
+    })
+
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    await screen.findByText('Tiempo de espera (ms)')
+    await userEvent.click(screen.getByRole('button', { name: /eliminar función/i }))
+    const firstDialog = await screen.findByRole('alertdialog', { name: /eliminar función/i })
+    await userEvent.type(within(firstDialog).getByPlaceholderText('hello-fn'), 'hello-fn')
+    await userEvent.click(within(firstDialog).getByRole('button', { name: /^eliminar$/i }))
+    await within(firstDialog).findByRole('alert')
+
+    if (changeTarget) {
+      await userEvent.click(within(firstDialog).getByRole('button', { name: /cancelar/i }))
+      await userEvent.click(screen.getByRole('button', { name: /other-fn/i }))
+      await screen.findByText('Tiempo de espera (ms)')
+      await userEvent.click(screen.getByRole('button', { name: /eliminar función/i }))
+      const secondDialog = await screen.findByRole('alertdialog', { name: /eliminar función/i })
+      await userEvent.type(within(secondDialog).getByPlaceholderText('other-fn'), 'other-fn')
+      await userEvent.click(within(secondDialog).getByRole('button', { name: /^eliminar$/i }))
+    } else {
+      await userEvent.click(within(firstDialog).getByRole('button', { name: /^eliminar$/i }))
+    }
+
+    expect(await screen.findByText(changeTarget ? /función other-fn eliminada/i : /función hello-fn eliminada/i)).toBeInTheDocument()
+    expect(keys).toHaveLength(2)
+    if (changeTarget) expect(keys[1]).not.toBe(keys[0])
+    else expect(keys[1]).toBe(keys[0])
+  })
+
   it('si DELETE falla conserva fila y selección, y muestra error sin éxito falso', async () => {
     mockRequestConsoleSessionJson.mockImplementation(async (url: string, options?: { method?: string }) => {
       if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()

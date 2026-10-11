@@ -506,7 +506,7 @@ export function ConsoleFunctionsPage() {
   const invokeIdempotencyKeyRef = useRef(buildIdempotencyKey())
   const deployIdempotencyKeyRef = useRef(buildIdempotencyKey())
   const rollbackIdempotencyKeyRef = useRef(buildIdempotencyKey())
-  const deleteIdempotencyKeyRef = useRef(buildIdempotencyKey())
+  const deleteIdempotencyKeyRef = useRef<{ resourceId: string; key: string } | null>(null)
 
   const resetActionState = useCallback(() => {
     setActionDetail(EMPTY_ACTION_DETAIL_STATE)
@@ -855,10 +855,18 @@ export function ConsoleFunctionsPage() {
   }, [loadActionDetail, loadVersions, rollbackTargetVersionId, selectedActionId])
 
   const handleDeleteFunction = useCallback(async (action: FunctionAction) => {
+    if (deleteIdempotencyKeyRef.current?.resourceId !== action.resourceId) {
+      deleteIdempotencyKeyRef.current = { resourceId: action.resourceId, key: buildIdempotencyKey() }
+    }
     try {
-      await deleteFunction(action.resourceId, deleteIdempotencyKeyRef.current)
-      deleteIdempotencyKeyRef.current = buildIdempotencyKey()
+      await deleteFunction(action.resourceId, deleteIdempotencyKeyRef.current.key)
+      deleteIdempotencyKeyRef.current = null
     } catch (error) {
+      // A returned HTTP error is a final result and may be replayed for 24h. Reuse the
+      // key only when no response arrived, and only when retrying the same resource.
+      if (error && typeof error === 'object' && 'status' in error && typeof error.status === 'number') {
+        deleteIdempotencyKeyRef.current = null
+      }
       const message = describeConsoleError(error, 'No se pudo eliminar la función.')
       // `preLocalized: true` tells useDestructiveOp's shared confirm-error mapping to trust this
       // already-safe message verbatim instead of re-deriving a more generic one (#743).

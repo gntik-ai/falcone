@@ -8,9 +8,9 @@
 // workspace database). Wires the Postgres data-row family (CRUD + bulk) and the Postgres
 // DDL family (schema/table/column/index); other OpenAPI families plug into the same table.
 import http from 'node:http';
-import { reserveHttpRequest } from '../../../../packages/internal-contracts/src/http-idempotency.mjs';
 import https from 'node:https';
 import { randomUUID } from 'node:crypto';
+import { reserveHttpRequest, invalidIdempotencyKeyResponse } from '../../../../packages/internal-contracts/src/http-idempotency.mjs';
 import { recordHttp, recordMcpDependency, renderMetrics, setHttpRouteTemplates, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
@@ -1488,6 +1488,8 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
           return sendJson(res, 403, { code: 'INSUFFICIENT_SCOPE', message: 'Credential scope does not permit this operation', requiredScope });
         }
       }
+      const invalidKey = invalidIdempotencyKeyResponse(method, req.headers['idempotency-key']);
+      if (invalidKey) return sendJson(res, invalidKey.statusCode, invalidKey.body, invalidKey.headers);
       // SSE routes own the response (streaming); pass req/res and skip the JSON path.
       if (opts?.sse) {
         await handler(groups, { url, identity, registry, req, res, logger });
@@ -1515,7 +1517,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       let rawBody;
       if (keyedMutation) {
         rawBody = await readBodyBytes(req);
-        idempotency = await reserveHttpRequest({ pool: idempotencyPool, key: req.headers['idempotency-key'], method, url: url.href, rawBody, tenantId: identity.tenantId, principalId: identity.keyId ? `apikey:${identity.keyId}` : identity.actorId ? `subject:${identity.actorId}` : undefined, route: opts });
+        idempotency = await reserveHttpRequest({ pool: idempotencyPool, key: req.headers['idempotency-key'], method, url: url.href, rawBody, identity, route: opts });
         if (idempotency?.response) {
           const replay = idempotency.response;
           return sendJson(res, replay.statusCode, replay.body, replay.headers);
