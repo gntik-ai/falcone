@@ -10,7 +10,7 @@
 - [x] Run bounded available tests and record unavailable checks.
 - [ ] Source PR CI: run all three Temporal-dependent stream cases and existing socket-based flow/error-code regressions with installed dependencies.
 - [ ] Paired charts maker/checker: implement and test the access-log format across all five profiles and preserve metrics export and route-copy alignment.
-- [ ] Paired charts checker fixes: remove literal outer quotes/backslashes from the folded access-log scalar, and compare the parsed format to a known-good APISIX 3.10 literal across all five profiles.
+- [x] Paired charts checker fixes present on read-only follow-up inspection: valid YAML quoting and comparison of the parsed format to a known-good APISIX 3.10 literal across all five profiles. Chart execution evidence remains the paired maker/checker's responsibility.
 - [ ] Runtime verifier: sentinel SSE request plus APISIX/executor/control-plane log check in kind.
 - [ ] Operator follow-up: confirm external ingress/LB logging and track the nginx error-log residual until u5.
 
@@ -41,3 +41,19 @@ The two blocking checker findings belong to the separate deployment repository. 
 - SKIPPED: paired chart checks and runtime pod-log verification are outside the assigned source-only sandbox. Nginx error-log request lines and external ingress/LB logging remain the documented residuals.
 
 No dependency changes, deployment edits, chart-pin edits or debug instrumentation are included in this follow-up.
+
+## Source revalidation at the final Hermes pin (2026-10-11)
+
+The assigned worktree and issue/run branch were clean at the supplied HEAD `3e043a61395dcdd0b2d7ff3506ccb63a4be6cacc`. Review found no remaining source implementation defect in the scoped logger paths. The previous implementation and Hermes-managed pins are preserved; this follow-up corrects the handoff's now-stale chart findings.
+
+Read-only inspection of the paired deployment worktree now shows valid double-quoted YAML at `charts/in-falcone/templates/apisix-config-file.yaml:48`, instead of a folded scalar with literal quoting. Its access-log contract compares the parsed format against an independent APISIX 3.10 field-layout literal for default, staging, prod, airgap and kind. The earlier checker findings above describe the prior chart state; they are no longer pending implementation. This inspection does not claim chart render or runtime validation.
+
+- PASS: `node --test --experimental-test-isolation=none tests/blackbox/flow-stream-apikey-logs.test.mjs`: 8 passing cases, 3 skipped Temporal-dependent cases because existing yaml/ajv packages are absent.
+- PASS: `node --test --experimental-test-isolation=none tests/unit/http-metric-route-labels.test.mjs`: 8 passing cases.
+- PASS: `node --test --experimental-test-isolation=none tests/blackbox/authorization-denial-audit.test.mjs`: 12 passing cases.
+- PASS: isolated-archive reproduction and negative control using `node --test --experimental-test-isolation=none --test-name-pattern='forced 5xx on flow query-key authentication' tests/blackbox/flow-stream-apikey-logs.test.mjs`. Substituting the immutable base executor produces the expected boolean query-leak assertion failure; assigned HEAD passes. A deliberate raw-URL logger injection fails the same assertion; restored HEAD passes. Passing the exception containing the query-bearing URL directly to the logger is the confirmed original cause. Captured logs were suppressed, the temporary archive was removed, and assigned source was untouched.
+- SKIPPED: `node --test --experimental-test-isolation=none tests/blackbox/flows-execution-events.test.mjs`: module loading stops at `ERR_MODULE_NOT_FOUND` for existing `pg`, before exercising assertions.
+- SKIPPED: `node --test --experimental-test-isolation=none tests/blackbox/executor-5xx-code-redaction.test.mjs`: all 25 cases stop at `listen EPERM: operation not permitted 127.0.0.1`, before requests reach the code under test.
+- SKIPPED: chart render/lint checks belong to the paired deployment assignment; pod-log verification requires the runtime verifier. Source PR CI must execute the missing stream and regression checks with installed dependencies and permitted sockets. Nginx error-log request lines and external ingress/LB logging remain the documented residuals.
+
+No source runtime, dependency manifest, lockfile, deployment or chart-pin change is required by this review. No timeout wrapper or debug instrumentation remains.
