@@ -87,17 +87,34 @@ curl -s -X POST -H "authorization: Bearer $TOKEN" -H 'content-type: application/
 
 WORKSPACE-addressed; export reads documents stamped with **both** the workspace's `tenantId` and its
 `workspaceId` (the scope the data-API write path stamps), and import stamps that same verified scope
-onto every inserted document.
+onto every imported document.
 
 ```text
 POST /v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/exports
 POST /v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/imports
 ```
 
-- Export strips the Mongo `_id` and the scope fields from each exported document.
-- Import body is `{ "documents": [ … ] }`. Any `tenantId`/`workspaceId`/`_id` carried in a document
-  is dropped and re-stamped with the caller's verified scope — so an import can never write into
-  another tenant or workspace.
+- Export preserves `_id`, encoding ObjectId as `{ "$oid": "<24-hex>" }` and leaving scalar
+  identities unchanged. It strips `tenantId` and `workspaceId` from each exported document.
+- Import requires `{ "format": "json", "mode": "insert|replace|upsert", "documents": [ … ] }`.
+  Missing or invalid format/mode returns `400 VALIDATION_ERROR` before any Mongo call.
+  `insert` preserves a supplied `_id` (Mongo generates one when omitted). `replace` replaces an
+  existing in-scope `_id`; an absent identity is skipped as `NOT_MATCHED`, without inserting.
+  `upsert` replaces an existing in-scope `_id` or inserts a new document with that identity.
+  Replace/upsert require every document to carry a stable `_id`; the entire batch is validated
+  before writing. Import decodes only the exact ObjectId form above; malformed `$oid` and other
+  `$`-prefixed keys in `_id` return `400 VALIDATION_ERROR`.
+- Any body-supplied `tenantId`/`workspaceId` is overwritten with the verified workspace scope.
+  Replacement filters contain `_id` **and both** verified scope fields. A foreign document is
+  never matched. Duplicate-key conflicts, including foreign identity collisions, reveal no
+  driver details: `ordered: false` skips the entry as `DUPLICATE_ID`; `ordered: true` (default)
+  stops at the conflict with `409 DUPLICATE_ID`. Earlier successful writes remain in place.
+- Successful imports keep HTTP `200` and `entityType`, `importedCount`, `skippedCount`, `skipped`.
+  Additive fields are `format`, `mode`, `ordered`, `matchedCount`, `upsertedCount`, `replacedCount`;
+  skipped entries include their zero-based `index`. `importedCount` counts successful inserts,
+  upserts and matched replacements; `replacedCount` includes matches whose payload is unchanged.
+  Both operations remain bounded by `MONGO_IO_MAX_DOCS` (default 5000). Export followed by an
+  upsert import into the same scope preserves identity, including ObjectId type, without duplicates.
 
 ## PostgreSQL table data export / import
 

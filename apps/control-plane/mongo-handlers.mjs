@@ -6,7 +6,7 @@
 // collections, indexes, views and documents. We talk to it with the official `mongodb`
 // driver (FerretDB is MongoDB-wire-compatible), returning the camelCase shapes the page
 // expects. System databases are hidden. Provisioning (engine=mongodb) creates the database.
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import * as store from './tenant-store.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
 import { resolveMongoTls } from './transport-security.mjs';
@@ -232,11 +232,30 @@ async function ownedWorkspaceForData(ctx) {
   return { ws };
 }
 
-// Strip the Mongo `_id` (it is collection-managed; re-inserting a foreign _id risks a duplicate-key
-// collision) and the scope fields (re-stamped on import). Returns a plain, JSON-safe document.
+// Keep identity (ObjectId as Extended JSON); strip scope fields re-stamped on import.
 function exportDoc(doc) {
   const { _id, tenantId, workspaceId, ...rest } = doc;
-  return jsonSafe(rest);
+  return { ...jsonSafe(rest), _id: _id?._bsontype === 'ObjectId' ? { $oid: _id.toHexString() } : jsonSafe(_id) };
+}
+
+// Only the exact Extended JSON ObjectId form is decoded; operator keys are never ids.
+function importId(id) {
+  if (!id || typeof id !== 'object') return id;
+  if (Object.hasOwn(id, '$oid')) {
+    if (Object.keys(id).length !== 1 || typeof id.$oid !== 'string' || !/^[0-9a-f]{24}$/i.test(id.$oid)) {
+      throw new Error('invalid ObjectId');
+    }
+    return new ObjectId(id.$oid);
+  }
+  const validate = (value) => {
+    if (!value || typeof value !== 'object') return;
+    for (const [key, nested] of Object.entries(value)) {
+      if (key.startsWith('$')) throw new Error('invalid identity operator');
+      validate(nested);
+    }
+  };
+  validate(id);
+  return id;
 }
 
 // POST /v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/exports
@@ -273,25 +292,58 @@ async function mongoDataImport(ctx) {
   const docs = Array.isArray(ctx.body?.documents) ? ctx.body.documents : null;
   if (!docs) return err(400, 'VALIDATION_ERROR', 'documents (array) is required');
   if (docs.length > MONGO_IO_MAX_DOCS) return err(413, 'MONGO_IMPORT_TOO_LARGE', `import exceeds the ${MONGO_IO_MAX_DOCS}-document limit`);
-  let inserted = 0;
+  const { format, mode, ordered = true } = ctx.body;
+  if (format !== 'json') return err(400, 'VALIDATION_ERROR', 'format must be json');
+  if (!['insert', 'replace', 'upsert'].includes(mode)) return err(400, 'VALIDATION_ERROR', 'mode must be insert, replace or upsert');
+  if (typeof ordered !== 'boolean') return err(400, 'VALIDATION_ERROR', 'ordered must be a boolean');
+  if (mode !== 'insert' && docs.some((doc) => !doc || typeof doc !== 'object' || Array.isArray(doc)
+    || doc._id === undefined || doc._id === null || doc._id === '')) {
+    return err(400, 'VALIDATION_ERROR', 'replace and upsert require every document to carry a stable _id');
+  }
+  let normalized;
+  try {
+    normalized = docs.map((doc) => doc && typeof doc === 'object' && !Array.isArray(doc) && Object.hasOwn(doc, '_id')
+      ? { ...doc, _id: importId(doc._id) } : doc);
+  } catch {
+    return err(400, 'VALIDATION_ERROR', '_id must contain a valid ObjectId or no operator keys');
+  }
+  let imported = 0; let matched = 0; let replaced = 0; let upserted = 0;
   const skipped = [];
   try {
     const c = await mc(ctx);
     const collection = c.db(db).collection(col);
-    for (const raw of docs) {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { skipped.push({ reason: 'NOT_AN_OBJECT' }); continue; }
+    for (const [index, raw] of normalized.entries()) {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { skipped.push({ index, reason: 'NOT_AN_OBJECT' }); continue; }
       // ALWAYS stamp the caller's VERIFIED scope; never trust a body-supplied tenantId/workspaceId.
-      // Drop any incoming _id so a foreign _id can't collide or be used to target another doc.
-      const { _id, tenantId: _t, workspaceId: _w, ...fields } = raw;
-      await collection.insertOne({ ...fields, tenantId: ws.tenant_id, workspaceId: ws.id });
-      inserted += 1;
+      const { tenantId: _t, workspaceId: _w, ...fields } = raw;
+      const document = { ...fields, tenantId: ws.tenant_id, workspaceId: ws.id };
+      try {
+        if (mode !== 'insert') {
+          // Identity is always matched within the VERIFIED workspace scope.
+          const result = await collection.replaceOne({ _id: document._id, tenantId: ws.tenant_id, workspaceId: ws.id }, document, { upsert: mode === 'upsert' });
+          matched += result.matchedCount;
+          replaced += result.matchedCount;
+          upserted += result.upsertedCount;
+          if (!result.matchedCount && !result.upsertedCount) { skipped.push({ index, reason: 'NOT_MATCHED' }); continue; }
+        } else {
+          await collection.insertOne(document);
+        }
+        imported += 1;
+      } catch (e) {
+        // Shared collections can collide across scopes; never expose driver details.
+        if (e.code !== 11000) throw e;
+        if (ordered) return err(409, 'DUPLICATE_ID', 'document identity conflicts with an existing document');
+        skipped.push({ index, reason: 'DUPLICATE_ID' });
+      }
     }
     return ok(200, {
       entityType: 'mongo_data_import_result',
       targetWorkspaceId: ws.id, targetTenantId: ws.tenant_id,
       databaseName: db, collectionName: col,
       importedAt: new Date().toISOString(),
-      totalEntries: docs.length, importedCount: inserted, skippedCount: skipped.length, skipped
+      format, mode, ordered,
+      totalEntries: docs.length, importedCount: imported, skippedCount: skipped.length, skipped,
+      matchedCount: matched, upsertedCount: upserted, replacedCount: replaced
     });
   } catch (e) {
     return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'MONGO_IMPORT_FAILED', String(e.message ?? e));

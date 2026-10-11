@@ -109,6 +109,8 @@ export interface MongoDataExport {
   documents: MongoDocument[]
 }
 
+export type MongoDataImportMode = 'insert' | 'replace' | 'upsert'
+
 export interface MongoDataImportResult {
   entityType: string
   targetWorkspaceId: string
@@ -116,6 +118,13 @@ export interface MongoDataImportResult {
   totalEntries: number
   importedCount: number
   skippedCount: number
+  skipped: { index: number; reason: string }[]
+  format: 'json'
+  mode: MongoDataImportMode
+  ordered: boolean
+  matchedCount: number
+  upsertedCount: number
+  replacedCount: number
 }
 
 // Export the caller-workspace documents of a collection (bounded, inline). The backend reads only
@@ -140,11 +149,12 @@ export function importDocuments(
   workspaceId: string,
   databaseName: string,
   collectionName: string,
-  documents: MongoDocument[]
+  documents: MongoDocument[],
+  mode: MongoDataImportMode = 'insert'
 ): Promise<MongoDataImportResult> {
   return requestConsoleSessionJson<MongoDataImportResult>(
     `${dataBase(workspaceId, databaseName, collectionName)}/imports`,
-    { method: 'POST', body: { documents } }
+    { method: 'POST', body: { format: 'json', mode, documents } }
   )
 }
 
