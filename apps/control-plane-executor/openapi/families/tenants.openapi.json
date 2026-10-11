@@ -2907,6 +2907,31 @@
           "residual": {
             "additionalProperties": false,
             "properties": {
+              "databaseTables": {
+                "description": "Tenant-derived database tables retained because the role cannot verify or delete all rows, including foreign-key parents. Any entry means database cleanup is incomplete. Audit tables retained by explicit policy are excluded.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "count": {
+                      "description": "Verified tenant row count, or null when permissions or RLS prevent a trustworthy count. Unknown is never reported as zero.",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "table": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "table",
+                    "count"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
               "knativeServices": {
                 "items": {
                   "type": "string"
@@ -2941,6 +2966,23 @@
           "purged",
           "removed",
           "residual"
+        ],
+        "type": "object"
+      },
+      "TenantPurgeIncomplete": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "const": "TENANT_PURGE_INCOMPLETE"
+          },
+          "message": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
         ],
         "type": "object"
       },
@@ -6590,7 +6632,7 @@
                 }
               }
             },
-            "description": "Tenant purge completed. Workspace secret KV data and metadata are destroyed before registry deletion. A disabled backend is disclosed in residual.secretsBackend."
+            "description": "Tenant purge completed. Workspace secret KV data and metadata are destroyed before registry deletion. A disabled backend is disclosed in residual.secretsBackend. Protected database tables and their FK parents are disclosed in residual.databaseTables; a null count means the role cannot verify all rows. Such a response is not evidence of complete database erasure."
           },
           "202": {
             "content": {
@@ -6676,11 +6718,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RuntimeTeardownUnavailable"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/RuntimeTeardownUnavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TenantPurgeIncomplete"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Runtime teardown coordinator unavailable."
+            "description": "Runtime teardown coordinator unavailable, or TENANT_PURGE_INCOMPLETE: an unexpected database error or remaining rows aborted cleanup. The tenant row is retained; retry the authorized purge. Protected tables are instead disclosed in the completed response. Audit-trail retention follows the explicit allowlist."
           },
           "504": {
             "content": {

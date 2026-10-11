@@ -285,8 +285,10 @@ async function deleteTenant(ctx) {
     message: 'tenant marked deleted; POST /v1/tenants/{id}/purge to remove all owned resources' });
 }
 
-// POST /v1/tenants/{tenantId}/purge — hard cascade: remove EVERY resource the tenant owns
-// (workspaces, databases, realms, buckets, topics, keys, registry rows, async-op rows).
+// POST /v1/tenants/{tenantId}/purge — delete the enumerated tenant-derived database rows,
+// except the explicit audit-retention allowlist in tenant-store. Protected tables
+// and their FK parents are disclosed in residual.databaseTables (null means the
+// role cannot verify the count). Other errors abort before deleting the tenant.
 // Runtime cleanup gates the cascade; secret destruction must finish before row deletion.
 // Other physical teardown is best-effort, with the removed resources reported below.
 async function purgeTenant(ctx) {
@@ -301,8 +303,16 @@ async function purgeTenant(ctx) {
   if (secrets.error) return secrets.error;
   const realm = tenant.iam_realm;
 
-  // 1. Delete all registry rows + collect the physical resources to tear down.
-  const phys = await store.purgeTenant(pool, tenant.id);
+  // 1. Collect physical resources, then transactionally clear non-retained registry rows.
+  let phys;
+  try { phys = await store.purgeTenant(pool, tenant.id); }
+  catch (error) {
+    if (error.statusCode !== 503) throw error;
+    console.error('[control-plane] tenant purge database cleanup failed', {
+      code: error.code, table: error.table ?? null, count: error.count ?? null,
+    });
+    return err(503, 'TENANT_PURGE_INCOMPLETE', 'Database cleanup could not be verified; tenant rows are retained. Retry the authorized purge.');
+  }
   // 2. Drop each physical workspace database (catalog-level isolation teardown).
   const databasesDropped = [];
   for (const db of phys.databases) { try { await dropWorkspaceDatabase(pool, db); databasesDropped.push(db); } catch { /* best-effort */ } }
@@ -332,8 +342,10 @@ async function purgeTenant(ctx) {
       // documents were removed).
       mongoDatabases: mongo.dropped, mongoDatabasesRetained: mongo.retained,
     },
-    // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
-    residual: { knativeServices: [], ...secrets.residual },
+    // Database residue is separate from physical runtime/secret teardown residue.
+    residual: { knativeServices: [], ...secrets.residual,
+      ...(phys.databaseResidual.length ? { databaseTables: phys.databaseResidual } : {}),
+    },
   });
 }
 
