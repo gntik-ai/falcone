@@ -5,6 +5,8 @@ import { Readable, Writable } from 'node:stream';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { generateKeyPairSync, sign } from 'node:crypto';
+import { loadRoutes as compileRoutes, matchRoute as matchCompiledRoute } from '../../../apps/control-plane/route-table.mjs';
+import { invokeRoute } from '../../../apps/control-plane/route-invoke.mjs';
 import { routes } from '../../../apps/control-plane/routes.mjs';
 import * as store from '../../../apps/control-plane/tenant-store.mjs';
 import * as audit from '../../../apps/control-plane/audit-writer.mjs';
@@ -87,7 +89,7 @@ export async function startDenialServer({ insert = null, extraRoutes = [] } = {}
     ...(route.module ? { module: fileURLToPath(new URL(`../../../${route.module.replace('/repo/', '')}`, import.meta.url)) } : {})
   });
   const bindings = {
-    http, pool, jwtVerifier, reserveHttpRequest, PORT: 0,
+    http, pool, jwtVerifier, reserveHttpRequest, compileRoutes, matchCompiledRoute, invokeRoute, PORT: 0,
     seedRoutes: [...routes, ...extraRoutes].map(remap),
     LOCAL_HANDLERS: locals,
     console: { error() {}, warn: (line) => warnings.push(line) },
