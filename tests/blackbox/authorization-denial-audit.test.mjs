@@ -10,6 +10,7 @@ function assertDenialHeaders(response) {
     'access-control-allow-origin': '*',
     'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     'access-control-allow-headers': 'authorization,content-type,x-correlation-id,idempotency-key',
+    'access-control-expose-headers': 'X-Idempotency-Replayed',
     'access-control-max-age': '600'
   });
 }

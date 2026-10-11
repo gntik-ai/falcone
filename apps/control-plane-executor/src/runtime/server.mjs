@@ -10,7 +10,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import { randomUUID } from 'node:crypto';
-import { reserveHttpRequest, invalidIdempotencyKeyResponse } from '../../../../packages/internal-contracts/src/http-idempotency.mjs';
+import { reserveHttpRequest, invalidIdempotencyKeyResponse, isMutationMethod } from '../../../../packages/internal-contracts/src/http-idempotency.mjs';
 import { recordHttp, recordMcpDependency, renderMetrics, setHttpRouteTemplates, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
@@ -1513,7 +1513,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
         const { status, body: out } = await handler(groups, ctx);
         return sendJson(res, status, out);
       }
-      const keyedMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && req.headers['idempotency-key'] !== undefined;
+      const keyedMutation = isMutationMethod(method) && req.headers['idempotency-key'] !== undefined;
       let rawBody;
       if (keyedMutation) {
         rawBody = await readBodyBytes(req);
@@ -1546,7 +1546,6 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       await idempotency?.complete?.({ statusCode: status, body: out, headers });
       return sendJson(res, status, out, headers);
     } catch (err) {
-      await idempotency?.release?.().catch(() => {});
       const statusCode = err.statusCode ?? 500;
       if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
       const envelope = {
@@ -1563,6 +1562,8 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       // Quota breaches (429 QUOTA_EXCEEDED) carry the breached dimension so the caller can show
       // which limit was hit (spec: body indicates the breached dimension).
       if (err.dimension && statusCode < 500) envelope.dimension = err.dimension;
+      if (statusCode >= 500) await idempotency?.release?.().catch(() => {});
+      else await idempotency?.complete?.({ statusCode, body: envelope }).catch(() => {});
       return sendJson(res, statusCode, envelope);
     }
   });

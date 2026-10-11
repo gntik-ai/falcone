@@ -874,7 +874,7 @@ export function ConsoleFunctionsPage() {
     } catch (error) {
       // A returned HTTP error is a final result and may be replayed for 24h. Reuse the
       // key only when no response arrived, and only when retrying the same resource.
-      if (error && typeof error === 'object' && 'status' in error && typeof error.status === 'number') {
+      if (getConsoleErrorStatus(error) !== undefined) {
         deleteIdempotencyKeyRef.current = null
       }
       const message = describeConsoleError(error, 'No se pudo eliminar la función.')

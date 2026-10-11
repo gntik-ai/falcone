@@ -18,7 +18,7 @@ const headers = { authorization: `Bearer ${token}`, 'idempotency-key': 'same-key
 test('control-plane HTTP: local and action dispatch replay with verified identity and preserve retry semantics', async t => {
   t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ keys: [jwk] }), { status: 200 }));
   const replay = idempotencyDatabase();
-  let denials = 0, plans = 0, failNext = false;
+  let denials = 0, plans = 0, failNext = false, conflictNext = false;
   setDatabase({ async query(sql, values = []) {
     if (sql.includes('http_idempotency_records')) return replay.query(sql, values);
     if (sql.includes('INSERT INTO scope_enforcement_denials')) {
@@ -26,6 +26,10 @@ test('control-plane HTTP: local and action dispatch replay with verified identit
     }
     if (sql.includes('INSERT INTO plans')) {
       if (failNext) { failNext = false; throw new Error('fixture database outage'); }
+      if (conflictNext) {
+        conflictNext = false;
+        throw Object.assign(new Error('plan already exists'), { statusCode: 409, code: 'PLAN_SLUG_CONFLICT' });
+      }
       return { rows: [{ id: `plan-${++plans}`, slug: values[0], display_name: values[1], status: 'active' }], rowCount: 1 };
     }
     return { rows: [], rowCount: 0 };
@@ -52,6 +56,18 @@ test('control-plane HTTP: local and action dispatch replay with verified identit
   const retryInput = { ...planInput, headers: { ...headers, 'idempotency-key': 'retry-key-123' } };
   assert.equal((await request(server, retryInput)).status, 500);
   assert.equal((await request(server, retryInput)).status, 201);
+  await t.test('thrown client errors replay the original HTTP envelope without re-executing the action', async () => {
+    conflictNext = true;
+    const conflictInput = { ...planInput, headers: { ...headers, 'idempotency-key': 'conflict-key-123' } };
+    const first = await request(server, conflictInput);
+    const second = await request(server, conflictInput);
+    assert.equal(first.status, 409);
+    assert.deepEqual(first.body, { code: 'PLAN_SLUG_CONFLICT', message: 'PLAN_SLUG_CONFLICT' });
+    assert.equal(first.headers['x-idempotency-replayed'], undefined);
+    assert.equal(second.status, first.status);
+    assert.deepEqual(second.body, first.body);
+    assert.equal(second.headers['x-idempotency-replayed'], 'true');
+  });
   const { 'idempotency-key': _key, ...unkeyedHeaders } = headers;
   assert.equal((await request(server, { ...input, headers: unkeyedHeaders })).status, 202);
   assert.equal((await request(server, { ...input, headers: unkeyedHeaders })).status, 202);

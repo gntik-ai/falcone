@@ -39,6 +39,22 @@ test('browsers can read the replay marker on executor responses', async () => {
   assert.match(result.headers['access-control-expose-headers'] ?? '', /X-Idempotency-Replayed/i);
 });
 
+test('executor HTTP: thrown client errors replay their original envelope', async () => {
+  const server = createControlPlaneServer({ registry: {}, idempotencyPool: database(), logger: { error() {} } });
+  const input = {
+    path: '/v1/postgres/databases/fixture/schemas',
+    headers: { ...headers, 'x-workspace-id': 'fixture-workspace' }, body: '{"name":"invalid-name"}',
+  };
+  const first = await request(server, input);
+  const second = await request(server, input);
+  assert.equal(first.status, 400);
+  assert.deepEqual(first.body, { code: 'INVALID_IDENTIFIER', message: 'Invalid schemaName identifier' });
+  assert.equal(first.headers['x-idempotency-replayed'], undefined);
+  assert.equal(second.status, 400);
+  assert.deepEqual(second.body, first.body);
+  assert.equal(second.headers['x-idempotency-replayed'], 'true');
+});
+
 test('streaming mutations reject malformed keys before invoking the streaming handler', async () => {
   const server = createControlPlaneServer({ registry: {}, logger: { error() {} } });
   const result = await request(server, {

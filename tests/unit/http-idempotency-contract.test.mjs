@@ -24,3 +24,12 @@ test('all generated families advertise an optional mutation key', async () => {
     if (family.components?.parameters?.IdempotencyKey) assert.equal(family.components.parameters.IdempotencyKey.required, false, path);
   }
 });
+
+test('the published contract explains fail-closed reservations and advisory polling', () => {
+  const description = source.components.parameters.IdempotencyKey.description;
+  assert.match(description, /503 IDEMPOTENCY_UNAVAILABLE/);
+  assert.match(description, /without a verified principal or configured replay storage/);
+  assert.match(description, /reservation blocks retries until its 24h expiry/);
+  assert.match(description, /Retry-After is a polling suggestion/);
+  assert.match(taxonomy.shared_http.headers.idempotency_key.purpose, /503 IDEMPOTENCY_UNAVAILABLE/);
+});

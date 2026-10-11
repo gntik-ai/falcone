@@ -5,6 +5,10 @@ const KEY_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;
 const SAFE_HEADERS = new Set(['content-range', 'accept-ranges', 'etag', 'location', 'retry-after', 'x-correlation-id']);
 export const DEFAULT_RESPONSE_CAP = 256 * 1024;
 
+export function isMutationMethod(method) {
+  return MUTATIONS.has(method);
+}
+
 export function requestFingerprint(method, url, rawBody) {
   const target = new URL(url, 'http://idempotency.local');
   target.searchParams.sort();
@@ -36,7 +40,7 @@ function response(statusCode, code, headers = {}) {
 }
 
 export function invalidIdempotencyKeyResponse(method, key) {
-  if (!MUTATIONS.has(method) || key === undefined) return null;
+  if (!isMutationMethod(method) || key === undefined) return null;
   return typeof key !== 'string' || !KEY_PATTERN.test(key)
     ? response(400, 'INVALID_IDEMPOTENCY_KEY') : null;
 }
@@ -46,7 +50,7 @@ export async function reserveHttpRequest({ pool, key, method, url, rawBody, iden
   if (route.proxy) return null;
   const invalidKey = invalidIdempotencyKeyResponse(method, key);
   if (invalidKey) return { response: invalidKey };
-  if (!MUTATIONS.has(method) || key === undefined || route.stream || route.sse || route.noAuth || route.auth === 'public' || route.webhook) return null;
+  if (!isMutationMethod(method) || key === undefined || route.stream || route.sse || route.noAuth || route.auth === 'public' || route.webhook) return null;
   // Callers pass their already-verified identity. Keep both HTTP planes' subject and
   // API credential namespaces consistent without admitting unverified request fields.
   tenantId ??= identity?.tenantId;

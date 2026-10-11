@@ -160,7 +160,7 @@ function compilePath(tmpl) {
 }
 
 let ROUTES = [];
-export function loadRoutes(extra = []) {
+function loadRoutes(extra = []) {
   // Dedupe by `METHOD path`. Seed routes (curated: domain B local handlers +
   // proven A routes) take precedence over the generated runtime map on collision.
   const byKey = new Map();
@@ -346,7 +346,7 @@ async function invokeRoute(route, handler, params, callerContext, identity, db) 
 }
 
 // ---- request handler -------------------------------------------------------
-export const server = http.createServer(async (req, res) => {
+const server = http.createServer(async (req, res) => {
   const method = (req.method ?? 'GET').toUpperCase();
   // Prometheus scrape endpoint (no auth) — this process's HTTP metrics (#499).
   if (method === 'GET' && (req.url === '/metrics' || req.url === '/metrics/')) {
@@ -528,7 +528,6 @@ export const server = http.createServer(async (req, res) => {
     }
     await reply(result?.statusCode ?? 200, result?.body ?? null, respHeaders);
   } catch (err) {
-    await idempotency?.release?.().catch(() => {});
     // Log the full error (incl. stack) server-side only; never echo an exception's
     // message/stack to the client (stack-trace exposure). Return the stable code.
     console.error('[control-plane] request failed:', err);
@@ -539,7 +538,10 @@ export const server = http.createServer(async (req, res) => {
     // those are unmapped internal errors and the SQLSTATE leaks the storage engine (#634). Only echo
     // the stable application code for deliberately mapped client errors (< 500).
     const code = statusCode >= 500 ? 'CONTROL_PLANE_ERROR' : (err?.code ?? 'CONTROL_PLANE_ERROR');
-    sendJson(res, statusCode, { code, message: statusCode >= 500 ? 'Internal server error' : code });
+    const envelope = { code, message: statusCode >= 500 ? 'Internal server error' : code };
+    if (statusCode >= 500) await idempotency?.release?.().catch(() => {});
+    else await idempotency?.complete?.({ statusCode, body: envelope }).catch(() => {});
+    sendJson(res, statusCode, envelope);
   }
 });
 
@@ -663,6 +665,8 @@ export async function bootstrapControlPlane() {
   functionCleanupTimer = setInterval(recoverCleanup, 30_000);
   functionCleanupTimer.unref();
 }
+
+export { server, loadRoutes };
 
 // Importing the dispatcher for an embedded caller does not start the process. The runnable
 // entry point still completes every required database/runtime gate before binding the port.
