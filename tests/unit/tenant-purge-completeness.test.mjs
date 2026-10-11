@@ -43,7 +43,7 @@ function assertCovered(tables) {
 }
 
 const sources = [
-  ...files(new URL('../../packages/provisioning-orchestrator/src/migrations/', import.meta.url).pathname),
+  ...files(new URL('../../packages/', import.meta.url).pathname).filter((path) => path.includes('/migrations/')),
   ...files(new URL('../../apps/', import.meta.url).pathname),
 ];
 
@@ -51,6 +51,8 @@ test('every tenant_id-keyed source schema table is covered by the purge or audit
   const discovered = sources.flatMap((path) => tenantTables(readFileSync(path, 'utf8')));
   assert.ok(discovered.includes('workspace_sub_quotas'));
   assert.ok(discovered.includes('flow_versions'));
+  assert.ok(discovered.includes('scheduled_executions'));
+  assert.ok(discovered.includes('backup_operations'));
   assertCovered(discovered);
 });
 
@@ -68,4 +70,19 @@ test('audit tables have explicit retention reasons and plan-change history is pu
   }
   assert.ok(store.TENANT_PURGE_TABLES.includes('tenant_plan_change_history'));
   assert.equal(store.TENANT_PURGE_RETAINED_TABLES.tenant_plan_change_history, undefined);
+});
+
+
+// Mirrors the tenant-keyed tables defined only in the deployment repository.
+// Sources: 20260328-002-quota-threshold-alert-posture-store.sql and
+// 20260327-001-function-audit-records.sql under charts/in-falcone/bootstrap/migrations.
+// This inventory lets the source-only guard enforce their explicit policy too.
+test('deployment-only tenant tables have an explicit mirrored purge/retention policy', () => {
+  const mirrored = `
+    CREATE TABLE quota_last_known_posture (tenant_id TEXT NOT NULL);
+    CREATE TABLE function_audit_records (tenant_id TEXT NOT NULL);
+  `;
+  assertCovered(tenantTables(mirrored));
+  assert.ok(store.TENANT_PURGE_TABLES.includes('quota_last_known_posture'));
+  assert.match(store.TENANT_PURGE_RETAINED_TABLES.function_audit_records, /audit/i);
 });

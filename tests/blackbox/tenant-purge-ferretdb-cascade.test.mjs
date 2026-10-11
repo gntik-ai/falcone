@@ -104,6 +104,9 @@ function fakePurgePool({ tenant, workspaces = {}, mongoByTenant = {}, mongoByWor
   const deletes = [];
   const query = async (sql, params = []) => {
     const s = String(sql);
+    if (/has_table_privilege/.test(s)) return { rows: [{ allowed: true }] };
+    // This fixture verifies the Mongo teardown boundary, not PostgreSQL row storage.
+    if (/SELECT count\(\*\)/i.test(s)) return { rows: [{ count: 0 }] };
     if (/^\s*DELETE\s+FROM/i.test(s)) { deletes.push({ sql: s.trim(), params }); return { rows: [], rowCount: 1 }; }
     if (/FROM\s+tenants\s+WHERE/i.test(s)) return { rows: tenant && (params[0] === tenant.id || params[0] === tenant.slug) ? [tenant] : [] };
     if (/FROM\s+workspaces\s+WHERE/i.test(s)) return { rows: workspaces[params[0]] ? [workspaces[params[0]]] : [] };

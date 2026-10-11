@@ -286,8 +286,9 @@ async function deleteTenant(ctx) {
 }
 
 // POST /v1/tenants/{tenantId}/purge — delete the enumerated tenant-derived database rows,
-// except the explicit audit-retention allowlist in tenant-store. Database errors or
-// residual rows abort the transaction before the tenant row is deleted; retry the purge.
+// except the explicit audit-retention allowlist in tenant-store. Protected tables
+// and their FK parents are disclosed in residual.databaseTables (null means the
+// role cannot verify the count). Other errors abort before deleting the tenant.
 // Runtime cleanup gates the cascade; secret destruction must finish before row deletion.
 // Other physical teardown is best-effort, with the removed resources reported below.
 async function purgeTenant(ctx) {
@@ -305,7 +306,11 @@ async function purgeTenant(ctx) {
   // 1. Collect physical resources, then transactionally clear non-retained registry rows.
   let phys;
   try { phys = await store.purgeTenant(pool, tenant.id); }
-  catch {
+  catch (error) {
+    if (error.statusCode !== 503) throw error;
+    console.error('[control-plane] tenant purge database cleanup failed', {
+      code: error.code, table: error.table ?? null, count: error.count ?? null,
+    });
     return err(503, 'TENANT_PURGE_INCOMPLETE', 'Database cleanup could not be verified; tenant rows are retained. Retry the authorized purge.');
   }
   // 2. Drop each physical workspace database (catalog-level isolation teardown).
@@ -337,8 +342,10 @@ async function purgeTenant(ctx) {
       // documents were removed).
       mongoDatabases: mongo.dropped, mongoDatabasesRetained: mongo.retained,
     },
-    // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
-    residual: { knativeServices: [], ...secrets.residual },
+    // Database residue is separate from physical runtime/secret teardown residue.
+    residual: { knativeServices: [], ...secrets.residual,
+      ...(phys.databaseResidual.length ? { databaseTables: phys.databaseResidual } : {}),
+    },
   });
 }
 

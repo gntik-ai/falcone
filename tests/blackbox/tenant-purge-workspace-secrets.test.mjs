@@ -16,6 +16,12 @@ function registryPool() {
     ['ws-b', { id: 'ws-b', tenant_id: 'tenant-b' }],
   ]);
   const query = async (sql, params = []) => {
+    if (/has_table_privilege/.test(sql)) return { rows: [{ allowed: true }] };
+    if (/SELECT count\(\*\)/i.test(sql)) {
+      const count = /FROM tenants WHERE/i.test(sql) ? Number(tenants.has(params[0]))
+        : /FROM workspaces WHERE/i.test(sql) ? [...workspaces.values()].filter((ws) => ws.tenant_id === params[0]).length : 0;
+      return { rows: [{ count }] };
+    }
     if (/^DELETE FROM tenants /i.test(sql)) tenants.delete(params[0]);
     if (/^DELETE FROM workspaces WHERE id/i.test(sql)) workspaces.delete(params[0]);
     if (/^DELETE FROM workspaces WHERE tenant_id/i.test(sql)) {

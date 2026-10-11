@@ -1311,6 +1311,12 @@ export const TENANT_PURGE_TABLES = Object.freeze([
   'tenant_plan_quota_impacts', 'tenant_plan_capability_impacts', 'tenant_plan_change_history',
   'workspace_sub_quotas', 'quota_overrides', 'billing_usage_records',
   'workspace_embedding_mappings', 'workspace_embedding_providers', 'workspace_llm_usage', 'workspace_llm_providers',
+  'workspace_doc_notes', 'workspace_openapi_versions', 'workspace_sdk_packages',
+  'webhook_delivery_attempts', 'webhook_deliveries', 'webhook_signing_secrets', 'webhook_subscriptions',
+  'scheduled_executions', 'scheduled_jobs', 'scheduling_configurations',
+  'realtime_sessions', 'realtime_scope_channel_mappings',
+  'restore_confirmation_requests', 'backup_operations', 'backup_status_snapshots',
+  'quota_last_known_posture',
   'realtime_subscriptions', 'realtime_channels', 'subscription_quotas',
   'pg_capture_configs', 'mongo_capture_configs',
   'secret_metadata', 'secret_version_states',
@@ -1329,6 +1335,9 @@ export const TENANT_PURGE_TABLES = Object.freeze([
 
 // Deliberate audit-trail retention only; plan-change history and its impacts are NOT audit exceptions.
 export const TENANT_PURGE_RETAINED_TABLES = Object.freeze({
+  function_audit_records: 'Retain function invocation audit trail (deployment-owned schema).',
+  backup_audit_events: 'Retain backup and restore governance audit trail.',
+  realtime_subscription_auth_records: 'Retain realtime subscription authorization audit trail.',
   plan_audit_events: 'Retain plan governance audit trail.',
   config_export_audit_log: 'Retain functional export audit trail.',
   config_preflight_audit_log: 'Retain configuration preflight audit trail.',
@@ -1348,20 +1357,24 @@ export const TENANT_PURGE_RETAINED_TABLES = Object.freeze({
 const TENANT_PURGE_SCOPES = Object.freeze({
   tenants: 'id = $1',
   saga_compensation_log: 'saga_id IN (SELECT saga_id FROM saga_instances WHERE tenant_id = $1)',
+  webhook_delivery_attempts: 'delivery_id IN (SELECT id FROM webhook_deliveries WHERE tenant_id = $1)',
   // The hand-built runtime also defines saga_steps with run_id instead of saga_id.
   // Project the row to avoid querying a nonexistent column; only product saga children match.
   saga_steps: "to_jsonb(saga_steps)->>'saga_id' IN (SELECT saga_id::text FROM saga_instances WHERE tenant_id = $1)",
 });
 
 // Collect physical resources before deleting registry rows. One transaction clears
-// all non-retained rows or fails before the tenant is deleted. Only 42P01 is tolerated.
+// all accessible non-retained rows. Protected tables are explicitly disclosed;
+// other errors abort before the tenant is deleted. Only 42P01 means already clean.
 export async function purgeTenant(pool, tenantId) {
   if (typeof pool?.connect !== 'function') throw new TypeError('tenant purge requires a transactional pool');
   const db = await pool.connect();
+  let activeTable;
+  const tableCounts = new Map();
   try {
     await db.query('BEGIN');
-    // This does NOT bypass RLS or grant DELETE. PostgreSQL raises an error if a policy
-    // would filter rows for this role, so restricted roles cannot report a clean purge.
+    // This does NOT bypass RLS or grant DELETE. Use it to verify complete visibility:
+    // an RLS-filtered table raises 42501 and is disclosed, never counted as empty.
     await db.query('SET LOCAL row_security = off');
     const optionalQuery = async (sql, params) => {
       await db.query('SAVEPOINT tenant_purge_optional');
@@ -1370,23 +1383,76 @@ export async function purgeTenant(pool, tenantId) {
         await db.query('RELEASE SAVEPOINT tenant_purge_optional');
         return result;
       } catch (error) {
-        // An absent product table is the ONLY tolerated SQL error. Roll back to the
-        // savepoint because 42P01 otherwise leaves the PostgreSQL transaction aborted.
-        if (error.code !== '42P01') throw error;
+        // Recover the transaction before the caller handles a protected table.
+        // Only an absent table is returned as clean; all other errors propagate.
         await db.query('ROLLBACK TO SAVEPOINT tenant_purge_optional');
         await db.query('RELEASE SAVEPOINT tenant_purge_optional');
+        if (error.code !== '42P01') throw error;
         return { rows: [] };
       }
     };
-    const collect = async (sql) => (await optionalQuery(sql, [tenantId])).rows;
-    const databases = (await collect('SELECT database_name FROM workspace_databases WHERE tenant_id=$1')).map((r) => r.database_name);
-    const mongoDatabases = (await collect('SELECT DISTINCT database_name FROM workspace_mongo_databases WHERE tenant_id=$1')).map((r) => r.database_name);
-    const buckets = (await collect('SELECT bucket_name FROM workspace_buckets WHERE tenant_id=$1')).map((r) => r.bucket_name);
-    const topics = (await collect('SELECT physical_topic_name FROM workspace_topics WHERE tenant_id=$1')).map((r) => r.physical_topic_name);
-    const ksvcs = (await collect("SELECT ksvc_name FROM fn_actions WHERE tenant_id=$1 AND ksvc_name IS NOT NULL")).map((r) => r.ksvc_name);
-    const workspaceIds = (await collect('SELECT id FROM workspaces WHERE tenant_id=$1')).map((r) => r.id);
+    const collect = async (table, sql) => {
+      activeTable = table;
+      return (await optionalQuery(sql, [tenantId])).rows;
+    };
+    const databases = (await collect('workspace_databases', 'SELECT database_name FROM workspace_databases WHERE tenant_id=$1')).map((r) => r.database_name);
+    const mongoDatabases = (await collect('workspace_mongo_databases', 'SELECT DISTINCT database_name FROM workspace_mongo_databases WHERE tenant_id=$1')).map((r) => r.database_name);
+    const buckets = (await collect('workspace_buckets', 'SELECT bucket_name FROM workspace_buckets WHERE tenant_id=$1')).map((r) => r.bucket_name);
+    const topics = (await collect('workspace_topics', 'SELECT physical_topic_name FROM workspace_topics WHERE tenant_id=$1')).map((r) => r.physical_topic_name);
+    const ksvcs = (await collect('fn_actions', "SELECT ksvc_name FROM fn_actions WHERE tenant_id=$1 AND ksvc_name IS NOT NULL")).map((r) => r.ksvc_name);
+    const workspaceIds = (await collect('workspaces', 'SELECT id FROM workspaces WHERE tenant_id=$1')).map((r) => r.id);
 
+    const protectedTables = new Set();
+    const emptyDeniedTables = new Set();
+    for (const table of TENANT_PURGE_TABLES) {
+      activeTable = table;
+      try {
+        const { rows } = await optionalQuery(`SELECT count(*) AS count FROM ${table} WHERE ${TENANT_PURGE_SCOPES[table] ?? 'tenant_id = $1'}`, [tenantId]);
+        if (!rows.length) continue; // 42P01: no table to delete or retain.
+        const count = Number(rows[0].count);
+        tableCounts.set(table, count);
+        const permission = await optionalQuery("SELECT has_table_privilege(to_regclass($1), 'DELETE') AS allowed", [table]);
+        if (permission.rows[0]?.allowed !== true) {
+          if (count > 0) protectedTables.add(table);
+          else emptyDeniedTables.add(table);
+        }
+      } catch (error) {
+        if (error.code !== '42501') throw error;
+        protectedTables.add(table);
+        // With FORCE RLS or denied SELECT, no trustworthy count is available.
+        tableCounts.set(table, null);
+      }
+    }
+    // A retained child protects its FK parents too, including cascading FKs:
+    // deleting a parent must not indirectly destroy rows disclosed as retained.
+    activeTable = undefined;
+    const { rows: foreignKeys } = await db.query(`
+      SELECT CASE WHEN cn.nspname = 'public' THEN child.relname ELSE cn.nspname || '.' || child.relname END AS child,
+             CASE WHEN pn.nspname = 'public' THEN parent.relname ELSE pn.nspname || '.' || parent.relname END AS parent
+        FROM pg_constraint fk
+        JOIN pg_class child ON child.oid = fk.conrelid
+        JOIN pg_namespace cn ON cn.oid = child.relnamespace
+        JOIN pg_class parent ON parent.oid = fk.confrelid
+        JOIN pg_namespace pn ON pn.oid = parent.relnamespace
+       WHERE fk.contype = 'f' AND fk.conrelid IN
+             (SELECT to_regclass(name) FROM unnest($1::text[]) AS names(name))`, [TENANT_PURGE_TABLES]);
+    const purgeRelations = new Map(TENANT_PURGE_TABLES.map((table) => [table.replace(/^public\./, ''), table]));
+    let changed;
+    do {
+      changed = false;
+      for (const fk of foreignKeys) {
+        const child = purgeRelations.get(fk.child);
+        const parent = purgeRelations.get(fk.parent);
+        if (protectedTables.has(child) && parent && !protectedTables.has(parent)) {
+          protectedTables.add(parent);
+          changed = true;
+        }
+      }
+    } while (changed);
+    const databaseResidual = TENANT_PURGE_TABLES.filter((table) => protectedTables.has(table))
+      .map((table) => ({ table, count: tableCounts.get(table) ?? null }));
     const del = async (table, where, params) => {
+      activeTable = table;
       await optionalQuery(`DELETE FROM ${table} WHERE ${where}`, params);
       const { rows } = await optionalQuery(`SELECT count(*) AS count FROM ${table} WHERE ${where}`, params);
       const count = Number(rows[0]?.count ?? 0);
@@ -1397,17 +1463,20 @@ export async function purgeTenant(pool, tenantId) {
     // fn_activations has no tenant_id: scope through this tenant's collected workspaces.
     if (workspaceIds.length) await del('fn_activations', 'workspace_id = ANY($1)', [workspaceIds]);
     for (const table of TENANT_PURGE_TABLES) {
+      if (protectedTables.has(table) || emptyDeniedTables.has(table)) continue;
       await del(table, TENANT_PURGE_SCOPES[table] ?? 'tenant_id = $1', [tenantId]);
     }
     await db.query('COMMIT');
-    return { databases, mongoDatabases, buckets, topics, ksvcs, workspaceIds };
+    return { databases, mongoDatabases, buckets, topics, ksvcs,
+      workspaceIds: protectedTables.has('workspaces') ? [] : workspaceIds, databaseResidual };
   } catch (error) {
     try { await db.query('ROLLBACK'); } catch { /* preserve the original failure */ }
+    if (!/^[0-9A-Z]{5}$/.test(error.code ?? '') && error.code !== 'TENANT_PURGE_INCOMPLETE') throw error;
     // The HTTP boundary honors statusCode and sanitizes 5xx responses. Do not carry
     // backend messages/details into its logs: they may contain customer content.
     throw Object.assign(new Error('tenant purge database cleanup failed; retry the authorized purge'), {
       statusCode: 503, code: error.code ?? 'TENANT_PURGE_INCOMPLETE',
-      ...(error.code === 'TENANT_PURGE_INCOMPLETE' ? { table: error.table, count: error.count } : {}),
+      ...(activeTable ? { table: activeTable, count: error.count ?? tableCounts.get(activeTable) ?? null } : {}),
     });
   } finally {
     db.release();
