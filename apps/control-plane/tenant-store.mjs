@@ -765,6 +765,17 @@ export async function insertMongoDatabase(pool, { workspaceId, tenantId, databas
     [workspaceId, databaseName]);
   return existing[0] ?? null;
 }
+// Single-database lifecycle lookup/delete stays keyed by workspace and name (#967).
+export async function getWorkspaceMongoDatabase(pool, workspaceId, databaseName) {
+  const { rows } = await pool.query(
+    'SELECT * FROM workspace_mongo_databases WHERE workspace_id=$1 AND database_name=$2 LIMIT 1',
+    [workspaceId, databaseName]);
+  return rows[0] ?? null;
+}
+export async function deleteWorkspaceMongoDatabaseRecord(pool, workspaceId, databaseName) {
+  await pool.query('DELETE FROM workspace_mongo_databases WHERE workspace_id=$1 AND database_name=$2', [workspaceId, databaseName]);
+}
+
 // Distinct FerretDB database names a tenant has provisioned (across all its workspaces).
 // De-duplicated: the same db name may be recorded under several workspaces of the tenant,
 // but the teardown only needs to delete the tenant's documents from each db once.

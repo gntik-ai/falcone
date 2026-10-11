@@ -13,12 +13,12 @@ import { AUTH_HANDLERS } from './auth-handlers.mjs';
 import { INVITATION_HANDLERS } from './invitation-handlers.mjs';
 import { listTenantUsers } from './tenant-user-handlers.mjs';
 import { startSaga } from './saga.mjs';
-import { provisionWorkspaceDatabase, rotateWorkspaceDatabaseCredential, dropWorkspaceDatabase } from './dataplane.mjs';
+import { provisionWorkspaceDatabase, rotateWorkspaceDatabaseCredential, dropWorkspaceDatabase, isWorkspaceDatabaseEmpty, _ident as ident } from './dataplane.mjs';
 import { deleteBucket } from './storage-handlers.mjs';
 import { deleteTopics } from './kafka-handlers.mjs';
 import { METRICS_HANDLERS } from './metrics-handlers.mjs';
 import { STORAGE_HANDLERS } from './storage-handlers.mjs';
-import { MONGO_HANDLERS, mongoTeardown, mongoClient } from './mongo-handlers.mjs';
+import { MONGO_HANDLERS, mongoTeardown, mongoClient, isWorkspaceMongoDatabaseEmpty } from './mongo-handlers.mjs';
 import { PG_HANDLERS } from './pg-handlers.mjs';
 import { KAFKA_HANDLERS } from './kafka-handlers.mjs';
 import { FN_HANDLERS } from './fn-handlers.mjs';
@@ -1305,6 +1305,61 @@ async function provisionDatabaseGeneric(ctx) {
   if (res.statusCode === 201) return ok(201, { databaseId: res.body?.database?.id, ...res.body });
   return res;
 }
+// DELETE /v1/workspaces/{workspaceId}/databases/{databaseName} — remove only this
+// registry resource, physical database first so a failed drop remains retryable (#967).
+async function deleteDatabase(ctx) {
+  const { pool, identity, params } = ctx;
+  let auditScope;
+  const scoped = (result) => auditScope ? { ...result, auditScope } : result;
+  try {
+    const ws = await store.getWorkspace(pool, params.workspaceId);
+    const platform = identity?.actorType === 'superadmin' || identity?.actorType === 'internal';
+    if (!ws || (!platform && identity?.tenantId !== ws.tenant_id)) {
+      return err(404, 'WORKSPACE_NOT_FOUND', 'workspace not found');
+    }
+    auditScope = { tenantId: ws.tenant_id, workspaceId: ws.id };
+    if (!can(identity, 'database.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
+      return scoped(err(403, 'FORBIDDEN', 'caller may not administer this workspace database'));
+    }
+    const requestedEngine = ctx.query?.engine;
+    if (requestedEngine != null && !['postgresql', 'mongodb'].includes(requestedEngine)) {
+      return scoped(err(400, 'VALIDATION_ERROR', 'engine must be postgresql or mongodb'));
+    }
+    let db = requestedEngine === 'mongodb' ? null : await store.getWorkspaceDatabase(pool, ws.id);
+    if (db?.database_name !== params.databaseName || db?.engine !== 'postgresql') db = null;
+    let engine = 'postgresql';
+    if (!db && requestedEngine !== 'postgresql') {
+      db = await store.getWorkspaceMongoDatabase(pool, ws.id, params.databaseName);
+      engine = 'mongodb';
+    }
+    if (!db || db.database_name !== params.databaseName || db.tenant_id !== ws.tenant_id || db.workspace_id !== ws.id) {
+      return scoped(err(404, 'DATABASE_NOT_FOUND', 'database not found'));
+    }
+    if (engine === 'mongodb') {
+      const client = await (ctx.mongoClient ?? mongoClient());
+      const empty = ctx.isWorkspaceMongoDatabaseEmpty ?? isWorkspaceMongoDatabaseEmpty;
+      if (ctx.query?.force !== 'true' && !(await empty({ client, tenantId: ws.tenant_id, workspaceId: ws.id, databaseName: db.database_name }))) {
+        return scoped(err(409, 'DATABASE_NOT_EMPTY', 'database is not empty; use force=true to delete'));
+      }
+      const result = await mongoTeardown({ client, tenantId: ws.tenant_id, workspaceId: ws.id, databaseNames: [db.database_name] });
+      if (result.errors.length) throw new Error('mongo teardown failed');
+      await store.deleteWorkspaceMongoDatabaseRecord(pool, ws.id, db.database_name);
+      return scoped(ok(200, { workspaceId: ws.id, databaseName: db.database_name, engine, deleted: true,
+        retained: result.retained.includes(db.database_name) }));
+    }
+    if (ident(db.database_name, 'wsdb') !== db.database_name) throw new Error('invalid database identifier');
+    const empty = ctx.isWorkspaceDatabaseEmpty ?? isWorkspaceDatabaseEmpty;
+    if (ctx.query?.force !== 'true' && !(await empty(pool, db.database_name, ctx.pgClient))) {
+      return scoped(err(409, 'DATABASE_NOT_EMPTY', 'database is not empty; use force=true to delete'));
+    }
+    await (ctx.dropWorkspaceDatabase ?? dropWorkspaceDatabase)(pool, db.database_name, { strictRoleDrop: true });
+    await store.deleteWorkspaceDatabaseRecord(pool, db.id);
+    return scoped(ok(200, { workspaceId: ws.id, databaseName: db.database_name, engine: 'postgresql', deleted: true }));
+  } catch {
+    // Backend errors may contain credentials; never expose them in the response/audit (#967).
+    return scoped(err(502, 'DELETE_DATABASE_FAILED', 'database deletion failed; retry the request'));
+  }
+}
 // GET /v1/workspaces/{workspaceId}/database — metadata only (no secret).
 async function getDatabase(ctx) {
   const r = await resolveWorkspaceForManage(ctx); if (r.error) return r.error;
@@ -1565,7 +1620,7 @@ export const LOCAL_HANDLERS = {
   createWorkspaceIamClient,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential, deleteServiceAccount,
-  provisionDatabase, provisionDatabaseGeneric, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,
+  provisionDatabase, provisionDatabaseGeneric, deleteDatabase, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,
   iamListUsers, iamGetUser, iamCreateUser, iamDeleteUser, iamSetUserStatus, iamListRoles, iamListScopes, iamGetRole, iamDeleteRole, iamCreateRole, iamListGroups, iamCreateGroup, iamListClients,
   iamListRealms, iamGetRealm, iamUpdateRealm,
   iamListUserRoles, iamAssignUserRoles, iamRemoveUserRoles,

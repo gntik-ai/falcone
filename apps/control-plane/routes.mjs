@@ -246,6 +246,8 @@ export const routes = [
   { method: 'POST', path: '/v1/mongo/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/imports', localHandler: 'mongoDataImport', auth: 'authenticated' },
   // engine-dispatched DB provisioning (postgresql | mongodb) — the SPA wizard target
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/databases', localHandler: 'provisionDatabaseGeneric', auth: 'authenticated' },
+  // Single-database lifecycle; leaves the workspace and its other resources intact (#967).
+  { method: 'DELETE', path: '/v1/workspaces/{workspaceId}/databases/{databaseName}', localHandler: 'deleteDatabase', auth: 'authenticated' },
 
   // ---- domain B: object storage (REAL SeaweedFS/S3 via SigV4) ---------------
   { method: 'GET',  path: '/v1/storage/buckets', localHandler: 'storageListBuckets', auth: 'authenticated' },
