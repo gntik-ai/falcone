@@ -35,4 +35,11 @@ The paired charts change SHALL render `nginx_config.http.access_log_format` in d
 - **WHEN** the format is removed or a query-bearing variable is reintroduced
 - **THEN** the paired chart contract fails
 
+#### Scenario: Access-log field layout survives YAML parsing
+
+- **WHEN** the rendered ConfigMap's `config.yaml` is parsed for each supported profile
+- **THEN** the format equals the known-good APISIX 3.10 default with only `$request` replaced by `$request_method $uri $server_protocol` and `$upstream_uri` replaced by `$uri`
+- **AND** literal field delimiters remain unchanged, with no enclosing double quotes or backslash characters in the parsed format
+- **AND** the paired chart contract fails for a folded scalar containing YAML-style outer quotes or escaped delimiters
+
 Application and access-log protection SHALL NOT be represented as protection from nginx error-log request-line disclosure or unverified external ingress/load-balancer logging.

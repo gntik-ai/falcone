@@ -10,6 +10,7 @@
 - [x] Run bounded available tests and record unavailable checks.
 - [ ] Source PR CI: run all three Temporal-dependent stream cases and existing socket-based flow/error-code regressions with installed dependencies.
 - [ ] Paired charts maker/checker: implement and test the access-log format across all five profiles and preserve metrics export and route-copy alignment.
+- [ ] Paired charts checker fixes: remove literal outer quotes/backslashes from the folded access-log scalar, and compare the parsed format to a known-good APISIX 3.10 literal across all five profiles.
 - [ ] Runtime verifier: sentinel SSE request plus APISIX/executor/control-plane log check in kind.
 - [ ] Operator follow-up: confirm external ingress/LB logging and track the nginx error-log residual until u5.
 
@@ -27,3 +28,16 @@ Assignment: worktree `/srv/engineering/worktrees/falcone/ff74fffe-da48-5af7-b281
 - SKIPPED: runtime pod-log verification and paired chart checks are outside this source-only, offline sandbox.
 
 No test timeout wrapper, dependency manifest change, lockfile change, credential access or deployment is needed. The temporary reproduction and mutation copies are removed after verification.
+
+## Source follow-up after independent review (2026-10-11)
+
+The assigned source branch was clean at the supplied HEAD `8536b67c655b06f903d6df32c544316ad2571af6`. The existing application implementation satisfies the reviewed source behavior; it is preserved without further runtime changes. This follow-up clarifies the paired chart serialization contract and records new verification evidence.
+
+The two blocking checker findings belong to the separate deployment repository. Read-only inspection confirms `charts/in-falcone/templates/apisix-config-file.yaml:48` still uses a folded scalar with literal outer quotes and escaped delimiters, and `tests/blackbox/staging-infrastructure/apisix-access-log-contract.test.mjs:30` checks variables without asserting the parsed format's exact field layout. The deployment maker must correct both together, watch the strengthened contract fail before the template fix, and rerun its deterministic adapter/metrics-export checks. That worktree is outside this source assignment's writable roots. Hermes owns any subsequent chart-pin update.
+
+- Reproduction/negative-control command: `node --test --experimental-test-isolation=none --test-name-pattern='forced 5xx on flow query-key authentication' tests/blackbox/flow-stream-apikey-logs.test.mjs`, run in an isolated archive. Replacing only the executor server with the immutable base version produces the expected boolean leak assertion failure. Restoring HEAD passes; injecting `logger.error(req.url)` fails that same assertion; restoring HEAD passes again. The confirmed cause is passing an exception containing the raw query-bearing URL directly to the logger. No captured query material was printed, and the archive was removed.
+- PASS: log-capture suite, 8 cases; metric-route-label suite, 8 cases; authorization-denial audit suite, 12 cases. Each suite ran in its own process, avoiding shared metric registry interference.
+- SKIPPED: 3 Temporal-dependent log-capture cases because existing yaml/ajv packages are not installed; flow-events suite because `pg` is not installed; all 25 executor-5xx cases because socket setup raises `listen EPERM: operation not permitted 127.0.0.1` before exercising assertions. Source PR CI must run these checks with installed dependencies and permitted sockets.
+- SKIPPED: paired chart checks and runtime pod-log verification are outside the assigned source-only sandbox. Nginx error-log request lines and external ingress/LB logging remain the documented residuals.
+
+No dependency changes, deployment edits, chart-pin edits or debug instrumentation are included in this follow-up.
