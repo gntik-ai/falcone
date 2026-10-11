@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: 'e6692ebc683379a6f6865f4143da8e99861088d0'
+  FALCONE_CHARTS_REF: '62bb996b5526e924d340398f903becadc95f7273'
 
 jobs:
   quality:
@@ -58,6 +58,12 @@ jobs:
           node --test tests/blackbox/flow-stream-apikey-logs.test.mjs \
             tests/blackbox/flows-execution-events.test.mjs \
             tests/blackbox/executor-5xx-code-redaction.test.mjs
+
+      - name: Worker and control-plane image contracts
+        run: |
+          node --test tests/blackbox/flows-worker-dockerfile.test.mjs \
+            tests/blackbox/scheduling-handler-dockerfile.test.mjs \
+            tests/blackbox/flows-worker-pg-env-and-search-attrs.test.mjs
 
       - name: Live catalog quota admission
         run: |
