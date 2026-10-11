@@ -24,6 +24,7 @@ let bootstrap; let pool;
 const SCHEMA = `
   CREATE TABLE workspaces (id text PRIMARY KEY, tenant_id text, workspace_id text);
   CREATE TABLE workspace_databases (id text PRIMARY KEY, tenant_id text, workspace_id text, engine text);
+  CREATE TABLE workspace_mongo_databases (id text PRIMARY KEY, tenant_id text, workspace_id text, database_name text);
   CREATE TABLE workspace_functions (id text PRIMARY KEY, tenant_id text, workspace_id text);
   CREATE TABLE workspace_topics (id text PRIMARY KEY, tenant_id text, workspace_id text);
   CREATE TABLE workspace_api_keys (id serial PRIMARY KEY, tenant_id text, workspace_id text);
@@ -38,7 +39,8 @@ before(async () => {
   // Tenant under test: 2 workspaces, 3 pg dbs + 1 mongo db, 4 functions, 2 topics, 5 api keys.
   for (let i = 0; i < 2; i++) await pool.query('INSERT INTO workspaces (id,tenant_id,workspace_id) VALUES ($1,$2,$3)', [`w${i}`, TEN, `${WS}${i}`]);
   for (let i = 0; i < 3; i++) await pool.query('INSERT INTO workspace_databases (id,tenant_id,workspace_id,engine) VALUES ($1,$2,$3,$4)', [`pg${i}`, TEN, WS, 'postgresql']);
-  await pool.query('INSERT INTO workspace_databases (id,tenant_id,workspace_id,engine) VALUES ($1,$2,$3,$4)', ['mg0', TEN, WS, 'mongodb']);
+  // Mongo is counted in its own lifecycle registry (#967), not the Postgres table.
+  await pool.query('INSERT INTO workspace_mongo_databases (id,tenant_id,workspace_id,database_name) VALUES ($1,$2,$3,$4)', ['mg0', TEN, WS, 'notes']);
   for (let i = 0; i < 4; i++) await pool.query('INSERT INTO workspace_functions (id,tenant_id,workspace_id) VALUES ($1,$2,$3)', [`f${i}`, TEN, WS]);
   for (let i = 0; i < 2; i++) await pool.query('INSERT INTO workspace_topics (id,tenant_id,workspace_id) VALUES ($1,$2,$3)', [`t${i}`, TEN, WS]);
   for (let i = 0; i < 5; i++) await pool.query('INSERT INTO workspace_api_keys (tenant_id,workspace_id) VALUES ($1,$2)', [TEN, WS]);
@@ -63,7 +65,7 @@ test('every production dimension is measured against the live tables (no NO_QUER
   }
   assert.equal(counts.get('max_workspaces').currentUsage, 2);
   assert.equal(counts.get('max_pg_databases').currentUsage, 3, 'postgresql dbs only (engine filter)');
-  assert.equal(counts.get('max_mongo_databases').currentUsage, 1, 'mongodb dbs only');
+  assert.equal(counts.get('max_mongo_databases').currentUsage, 1, 'Mongo registry rows only (#967)');
   assert.equal(counts.get('max_functions').currentUsage, 4);
   assert.equal(counts.get('max_kafka_topics').currentUsage, 2);
   assert.equal(counts.get('max_api_keys').currentUsage, 5);

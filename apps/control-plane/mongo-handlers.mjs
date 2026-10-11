@@ -407,7 +407,19 @@ async function mongoProvision(ctx) {
 // The client is injected by the caller (mirrors the ctx.mongoClient seam) so the
 // teardown is unit-testable with a fake client.
 const isSystemCollection = (n) => SYSTEM_DBS.has(n) || String(n).startsWith('system.');
-export async function mongoTeardown({ client, tenantId, databaseNames }) {
+// A database shared by other workspaces is empty for this delete only when this
+// workspace has no stamped documents. Unscoped legacy documents stay untouched (#967).
+export async function isWorkspaceMongoDatabaseEmpty({ client, tenantId, workspaceId, databaseName }) {
+  const db = client.db(databaseName);
+  const cols = (await db.listCollections().toArray())
+    .filter((x) => x.type === 'collection' && !isSystemCollection(x.name));
+  for (const x of cols) {
+    if (await db.collection(x.name).countDocuments({ tenantId, workspaceId }) > 0) return false;
+  }
+  return true;
+}
+
+export async function mongoTeardown({ client, tenantId, databaseNames, workspaceId }) {
   const dropped = [];
   const retained = [];
   const errors = [];
@@ -416,9 +428,9 @@ export async function mongoTeardown({ client, tenantId, databaseNames }) {
       const db = client.db(name);
       const cols = (await db.listCollections().toArray())
         .filter((x) => x.type === 'collection' && !isSystemCollection(x.name));
-      // 1. Delete THIS tenant's documents from every non-system collection.
+      // 1. Delete THIS tenant's documents; standalone delete also narrows to its workspace (#967).
       for (const x of cols) {
-        await db.collection(x.name).deleteMany({ tenantId });
+        await db.collection(x.name).deleteMany(workspaceId == null ? { tenantId } : { tenantId, workspaceId });
       }
       // 2. Drop the db only if no other tenant's documents remain anywhere in it.
       let remaining = 0;

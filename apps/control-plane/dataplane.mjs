@@ -14,6 +14,7 @@
 // records the function and reports runtimeStatus 'pending_data_plane' unless the
 // executor path is available (no fake "deployed" claim).
 import { randomBytes } from 'node:crypto';
+import { withPostgresSsl } from './transport-security.mjs';
 
 const PGHOST = process.env.PGHOST || 'falcone-postgresql';
 const PGPORT = process.env.PGPORT || '5432';
@@ -109,9 +110,40 @@ export async function rotateWorkspaceDatabaseCredential(pool, { database, mode, 
   };
 }
 
+// Any user table (even with zero rows) requires explicit force for deletion (#967).
+// An absent physical database is already empty; other probe failures fail closed.
+export async function isWorkspaceDatabaseEmpty(pool, database, injectedClient = null) {
+  const db = ident(database, 'wsdb');
+  if (db !== database) throw new Error('invalid database identifier');
+  if (!(await databaseExists(pool, db))) return true;
+  let client = injectedClient;
+  try {
+    if (!client) {
+      const { default: pg } = await import('pg');
+      client = new pg.Client(withPostgresSsl({
+        host: PGHOST, port: Number(PGPORT), user: PGUSER, password: PGPASSWORD,
+        database: db, connectionTimeoutMillis: 5000, statement_timeout: 10000
+      }));
+      await client.connect();
+    }
+    const { rows } = await client.query(`SELECT NOT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind IN ('r', 'p', 'f')
+        AND n.nspname <> 'information_schema' AND n.nspname !~ '^pg_'
+    ) AS empty`);
+    return rows[0]?.empty === true;
+  } catch (e) {
+    if (e.code === '3D000') return true;
+    throw e;
+  } finally {
+    if (client && !injectedClient) await client.end().catch(() => {});
+  }
+}
+
 // Drop a provisioned database (used by the saga compensator and explicit delete):
 // terminate stragglers, drop the db, then drop the dedicated role if present.
-export async function dropWorkspaceDatabase(pool, database) {
+export async function dropWorkspaceDatabase(pool, database, { strictRoleDrop = false } = {}) {
   const db = ident(database, 'wsdb');
   try {
     await pool.query(
@@ -119,7 +151,10 @@ export async function dropWorkspaceDatabase(pool, database) {
   } catch {}
   await pool.query(`DROP DATABASE IF EXISTS "${db}"`);
   const role = `${db}_app`.slice(0, 60);
-  if (await roleExists(pool, role)) { try { await pool.query(`DROP ROLE IF EXISTS "${role}"`); } catch {} }
+  if (await roleExists(pool, role)) {
+    try { await pool.query(`DROP ROLE IF EXISTS "${role}"`); }
+    catch (e) { if (strictRoleDrop) throw e; } // Standalone delete stays retryable (#967); cascades keep best-effort behavior.
+  }
 }
 
 export { ident as _ident };

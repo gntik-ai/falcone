@@ -12,7 +12,8 @@ const DIMENSION_QUERY_MAP = {
   // Production catalog (quota_dimension_catalog) → live in_falcone tables.
   max_workspaces: makeDimensionQuery('workspaces', { fakeKey: 'workspaces' }),
   max_pg_databases: makeDimensionQuery('workspace_databases', { fakeKey: 'pg_databases', where: "engine = 'postgresql'" }),
-  max_mongo_databases: makeDimensionQuery('workspace_databases', { fakeKey: 'mongo_databases', where: "engine = 'mongodb'" }),
+  // Mongo lifecycle uses its own workspace registry; deleting a row frees usage (#967).
+  max_mongo_databases: makeDimensionQuery('workspace_mongo_databases', { fakeKey: 'mongo_databases' }),
   max_functions: makeDimensionQuery('workspace_functions', { fakeKey: 'functions' }),
   max_kafka_topics: makeDimensionQuery('workspace_topics', { fakeKey: 'kafka_topics' }),
   max_api_keys: makeDimensionQuery('workspace_api_keys', { fakeKey: 'api_keys' }),

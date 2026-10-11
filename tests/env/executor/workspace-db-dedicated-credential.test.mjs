@@ -23,6 +23,7 @@ import {
   provisionWorkspaceDatabase,
   rotateWorkspaceDatabaseCredential,
   dropWorkspaceDatabase,
+  isWorkspaceDatabaseEmpty,
 } from '../../../apps/control-plane/dataplane.mjs';
 
 const { Pool } = pg;
@@ -120,6 +121,21 @@ test('rotateWorkspaceDatabaseCredential performs a REAL rotation: old rejected, 
 
   // Keep the surfaced credential current for teardown bookkeeping.
   provisioned = { ...provisioned, password: rotated.password };
+});
+
+test('#967: any user table, including an empty table outside public, prevents unforced deletion', async () => {
+  assert.ok(provisioned, 'provisioning test must run first');
+  const database = new Pool({ host: PGHOST, port: Number(PGPORT), user: PGUSER,
+    password: PGPASSWORD, database: provisioned.database, max: 1 });
+  try {
+    assert.equal(await isWorkspaceDatabaseEmpty(admin, provisioned.database, database), true);
+    await database.query('CREATE SCHEMA app; CREATE TABLE app.notes (id integer)');
+    assert.equal(await isWorkspaceDatabaseEmpty(admin, provisioned.database, database), false);
+    await database.query('DROP TABLE app.notes');
+    assert.equal(await isWorkspaceDatabaseEmpty(admin, provisioned.database, database), true);
+  } finally {
+    await database.end();
+  }
 });
 
 test('dropWorkspaceDatabase removes both the dedicated database and its role', async () => {

@@ -6554,6 +6554,226 @@
         "x-visibility": "public"
       }
     },
+    "/v1/workspaces/{workspaceId}/databases/{databaseName}": {
+      "delete": {
+        "description": "Independent database lifecycle (#967). Requires database.admin in the owning workspace. User tables require force=true for Postgres; scoped documents require force=true for Mongo. Mongo removes only documents matching both tenantId and workspaceId, and retains a database with remaining documents. A failed physical drop keeps the registry row for retry. Without engine, a matching Postgres registry entry takes precedence over Mongo.",
+        "operationId": "deleteDatabase",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "description": "Database name recorded in this workspace registry.",
+            "in": "path",
+            "name": "databaseName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Select the database engine when names overlap.",
+            "in": "query",
+            "name": "engine",
+            "required": false,
+            "schema": {
+              "enum": [
+                "postgresql",
+                "mongodb"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Explicitly allow deletion of a non-empty database.",
+            "in": "query",
+            "name": "force",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "databaseName": {
+                      "type": "string"
+                    },
+                    "deleted": {
+                      "enum": [
+                        true
+                      ],
+                      "type": "boolean"
+                    },
+                    "engine": {
+                      "enum": [
+                        "postgresql",
+                        "mongodb"
+                      ],
+                      "type": "string"
+                    },
+                    "retained": {
+                      "description": "Mongo only: the physical database remains because it still contains documents.",
+                      "type": "boolean"
+                    },
+                    "workspaceId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "workspaceId",
+                    "databaseName",
+                    "engine",
+                    "deleted"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Database registry row removed. Mongo reports retained when other documents remain in the shared physical database. The workspace and sibling resources remain intact."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The request is malformed or contextually inconsistent."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Workspace or database not found. Cross-tenant and missing resources have identical responses."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "DATABASE_NOT_EMPTY: explicit force=true is required."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Physical teardown failed; the registry row remains for retry."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete one provisioned workspace database",
+        "tags": [
+          "Workspaces"
+        ],
+        "x-audiences": [
+          "developer_external",
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_viewer",
+          "platform_team"
+        ],
+        "x-family": "workspaces",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "workspace_database",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      }
+    },
     "/v1/workspaces/{workspaceId}/docs": {
       "get": {
         "operationId": "getWorkspaceDocs",

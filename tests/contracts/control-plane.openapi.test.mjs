@@ -14,6 +14,26 @@ function assertUsesErrorResponse(document, response, message) {
   assert.deepEqual(schema, document.components.schemas.ErrorResponse, message);
 }
 
+test('#967: workspace database DELETE advertises success and safe error contracts', async () => {
+  const document = await SwaggerParser.validate(OPENAPI_PATH);
+  const del = document.paths['/v1/workspaces/{workspaceId}/databases/{databaseName}']?.delete;
+  assert.ok(del, 'database lifecycle DELETE is advertised');
+  assert.equal(del.operationId, 'deleteDatabase');
+  assert.equal(del['x-scope'], 'workspace');
+  assert.deepEqual(del.security, [{ bearerAuth: [] }]);
+  const parameters = resolveParameters(document, del);
+  assert.ok(parameters.some((p) => p.name === 'workspaceId' && p.required && p.in === 'path'));
+  assert.ok(parameters.some((p) => p.name === 'databaseName' && p.required && p.in === 'path'));
+  assert.deepEqual(parameters.find((p) => p.name === 'engine').schema.enum, ['postgresql', 'mongodb']);
+  assert.equal(parameters.find((p) => p.name === 'force').schema.type, 'boolean');
+  const success = del.responses['200'].content['application/json'].schema;
+  assert.deepEqual(success.required, ['workspaceId', 'databaseName', 'engine', 'deleted']);
+  assert.equal(success.properties.retained.type, 'boolean');
+  for (const status of ['400', '403', '404', '409', '502']) {
+    assertUsesErrorResponse(document, del.responses[status], `delete error ${status} uses ErrorResponse`);
+  }
+});
+
 test('control-plane OpenAPI document remains structurally valid', async () => {
   const document = await SwaggerParser.validate(OPENAPI_PATH);
 

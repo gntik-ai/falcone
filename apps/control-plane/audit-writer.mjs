@@ -30,6 +30,7 @@ const AUDITABLE_LOCAL_HANDLERS = {
   revokeCredential: 'workspace.service-account.credential.revoke',
   provisionDatabase: 'workspace.database.provision',
   provisionDatabaseGeneric: 'workspace.database.provision',
+  deleteDatabase: 'workspace.database.delete', // Independent database lifecycle (#967).
   rotateDatabaseCredential: 'workspace.database.credential.rotate',
   registerFunction: 'workspace.function.register',
   iamCreateUser: 'iam.user.create', iamDeleteUser: 'iam.user.delete', iamSetUserStatus: 'iam.user.status',
@@ -87,7 +88,9 @@ export function auditEventForRoute(route, ctx, result) {
   if (!actionType) return null;
   const status = result?.statusCode ?? 200;
   const { tenantId, workspaceId } = resolveScope(route, ctx, result);
-  if (!tenantId) return null; // never record an action we cannot attribute to a tenant
+  // A platform database-delete attempt may target a missing workspace. Audit that
+  // attempt globally rather than inventing an owning tenant (#967).
+  if (!tenantId && actionType !== 'workspace.database.delete') return null;
   const evidence = result?.knativeEvidence;
   const safeEvidence = evidence && typeof evidence === 'object' ? {
     capability: evidence.capability === 'mcp' ? 'mcp' : 'function',
