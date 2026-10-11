@@ -44,7 +44,7 @@ export async function invokeRoute(route, handler, params, callerContext, identit
     }
     case 'identity-overrides':
       if (!identity?.tenantId) return { statusCode: 401, body: { code: 'UNAUTHENTICATED' } };
-      return handler(params, { ...buildOverrides(route, db), identity: { ...identity, actorId: identity.sub } });
+      return handler(params, { ...buildOverrides(route, db), identity: { ...identity, ...authFrom(identity) } });
     case 'params-auth-db': {
       if (!identity) return { statusCode: 401, body: { code: 'UNAUTHENTICATED' } };
       const tenantId = params.domain === 'tenant' ? identity.tenantId : null;

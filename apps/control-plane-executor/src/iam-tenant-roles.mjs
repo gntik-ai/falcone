@@ -140,6 +140,28 @@ function errorBody(code, message, extra = {}) {
   return { code, error: message, ...extra };
 }
 
+// Match the management audiences in the public route contract. Reachable-action
+// validation limits grants; it does not authorize creating, editing or deleting
+// a role. actor_type alone grants no management authority.
+function canManageCustomRoles(identity) {
+  const roles = identity.roles ?? [];
+  if (roles.some(role => [
+    'tenant_owner', 'tenant_admin',
+    'superadmin', 'platform_admin', 'platform_operator'
+  ].includes(role))) return true;
+  // Membership in workspace_ids does not select the scope of a new role. A
+  // workspace administrator must present a token bound to a specific workspace.
+  return Boolean(identity.workspaceId)
+    && roles.some(role => ['workspace_owner', 'workspace_admin'].includes(role));
+}
+
+function roleInScope(row, identity) {
+  // Even tenant administrators using a workspace-bound token stay in that
+  // workspace. Unbound tenant administrators may manage any role in the tenant.
+  return row?.tenant_id === identity.tenantId
+    && (!identity.workspaceId || row.workspace_id === identity.workspaceId);
+}
+
 function serializeRole(row) {
   return {
     id: row.id,
@@ -246,6 +268,9 @@ export async function createTenantCustomRole(params = {}, overrides = {}) {
   if (!identity) {
     return { statusCode: 401, body: errorBody('UNAUTHORIZED', 'Missing tenant identity headers.') };
   }
+  if (!canManageCustomRoles(identity)) {
+    return { statusCode: 403, body: errorBody('FORBIDDEN', 'Custom role management requires an administrator role.') };
+  }
 
   db = tenantRoleStorage(db, identity);
   const roleName = params.role_name;
@@ -313,7 +338,7 @@ export async function getTenantCustomRole(params = {}, overrides = {}) {
   db = tenantRoleStorage(db, identity);
   const roleId = params.roleId ?? params.role_id;
   const row = await db.findById(roleId);
-  if (!row || row.tenant_id !== identity.tenantId) {
+  if (!roleInScope(row, identity)) {
     return { statusCode: 404, body: errorBody('NOT_FOUND', 'Custom role not found.') };
   }
 
@@ -334,11 +359,14 @@ export async function updateTenantCustomRole(params = {}, overrides = {}) {
   if (!identity) {
     return { statusCode: 401, body: errorBody('UNAUTHORIZED', 'Missing tenant identity headers.') };
   }
+  if (!canManageCustomRoles(identity)) {
+    return { statusCode: 403, body: errorBody('FORBIDDEN', 'Custom role management requires an administrator role.') };
+  }
 
   db = tenantRoleStorage(db, identity);
   const roleId = params.roleId ?? params.role_id;
   const row = await db.findById(roleId);
-  if (!row || row.tenant_id !== identity.tenantId) {
+  if (!roleInScope(row, identity)) {
     return { statusCode: 404, body: errorBody('NOT_FOUND', 'Custom role not found.') };
   }
 
@@ -371,11 +399,14 @@ export async function deleteTenantCustomRole(params = {}, overrides = {}) {
   if (!identity) {
     return { statusCode: 401, body: errorBody('UNAUTHORIZED', 'Missing tenant identity headers.') };
   }
+  if (!canManageCustomRoles(identity)) {
+    return { statusCode: 403, body: errorBody('FORBIDDEN', 'Custom role management requires an administrator role.') };
+  }
 
   db = tenantRoleStorage(db, identity);
   const roleId = params.roleId ?? params.role_id;
   const row = await db.findById(roleId);
-  if (!row || row.tenant_id !== identity.tenantId) {
+  if (!roleInScope(row, identity)) {
     return { statusCode: 404, body: errorBody('NOT_FOUND', 'Custom role not found.') };
   }
 
