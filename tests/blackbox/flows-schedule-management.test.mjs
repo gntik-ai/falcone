@@ -197,16 +197,17 @@ function makeRegistry() {
 }
 
 // Boot the server with an executor + a wired-in trigger registry sharing the SAME fake Temporal.
-async function withScheduleServer(fn, { temporal } = {}) {
+async function withScheduleServer(fn, { temporal, getTemporalClient, schedulingDisabled = false, logger = { error() {} } } = {}) {
   const t = temporal ?? makeFakeTemporal();
   const registry = makeRegistry();
   const flowExecutor = createFlowExecutor({ temporalClient: t, temporalAddress: 'fake:7233' });
   const triggerRegistry = createFlowTriggerRegistry({
-    temporalClient: t,
+    temporalClient: getTemporalClient ? undefined : t,
+    getTemporalClient,
     startTriggeredExecution: (args) => flowExecutor.startTriggeredExecution(args),
-    logger: { error() {} },
+    logger,
   });
-  flowExecutor.setTriggerRegistry(triggerRegistry);
+  if (!schedulingDisabled) flowExecutor.setTriggerRegistry(triggerRegistry);
   const server = createControlPlaneServer({ registry, flowExecutor, logger: { error() {} } });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -221,6 +222,68 @@ async function withScheduleServer(fn, { temporal } = {}) {
 
 const flowsBase = (ws) => `/v1/flows/workspaces/${ws}/flows`;
 const schedulesBase = (ws) => `/v1/flows/workspaces/${ws}/schedules`;
+
+test('fix-989: schedule routes return redacted 503s and recover on the same server', async () => {
+  const temporal = makeFakeTemporal();
+  const flowId = 'flow-reconnect';
+  const scheduleId = `${TEN_A}:${WS_A}:${flowId}`;
+  await temporal.schedule.create({ scheduleId, spec: { cronExpressions: ['*/5 * * * *'] } });
+  let healthy = false;
+  let attempts = 0;
+  const original = Object.assign(new Error('private connect diagnostic'), { code: 14, stack: 'private connect stack' });
+  const logged = [];
+  const getTemporalClient = async () => {
+    attempts += 1;
+    if (!healthy) throw original;
+    return temporal;
+  };
+  const schedulePath = `${flowsBase(WS_A)}/${flowId}/schedule`;
+  const routes = [
+    ['GET', schedulePath, 200],
+    ['GET', schedulesBase(WS_A), 200],
+    ['POST', `${schedulePath}/pause`, 200],
+    ['POST', `${schedulePath}/resume`, 200],
+    ['POST', `${schedulePath}/trigger`, 202],
+  ];
+
+  await withScheduleServer(async ({ baseUrl }) => {
+    for (const [method, path] of routes) {
+      const res = await fetch(`${baseUrl}${path}`, { method, headers: headersFor(TEN_A, WS_A) });
+      assert.equal(res.status, 503, `${method} ${path}`);
+      assert.deepEqual(await res.json(), { code: 'TEMPORAL_UNAVAILABLE', message: 'Internal server error' });
+    }
+    assert.equal(attempts, 5, 'every request while down attempts a fresh connect');
+    assert.equal(logged.length, 5);
+    assert.ok(logged.every((args) => args.at(-1) === original), 'original diagnostics are logged server-side');
+
+    healthy = true;
+    for (const [method, path, status] of routes) {
+      const res = await fetch(`${baseUrl}${path}`, { method, headers: headersFor(TEN_A, WS_A) });
+      assert.equal(res.status, status, `${method} ${path} recovers`);
+      const body = await res.json();
+      if (path === schedulesBase(WS_A)) assert.equal(body.items[0].scheduleId, scheduleId);
+      else assert.equal(body.scheduleId, scheduleId);
+    }
+    assert.equal(attempts, 6, 'the successful connection is retained');
+    const missing = await fetch(`${baseUrl}${flowsBase(WS_A)}/missing/schedule`, { headers: headersFor(TEN_A, WS_A) });
+    assert.equal(missing.status, 404);
+    assert.equal((await missing.json()).code, 'SCHEDULE_NOT_FOUND');
+  }, { temporal, getTemporalClient, logger: { error: (...args) => logged.push(args) } });
+});
+
+test('fix-989: an unwired trigger plane keeps FLOW_SCHEDULING_DISABLED', async () => {
+  await withScheduleServer(async ({ baseUrl }) => {
+    const path = `${flowsBase(WS_A)}/flow-disabled/schedule`;
+    for (const [method, route] of [
+      ['GET', path], ['GET', schedulesBase(WS_A)],
+      ['POST', `${path}/pause`], ['POST', `${path}/resume`], ['POST', `${path}/trigger`],
+    ]) {
+      const res = await fetch(`${baseUrl}${route}`, { method, headers: headersFor(TEN_A, WS_A) });
+      assert.equal(res.status, 501);
+      assert.equal((await res.json()).code, 'FLOW_SCHEDULING_DISABLED');
+    }
+  }, { schedulingDisabled: true });
+});
 
 // Create + publish a cron flow in (tenantId, ws); returns its flowId (and so its scheduleId).
 async function publishCronFlow(baseUrl, tenantId, ws, name = 'Cron Flow', def = CRON_DEF) {

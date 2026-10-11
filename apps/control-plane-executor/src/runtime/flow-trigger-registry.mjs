@@ -339,9 +339,21 @@ function createPostgresTriggerStore(pool) {
 // ---------------------------------------------------------------------------------------------
 
 function createScheduleGateway({ temporalClient, getTemporalClient, logger }) {
+  let connecting = null;
+
   async function client() {
     if (temporalClient) return temporalClient;
-    if (getTemporalClient) return getTemporalClient();
+    if (getTemporalClient) {
+      if (!connecting) {
+        // Defer the factory so even a synchronous throw clears the assigned memo.
+        connecting = Promise.resolve().then(() => getTemporalClient()).catch((err) => {
+          connecting = null;
+          logger?.error?.('[flow-trigger-registry] Temporal connect failed:', err);
+          throw clientError('Temporal is unavailable', 503, 'TEMPORAL_UNAVAILABLE');
+        });
+      }
+      return connecting;
+    }
     throw clientError('Temporal is not configured', 503, 'TEMPORAL_UNAVAILABLE');
   }
 
@@ -520,8 +532,8 @@ export function resolveTriggerSecretKey() {
 
 export function createFlowTriggerRegistry({
   store = createTriggerStore(),
-  // Injected Temporal client (its `.schedule` is the ScheduleClient) OR a lazy getter shared with
-  // the flow executor's gateway.
+  // Injected Temporal client (its `.schedule` is the ScheduleClient) OR a connect factory.
+  // The schedule gateway shares pending attempts, retains success and discards failures.
   temporalClient,
   getTemporalClient,
   temporalTaskQueue = 'flows-main',
