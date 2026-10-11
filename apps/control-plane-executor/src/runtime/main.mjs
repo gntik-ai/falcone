@@ -299,7 +299,6 @@ const flowExecutor = process.env.TEMPORAL_ADDRESS
 // omitted it), so publishing a flow with a platform-event/webhook trigger 502'd with
 // `relation "flow_trigger_registrations" does not exist` (fix-flow-trigger-schema, C3).
 const triggerStore = createTriggerStore({ pool: keyPool });
-let scheduleClientP = null;
 async function bootFlowTriggers() {
   if (!flowExecutor) return;
   await wireFlowTriggers({
@@ -307,17 +306,12 @@ async function bootFlowTriggers() {
     store: triggerStore,
     temporalTaskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'flows-main',
     secretMasterKey: process.env.FLOW_TRIGGER_SECRET_KEY,
-    // Lazy Temporal client (its `.schedule` is the ScheduleClient). Shares the connection lifetime
-    // with the executor's gateway in production; here a dedicated lazy connect keeps the boundary.
+    // Dedicated Temporal connection factory (its client's `.schedule` is the ScheduleClient).
+    // The schedule gateway owns lazy connection caching and retries rejected attempts.
     getTemporalClient: async () => {
-      if (!scheduleClientP) {
-        scheduleClientP = (async () => {
-          const { Connection, Client } = await import('@temporalio/client');
-          const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS });
-          return new Client({ connection, namespace: process.env.TEMPORAL_NAMESPACE ?? 'falcone-flows' });
-        })();
-      }
-      return scheduleClientP;
+      const { Connection, Client } = await import('@temporalio/client');
+      const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS });
+      return new Client({ connection, namespace: process.env.TEMPORAL_NAMESPACE ?? 'falcone-flows' });
     },
     // Platform-event consumer: a single KafkaJS consumer group subscribing to the union of
     // registered tenant-scoped physical topics. Enabled only when a broker is configured.
