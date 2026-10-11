@@ -57,3 +57,20 @@ Read-only inspection of the paired deployment worktree now shows valid double-qu
 - SKIPPED: chart render/lint checks belong to the paired deployment assignment; pod-log verification requires the runtime verifier. Source PR CI must execute the missing stream and regression checks with installed dependencies and permitted sockets. Nginx error-log request lines and external ingress/LB logging remain the documented residuals.
 
 No source runtime, dependency manifest, lockfile, deployment or chart-pin change is required by this review. No timeout wrapper or debug instrumentation remains.
+
+## Source CI cancellation fix (2026-10-11)
+
+The assigned branch was clean at the supplied HEAD `95e28073a99b3ee00b3174c3891ed96ab8a86285`. The quality-job cancellations originate in the log-capture transport: the successful flow response uses `Connection: keep-alive`, so ending the response does not finish the underlying socket. Waiting solely for socket `finish` leaves the test promise unresolved and cancels subsequent cases. The transport now closes the test client on the terminal `stream-end` frame, as it already does for a forced stream-error frame. Application behavior and all existing leak/status/frame assertions remain intact.
+
+The regression seam is a real HTTP server and its serialized keep-alive SSE response, using the same synthetic request and in-memory network transport as the application cases. It requires no Temporal/database packages. Before the change, `node --test --experimental-test-isolation=none --test-name-pattern='terminal SSE completes' tests/blackbox/flow-stream-apikey-logs.test.mjs` reproduced the exact CI diagnostic: `Promise resolution is still pending but the event loop has already resolved`. After the transport fix, the regression passes.
+
+- PASS: `node --test --experimental-test-isolation=none tests/blackbox/flow-stream-apikey-logs.test.mjs`: 9 passing cases, zero failures/cancellations; 3 Temporal-dependent cases remain SKIPPED because existing yaml/ajv packages are absent.
+- PASS: `node --test --experimental-test-isolation=none tests/unit/http-metric-route-labels.test.mjs`: 8 cases.
+- PASS: `node --test --experimental-test-isolation=none tests/blackbox/authorization-denial-audit.test.mjs`: 12 cases.
+- PASS: isolated-archive negative control using `node --test --experimental-test-isolation=none --test-name-pattern='forced 5xx on flow query-key authentication' tests/blackbox/flow-stream-apikey-logs.test.mjs`: pristine source passes, injected `logger.error(req.url)` fails the boolean leak assertion, restored source passes. Captured logger content was suppressed and the archive removed.
+- SKIPPED: the matching quality command `node --test tests/blackbox/flow-stream-apikey-logs.test.mjs tests/blackbox/flows-execution-events.test.mjs tests/blackbox/executor-5xx-code-redaction.test.mjs` cannot complete its checks here: flow-events imports missing `pg`; executor-5xx socket setup raises `listen EPERM: operation not permitted 127.0.0.1` before assertions. Source PR CI must run these and all three Temporal cases with installed dependencies and permitted sockets.
+- SKIPPED: matching `pnpm test:unit` cannot complete here because node_modules is absent and sockets/subprocesses are restricted. Its before/after file-level results are identical (116 passing files, 109 environment-blocked files). Direct case diagnostics confirm missing packages and EPERM; this does not claim a passing full unit suite.
+- SKIPPED: `pnpm lint` stops before repository validation with `sh: 1: npm: not found`; markdown lint also requires the installed toolchain.
+- SKIPPED: paired chart render/lint checks belong to the deployment assignment; pod-log verification requires the runtime verifier. Nginx error-log request lines and external ingress/LB logging remain documented residuals.
+
+This follow-up changes only the regression transport and this handoff. Existing dependency manifests, lockfiles, runtime source, safety gates, CI coverage and Hermes chart pins are preserved. No timeout wrapper or debug instrumentation remains.

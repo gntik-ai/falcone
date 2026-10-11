@@ -29,7 +29,9 @@ function assertNoKey(calls) {
   assert.equal(text.includes(SENTINEL) || text.includes('apikey='), false, 'application log contains API-key query material');
 }
 
-async function request(server, path = FLOW_URL, headers = {}, { method = 'GET', body = '', stopWhen } = {}) {
+// SSE responses explicitly keep the connection alive, even after res.end(). Close the
+// test client on the terminal frame rather than waiting for the socket to finish.
+async function request(server, path = FLOW_URL, headers = {}, { method = 'GET', body = '', stopWhen = 'event: stream-end' } = {}) {
   const chunks = [];
   const socket = new Duplex({
     read() {},
@@ -144,6 +146,19 @@ test('executor: invalid query key returns 401 without logging it', async () => {
   assert.equal(response.status, 401);
   assert.match(response.raw, /UNAUTHENTICATED/);
   assertNoKey(calls);
+});
+
+test('log-capture transport: terminal SSE completes on a keep-alive connection', async () => {
+  // Match the real flow route's HTTP framing without database/Temporal dependencies.
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/event-stream', connection: 'keep-alive' });
+    res.write('event: node-status\ndata: {"status":"completed"}\n\n');
+    res.end('event: stream-end\ndata: {"status":"Completed"}\n\n');
+  });
+  const response = await request(server);
+  assert.equal(response.status, 200);
+  assert.match(response.raw, /event: node-status/);
+  assert.match(response.raw, /event: stream-end/);
 });
 
 async function monitoring(t, logger, fail = false) {
