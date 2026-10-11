@@ -24,6 +24,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
+import { kcAdmin } from '../../apps/control-plane/kc-admin.mjs';
 
 // ---- handler harness: inject store + kcAdmin via ctx, parameterized by SA status -----------------
 function handlerCtx({ status = 'active' } = {}) {
@@ -66,7 +67,7 @@ function bodyHasSecret(body) {
 
 test('bbx-685-01: issueCredential on a revoked SA returns 409 CREDENTIAL_REVOKED with no secret (Scenario)', async () => {
   const h = handlerCtx({ status: 'revoked' });
-  const res = await LOCAL_HANDLERS.issueCredential(h.ctx);
+  const res = await LOCAL_HANDLERS.issueCredential(h.ctx, { KEYCLOAK_ISSUER: 'https://iam.example/realms/platform' });
   assert.equal(res.statusCode, 409, 'rejects with conflict instead of a misleading 201');
   assert.equal(res.body.code, 'CREDENTIAL_REVOKED');
   assert.equal(bodyHasSecret(res.body), false, 'no clientSecret/secret is handed back for a revoked SA');
@@ -85,12 +86,70 @@ test('bbx-685-02: rotateCredential on a revoked SA returns 409 CREDENTIAL_REVOKE
 
 test('bbx-685-03: issueCredential on an active SA still returns 201 with a clientSecret (regression)', async () => {
   const h = handlerCtx({ status: 'active' });
-  const res = await LOCAL_HANDLERS.issueCredential(h.ctx);
+  const res = await LOCAL_HANDLERS.issueCredential(h.ctx, {});
   assert.equal(res.statusCode, 201, 'active SA path unchanged');
   assert.equal(res.body.clientSecret, 'current-secret');
   assert.equal(res.body.secret, 'current-secret');
   assert.equal(res.body.grantType, 'client_credentials');
   assert.deepEqual(h.calls.getClientSecret, [['ten-1', 'kc-uuid-1']], 'still fetches the live secret for an active SA');
+});
+
+test('#959: issued credentials use the public issuer and the service account tenant realm', async () => {
+  const h = handlerCtx();
+  const res = await LOCAL_HANDLERS.issueCredential(h.ctx, { KEYCLOAK_ISSUER: 'https://iam.example/realms/platform' });
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.body.tokenEndpoint, 'https://iam.example/realms/ten-1/protocol/openid-connect/token');
+  assert.ok(!res.body.tokenEndpoint.includes(h.ctx.kcAdmin.base));
+  assert.equal(res.body.credentialId, 'sa-acme-repro');
+  assert.equal(res.body.clientId, 'sa-acme-repro');
+  assert.equal(res.body.secret, 'current-secret');
+  assert.equal(res.body.clientSecret, 'current-secret');
+  assert.equal(res.body.grantType, 'client_credentials');
+  assert.equal(res.body.expiresAt, null);
+  assert.ok(Number.isFinite(Date.parse(res.body.issuedAt)));
+  assert.deepEqual(h.calls.getClientSecret, [['ten-1', 'kc-uuid-1']]);
+});
+
+test('#959: issuance preserves issuer prefixes and encodes the service account realm', async () => {
+  const h = handlerCtx();
+  h.sa.iam_realm = 'tenant realm/one';
+  for (const issuer of ['https://iam.example/auth/realms/platform', 'https://iam.example/auth/realms/platform/']) {
+    const res = await LOCAL_HANDLERS.issueCredential(h.ctx, { KEYCLOAK_ISSUER: issuer });
+    assert.equal(res.statusCode, 201);
+    assert.equal(res.body.tokenEndpoint, 'https://iam.example/auth/realms/tenant%20realm%2Fone/protocol/openid-connect/token');
+  }
+});
+
+test('#959: invalid public issuers keep the internal-only string fallback', async () => {
+  for (const issuer of [undefined, '', 'not-a-url', 'ftp://iam.example/realms/platform',
+    'https://user:password@iam.example/realms/platform', 'https://iam.example/auth']) {
+    const h = handlerCtx();
+    const res = await LOCAL_HANDLERS.issueCredential(h.ctx, { KEYCLOAK_ISSUER: issuer });
+    assert.equal(res.statusCode, 201);
+    assert.equal(res.body.tokenEndpoint, 'http://kc/realms/ten-1/protocol/openid-connect/token');
+    assert.deepEqual(h.calls.getClientSecret, [['ten-1', 'kc-uuid-1']]);
+  }
+});
+
+test('#959: the public response endpoint leaves real Keycloak admin traffic on its internal base', async (t) => {
+  const h = handlerCtx();
+  h.ctx.kcAdmin = kcAdmin;
+  const requests = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    requests.push(String(url));
+    assert.ok(String(url).startsWith(`${kcAdmin.base}/`));
+    if (String(url).endsWith('/protocol/openid-connect/token')) return Response.json({ access_token: 'test-token', expires_in: 3600 });
+    assert.equal(String(url), `${kcAdmin.base}/admin/realms/ten-1/clients/kc-uuid-1/client-secret`);
+    return Response.json({ value: 'current-secret' });
+  });
+  const res = await LOCAL_HANDLERS.issueCredential(h.ctx, { KEYCLOAK_ISSUER: 'https://iam.example/realms/platform' });
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.body.tokenEndpoint, 'https://iam.example/realms/ten-1/protocol/openid-connect/token');
+  assert.equal(res.body.clientSecret, 'current-secret');
+  assert.deepEqual(requests, [
+    `${kcAdmin.base}/realms/master/protocol/openid-connect/token`,
+    `${kcAdmin.base}/admin/realms/ten-1/clients/kc-uuid-1/client-secret`,
+  ]);
 });
 
 test('bbx-685-04: rotateCredential on an active SA still returns 201 with a clientSecret and stamps invalidation (#684 regression)', async () => {
