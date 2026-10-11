@@ -73,14 +73,15 @@ test('bbx-flows-adr-002: ADR contains all seven required decision fields', () =>
 // bbx-flows-adr-003: SDK choice cites Dockerfile FROM node:22 evidence.
 test('bbx-flows-adr-003: ADR cites the node:22 Dockerfile SDK evidence', () => {
   const adr = temporalAdrSection();
-  assert.match(adr, /apps\/control-plane\/Dockerfile/i, 'must cite the control-plane Dockerfile');
+  // #906 moved the cited evidence to the executor app (apps/control-plane-executor/...).
+  assert.match(adr, /apps\/control-plane(?:-executor)?\/Dockerfile/i, 'must cite the control-plane Dockerfile');
   assert.match(adr, /node:22/i, 'must cite FROM node:22');
 });
 
 // bbx-flows-adr-004: SDK choice cites the "type":"module" package.json evidence.
 test('bbx-flows-adr-004: ADR cites the "type":"module" package.json SDK evidence', () => {
   const adr = temporalAdrSection();
-  assert.match(adr, /apps\/control-plane\/package\.json/i, 'must cite the control-plane package.json');
+  assert.match(adr, /apps\/control-plane(?:-executor)?\/package\.json/i, 'must cite the control-plane package.json');
   assert.match(adr, /"type"\s*:\s*"module"/i, 'must cite "type":"module"');
 });
 
