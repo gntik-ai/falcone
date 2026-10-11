@@ -57559,6 +57559,16 @@
               }
             }
           },
+          "409": {
+            "description": "DATABASE_NOT_EMPTY: explicit force=true is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "413": {
             "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
             "content": {
@@ -57589,6 +57599,16 @@
               }
             }
           },
+          "502": {
+            "description": "Physical teardown failed; the registry row remains for retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "504": {
             "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
             "content": {
@@ -57601,26 +57621,6 @@
           },
           "default": {
             "description": "Unexpected control-plane error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "DATABASE_NOT_EMPTY: explicit force=true is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Physical teardown failed; the registry row remains for retry.",
             "content": {
               "application/json": {
                 "schema": {

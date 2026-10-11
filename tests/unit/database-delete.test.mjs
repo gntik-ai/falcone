@@ -69,6 +69,31 @@ test('#967: admin and superadmin can delete; request body cannot redirect scope'
   }
 });
 
+test('#967: body-supplied force cannot bypass the non-empty database guard', async () => {
+  for (const fixture of [
+    () => {
+      const h = databaseDeleteFixture();
+      h.ctx.isWorkspaceDatabaseEmpty = async () => false;
+      return h;
+    },
+    () => mongoDeleteFixture([{ tenantId: 'tenant-a', workspaceId: 'ws-a' }]),
+  ]) {
+    const h = fixture();
+    h.ctx.body = { force: true };
+    const result = await LOCAL_HANDLERS.deleteDatabase(h.ctx);
+    assert.equal(result.statusCode, 409);
+    assert.equal(result.body.code, 'DATABASE_NOT_EMPTY');
+    assert.equal(h.pg.length, 1);
+    assert.equal(h.physical.size, 1);
+    assert.equal(h.roles.size, 1);
+    if (h.documents) {
+      assert.deepEqual(h.documents, [{ tenantId: 'tenant-a', workspaceId: 'ws-a' }]);
+      assert.equal(h.mongo.length, 1);
+      assert.equal(h.wasDropped(), false);
+    }
+  }
+});
+
 test('#967: foreign registry records are indistinguishable from missing databases', async () => {
   const foreign = databaseDeleteFixture();
   foreign.pg[0].tenant_id = 'tenant-other';
