@@ -36,6 +36,7 @@ echo "==> running control-plane executor + HTTP tests (Postgres)"
 node --test "$HERE"/postgres-data-executor.test.mjs "$HERE"/postgres-ddl-executor.test.mjs \
   "$HERE"/postgres-ddl-grants-rls.test.mjs \
   "$HERE"/control-plane-http.test.mjs "$HERE"/app-api-keys-rls.test.mjs \
+  "$HERE"/tenant-purge-cascade.test.mjs \
   "$HERE"/postgres-realtime-executor.test.mjs "$HERE"/vector-search-knn-rls.test.mjs \
   "$HERE"/vector-capability-unavailable.test.mjs \
   "$HERE"/embedding-provider-persistence.test.mjs "$HERE"/postgres-extension-preflight.test.mjs \

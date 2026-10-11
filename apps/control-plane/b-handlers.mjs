@@ -285,8 +285,9 @@ async function deleteTenant(ctx) {
     message: 'tenant marked deleted; POST /v1/tenants/{id}/purge to remove all owned resources' });
 }
 
-// POST /v1/tenants/{tenantId}/purge — hard cascade: remove EVERY resource the tenant owns
-// (workspaces, databases, realms, buckets, topics, keys, registry rows, async-op rows).
+// POST /v1/tenants/{tenantId}/purge — delete the enumerated tenant-derived database rows,
+// except the explicit audit-retention allowlist in tenant-store. Database errors or
+// residual rows abort the transaction before the tenant row is deleted; retry the purge.
 // Runtime cleanup gates the cascade; secret destruction must finish before row deletion.
 // Other physical teardown is best-effort, with the removed resources reported below.
 async function purgeTenant(ctx) {
@@ -301,8 +302,12 @@ async function purgeTenant(ctx) {
   if (secrets.error) return secrets.error;
   const realm = tenant.iam_realm;
 
-  // 1. Delete all registry rows + collect the physical resources to tear down.
-  const phys = await store.purgeTenant(pool, tenant.id);
+  // 1. Collect physical resources, then transactionally clear non-retained registry rows.
+  let phys;
+  try { phys = await store.purgeTenant(pool, tenant.id); }
+  catch {
+    return err(503, 'TENANT_PURGE_INCOMPLETE', 'Database cleanup could not be verified; tenant rows are retained. Retry the authorized purge.');
+  }
   // 2. Drop each physical workspace database (catalog-level isolation teardown).
   const databasesDropped = [];
   for (const db of phys.databases) { try { await dropWorkspaceDatabase(pool, db); databasesDropped.push(db); } catch { /* best-effort */ } }

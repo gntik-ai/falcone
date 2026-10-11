@@ -1305,33 +1305,111 @@ export async function purgeWorkspace(pool, workspaceId) {
   return { databases, mongoDatabases, buckets, topics, ksvcs, workspaceId };
 }
 
-// Cascading purge of every row a tenant owns (add-tenant-delete-purge-cascade, #501). Collects
-// the physical resources the caller must tear down (databases/buckets/topics/ksvcs) BEFORE
-// deleting the registry rows, then deletes child rows before parents. Each table delete is
-// best-effort (a table absent in this hand-built runtime — e.g. product-migration plan tables —
-// must not abort the purge); the operation is idempotent, so a partial run can simply be retried.
-export async function purgeTenant(pool, tenantId) {
-  const collect = async (sql) => { try { return (await pool.query(sql, [tenantId])).rows; } catch { return []; } };
-  const databases = (await collect('SELECT database_name FROM workspace_databases WHERE tenant_id=$1')).map((r) => r.database_name);
-  // FerretDB (mongo) databases recorded for this tenant — collected (de-duplicated)
-  // for an isolation-safe document teardown (fix-tenant-purge-ferretdb-cascade, #682).
-  const mongoDatabases = (await collect('SELECT DISTINCT database_name FROM workspace_mongo_databases WHERE tenant_id=$1')).map((r) => r.database_name);
-  const buckets = (await collect('SELECT bucket_name FROM workspace_buckets WHERE tenant_id=$1')).map((r) => r.bucket_name);
-  const topics = (await collect('SELECT physical_topic_name FROM workspace_topics WHERE tenant_id=$1')).map((r) => r.physical_topic_name);
-  const ksvcs = (await collect("SELECT ksvc_name FROM fn_actions WHERE tenant_id=$1 AND ksvc_name IS NOT NULL")).map((r) => r.ksvc_name);
-  const workspaceIds = (await collect('SELECT id FROM workspaces WHERE tenant_id=$1')).map((r) => r.id);
+// Static identifiers only. Children precede parents; the tenant root is deleted last.
+export const TENANT_PURGE_TABLES = Object.freeze([
+  'flow_versions', 'flow_schedules', 'flow_trigger_secrets', 'flow_trigger_registrations', 'flow_definitions',
+  'tenant_plan_quota_impacts', 'tenant_plan_capability_impacts', 'tenant_plan_change_history',
+  'workspace_sub_quotas', 'quota_overrides', 'billing_usage_records',
+  'workspace_embedding_mappings', 'workspace_embedding_providers', 'workspace_llm_usage', 'workspace_llm_providers',
+  'realtime_subscriptions', 'realtime_channels', 'subscription_quotas',
+  'pg_capture_configs', 'mongo_capture_configs',
+  'secret_metadata', 'secret_version_states',
+  // Rotation history has a non-cascading FK to rotation state: both are purged.
+  'service_account_rotation_history', 'service_account_rotation_states', 'tenant_rotation_policies',
+  'function_privilege_assignments', 'privilege_domain_assignments', 'runtime_cleanup_obligations',
+  'tenant_config_reprovision_locks', 'saga_compensation_log', 'saga_steps', 'saga_instances',
+  'fn_action_versions', 'fn_actions', 'workspace_functions', 'workspace_topics', 'workspace_buckets',
+  'workspace_databases', 'workspace_mongo_databases', 'workspace_api_keys', 'service_accounts',
+  'external_applications', 'tenant_invitations',
+  'retry_overrides', 'manual_intervention_flags', 'retry_attempts', 'idempotency_key_records',
+  'async_operation_log_entries', 'async_operation_transitions', 'async_operations',
+  'tenant_plan_assignments', 'tenant_custom_roles', 'effective_entitlements', 'public.http_idempotency_records',
+  'workspaces', 'tenants',
+]);
 
-  const del = async (sql, params) => { try { await pool.query(sql, params); } catch (e) { if (e.code !== '42P01') throw e; } }; // ignore undefined_table
-  // fn_activations has no tenant_id — scope by the tenant's workspaces.
-  if (workspaceIds.length) await del('DELETE FROM fn_activations WHERE workspace_id = ANY($1)', [workspaceIds]);
-  for (const t of ['fn_action_versions', 'fn_actions', 'workspace_functions', 'workspace_topics', 'workspace_buckets',
-                   'workspace_databases', 'workspace_mongo_databases', 'workspace_api_keys', 'service_accounts',
-                   'external_applications', 'tenant_invitations',
-                   'async_operation_log_entries', 'async_operation_transitions', 'async_operations',
-                   'tenant_plan_assignments', 'tenant_custom_roles', 'effective_entitlements', 'public.http_idempotency_records']) {
-    await del(`DELETE FROM ${t} WHERE tenant_id = $1`, [tenantId]);
+// Deliberate audit-trail retention only; plan-change history and its impacts are NOT audit exceptions.
+export const TENANT_PURGE_RETAINED_TABLES = Object.freeze({
+  plan_audit_events: 'Retain plan governance audit trail.',
+  config_export_audit_log: 'Retain functional export audit trail.',
+  config_preflight_audit_log: 'Retain configuration preflight audit trail.',
+  config_reprovision_audit_log: 'Retain configuration reprovision audit trail.',
+  pg_capture_audit_log: 'Retain PostgreSQL capture audit trail (FK uses ON DELETE SET NULL).',
+  mongo_capture_audit_log: 'Retain document capture audit trail (FK uses ON DELETE SET NULL).',
+  subscription_audit_log: 'Retain realtime subscription audit trail.',
+  scope_enforcement_denials: 'Retain scope authorization denial audit trail.',
+  privilege_domain_denials: 'Retain data privilege denial audit trail.',
+  privilege_domain_assignment_history: 'Retain data privilege assignment audit trail.',
+  function_privilege_denials: 'Retain function privilege denial audit trail.',
+  function_privilege_assignment_history: 'Retain function privilege assignment audit trail.',
+  quota_enforcement_log: 'Retain quota enforcement decision audit trail.',
+  secret_rotation_events: 'Retain secret rotation audit trail; secret values are not stored here.',
+});
+
+const TENANT_PURGE_SCOPES = Object.freeze({
+  tenants: 'id = $1',
+  saga_compensation_log: 'saga_id IN (SELECT saga_id FROM saga_instances WHERE tenant_id = $1)',
+  // The hand-built runtime also defines saga_steps with run_id instead of saga_id.
+  // Project the row to avoid querying a nonexistent column; only product saga children match.
+  saga_steps: "to_jsonb(saga_steps)->>'saga_id' IN (SELECT saga_id::text FROM saga_instances WHERE tenant_id = $1)",
+});
+
+// Collect physical resources before deleting registry rows. One transaction clears
+// all non-retained rows or fails before the tenant is deleted. Only 42P01 is tolerated.
+export async function purgeTenant(pool, tenantId) {
+  if (typeof pool?.connect !== 'function') throw new TypeError('tenant purge requires a transactional pool');
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    // This does NOT bypass RLS or grant DELETE. PostgreSQL raises an error if a policy
+    // would filter rows for this role, so restricted roles cannot report a clean purge.
+    await db.query('SET LOCAL row_security = off');
+    const optionalQuery = async (sql, params) => {
+      await db.query('SAVEPOINT tenant_purge_optional');
+      try {
+        const result = await db.query(sql, params);
+        await db.query('RELEASE SAVEPOINT tenant_purge_optional');
+        return result;
+      } catch (error) {
+        // An absent product table is the ONLY tolerated SQL error. Roll back to the
+        // savepoint because 42P01 otherwise leaves the PostgreSQL transaction aborted.
+        if (error.code !== '42P01') throw error;
+        await db.query('ROLLBACK TO SAVEPOINT tenant_purge_optional');
+        await db.query('RELEASE SAVEPOINT tenant_purge_optional');
+        return { rows: [] };
+      }
+    };
+    const collect = async (sql) => (await optionalQuery(sql, [tenantId])).rows;
+    const databases = (await collect('SELECT database_name FROM workspace_databases WHERE tenant_id=$1')).map((r) => r.database_name);
+    const mongoDatabases = (await collect('SELECT DISTINCT database_name FROM workspace_mongo_databases WHERE tenant_id=$1')).map((r) => r.database_name);
+    const buckets = (await collect('SELECT bucket_name FROM workspace_buckets WHERE tenant_id=$1')).map((r) => r.bucket_name);
+    const topics = (await collect('SELECT physical_topic_name FROM workspace_topics WHERE tenant_id=$1')).map((r) => r.physical_topic_name);
+    const ksvcs = (await collect("SELECT ksvc_name FROM fn_actions WHERE tenant_id=$1 AND ksvc_name IS NOT NULL")).map((r) => r.ksvc_name);
+    const workspaceIds = (await collect('SELECT id FROM workspaces WHERE tenant_id=$1')).map((r) => r.id);
+
+    const del = async (table, where, params) => {
+      await optionalQuery(`DELETE FROM ${table} WHERE ${where}`, params);
+      const { rows } = await optionalQuery(`SELECT count(*) AS count FROM ${table} WHERE ${where}`, params);
+      const count = Number(rows[0]?.count ?? 0);
+      if (count > 0) throw Object.assign(new Error('tenant purge left database rows'), {
+        code: 'TENANT_PURGE_INCOMPLETE', table, count,
+      });
+    };
+    // fn_activations has no tenant_id: scope through this tenant's collected workspaces.
+    if (workspaceIds.length) await del('fn_activations', 'workspace_id = ANY($1)', [workspaceIds]);
+    for (const table of TENANT_PURGE_TABLES) {
+      await del(table, TENANT_PURGE_SCOPES[table] ?? 'tenant_id = $1', [tenantId]);
+    }
+    await db.query('COMMIT');
+    return { databases, mongoDatabases, buckets, topics, ksvcs, workspaceIds };
+  } catch (error) {
+    try { await db.query('ROLLBACK'); } catch { /* preserve the original failure */ }
+    // The HTTP boundary honors statusCode and sanitizes 5xx responses. Do not carry
+    // backend messages/details into its logs: they may contain customer content.
+    throw Object.assign(new Error('tenant purge database cleanup failed; retry the authorized purge'), {
+      statusCode: 503, code: error.code ?? 'TENANT_PURGE_INCOMPLETE',
+      ...(error.code === 'TENANT_PURGE_INCOMPLETE' ? { table: error.table, count: error.count } : {}),
+    });
+  } finally {
+    db.release();
   }
-  await del('DELETE FROM workspaces WHERE tenant_id = $1', [tenantId]);
-  await del('DELETE FROM tenants WHERE id = $1', [tenantId]);
-  return { databases, mongoDatabases, buckets, topics, ksvcs, workspaceIds };
 }

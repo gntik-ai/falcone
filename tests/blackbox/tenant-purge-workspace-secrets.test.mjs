@@ -26,7 +26,7 @@ function registryPool() {
     if (/FROM workspaces WHERE/i.test(sql)) return { rows: workspaces.has(params[0]) ? [workspaces.get(params[0])] : [] };
     return { rows: [] };
   };
-  return { query };
+  return { query, connect: async () => ({ query, release() {} }) };
 }
 
 function setup() {
@@ -158,5 +158,27 @@ for (const scope of ['tenant', 'workspace']) {
       { event: 'secret_teardown_failure', operation: scope === 'tenant' ? 'purgeTenant' : 'purgeWorkspace', status: 0 },
     ]);
     assert.ok(!JSON.stringify({ result, logs }).includes(MARKER));
+  });
+}
+
+for (const sqlstate of ['42501', '42P01']) {
+  test(`tenant purge database error ${sqlstate} is ${sqlstate === '42P01' ? 'an absent table' : 'retryable, never a clean success'}`, async () => {
+    const { ctx } = setup();
+    const originalQuery = ctx.pool.query;
+    const query = async (sql, params) => {
+      if (/^DELETE FROM flow_versions /.test(sql)) {
+        throw Object.assign(new Error(MARKER), { code: sqlstate, detail: MARKER });
+      }
+      return originalQuery(sql, params);
+    };
+    ctx.pool = { query, connect: async () => ({ query, release() {} }) };
+    const result = await LOCAL_HANDLERS.purgeTenant({ ...ctx, params: { tenantId: 'tenant-a' } });
+    assert.equal(result.statusCode, sqlstate === '42P01' ? 200 : 503);
+    if (sqlstate === '42501') {
+      assert.equal(result.body.code, 'TENANT_PURGE_INCOMPLETE');
+      assert.equal(result.body.purged, undefined);
+      assert.equal((await LOCAL_HANDLERS.getTenant({ ...ctx, params: { tenantId: 'tenant-a' } })).statusCode, 200);
+    }
+    assert.ok(!JSON.stringify(result).includes(MARKER), 'backend detail is never disclosed');
   });
 }

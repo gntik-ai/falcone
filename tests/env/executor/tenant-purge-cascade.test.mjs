@@ -20,7 +20,7 @@ const WS = 'ws_purge'; const OWS = 'ws_keep';
 let bootstrap; let pool;
 const url = (db) => ADMIN_URL.replace(/\/[^/?]+(\?.*)?$/, `/${db}$1`);
 
-// The owned-resource tables a tenant touches (subset sufficient to prove the cascade).
+// Tenant purge database seam: published versions, dependency order, role policy and isolation.
 const SCHEMA = `
   CREATE TABLE tenants (id text PRIMARY KEY, slug text, display_name text, status text DEFAULT 'active', iam_realm text);
   CREATE TABLE workspaces (id text PRIMARY KEY, tenant_id text, slug text, display_name text);
@@ -34,6 +34,19 @@ const SCHEMA = `
   CREATE TABLE workspace_api_keys (id serial PRIMARY KEY, tenant_id text, workspace_id text, key_type text, key_prefix text, key_hash text, scopes jsonb);
   CREATE TABLE async_operations (operation_id text PRIMARY KEY, tenant_id text, status text);
   CREATE TABLE async_operation_transitions (id serial PRIMARY KEY, operation_id text, tenant_id text);
+  CREATE TABLE flow_definitions (id text PRIMARY KEY, tenant_id text, workspace_id text);
+  CREATE TABLE flow_versions (flow_id text REFERENCES flow_definitions(id), version int, tenant_id text, workspace_id text, definition jsonb, PRIMARY KEY(flow_id, version));
+  CREATE TABLE flow_schedules (id text PRIMARY KEY, flow_id text REFERENCES flow_definitions(id), tenant_id text);
+  CREATE TABLE flow_trigger_secrets (id text PRIMARY KEY, flow_id text REFERENCES flow_definitions(id), tenant_id text);
+  CREATE TABLE flow_trigger_registrations (id text PRIMARY KEY, flow_id text REFERENCES flow_definitions(id), tenant_id text);
+  CREATE TABLE tenant_plan_assignments (id text PRIMARY KEY, tenant_id text);
+  CREATE TABLE tenant_plan_change_history (id text PRIMARY KEY, tenant_id text);
+  CREATE TABLE tenant_plan_quota_impacts (id text PRIMARY KEY, history_id text REFERENCES tenant_plan_change_history(id) ON DELETE CASCADE, tenant_id text);
+  CREATE TABLE tenant_plan_capability_impacts (id text PRIMARY KEY, history_id text REFERENCES tenant_plan_change_history(id) ON DELETE CASCADE, tenant_id text);
+  CREATE TABLE workspace_sub_quotas (id text PRIMARY KEY, workspace_id text REFERENCES workspaces(id), tenant_id text);
+  CREATE TABLE saga_instances (saga_id text PRIMARY KEY, tenant_id text);
+  CREATE TABLE saga_steps (step_id text PRIMARY KEY, saga_id text REFERENCES saga_instances(saga_id));
+  CREATE TABLE saga_compensation_log (id text PRIMARY KEY, saga_id text REFERENCES saga_instances(saga_id), step_id text REFERENCES saga_steps(step_id));
 `;
 
 async function seed(ten, ws, dbname) {
@@ -49,6 +62,20 @@ async function seed(ten, ws, dbname) {
   await pool.query('INSERT INTO workspace_api_keys (tenant_id,workspace_id,key_type,key_prefix,key_hash,scopes) VALUES ($1,$2,$3,$4,$5,$6)', [ten, ws, 'service', 'flc', 'h', '[]']);
   await pool.query('INSERT INTO async_operations (operation_id,tenant_id,status) VALUES ($1,$2,$3)', [`op_${ws}`, ten, 'completed']);
   await pool.query('INSERT INTO async_operation_transitions (operation_id,tenant_id) VALUES ($1,$2)', [`op_${ws}`, ten]);
+  await pool.query('INSERT INTO flow_definitions VALUES ($1,$2,$3)', [`flow_${ws}`, ten, ws]);
+  await pool.query("INSERT INTO flow_versions VALUES ($1,1,$2,$3,'{}'),($1,2,$2,$3,'{}')", [`flow_${ws}`, ten, ws]);
+  for (const table of ['flow_schedules', 'flow_trigger_secrets', 'flow_trigger_registrations']) {
+    await pool.query(`INSERT INTO ${table} VALUES ($1,$2,$3)`, [`child_${ws}`, `flow_${ws}`, ten]);
+  }
+  await pool.query('INSERT INTO tenant_plan_assignments VALUES ($1,$2)', [`plan_${ws}`, ten]);
+  await pool.query('INSERT INTO tenant_plan_change_history VALUES ($1,$2)', [`history_${ws}`, ten]);
+  for (const table of ['tenant_plan_quota_impacts', 'tenant_plan_capability_impacts']) {
+    await pool.query(`INSERT INTO ${table} VALUES ($1,$2,$3)`, [`impact_${ws}`, `history_${ws}`, ten]);
+  }
+  await pool.query('INSERT INTO workspace_sub_quotas VALUES ($1,$2,$3)', [`quota_${ws}`, ws, ten]);
+  await pool.query('INSERT INTO saga_instances VALUES ($1,$2)', [`saga_${ws}`, ten]);
+  await pool.query('INSERT INTO saga_steps VALUES ($1,$2)', [`step_${ws}`, `saga_${ws}`]);
+  await pool.query('INSERT INTO saga_compensation_log VALUES ($1,$2,$3)', [`log_${ws}`, `saga_${ws}`, `step_${ws}`]);
 }
 
 before(async () => {
@@ -59,14 +86,49 @@ before(async () => {
   await pool.query(SCHEMA);
   await seed(TEN, WS, 'wsdb_purge_me');
   await seed(OTHER, OWS, 'wsdb_keep_me');
+  // Mirrors chart migration 20260612-004-flow-rls.sql: FORCE RLS and immutable
+  // versions for the application role. Use an isolated NOLOGIN probe role.
+  await bootstrap.query('CREATE ROLE cp_purge_app_probe NOLOGIN');
+  await pool.query('GRANT USAGE ON SCHEMA public TO cp_purge_app_probe');
+  await pool.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ${[...TABLES, 'tenants', 'fn_activations', 'saga_steps', 'saga_compensation_log'].filter((t) => t !== 'flow_versions').join(', ')} TO cp_purge_app_probe`);
+  await pool.query('GRANT SELECT, INSERT ON flow_versions TO cp_purge_app_probe');
+  for (const table of ['flow_definitions', 'flow_versions']) {
+    await pool.query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
+    await pool.query(`ALTER TABLE ${table} FORCE ROW LEVEL SECURITY`);
+    await pool.query(`CREATE POLICY ${table}_tenant_isolation ON ${table}
+      USING (tenant_id = current_setting('app.tenant_id', true)
+             AND workspace_id = current_setting('app.workspace_id', true))
+      WITH CHECK (tenant_id = current_setting('app.tenant_id', true)
+                  AND workspace_id = current_setting('app.workspace_id', true))`);
+  }
+  const { rows } = await pool.query('SELECT rolsuper OR rolbypassrls AS admin FROM pg_roles WHERE rolname = current_user');
+  assert.equal(rows[0].admin, true, 'env runner metadata pool must use the migration-owner/BYPASSRLS path');
 });
 
 after(async () => {
   await pool?.end().catch(() => {});
-  if (bootstrap) { await bootstrap.query(`DROP DATABASE IF EXISTS ${PROBE_DB}`).catch(() => {}); await bootstrap.end().catch(() => {}); }
+  if (bootstrap) { await bootstrap.query(`DROP DATABASE IF EXISTS ${PROBE_DB}`).catch(() => {}); await bootstrap.query('DROP ROLE IF EXISTS cp_purge_app_probe').catch(() => {}); await bootstrap.end().catch(() => {}); }
 });
 
-const TABLES = ['workspaces', 'workspace_databases', 'workspace_buckets', 'workspace_topics', 'workspace_functions', 'fn_actions', 'service_accounts', 'workspace_api_keys', 'async_operations', 'async_operation_transitions'];
+const TABLES = ['workspaces', 'workspace_databases', 'workspace_buckets', 'workspace_topics', 'workspace_functions', 'fn_actions', 'service_accounts', 'workspace_api_keys', 'async_operations', 'async_operation_transitions', 'flow_definitions', 'flow_versions', 'flow_schedules', 'flow_trigger_secrets', 'flow_trigger_registrations', 'tenant_plan_assignments', 'tenant_plan_change_history', 'tenant_plan_quota_impacts', 'tenant_plan_capability_impacts', 'workspace_sub_quotas', 'saga_instances'];
+
+test('application role cannot silently purge immutable or RLS-hidden versions', async () => {
+  const restricted = {
+    connect: async () => {
+      const client = await pool.connect();
+      await client.query('SET ROLE cp_purge_app_probe');
+      return {
+        query: client.query.bind(client),
+        release: () => { client.release(true); },
+      };
+    },
+  };
+  await assert.rejects(store.purgeTenant(restricted, TEN), { code: '42501', statusCode: 503 });
+  assert.equal((await pool.query('SELECT count(*)::int n FROM flow_versions WHERE tenant_id=$1', [TEN])).rows[0].n, 2);
+  assert.equal((await pool.query('SELECT count(*)::int n FROM tenants WHERE id=$1', [TEN])).rows[0].n, 1);
+  const { rows } = await pool.query("SELECT has_table_privilege('cp_purge_app_probe', 'flow_versions', 'DELETE') AS allowed");
+  assert.equal(rows[0].allowed, false, 'purge must not weaken published-version immutability');
+});
 
 test('purgeTenant removes every owned row + returns the physical resources to tear down', async () => {
   const phys = await store.purgeTenant(pool, TEN);
@@ -83,12 +145,16 @@ test('purgeTenant removes every owned row + returns the physical resources to te
   }
   const { rows: tt } = await pool.query('SELECT count(*)::int n FROM tenants WHERE id=$1', [TEN]);
   assert.equal(tt[0].n, 0, 'the tenant row itself is gone');
+  for (const table of ['saga_steps', 'saga_compensation_log']) {
+    assert.equal((await pool.query(`SELECT count(*)::int n FROM ${table} WHERE saga_id=$1`, [`saga_${WS}`])).rows[0].n, 0);
+    assert.equal((await pool.query(`SELECT count(*)::int n FROM ${table} WHERE saga_id=$1`, [`saga_${OWS}`])).rows[0].n, 1);
+  }
 });
 
 test('another tenant\'s rows are untouched (no over-deletion)', async () => {
   for (const t of TABLES) {
     const { rows } = await pool.query(`SELECT count(*)::int n FROM ${t} WHERE tenant_id = $1`, [OTHER]);
-    assert.equal(rows[0].n, 1, `${t} still has the other tenant's row`);
+    assert.equal(rows[0].n, t === 'flow_versions' ? 2 : 1, `${t} still has the other tenant's row`);
   }
   const { rows } = await pool.query('SELECT count(*)::int n FROM tenants WHERE id=$1', [OTHER]);
   assert.equal(rows[0].n, 1, 'the other tenant survives');
@@ -97,4 +163,8 @@ test('another tenant\'s rows are untouched (no over-deletion)', async () => {
 test('purge is idempotent (a second run is a no-op, not an error)', async () => {
   const phys = await store.purgeTenant(pool, TEN);
   assert.deepEqual(phys.databases, [], 'nothing left to tear down');
+  for (const table of TABLES) {
+    assert.equal((await pool.query(`SELECT count(*)::int n FROM ${table} WHERE tenant_id=$1`, [OTHER])).rows[0].n,
+      table === 'flow_versions' ? 2 : 1, `${table} still survives a second purge`);
+  }
 });
