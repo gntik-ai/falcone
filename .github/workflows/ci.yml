@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '10735ee681813220667c09e8f366e2e3c1855557'
+  FALCONE_CHARTS_REF: 'e6692ebc683379a6f6865f4143da8e99861088d0'
 
 jobs:
   quality:
@@ -52,6 +52,12 @@ jobs:
 
       - name: Unit tests
         run: pnpm test:unit
+
+      - name: Flow stream API-key log hygiene
+        run: |
+          node --test tests/blackbox/flow-stream-apikey-logs.test.mjs \
+            tests/blackbox/flows-execution-events.test.mjs \
+            tests/blackbox/executor-5xx-code-redaction.test.mjs
 
       - name: Live catalog quota admission
         run: |
