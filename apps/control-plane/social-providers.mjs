@@ -1,3 +1,5 @@
+import { keycloakPublicBase } from './keycloak-public-base.mjs';
+
 // Only built-in social templates; tenant-supplied OIDC/SAML endpoints are excluded.
 export const SOCIAL_PROVIDER_IDS = ['google', 'github', 'microsoft', 'gitlab', 'facebook', 'linkedin-openid-connect'];
 const CONFIG_KEYS = new Set(['clientId', 'clientSecret', 'defaultScope']);
@@ -30,14 +32,7 @@ export function validateSocialProvider(alias, body) {
 export function socialProviderView(provider, realm, env = process.env) {
   // KEYCLOAK_ISSUER supplies the public issuer when configured. Never use
   // the internal admin base as a public hostname or guess when the setting is absent.
-  let base = null;
-  try {
-    const issuer = new URL(env.KEYCLOAK_ISSUER);
-    if (['https:', 'http:'].includes(issuer.protocol) && !issuer.username && !issuer.password
-      && /\/realms\/[^/]+\/?$/.test(issuer.pathname)) {
-      base = issuer.origin + issuer.pathname.replace(/\/realms\/[^/]+\/?$/, '');
-    }
-  } catch { /* unset or invalid public issuer */ }
+  const base = keycloakPublicBase(env);
   return {
     alias: provider.alias, providerId: provider.providerId,
     enabled: provider.enabled !== false, displayName: provider.displayName ?? null,

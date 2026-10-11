@@ -9,6 +9,7 @@ import { createWorkspaceIamClient } from './workspace-iam-client-handlers.mjs';
 import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, normalizeKeycloakAttributes, TENANT_REALM_ROLES } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
 import { socialProviderView, validateSocialProvider, SocialProviderValidationError } from './social-providers.mjs';
+import { keycloakPublicBase } from './keycloak-public-base.mjs';
 import { AUTH_HANDLERS } from './auth-handlers.mjs';
 import { INVITATION_HANDLERS } from './invitation-handlers.mjs';
 import { listTenantUsers } from './tenant-user-handlers.mjs';
@@ -823,7 +824,7 @@ async function saForCredential(ctx) {
   return { sa };
 }
 // POST /v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-issuance
-async function issueCredential(ctx) {
+async function issueCredential(ctx, env = process.env) {
   const kc = ctx.kcAdmin ?? kcAdmin;
   const r = await saForCredential(ctx); if (r.error) return r.error;
   // A revoked SA's Keycloak client is disabled (fix-sa-credential-revocation-invalidate-tokens, #684),
@@ -832,8 +833,10 @@ async function issueCredential(ctx) {
   if (r.sa.status === 'revoked') return err(409, 'CREDENTIAL_REVOKED', 'service account credential is revoked; re-create the service account to issue a new credential');
   try {
     const secret = await kc.getClientSecret(r.sa.iam_realm, r.sa.kc_client_uuid);
+    // The fallback is internal-only, for dev installs without a valid public issuer.
+    const base = keycloakPublicBase(env) ?? kc.base;
     return ok(201, { credentialId: r.sa.kc_client_id, secret, expiresAt: null,
-      clientId: r.sa.kc_client_id, clientSecret: secret, tokenEndpoint: `${kc.base}/realms/${r.sa.iam_realm}/protocol/openid-connect/token`, grantType: 'client_credentials', issuedAt: new Date().toISOString() });
+      clientId: r.sa.kc_client_id, clientSecret: secret, tokenEndpoint: `${base}/realms/${encodeURIComponent(r.sa.iam_realm)}/protocol/openid-connect/token`, grantType: 'client_credentials', issuedAt: new Date().toISOString() });
   } catch (e) {
     return kcBackedErr(e, 'ISSUE_CREDENTIAL_FAILED');
   }
