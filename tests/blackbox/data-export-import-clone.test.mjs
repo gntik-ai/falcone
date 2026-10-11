@@ -16,6 +16,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { ObjectId } from 'mongodb';
 
 import { routes } from '../../apps/control-plane/routes.mjs';
 import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs';
@@ -449,22 +450,204 @@ test('bbx-683-storage-conflict-policy: skip and fail both leave an existing obje
 function makeMongoClient(collections = {}) {
   // collections keyed by `${db}.${col}` -> array of docs
   const inserted = [];
+  const sameId = (a, b) => a?._bsontype === 'ObjectId' && b?._bsontype === 'ObjectId'
+    ? a.equals(b) : a === b;
+  const matches = (doc, filter) => Object.entries(filter).every(([key, value]) =>
+    key === '_id' ? sameId(doc[key], value) : doc[key] === value);
+  const duplicate = () => { throw Object.assign(new Error('duplicate key: foreign-private-data'), { code: 11000 }); };
   const client = {
     db: (dbName) => ({
-      collection: (colName) => ({
-        find: (filter) => ({
-          limit: () => ({
-            toArray: async () => (collections[`${dbName}.${colName}`] ?? []).filter((d) =>
-              (!filter.tenantId || d.tenantId === filter.tenantId) && (!filter.workspaceId || d.workspaceId === filter.workspaceId))
-          })
-        }),
-        insertOne: async (doc) => { inserted.push({ db: dbName, col: colName, doc }); (collections[`${dbName}.${colName}`] ??= []).push(doc); return { insertedId: 'x' }; }
-      })
+      collection: (colName) => {
+        const docs = collections[`${dbName}.${colName}`] ??= [];
+        const insert = (doc) => {
+          const saved = { ...doc, _id: doc._id ?? `generated-${inserted.length}` };
+          if (docs.some((d) => sameId(d._id, saved._id))) duplicate();
+          inserted.push({ db: dbName, col: colName, doc: saved });
+          docs.push(saved);
+          return { insertedId: saved._id };
+        };
+        return {
+          find: (filter) => {
+            let skip = 0; let limit = Infinity;
+            const cursor = {
+              skip: (n) => { skip = n; return cursor; },
+              limit: (n) => { limit = n; return cursor; },
+              toArray: async () => docs.filter((d) => matches(d, filter)).slice(skip, skip + limit)
+            };
+            return cursor;
+          },
+          insertOne: async (doc) => insert(doc),
+          replaceOne: async (filter, replacement, { upsert }) => {
+            const index = docs.findIndex((d) => matches(d, filter));
+            if (index >= 0) {
+              docs[index] = { ...replacement };
+              return { matchedCount: 1, modifiedCount: 1, upsertedCount: 0 };
+            }
+            if (!upsert) return { matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
+            insert(replacement);
+            return { matchedCount: 0, modifiedCount: 0, upsertedCount: 1 };
+          }
+        };
+      }
     })
   };
   client.inserted = inserted;
   return client;
 }
+
+const mongoParams = { workspaceId: WS_A, databaseName: 'appdb', collectionName: 'users' };
+const mongoContext = (mongoClient, body = {}, params = mongoParams) => ctx(params, { pool: makePool(), mongoClient, body });
+const mongoRead = (mongoClient, workspaceId = WS_A, identity = ownerA) => MONGO_HANDLERS.mongoDocuments(ctx(
+  { workspaceId, db: 'appdb', col: 'users' }, { pool: makePool(), mongoClient, identity }));
+
+test('bbx-995-mongo-upsert: replay preserves one scoped identity and the latest payload', async () => {
+  const mongoClient = makeMongoClient();
+  for (const [index, document] of [{ _id: 'u1', name: 'alpha', obsolete: true }, { _id: 'u1', name: 'beta' }].entries()) {
+    const result = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, { format: 'json', mode: 'upsert', documents: [document] }));
+    assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+    assert.equal(result.body.importedCount, 1);
+    assert.equal(result.body.upsertedCount, index === 0 ? 1 : 0);
+    assert.equal(result.body.matchedCount, index === 0 ? 0 : 1);
+    assert.equal(result.body.replacedCount, index === 0 ? 0 : 1);
+  }
+  const result = await mongoRead(mongoClient);
+  assert.deepEqual(result.body.items, [{ _id: 'u1', name: 'beta', tenantId: TENANT_A, workspaceId: WS_A }]);
+});
+
+test('bbx-995-mongo-validation: required enums are rejected before any Mongo call', async () => {
+  for (const options of [{ mode: 'insert' }, { format: 'json' }, { format: 'json', mode: 'merge' }, { format: 'csv', mode: 'insert' }]) {
+    let touched = false;
+    const mongoClient = { db: () => { touched = true; throw new Error('must not reach Mongo'); } };
+    const result = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, { ...options, documents: [{ name: 'alice' }] }));
+    assert.equal(result.statusCode, 400, JSON.stringify(options));
+    assert.equal(result.body.code, 'VALIDATION_ERROR');
+    assert.equal(touched, false);
+  }
+});
+
+test('bbx-995-mongo-stable-id: replace/upsert validate the entire batch before writing', async () => {
+  for (const mode of ['replace', 'upsert']) {
+    for (const invalid of [{ name: 'missing' }, { _id: null }, { _id: '' }, null]) {
+      let touched = false;
+      const mongoClient = { db: () => { touched = true; throw new Error('must not reach Mongo'); } };
+      const result = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, {
+        format: 'json', mode, documents: [{ _id: 'valid-first' }, invalid]
+      }));
+      assert.equal(result.statusCode, 400, `${mode}: ${JSON.stringify(invalid)}`);
+      assert.equal(result.body.code, 'VALIDATION_ERROR');
+      assert.equal(touched, false, 'even the first valid entry must not be written');
+    }
+  }
+});
+
+test('bbx-995-mongo-replace: replaces an existing identity and reports missing identities without inserting', async () => {
+  const mongoClient = makeMongoClient({ 'appdb.users': [{ _id: 'r1', name: 'old', obsolete: true, tenantId: TENANT_A, workspaceId: WS_A }] });
+  const result = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, {
+    format: 'json', mode: 'replace', documents: [{ _id: 'r1', name: 'new' }, { _id: 'absent', name: 'not inserted' }]
+  }));
+  assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+  assert.deepEqual((await mongoRead(mongoClient)).body.items, [{ _id: 'r1', name: 'new', tenantId: TENANT_A, workspaceId: WS_A }]);
+  assert.equal(result.body.importedCount, 1);
+  assert.equal(result.body.matchedCount, 1);
+  assert.equal(result.body.replacedCount, 1);
+  assert.equal(result.body.upsertedCount, 0);
+  assert.equal(result.body.skippedCount, 1);
+  assert.deepEqual(result.body.skipped, [{ index: 1, reason: 'NOT_MATCHED' }]);
+  assert.equal(result.body.format, 'json');
+  assert.equal(result.body.mode, 'replace');
+  assert.equal(result.body.ordered, true);
+});
+
+test('bbx-995-mongo-duplicate: insert preserves supplied ids; unordered skips conflicts and ordered stops with 409', async () => {
+  for (const ordered of [false, true]) {
+    const mongoClient = makeMongoClient();
+    const body = { format: 'json', mode: 'insert', ordered, documents: [{ _id: 'i1', name: 'original' }] };
+    assert.equal((await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, body))).statusCode, 200);
+    const result = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, {
+      ...body, documents: [{ _id: 'i1', name: 'duplicate' }, { _id: 'i2', name: 'next' }]
+    }));
+    assert.equal(result.statusCode, ordered ? 409 : 200, JSON.stringify(result.body));
+    assert.ok(!JSON.stringify(result.body).includes('foreign-private-data'), 'never echo the driver message');
+    if (!ordered) {
+      assert.equal(result.body.importedCount, 1);
+      assert.equal(result.body.skippedCount, 1);
+      assert.deepEqual(result.body.skipped, [{ index: 0, reason: 'DUPLICATE_ID' }]);
+      assert.equal(result.body.ordered, false);
+    }
+    const expected = [{ _id: 'i1', name: 'original', tenantId: TENANT_A, workspaceId: WS_A }];
+    if (!ordered) expected.push({ _id: 'i2', name: 'next', tenantId: TENANT_A, workspaceId: WS_A });
+    assert.deepEqual((await mongoRead(mongoClient)).body.items, expected);
+  }
+});
+
+test('bbx-995-mongo-insert-default-id: ordinary console imports still generate identity and skip non-objects', async () => {
+  const mongoClient = makeMongoClient();
+  const result = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, {
+    format: 'json', mode: 'insert', documents: [{ name: 'console' }, null, 'invalid', []]
+  }));
+  assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+  assert.equal(result.body.entityType, 'mongo_data_import_result');
+  assert.equal(result.body.importedCount, 1);
+  assert.equal(result.body.skippedCount, 3);
+  assert.deepEqual(result.body.skipped, [
+    { index: 1, reason: 'NOT_AN_OBJECT' }, { index: 2, reason: 'NOT_AN_OBJECT' }, { index: 3, reason: 'NOT_AN_OBJECT' }
+  ]);
+  const listed = await mongoRead(mongoClient);
+  assert.deepEqual(listed.body.items, [{ _id: 'generated-0', name: 'console', tenantId: TENANT_A, workspaceId: WS_A }]);
+});
+
+test('bbx-995-mongo-id-validation: malformed Extended JSON and operator ids reject the batch before Mongo', async () => {
+  for (const mode of ['insert', 'replace', 'upsert']) {
+    for (const _id of [{ $oid: 'bad' }, { $oid: 123 }, { $oid: '0'.repeat(24), extra: true }, { $ne: null }, { nested: { $eq: 'u1' } }, { $date: '2026-01-01' }]) {
+      let touched = false;
+      const mongoClient = { db: () => { touched = true; throw new Error('must not reach Mongo'); } };
+      const result = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, {
+        format: 'json', mode, documents: [{ _id: 'valid-first' }, { _id }]
+      }));
+      assert.equal(result.statusCode, 400, `${mode}: ${JSON.stringify(_id)}`);
+      assert.equal(result.body.code, 'VALIDATION_ERROR');
+      assert.equal(touched, false);
+    }
+  }
+});
+
+test('bbx-995-mongo-scope: all modes overwrite forged scope and cannot modify or reveal foreign identities', async () => {
+  for (const foreign of [
+    { _id: 'foreign', name: 'private', tenantId: TENANT_B, workspaceId: WS_B },
+    { _id: 'foreign', name: 'private', tenantId: TENANT_A, workspaceId: 'ws-sibling' }
+  ]) {
+    for (const mode of ['insert', 'replace', 'upsert']) {
+      for (const ordered of [false, true]) {
+        const mongoClient = makeMongoClient({ 'appdb.users': [{ ...foreign }] });
+        const result = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, {
+          format: 'json', mode, ordered, documents: [{ _id: 'foreign', name: 'overwrite', tenantId: foreign.tenantId, workspaceId: foreign.workspaceId }]
+        }));
+        assert.equal(result.statusCode, mode !== 'replace' && ordered ? 409 : 200, `${mode}: ${JSON.stringify(result.body)}`);
+        assert.ok(!JSON.stringify(result.body).includes('private'), 'no foreign data or raw driver message');
+        if (result.statusCode === 200) {
+          assert.equal(result.body.importedCount, 0);
+          assert.deepEqual(result.body.skipped, [{ index: 0, reason: mode === 'replace' ? 'NOT_MATCHED' : 'DUPLICATE_ID' }]);
+        }
+        assert.deepEqual((await mongoRead(mongoClient)).body.items, [], 'foreign identity never becomes visible in caller scope');
+        const foreignPool = makePool({ workspaces: { ...WORKSPACE_ROWS, 'ws-sibling': { id: 'ws-sibling', tenant_id: TENANT_A } } });
+        const original = await MONGO_HANDLERS.mongoDocuments(ctx({ workspaceId: foreign.workspaceId, db: 'appdb', col: 'users' }, {
+          pool: foreignPool, mongoClient, identity: foreign.tenantId === TENANT_B ? ownerB : ownerA
+        }));
+        assert.deepEqual(original.body.items, [foreign], 'the other owner still sees the unchanged document');
+
+        const fresh = { _id: 'fresh', name: 'scoped', tenantId: TENANT_A, workspaceId: WS_A };
+        if (mode === 'replace') {
+          await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, { format: 'json', mode: 'insert', documents: [fresh] }));
+        }
+        const imported = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, {
+          format: 'json', mode, documents: [{ ...fresh, tenantId: foreign.tenantId, workspaceId: foreign.workspaceId }]
+        }));
+        assert.equal(imported.statusCode, 200);
+        assert.deepEqual((await mongoRead(mongoClient)).body.items, [fresh], `${mode} re-stamps both verified scope fields`);
+      }
+    }
+  }
+});
 
 test('bbx-683-mongo-roundtrip: export reads only the workspace scope; import re-stamps the verified scope', async () => {
   const mongoClient = makeMongoClient({
@@ -478,16 +661,38 @@ test('bbx-683-mongo-roundtrip: export reads only the workspace scope; import re-
   assert.equal(exp.statusCode, 200, JSON.stringify(exp.body));
   assert.equal(exp.body.documentCount, 1, 'only the caller-workspace document is exported');
   assert.equal(exp.body.documents[0].name, 'alice');
-  assert.ok(!('tenantId' in exp.body.documents[0]) && !('_id' in exp.body.documents[0]), 'scope + _id stripped from the export');
+  assert.deepEqual(exp.body.documents, [{ _id: '1', name: 'alice' }], 'identity preserved; scope fields stripped');
 
   // Import a doc carrying a FORGED foreign scope — it must be re-stamped to the caller's scope.
-  const imp = await MONGO_HANDLERS.mongoDataImport(ctx({ workspaceId: WS_A, databaseName: 'appdb', collectionName: 'users' }, { pool: makePool(), mongoClient, body: { documents: [{ name: 'bob', tenantId: TENANT_B, workspaceId: WS_B, _id: 'forged' }] } }));
+  const imp = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, { format: 'json', mode: 'insert', documents: [{ name: 'bob', tenantId: TENANT_B, workspaceId: WS_B, _id: 'supplied' }] }));
   assert.equal(imp.statusCode, 200, JSON.stringify(imp.body));
   assert.equal(imp.body.importedCount, 1);
-  const stamped = mongoClient.inserted.find((i) => i.doc.name === 'bob').doc;
+  const stamped = (await mongoRead(mongoClient)).body.items.find((doc) => doc.name === 'bob');
   assert.equal(stamped.tenantId, TENANT_A, 'import stamps the VERIFIED tenant, never the body tenant');
   assert.equal(stamped.workspaceId, WS_A, 'import stamps the VERIFIED workspace');
-  assert.ok(!('_id' in stamped), 'forged _id dropped');
+  assert.equal(stamped._id, 'supplied', 'client identity preserved');
+  const restored = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, { format: 'json', mode: 'upsert', documents: exp.body.documents }));
+  assert.equal(restored.statusCode, 200);
+  assert.deepEqual((await MONGO_HANDLERS.mongoDataExport(mongoContext(mongoClient))).body.documents, [{ _id: '1', name: 'alice' }, { _id: 'supplied', name: 'bob' }]);
+});
+
+test('bbx-995-mongo-objectid-roundtrip: ObjectId and scalar identities retain their distinct BSON types', async () => {
+  const hex = '507f1f77bcf86cd799439011';
+  const mongoClient = makeMongoClient({ 'appdb.users': [
+    { _id: new ObjectId(hex), name: 'bson', tenantId: TENANT_A, workspaceId: WS_A },
+    { _id: hex, name: 'string', tenantId: TENANT_A, workspaceId: WS_A },
+    { _id: 42, name: 'number', tenantId: TENANT_A, workspaceId: WS_A }
+  ] });
+  const exp = await MONGO_HANDLERS.mongoDataExport(mongoContext(mongoClient));
+  assert.deepEqual(exp.body.documents, [{ _id: { $oid: hex }, name: 'bson' }, { _id: hex, name: 'string' }, { _id: 42, name: 'number' }]);
+  for (const documents of [exp.body.documents, [{ _id: { $oid: hex.toUpperCase() }, name: 'updated' }]]) {
+    const result = await MONGO_HANDLERS.mongoDataImport(mongoContext(mongoClient, { format: 'json', mode: 'upsert', documents }));
+    assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+    assert.equal(result.body.upsertedCount, 0, 'all original BSON identities still match');
+  }
+  const after = await MONGO_HANDLERS.mongoDataExport(mongoContext(mongoClient));
+  assert.equal(after.body.documentCount, 3, 'no string/ObjectId duplicate');
+  assert.deepEqual(after.body.documents, [{ _id: { $oid: hex }, name: 'updated' }, { _id: hex, name: 'string' }, { _id: 42, name: 'number' }]);
 });
 
 test('bbx-683-mongo-idor: cross-tenant export/import is 404 BEFORE touching the document store (Scenario 2)', async () => {

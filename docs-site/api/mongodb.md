@@ -86,6 +86,49 @@ curl -sS -X DELETE "$DOCS/<document-id>" \
   -H "authorization: Bearer $TOKEN"
 ```
 
+## Document export and import
+
+The console's workspace-scoped bulk import requires `format: "json"` and an explicit `mode`:
+
+```json
+{
+  "format": "json",
+  "mode": "upsert",
+  "ordered": true,
+  "documents": [{ "_id": "u1", "name": "alpha" }]
+}
+```
+
+| Mode | Identity and write behavior |
+| --- | --- |
+| `insert` | Preserves a supplied `_id`; Mongo generates one if omitted. |
+| `replace` | Requires `_id` on every document; replaces only a document in the verified tenant/workspace. Missing matches are skipped as `NOT_MATCHED`, with nothing inserted. |
+| `upsert` | Requires `_id` on every document; replaces an in-scope match or inserts with that identity. Replaying an import creates no duplicates. |
+
+Export strips the tenant/workspace fields and preserves `_id`. ObjectId identities use Extended
+JSON, for example `{ "_id": { "$oid": "507f1f77bcf86cd799439011" } }`; import decodes that exact
+form back to ObjectId. String and numeric identities stay unchanged. Export then upsert-import
+into the same scope preserves document identity and BSON type. Other BSON types have no fidelity
+guarantee in this transfer format.
+
+Missing/invalid format or mode, a missing stable `_id` in replace/upsert, malformed `$oid`, or any
+other `$`-prefixed operator key in `_id` returns `400 VALIDATION_ERROR` before writing anything.
+All modes overwrite body-supplied scope fields with the verified tenant and workspace, and
+replacement filters include both scope fields plus `_id`. Cross-tenant workspaces return
+`404 WORKSPACE_NOT_FOUND` before any Mongo call.
+
+Duplicate identities yield a generic conflict with no foreign document or driver details.
+With `ordered: false`, conflicts are skipped as `DUPLICATE_ID` and later entries continue.
+With `ordered: true` (default), the first conflict stops the import with `409 DUPLICATE_ID`;
+previous successful writes remain. Replace never matches a foreign identity.
+
+Successful console imports retain HTTP `200` and `entityType`, `importedCount`, `skippedCount`,
+and `skipped`. The response also includes `format`, `mode`, `ordered`, `matchedCount`,
+`upsertedCount`, and `replacedCount`; skipped entries carry a zero-based `index` and a `reason`.
+`importedCount` includes successful inserts, upserts, and matched replacements.
+`replacedCount` counts all matched replacements, even when the payload is unchanged.
+`MONGO_IO_MAX_DOCS` bounds export and import (default 5000 documents).
+
 ## Collection management
 
 Structural document-store routes are separate from data routes:
