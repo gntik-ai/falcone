@@ -81,6 +81,9 @@ jobs:
       - name: Workspace delete cascade
         run: node --test tests/blackbox/workspace-delete-cascade.test.mjs
 
+      - name: Flows ADR and spike artifacts
+        run: node --test tests/blackbox/flows-adr-spike-artifacts.test.mjs
+
       - name: Console E2E scaffolding
         run: pnpm test:e2e:console
 
