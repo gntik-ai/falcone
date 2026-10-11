@@ -38,6 +38,9 @@ export function mergeFunctionsFamilySource(document, family, version) {
   for (const [section, components] of Object.entries(family.components ?? {})) {
     result.components[section] ??= {};
     for (const [name, component] of Object.entries(components)) {
+      // The shared HTTP retry contract is maintained in the unified document. A generated
+      // family from the previous generation must not overwrite that source of truth.
+      if (section === 'parameters' && name === 'IdempotencyKey' && document.components?.parameters?.IdempotencyKey) continue;
       if (!isDeepStrictEqual(result.components[section][name], component)) {
         result.components[section][name] = structuredClone(component);
       }

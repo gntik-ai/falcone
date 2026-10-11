@@ -36,13 +36,14 @@
       },
       "idempotency_key": {
         "name": "Idempotency-Key",
-        "required_for_methods": [
+        "purpose": "Optional 24h replay for authenticated non-streaming mutations, isolated by tenant and verified subject or API-key credential ID. Identical retries return the original status/body and X-Idempotency-Replayed: true; original responses omit that header. Mismatches return 422, in-flight keys return 409 with Retry-After, and secret or oversized responses return 409 IDEMPOTENCY_REPLAY_UNAVAILABLE. No key is required in /v1. A keyed mutation without a verified principal or configured replay storage returns 503 IDEMPOTENCY_UNAVAILABLE. Recording failures leave the reservation blocking retries until its 24h expiry; Retry-After is advisory polling, not a release guarantee.",
+        "declared_for_methods": [
           "post",
           "put",
           "patch",
           "delete"
         ],
-        "purpose": "Coalesces safe retries for mutating requests accepted by the gateway and critical create/provision flows."
+        "required": false
       }
     },
     "pagination": {

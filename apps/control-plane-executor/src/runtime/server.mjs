@@ -10,6 +10,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import { randomUUID } from 'node:crypto';
+import { reserveHttpRequest, invalidIdempotencyKeyResponse, isMutationMethod } from '../../../../packages/internal-contracts/src/http-idempotency.mjs';
 import { recordHttp, recordMcpDependency, renderMetrics, setHttpRouteTemplates, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
@@ -32,7 +33,7 @@ const MCP_SUPERADMIN_ROLES = new Set(['superadmin', 'platform_admin']);
 const META_QUERY_KEYS = new Set(['select', 'order', 'page[size]', 'page[after]', 'countMode']);
 
 function sendJson(res, statusCode, body, headers = {}) {
-  const responseHeaders = { ...headers };
+  const responseHeaders = { 'Access-Control-Expose-Headers': 'X-Idempotency-Replayed', ...headers };
   delete responseHeaders['content-type'];
   delete responseHeaders['Content-Type'];
   delete responseHeaders['content-length'];
@@ -88,6 +89,20 @@ function proxyRequest(req, res, upstream, logger) {
     else res.destroy();
   });
   req.pipe(upstreamReq);
+}
+
+function parseJsonBody(raw) {
+  if (!raw.length) return {};
+  try { return JSON.parse(raw); } catch { throw Object.assign(new Error('Body is not valid JSON'), { statusCode: 400, code: 'INVALID_JSON' }); }
+}
+
+function readBodyBytes(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = []; let size = 0;
+    req.on('data', chunk => { chunks.push(Buffer.from(chunk)); size += chunk.length; if (size > 4e6) req.destroy(); });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
 }
 
 function readJsonBody(req) {
@@ -209,6 +224,7 @@ async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore, jwtVerifie
         // set for API keys (a key is always issued for a specific workspace).
         credentialWorkspaceId: resolved.workspaceId,
         actorId: `apikey:${resolved.keyType}`,
+        keyId: resolved.keyId,
         roleName: resolved.roleName,
         dbRole: resolved.dbRole, // assumed via SET LOCAL ROLE → RLS enforced for anon keys
         scopes: resolved.scopes,
@@ -1324,7 +1340,7 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
   return { status: successStatus, body: result };
 }
 
-export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig = mcpConfigStore, jwtVerifier, gatewaySharedSecret, resolveWorkspaceTenant, workspaceDocsDb, knativeRuntime, mcpRuntimeCleaner, logger = console } = {}) {
+export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig = mcpConfigStore, jwtVerifier, gatewaySharedSecret, resolveWorkspaceTenant, workspaceDocsDb, knativeRuntime, mcpRuntimeCleaner, idempotencyPool, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
@@ -1352,6 +1368,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
     const startNs = process.hrtime.bigint();
     const metric = { method, route: 'unmatched', tenantId: '' };
     res.on('finish', () => recordHttp({ ...metric, status: res.statusCode, durationSeconds: Number(process.hrtime.bigint() - startNs) / 1e9 }));
+    let idempotency;
     try {
       const url = new URL(req.url, 'http://control-plane.local');
       const match = routes.find(([m, re]) => m === method && re.test(url.pathname));
@@ -1471,6 +1488,8 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
           return sendJson(res, 403, { code: 'INSUFFICIENT_SCOPE', message: 'Credential scope does not permit this operation', requiredScope });
         }
       }
+      const invalidKey = invalidIdempotencyKeyResponse(method, req.headers['idempotency-key']);
+      if (invalidKey) return sendJson(res, invalidKey.statusCode, invalidKey.body, invalidKey.headers);
       // SSE routes own the response (streaming); pass req/res and skip the JSON path.
       if (opts?.sse) {
         await handler(groups, { url, identity, registry, req, res, logger });
@@ -1494,7 +1513,28 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
         const { status, body: out } = await handler(groups, ctx);
         return sendJson(res, status, out);
       }
-      const body = method === 'GET' || method === 'DELETE' ? {} : await readJsonBody(req);
+      const keyedMutation = isMutationMethod(method) && req.headers['idempotency-key'] !== undefined;
+      let rawBody;
+      if (keyedMutation) {
+        rawBody = await readBodyBytes(req);
+        idempotency = await reserveHttpRequest({ pool: idempotencyPool, key: req.headers['idempotency-key'], method, url: url.href, rawBody, identity, route: opts });
+        if (idempotency?.response) {
+          const replay = idempotency.response;
+          return sendJson(res, replay.statusCode, replay.body, replay.headers);
+        }
+      }
+      let body = {};
+      if (method !== 'GET' && method !== 'DELETE') {
+        if (rawBody === undefined) body = await readJsonBody(req);
+        else {
+          try { body = parseJsonBody(rawBody); }
+          catch (err) {
+            const invalid = { code: 'INVALID_JSON', message: err.message };
+            await idempotency?.complete?.({ statusCode: 400, body: invalid });
+            return sendJson(res, 400, invalid);
+          }
+        }
+      }
 
       // `authorization` is threaded through for handlers that must call the control-plane on the
       // caller's behalf (the platform MCP JSON-RPC route forwards the bearer token to the upstream,
@@ -1503,6 +1543,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
         method, url, identity, body, registry, headers: req.headers,
         authorization: delegatedAuthorizationFromHeaders(req.headers),
       });
+      await idempotency?.complete?.({ statusCode: status, body: out, headers });
       return sendJson(res, status, out, headers);
     } catch (err) {
       const statusCode = err.statusCode ?? 500;
@@ -1521,6 +1562,8 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       // Quota breaches (429 QUOTA_EXCEEDED) carry the breached dimension so the caller can show
       // which limit was hit (spec: body indicates the breached dimension).
       if (err.dimension && statusCode < 500) envelope.dimension = err.dimension;
+      if (statusCode >= 500) await idempotency?.release?.().catch(() => {});
+      else await idempotency?.complete?.({ statusCode, body: envelope }).catch(() => {});
       return sendJson(res, statusCode, envelope);
     }
   });

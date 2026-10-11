@@ -15,6 +15,8 @@
 // gateway-injected headers); here we self-validate the JWT so it works
 // regardless of APISIX plugin configuration.
 import http from 'node:http';
+import { pathToFileURL } from 'node:url';
+import { reserveHttpRequest } from '../../packages/internal-contracts/src/http-idempotency.mjs';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 import { createMultiRealmVerifier, deriveRealmTopology } from './jwt-verify.mjs';
@@ -196,6 +198,7 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
   'Access-Control-Allow-Headers': 'authorization,content-type,x-correlation-id,idempotency-key',
+  'Access-Control-Expose-Headers': 'X-Idempotency-Replayed',
   'Access-Control-Max-Age': '600'
 };
 function sendJson(res, statusCode, body, extra = {}) {
@@ -354,7 +357,11 @@ const server = http.createServer(async (req, res) => {
   const metric = { method, route: 'unmatched', tenantId: '' };
   res.on('finish', () => recordHttp({ ...metric, status: res.statusCode, durationSeconds: Number(process.hrtime.bigint() - startNs) / 1e9 }));
   // Keep verified attribution available to the mapped-error path (#958).
-  let route = null, identity = null, correlationId = null, routeParams = {};
+  let route = null, identity = null, correlationId = null, routeParams = {}, idempotency = null;
+  const reply = async (statusCode, body, headers = {}) => {
+    await idempotency?.complete?.({ statusCode, body, headers });
+    return sendJson(res, statusCode, body, headers);
+  };
   try {
     const parsed = new URL(req.url, `http://localhost:${PORT}`);
     const path = parsed.pathname;
@@ -405,6 +412,11 @@ const server = http.createServer(async (req, res) => {
 
     const query = Object.fromEntries(parsed.searchParams.entries());
     const rawBody = await readBody(req);
+    idempotency = await reserveHttpRequest({ pool, key: headers['idempotency-key'], method, url: parsed.href, rawBody, identity, route });
+    if (idempotency?.response) {
+      const replay = idempotency.response;
+      return sendJson(res, replay.statusCode, replay.body, replay.headers);
+    }
     const contentType = String(req.headers['content-type'] ?? '').toLowerCase();
     // A non-JSON content-type carries an opaque/binary body (e.g. object uploads): keep the exact
     // bytes for the handler instead of rejecting with INVALID_JSON. JSON (or an unspecified type,
@@ -421,7 +433,7 @@ const server = http.createServer(async (req, res) => {
         // Rejecting here, before handler dispatch, keeps a malformed body from reaching a
         // handler that derefs body.<field> and throwing an opaque 500 (#666).
         const parsedBody = normalizeJsonBody(rawBody);
-        if (!parsedBody.ok) return sendJson(res, parsedBody.statusCode, parsedBody.error);
+        if (!parsedBody.ok) return await reply(parsedBody.statusCode, parsedBody.error);
         body = parsedBody.body;
       } else {
         rawBodyIsBinary = true;
@@ -433,7 +445,7 @@ const server = http.createServer(async (req, res) => {
     // not via the /repo action loader.
     if (route.localHandler) {
       const fn = LOCAL_HANDLERS[route.localHandler];
-      if (typeof fn !== 'function') return sendJson(res, 500, { code: 'NO_HANDLER', message: `local handler ${route.localHandler} missing` });
+      if (typeof fn !== 'function') return await reply(500, { code: 'NO_HANDLER', message: `local handler ${route.localHandler} missing` });
       const ctx = {
         params: matched.params,
         query,
@@ -474,7 +486,7 @@ const server = http.createServer(async (req, res) => {
         if (lk === 'content-type' || lk === 'content-length') continue;
         localRespHeaders[k] = String(v);
       }
-      return sendJson(res, result?.statusCode ?? 200, result?.body ?? null, localRespHeaders);
+      return await reply(result?.statusCode ?? 200, result?.body ?? null, localRespHeaders);
     }
 
     // Inject the TRUSTED identity headers derived from the verified JWT, having
@@ -514,7 +526,7 @@ const server = http.createServer(async (req, res) => {
       if (lk === 'content-type' || lk === 'content-length') continue;
       respHeaders[k] = String(v);
     }
-    sendJson(res, result?.statusCode ?? 200, result?.body ?? null, respHeaders);
+    await reply(result?.statusCode ?? 200, result?.body ?? null, respHeaders);
   } catch (err) {
     // Log the full error (incl. stack) server-side only; never echo an exception's
     // message/stack to the client (stack-trace exposure). Return the stable code.
@@ -526,7 +538,10 @@ const server = http.createServer(async (req, res) => {
     // those are unmapped internal errors and the SQLSTATE leaks the storage engine (#634). Only echo
     // the stable application code for deliberately mapped client errors (< 500).
     const code = statusCode >= 500 ? 'CONTROL_PLANE_ERROR' : (err?.code ?? 'CONTROL_PLANE_ERROR');
-    sendJson(res, statusCode, { code, message: statusCode >= 500 ? 'Internal server error' : code });
+    const envelope = { code, message: statusCode >= 500 ? 'Internal server error' : code };
+    if (statusCode >= 500) await idempotency?.release?.().catch(() => {});
+    else await idempotency?.complete?.({ statusCode, body: envelope }).catch(() => {});
+    sendJson(res, statusCode, envelope);
   }
 });
 
@@ -651,24 +666,30 @@ export async function bootstrapControlPlane() {
   functionCleanupTimer.unref();
 }
 
-await bootstrapControlPlane();
-let shutdownStarted = false;
-for (const sig of ['SIGINT', 'SIGTERM']) {
-  process.on(sig, () => {
-    if (shutdownStarted) return;
-    shutdownStarted = true;
-    if (functionCleanupTimer) clearInterval(functionCleanupTimer);
-    const closeServer = server.listening
-      ? new Promise((resolve) => server.close(resolve))
-      : Promise.resolve();
-    closeServer
-      .then(() => closePools(
-        webhookSchemaPool,
-        webhookRuntimePool,
-        webhookLifecyclePool,
-        webhookWritePool,
-        pool,
-      ))
-      .finally(() => process.exit(0));
-  });
+export { server, loadRoutes };
+
+// Importing the dispatcher for an embedded caller does not start the process. The runnable
+// entry point still completes every required database/runtime gate before binding the port.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await bootstrapControlPlane();
+  let shutdownStarted = false;
+  for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.on(sig, () => {
+      if (shutdownStarted) return;
+      shutdownStarted = true;
+      if (functionCleanupTimer) clearInterval(functionCleanupTimer);
+      const closeServer = server.listening
+        ? new Promise((resolve) => server.close(resolve))
+        : Promise.resolve();
+      closeServer
+        .then(() => closePools(
+          webhookSchemaPool,
+          webhookRuntimePool,
+          webhookLifecyclePool,
+          webhookWritePool,
+          pool,
+        ))
+        .finally(() => process.exit(0));
+    });
+  }
 }

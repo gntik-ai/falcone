@@ -27,6 +27,7 @@ test('functions import-export OpenAPI contract exposes bounded export and import
 
   const importParameters = resolveParameters(document, importAction);
   assert.equal(importParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.equal(importParameters.find((parameter) => parameter.name === 'Idempotency-Key').required, false);
   assert.equal(importParameters.some((parameter) => parameter.name === 'workspaceId'), true);
 });
 
@@ -39,7 +40,8 @@ test('functions import-export routes are discoverable and authorization propagat
   assert.equal(exportRoute.resourceType, 'function_definition_export');
   assert.equal(importRoute.path, '/v1/functions/workspaces/{workspaceId}/definition-imports');
   assert.equal(importRoute.resourceType, 'function_definition_import');
-  assert.equal(importRoute.requiredHeaders.includes('Idempotency-Key'), true);
+  assert.equal(importRoute.supportsIdempotencyKey, true);
+  assert.equal(importRoute.requiredHeaders.includes('Idempotency-Key'), false);
   assert.ok(projection);
   assert.equal(projection.required_fields.includes('visibility_policy'), true);
   assert.equal(projection.required_fields.includes('import_operation'), true);

@@ -17,6 +17,7 @@ import { createMultiRealmVerifier } from '../../../apps/control-plane/jwt-verify
 import { createJwtVerifier } from '../../../apps/control-plane-executor/src/runtime/jwt-verify.mjs';
 import { secretBackendHealth } from '../../../apps/control-plane/fn-handlers.mjs';
 import { respondHealth } from '../../../apps/control-plane/health-response.mjs';
+import { reserveHttpRequest } from '../../../packages/internal-contracts/src/http-idempotency.mjs';
 
 const serverSource = await readFile(new URL('../../../apps/control-plane/server.mjs', import.meta.url), 'utf8');
 const localSource = await readFile(new URL('../../../apps/control-plane/b-handlers.mjs', import.meta.url), 'utf8');
@@ -61,7 +62,7 @@ export async function startMetricsServer() {
     'return { getTenant };',
   ].join('\n'))(store);
   const bindings = {
-    http, pool, jwtVerifier, PORT: 0, seedRoutes: routes, LOCAL_HANDLERS: locals,
+    http, pool, jwtVerifier, reserveHttpRequest, PORT: 0, seedRoutes: routes, LOCAL_HANDLERS: locals,
     console: { error() {}, warn() {} },
     webhookRuntimePool: null, webhookWritePool: null, knativeRuntime: null, runtimeTeardownCoordinator: null,
     createRuntimeCleanupRepository, secretBackendHealth, respondHealth,

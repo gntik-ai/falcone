@@ -294,3 +294,9 @@ test('bbx-736-03: async-operation-query list/logs run against the boot-created s
   assert.equal(logsResponse.body.total, 0);
   assert.deepEqual(logsResponse.body.pagination, { limit: 20, offset: 0 });
 });
+
+test('HTTP idempotency reservations are bootstrapped additively', async () => {
+  const { all } = await runBootstrap();
+  assert.match(all, /CREATE TABLE IF NOT EXISTS public\.http_idempotency_records/);
+  assert.match(all, /CREATE INDEX IF NOT EXISTS http_idempotency_expires_at/);
+});

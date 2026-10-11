@@ -84,12 +84,13 @@ export function createApiKeyStore({ pool }) {
     const res = await pool.query(
       `UPDATE workspace_api_keys SET last_used_at = now()
         WHERE key_hash = $1 AND status = 'active'
-        RETURNING tenant_id, workspace_id, key_type, scopes`,
+        RETURNING id, tenant_id, workspace_id, key_type, scopes`,
       [sha256(presentedKey)],
     );
     if (res.rowCount === 0) return null;
     const row = res.rows[0];
     return {
+      keyId: row.id,
       tenantId: row.tenant_id,
       workspaceId: row.workspace_id,
       keyType: row.key_type,

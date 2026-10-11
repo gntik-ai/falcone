@@ -18,6 +18,8 @@ test('functions OpenAPI contract extends action schemas with workspace secret re
   assert.equal(document.paths['/v1/functions/workspaces/{workspaceId}/secrets/{secretName}'].put.operationId, 'updateFunctionWorkspaceSecret');
   assert.equal(resolveParameters(document, createSecret).some((parameter) => parameter.name === 'Idempotency-Key'), true);
   assert.equal(resolveParameters(document, updateSecret).some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.equal(resolveParameters(document, createSecret).find((parameter) => parameter.name === 'Idempotency-Key').required, false);
+  assert.equal(resolveParameters(document, updateSecret).find((parameter) => parameter.name === 'Idempotency-Key').required, false);
 });
 
 test('function secret routes are discoverable through the generated public route catalog', () => {
@@ -26,6 +28,6 @@ test('function secret routes are discoverable through the generated public route
 
   assert.equal(createSecret.supportsIdempotencyKey, true);
   assert.equal(updateSecret.supportsIdempotencyKey, true);
-  assert.equal(createSecret.requiredHeaders.includes('Idempotency-Key'), true);
-  assert.equal(updateSecret.requiredHeaders.includes('Idempotency-Key'), true);
+  assert.equal(createSecret.requiredHeaders.includes('Idempotency-Key'), false);
+  assert.equal(updateSecret.requiredHeaders.includes('Idempotency-Key'), false);
 });
