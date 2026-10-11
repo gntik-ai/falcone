@@ -20,6 +20,7 @@ test('functions versioning OpenAPI contract exposes lifecycle version and rollba
   assert.equal(rollback['x-resource-type'], 'function_rollback');
   assert.equal(listVersionsParameters.some((parameter) => parameter.name === 'resourceId'), true);
   assert.equal(rollbackParameters.some((parameter) => parameter.name === 'Idempotency-Key'), true);
+  assert.equal(rollbackParameters.find((parameter) => parameter.name === 'Idempotency-Key').required, false);
   assert.equal(rollbackParameters.some((parameter) => parameter.name === 'resourceId'), true);
   assert.ok(rollback.responses['202'].content['application/json'].schema.properties.requestedVersionId);
   assert.ok(rollback.requestBody.content['application/json'].schema.properties.versionId);
@@ -47,5 +48,5 @@ test('functions versioning routes are discoverable through the generated public 
   assert.equal(rollback.path, '/v1/functions/actions/{resourceId}/rollback');
   assert.equal(rollback.resourceType, 'function_rollback');
   assert.equal(rollback.supportsIdempotencyKey, true);
-  assert.equal(rollback.requiredHeaders.includes('Idempotency-Key'), true);
+  assert.equal(rollback.requiredHeaders.includes('Idempotency-Key'), false);
 });

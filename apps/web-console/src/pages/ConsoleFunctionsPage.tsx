@@ -770,6 +770,10 @@ export function ConsoleFunctionsPage() {
         setActionDetailTab('activations')
       }
     } catch (error) {
+      // A response ends this submission; retain the key only for a network retry.
+      if (getConsoleErrorStatus(error) !== undefined) {
+        invokeIdempotencyKeyRef.current = buildIdempotencyKey()
+      }
       setInvokeResult({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo invocar la función.') })
     }
   }, [invokeForm, loadActivations, selectedActionId])
@@ -827,6 +831,9 @@ export function ConsoleFunctionsPage() {
         await loadActionDetail(resourceId)
       }
     } catch (error) {
+      if (getConsoleErrorStatus(error) !== undefined) {
+        deployIdempotencyKeyRef.current = buildIdempotencyKey()
+      }
       setDeployResult({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo desplegar la función.') })
     }
   }, [actionDetail.data, activeTenantId, activeWorkspaceId, deployForm, loadActionDetail, loadInventory, selectedActionId])
@@ -850,6 +857,9 @@ export function ConsoleFunctionsPage() {
       setRollbackResult({ data, loading: false, error: null })
       await Promise.all([loadActionDetail(selectedActionId), loadVersions(selectedActionId)])
     } catch (error) {
+      if (getConsoleErrorStatus(error) !== undefined) {
+        rollbackIdempotencyKeyRef.current = buildIdempotencyKey()
+      }
       setRollbackResult({ data: null, loading: false, error: describeConsoleError(error, 'No se pudo solicitar la reversión.') })
     }
   }, [loadActionDetail, loadVersions, rollbackTargetVersionId, selectedActionId])

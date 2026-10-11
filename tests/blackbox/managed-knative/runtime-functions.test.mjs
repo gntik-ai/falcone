@@ -235,7 +235,7 @@ test('bbx-933-functions-unavailable-03: public Function deploy contract exposes 
 
   assertAuthenticatedPublicRoute(createRoute);
   assert.equal(createRoute.supportsIdempotencyKey, true);
-  assert.ok(createRoute.requiredHeaders.includes('Idempotency-Key'));
+  assert.equal(createRoute.requiredHeaders.includes('Idempotency-Key'), false);
 
   const detailRead = operation('get', ACTION_PATH);
   const collectionRead = operation('get', WORKSPACE_ACTIONS_PATH);

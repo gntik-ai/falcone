@@ -606,6 +606,45 @@ describe('ConsoleFunctionsPage', () => {
     expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/functions/actions/res_fn_1/activations?page[size]=50', expect.any(Object))
   })
 
+  it.each([400, 403, 404, 422, 500, undefined])('reintenta invoke tras %s usando una clave nueva solo si llegó una respuesta HTTP', async (status) => {
+    const user = userEvent.setup()
+    const keys: string[] = []
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, options?: { method?: string; headers?: Record<string, string> }) => {
+      if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()
+      if (url === '/v1/functions/actions/res_fn_1') return detail()
+      if (url === '/v1/functions/actions/res_fn_1/activations?page[size]=50') return activations({ items: [] })
+      if (url === '/v1/functions/actions/res_fn_1/invocations' && options?.method === 'POST') {
+        const key = options.headers?.['Idempotency-Key'] ?? ''
+        keys.push(key)
+        if (keys.length === 1) {
+          if (status === undefined) throw new TypeError('Network error')
+          throw { status, code: `HTTP_${status}` }
+        }
+        if (status !== undefined && status < 500 && key === keys[0]) throw { status, code: `HTTP_${status}` }
+        return invokeAccepted()
+      }
+      throw new Error(`Unexpected URL ${url}`)
+    })
+
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    await openTab('Invocar')
+    await userEvent.click(screen.getByRole('button', { name: 'Invocar' }))
+    await screen.findByRole('alert')
+    if (status !== undefined) {
+      const payload = screen.getByLabelText(/contenido JSON/i)
+      await user.clear(payload)
+      await user.paste('{"changed":true}')
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Invocar' }))
+
+    expect(await screen.findByText(/inv_1/i)).toBeInTheDocument()
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toMatch(/^[A-Za-z0-9._:-]{8,128}$/)
+    if (status === undefined) expect(keys[1]).toBe(keys[0])
+    else expect(keys[1]).not.toBe(keys[0])
+  })
+
   it('muestra error de invoke', async () => {
     mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
       if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()
@@ -646,6 +685,46 @@ describe('ConsoleFunctionsPage', () => {
     await waitFor(() => expect(mockRequestConsoleSessionJson).toHaveBeenCalledWith('/v1/functions/actions', expect.objectContaining({ method: 'POST' })))
   })
 
+  it.each([400, 403, 404, 422, 500, undefined])('reintenta deploy tras %s usando una clave nueva solo si llegó una respuesta HTTP', async (status) => {
+    const keys: string[] = []
+    let created = false
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, options?: { method?: string; headers?: Record<string, string> }) => {
+      if (url === '/v1/functions/workspaces/wrk_alpha/inventory') {
+        return inventory({ actions: created ? [detail({ resourceId: 'res_fn_2', actionName: 'new-fn' })] : inventory().actions })
+      }
+      if (url === '/v1/functions/actions/res_fn_2') return detail({ resourceId: 'res_fn_2', actionName: 'new-fn' })
+      if (url === '/v1/functions/actions' && options?.method === 'POST') {
+        const key = options.headers?.['Idempotency-Key'] ?? ''
+        keys.push(key)
+        if (keys.length === 1) {
+          if (status === undefined) throw new TypeError('Network error')
+          throw { status, code: `HTTP_${status}` }
+        }
+        if (status !== undefined && status < 500 && key === keys[0]) throw { status, code: `HTTP_${status}` }
+        created = true
+        return { resourceId: 'res_fn_2', status: 'accepted' }
+      }
+      throw new Error(`Unexpected URL ${url}`)
+    })
+
+    renderPage()
+    await screen.findByText('hello-fn')
+    await userEvent.click(screen.getByRole('button', { name: /desplegar función/i }))
+    await userEvent.type(screen.getByLabelText(/nombre de acción/i), 'new-fn')
+    await userEvent.selectOptions(screen.getByLabelText(/entorno/i), 'nodejs:20')
+    await userEvent.type(screen.getByLabelText(/punto de entrada/i), 'index.main')
+    await userEvent.click(screen.getByRole('button', { name: /crear función/i }))
+    await screen.findByRole('alert')
+    if (status !== undefined) await userEvent.type(screen.getByLabelText(/código/i), '// corrected')
+    await userEvent.click(screen.getByRole('button', { name: /crear función/i }))
+
+    expect(await screen.findByRole('heading', { name: 'new-fn' })).toBeInTheDocument()
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toMatch(/^[A-Za-z0-9._:-]{8,128}$/)
+    if (status === undefined) expect(keys[1]).toBe(keys[0])
+    else expect(keys[1]).not.toBe(keys[0])
+  })
+
   it('prefill de deploy edit', async () => {
     mockRequestConsoleSessionJson.mockImplementation(async (url: string) => {
       if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()
@@ -675,6 +754,44 @@ describe('ConsoleFunctionsPage', () => {
     await screen.findByText('fnv_1')
     await userEvent.click(screen.getByRole('button', { name: /revertir/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/fnv_1/i)
+  })
+
+  it.each([400, 403, 404, 422, 500, undefined])('reintenta rollback tras %s usando una clave nueva solo si llegó una respuesta HTTP', async (status) => {
+    const keys: string[] = []
+    mockRequestConsoleSessionJson.mockImplementation(async (url: string, options?: { method?: string; body?: { versionId?: string }; headers?: Record<string, string> }) => {
+      if (url === '/v1/functions/workspaces/wrk_alpha/inventory') return inventory()
+      if (url === '/v1/functions/actions/res_fn_1') return detail()
+      if (url === '/v1/functions/actions/res_fn_1/versions?page[size]=50') {
+        return versions({ items: [...versions().items, { ...versions().items[1], versionId: 'fnv_0', versionNumber: 0 }] })
+      }
+      if (url === '/v1/functions/actions/res_fn_1/rollback' && options?.method === 'POST') {
+        const key = options.headers?.['Idempotency-Key'] ?? ''
+        keys.push(key)
+        if (keys.length === 1) {
+          if (status === undefined) throw new TypeError('Network error')
+          throw { status, code: `HTTP_${status}` }
+        }
+        if (status !== undefined && status < 500 && key === keys[0]) throw { status, code: `HTTP_${status}` }
+        return rollbackAccepted({ requestedVersionId: options.body?.versionId })
+      }
+      throw new Error(`Unexpected URL ${url}`)
+    })
+
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: /hello-fn/i }))
+    await openTab('Versiones')
+    await screen.findByText('fnv_1')
+    await userEvent.click(screen.getByRole('button', { name: /revertir/i }))
+    await screen.findByRole('alert')
+    if (status !== undefined) await userEvent.click(screen.getByRole('radio', { name: '0' }))
+    await userEvent.click(screen.getByRole('button', { name: /revertir/i }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/accepted/i))
+    expect(screen.getByRole('alert')).toHaveTextContent(status === undefined ? 'fnv_1' : 'fnv_0')
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toMatch(/^[A-Za-z0-9._:-]{8,128}$/)
+    if (status === undefined) expect(keys[1]).toBe(keys[0])
+    else expect(keys[1]).not.toBe(keys[0])
   })
 
   it('confirma eliminación destructiva, envía DELETE con idempotency key, refresca inventario y limpia selección', async () => {
