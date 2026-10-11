@@ -11,6 +11,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { randomUUID } from 'node:crypto';
 import { reserveHttpRequest, invalidIdempotencyKeyResponse, isMutationMethod } from '../../../../packages/internal-contracts/src/http-idempotency.mjs';
+import { requestErrorForLog } from '../../../../packages/internal-contracts/src/request-log.mjs';
 import { recordHttp, recordMcpDependency, renderMetrics, setHttpRouteTemplates, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { executePostgresData } from './postgres-data-executor.mjs';
 import { executePostgresDdl } from './postgres-ddl-executor.mjs';
@@ -84,7 +85,7 @@ function proxyRequest(req, res, upstream, logger) {
   );
   upstreamReq.setTimeout(PROXY_TIMEOUT_MS, () => upstreamReq.destroy(Object.assign(new Error('upstream timeout'), { code: 'ETIMEDOUT' })));
   upstreamReq.on('error', (err) => {
-    logger.error?.('[control-plane] upstream proxy failed:', err);
+    logger.error?.('[control-plane] upstream proxy failed:', requestErrorForLog(err, req.url));
     if (!res.headersSent) sendJson(res, 502, { code: 'UPSTREAM_UNAVAILABLE', message: 'Control-plane upstream unavailable' });
     else res.destroy();
   });
@@ -940,7 +941,7 @@ async function runFlowMonitoringSse(flowMonitoringExecutor, target, c) {
     // A pre-stream rejection (403 foreign workflow id / 401 identity) must surface as an HTTP
     // status, NOT a 200 stream — the stream was never opened (ensureStarted not called).
     const statusCode = err.statusCode ?? 500;
-    if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
+    if (statusCode >= 500) logger.error?.('[control-plane] request failed:', requestErrorForLog(err, req.url));
     if (!started && !res.headersSent) {
       const payload = JSON.stringify({ code: publicErrorCode(err, 'FLOW_MONITORING_ERROR'), message: statusCode >= 500 ? 'Internal server error' : err.message });
       res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(payload) });
@@ -1262,7 +1263,7 @@ async function runLlmComplete(llmExecutor, { workspaceId, tenantId }, c) {
     current = await iter.next();
   } catch (err) {
     const statusCode = err.statusCode ?? 500;
-    if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
+    if (statusCode >= 500) logger.error?.('[control-plane] request failed:', requestErrorForLog(err, req.url));
     return sendJson(res, statusCode, { code: publicErrorCode(err, 'LLM_PROVIDER_ERROR'), message: statusCode >= 500 ? 'Internal server error' : err.message });
   }
   res.writeHead(200, {
@@ -1547,7 +1548,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       return sendJson(res, status, out, headers);
     } catch (err) {
       const statusCode = err.statusCode ?? 500;
-      if (statusCode >= 500) logger.error?.('[control-plane] request failed:', err);
+      if (statusCode >= 500) logger.error?.('[control-plane] request failed:', requestErrorForLog(err, req.url));
       const envelope = {
         code: publicErrorCode(err, 'CONTROL_PLANE_ERROR'),
         message: statusCode >= 500 ? 'Internal server error' : err.message,

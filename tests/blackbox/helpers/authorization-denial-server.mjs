@@ -20,6 +20,7 @@ import { createRuntimeCleanupRepository } from '../../../apps/control-plane/runt
 import { createMultiRealmVerifier } from '../../../apps/control-plane/jwt-verify.mjs';
 import { can } from '../../../apps/control-plane/model-authz.mjs';
 import { reserveHttpRequest } from '../../../packages/internal-contracts/src/http-idempotency.mjs';
+import { requestErrorForLog } from '../../../packages/internal-contracts/src/request-log.mjs';
 
 export const TEN_A = '11111111-1111-1111-1111-111111111111';
 export const TEN_B = '22222222-2222-2222-2222-222222222222';
@@ -89,7 +90,7 @@ export async function startDenialServer({ insert = null, extraRoutes = [] } = {}
     ...(route.module ? { module: fileURLToPath(new URL(`../../../${route.module.replace('/repo/', '')}`, import.meta.url)) } : {})
   });
   const bindings = {
-    http, pool, jwtVerifier, reserveHttpRequest, compileRoutes, matchCompiledRoute, invokeRoute, PORT: 0,
+    http, pool, jwtVerifier, reserveHttpRequest, requestErrorForLog, compileRoutes, matchCompiledRoute, invokeRoute, PORT: 0,
     seedRoutes: [...routes, ...extraRoutes].map(remap),
     LOCAL_HANDLERS: locals,
     console: { error() {}, warn: (line) => warnings.push(line) },

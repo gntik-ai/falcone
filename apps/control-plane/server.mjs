@@ -17,6 +17,7 @@
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { reserveHttpRequest } from '../../packages/internal-contracts/src/http-idempotency.mjs';
+import { requestErrorForLog } from '../../packages/internal-contracts/src/request-log.mjs';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 import { createMultiRealmVerifier, deriveRealmTopology } from './jwt-verify.mjs';
@@ -329,7 +330,7 @@ const server = http.createServer(async (req, res) => {
     if (route.auth !== 'public' || (route.optionalIdentity && headers.authorization)) {
       try { identity = await authenticate(headers); }
       catch (e) {
-        console.error('[control-plane] token verification failed:', e);
+        console.error('[control-plane] token verification failed:', requestErrorForLog(e, req.url));
         return sendJson(res, 401, route.auth === 'knative_status'
           ? knativeRuntimeAuthenticationError('INVALID_TOKEN', correlationId)
           : { code: 'INVALID_TOKEN', message: 'Token verification failed' });
@@ -468,9 +469,9 @@ const server = http.createServer(async (req, res) => {
     }
     await reply(result?.statusCode ?? 200, result?.body ?? null, respHeaders);
   } catch (err) {
-    // Log the full error (incl. stack) server-side only; never echo an exception's
-    // message/stack to the client (stack-trace exposure). Return the stable code.
-    console.error('[control-plane] request failed:', err);
+    // Query-bearing diagnostics can embed API keys in messages, stacks and causes (#1118).
+    // Never echo an exception's message/stack to the client. Return the stable code.
+    console.error('[control-plane] request failed:', requestErrorForLog(err, req.url));
     const statusCode = err?.statusCode ?? (err?.code === 'FORBIDDEN' ? 403 : 500);
     void recordRouteDenial(pool, route, { identity, params: routeParams, req },
       { statusCode }, correlationId);

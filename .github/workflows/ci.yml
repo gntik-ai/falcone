@@ -53,6 +53,12 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit
 
+      - name: Flow stream API-key log hygiene
+        run: |
+          node --test tests/blackbox/flow-stream-apikey-logs.test.mjs \
+            tests/blackbox/flows-execution-events.test.mjs \
+            tests/blackbox/executor-5xx-code-redaction.test.mjs
+
       - name: Live catalog quota admission
         run: |
           node --test tests/blackbox/live-resource-quota-enforcement.test.mjs \
