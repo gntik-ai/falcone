@@ -21,21 +21,29 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const CP_DIR = resolve(REPO_ROOT, 'deploy', 'kind', 'control-plane');
+const CP_DIR = resolve(REPO_ROOT, 'apps', 'control-plane');
 const routeMap = JSON.parse(readFileSync(resolve(CP_DIR, 'route-map.runtime.json'), 'utf8'));
 const dockerfile = readFileSync(resolve(CP_DIR, 'Dockerfile'), 'utf8');
 
-// Distinct services trees the route map dispatches to (/repo/services/<tree>).
+// Distinct repository trees the route map dispatches to (/repo/{packages,apps}/<tree>).
 const referencedTrees = [...new Set(
   routeMap
     .filter((r) => typeof r.module === 'string')
-    .map((r) => /^\/repo\/services\/([^/]+)/.exec(r.module)?.[1])
+    .map((r) => /^\/repo\/((?:packages|apps)\/[^/]+)/.exec(r.module)?.[1])
     .filter(Boolean),
 )];
-// Trees the Dockerfile COPYs into /repo/services/.
-const copiedTrees = [...dockerfile.matchAll(/COPY\s+services\/([^/\s]+)\s+\/repo\/services\//g)].map((m) => m[1]);
+// Join continued COPY lines and preserve the packages/apps prefix so distinct trees
+// cannot be mistaken for one another. The destination must match the route-map path.
+const logicalDockerfile = dockerfile.replace(/\\\s*\r?\n/g, ' ');
+const copiedTrees = [...logicalDockerfile.matchAll(/^\s*COPY\s+((?:packages|apps)\/[^/\s]+)\s+\/repo\/\1\/?\s*$/gim)].map((m) => m[1]);
 const copiedControlPlaneModules = new Set(
-  [...dockerfile.matchAll(/deploy\/kind\/control-plane\/([A-Za-z0-9_.-]+\.mjs)\b/g)].map((m) => m[1]),
+  [...logicalDockerfile.matchAll(/^\s*COPY\s+([^\r\n]+)/gim)]
+    .map((m) => m[1].trim().split(/\s+/))
+    // WORKDIR is /app; only modules copied there satisfy the flattened local imports.
+    .filter((tokens) => ['.', './', '/app', '/app/'].includes(tokens.at(-1)))
+    .flatMap((tokens) => tokens.slice(0, -1))
+    .map((source) => /^apps\/control-plane\/([A-Za-z0-9_.-]+\.mjs)$/.exec(source)?.[1])
+    .filter(Boolean),
 );
 
 function localImports(moduleName) {
@@ -45,14 +53,15 @@ function localImports(moduleName) {
   return [...new Set([...staticImports, ...dynamicImports])];
 }
 
-test('bbx-sched-dockerfile-01: every route-map services tree is COPYed by the Dockerfile', () => {
+test('bbx-sched-dockerfile-01: every route-map packages/apps tree is COPYed by the Dockerfile', () => {
+  assert.ok(referencedTrees.length > 0, 'route map should reference at least one packages/apps tree');
   const missing = referencedTrees.filter((t) => !copiedTrees.includes(t));
   assert.deepEqual(missing, [], `Dockerfile is missing COPY for: ${missing.join(', ')}`);
 });
 
 test('bbx-sched-dockerfile-02: scheduling-engine specifically is COPYed (the regression)', () => {
-  assert.ok(referencedTrees.includes('scheduling-engine'), 'route map should dispatch to scheduling-engine');
-  assert.ok(copiedTrees.includes('scheduling-engine'), 'Dockerfile must COPY packages/scheduling-engine');
+  assert.ok(referencedTrees.includes('packages/scheduling-engine'), 'route map should dispatch to packages/scheduling-engine');
+  assert.ok(copiedTrees.includes('packages/scheduling-engine'), 'Dockerfile must COPY packages/scheduling-engine to /repo/packages/scheduling-engine');
 });
 
 test('bbx-sched-dockerfile-03: the scheduling handler module exists in the repo', () => {
@@ -69,6 +78,7 @@ test('bbx-sched-dockerfile-04: the Dockerfile fails the build when a route handl
 });
 
 test('bbx-sched-dockerfile-05: every copied local control-plane module import is also COPYed', () => {
+  assert.ok(copiedControlPlaneModules.has('server.mjs'), 'Dockerfile must COPY server.mjs to /app');
   const missing = [];
   for (const moduleName of copiedControlPlaneModules) {
     for (const imported of localImports(moduleName)) {
