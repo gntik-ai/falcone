@@ -91,6 +91,12 @@ function ctx(identity, workspaceId, teardown) {
   return {
     pool: fakePool(workspaceId), identity, params: { workspaceId }, query: {}, body: {},
     callerContext: { actor: { id: identity.sub, type: identity.actorType }, tenantId: identity.tenantId },
+    // Runtime cleanup is a prerequisite since #936 (503 RUNTIME_TEARDOWN_UNAVAILABLE without it);
+    // this fixture asserts the registry/physical cascade, so the runtime side has nothing pending.
+    runtimeTeardownCoordinator: {
+      purgeTenant: async () => ({ pending: false }),
+      purgeWorkspace: async () => ({ pending: false }),
+    },
     ...teardown && {
       dropWorkspaceDatabase: teardown.dropWorkspaceDatabase,
       deleteBucket: teardown.deleteBucket,

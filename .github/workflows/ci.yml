@@ -78,6 +78,9 @@ jobs:
       - name: Authorization denial audit harness
         run: node --test tests/blackbox/authorization-denial-audit.test.mjs
 
+      - name: Workspace delete cascade
+        run: node --test tests/blackbox/workspace-delete-cascade.test.mjs
+
       - name: Console E2E scaffolding
         run: pnpm test:e2e:console
 
