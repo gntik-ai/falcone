@@ -20,11 +20,10 @@ export async function resolveEffectiveLimit(db, tenantId, dimensionKey) {
 
 export async function resolveEffectiveLimitsForTenant(db, tenantId) {
   const assignment = await getLimitsByTenantCurrentPlan(db, tenantId);
-  if (!assignment) return { tenantId, noAssignment: true, effectiveLimits: [] };
   const dimensions = await listAllDimensions(db);
   const effectiveLimits = [];
   for (const dimension of dimensions) effectiveLimits.push(await resolveEffectiveLimit(db, tenantId, dimension.dimensionKey));
-  return { tenantId, planSlug: assignment.planSlug, planStatus: assignment.planStatus, effectiveLimits };
+  return { tenantId, ...(!assignment ? { noAssignment: true } : {}), planSlug: assignment?.planSlug ?? null, planStatus: assignment?.planStatus ?? null, effectiveLimits };
 }
 
 export async function insertEnforcementLog(db, record) {
