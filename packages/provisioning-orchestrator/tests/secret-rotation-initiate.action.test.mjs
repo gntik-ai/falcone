@@ -37,7 +37,7 @@ test('secret-rotation-initiate happy path', async () => {
 });
 
 test('secret-rotation-initiate rejects invalid grace period', async () => {
-  const result = await main({ auth: { sub: 'u', roles: ['superadmin'] }, secretPath: 'platform/x', domain: 'platform', newValue: 'v', gracePeriodSeconds: 10, db: makeDb() });
+  const result = await main({ auth: { sub: 'u', roles: ['superadmin'] }, secretPath: 'platform/x', domain: 'platform', newValue: 'v', gracePeriodSeconds: 10, db: makeDb(), vaultClient: { async writeSecret() { throw new Error('validation must prevent writes'); } } });
   assert.equal(result.error.code, 'INVALID_GRACE_PERIOD');
 });
 

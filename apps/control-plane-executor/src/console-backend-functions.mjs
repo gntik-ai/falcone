@@ -192,6 +192,6 @@ export async function invokeWorkflow(workflowId, params, callerContext) {
   return executeSaga(workflowId, params, callerContext);
 }
 
-export async function queryWorkflowStatus(sagaId, callerContext) {
-  return getSagaStatus(sagaId, callerContext);
+export async function queryWorkflowStatus(sagaId, callerContext, overrides) {
+  return getSagaStatus(sagaId, callerContext, overrides);
 }

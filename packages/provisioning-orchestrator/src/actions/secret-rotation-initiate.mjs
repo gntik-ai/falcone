@@ -15,7 +15,7 @@ export function resolveDependencies(params = {}) {
   return {
     db: params.db,
     repo: params.repo ?? repo,
-    vaultClient: params.vaultClient ?? { async writeSecret() { return { data: { version: 1 } }; } },
+    vaultClient: params.vaultClient ?? null,
     publishEvent: params.publishEvent ?? (async () => {}),
     triggerEsoRefresh: params.triggerEsoRefresh ?? (async () => {})
   };
@@ -33,6 +33,10 @@ export async function main(params = {}) {
   const ownership = await assertSecretRotationOwnership({ auth, secretPath, domain, tenantId, dataRepo, db });
   if (ownership.error) return { error: ownership.error };
   const ownerTenantId = ownership.ownerTenantId;
+
+  if (typeof vaultClient?.writeSecret !== 'function') {
+    return { error: { code: 'SECRET_BACKEND_UNAVAILABLE', status: 503 } };
+  }
 
   if (!Number.isInteger(gracePeriodSeconds) || gracePeriodSeconds < SECRET_ROTATION_MIN_GRACE_SECONDS || gracePeriodSeconds > SECRET_ROTATION_MAX_GRACE_SECONDS) {
     return { error: { code: 'INVALID_GRACE_PERIOD', status: 422 } };

@@ -1,3 +1,4 @@
+import { tenantRoleStorage } from './tenant-role-storage.mjs';
 /**
  * Per-tenant custom RBAC role catalog — management surface + validation.
  *
@@ -236,7 +237,7 @@ export function validateCustomRoleDefinition({ roleName, allowedActions, roles }
  * POST /v1/iam/tenant-roles — create a custom role.
  */
 export async function createTenantCustomRole(params = {}, overrides = {}) {
-  const db = overrides.db ?? params.db;
+  let db = overrides.db ?? params.db;
   if (!db) {
     return { statusCode: 500, body: errorBody('CONFIG_ERROR', 'Custom role storage is not configured.') };
   }
@@ -246,6 +247,7 @@ export async function createTenantCustomRole(params = {}, overrides = {}) {
     return { statusCode: 401, body: errorBody('UNAUTHORIZED', 'Missing tenant identity headers.') };
   }
 
+  db = tenantRoleStorage(db, identity);
   const roleName = params.role_name;
   const allowedActions = params.allowed_actions;
   const validation = validateCustomRoleDefinition({ roleName, allowedActions, roles: identity.roles });
@@ -254,13 +256,13 @@ export async function createTenantCustomRole(params = {}, overrides = {}) {
   }
 
   // Conflict: an active role with the same name already exists in scope.
-  const existing = db.listByScope(identity.tenantId, identity.workspaceId)
+  const existing = (await db.listByScope(identity.tenantId, identity.workspaceId))
     .find((row) => row.role_name === roleName);
   if (existing) {
     return { statusCode: 409, body: errorBody('ROLE_EXISTS', `A custom role named ${roleName} already exists in this scope.`) };
   }
 
-  const row = db.insert({
+  const row = await db.insert({
     tenant_id: identity.tenantId,
     workspace_id: identity.workspaceId,
     role_name: roleName,
@@ -277,7 +279,7 @@ export async function createTenantCustomRole(params = {}, overrides = {}) {
  * GET /v1/iam/tenant-roles — list custom roles scoped to the caller.
  */
 export async function listTenantCustomRoles(params = {}, overrides = {}) {
-  const db = overrides.db ?? params.db;
+  let db = overrides.db ?? params.db;
   if (!db) {
     return { statusCode: 500, body: errorBody('CONFIG_ERROR', 'Custom role storage is not configured.') };
   }
@@ -287,7 +289,8 @@ export async function listTenantCustomRoles(params = {}, overrides = {}) {
     return { statusCode: 401, body: errorBody('UNAUTHORIZED', 'Missing tenant identity headers.') };
   }
 
-  const rows = db.listByScope(identity.tenantId, identity.workspaceId);
+  db = tenantRoleStorage(db, identity);
+  const rows = await db.listByScope(identity.tenantId, identity.workspaceId);
   return { statusCode: 200, body: { items: rows.map(serializeRole) } };
 }
 
@@ -297,7 +300,7 @@ export async function listTenantCustomRoles(params = {}, overrides = {}) {
  * cross-tenant ID enumeration / existence leakage.
  */
 export async function getTenantCustomRole(params = {}, overrides = {}) {
-  const db = overrides.db ?? params.db;
+  let db = overrides.db ?? params.db;
   if (!db) {
     return { statusCode: 500, body: errorBody('CONFIG_ERROR', 'Custom role storage is not configured.') };
   }
@@ -307,8 +310,9 @@ export async function getTenantCustomRole(params = {}, overrides = {}) {
     return { statusCode: 401, body: errorBody('UNAUTHORIZED', 'Missing tenant identity headers.') };
   }
 
+  db = tenantRoleStorage(db, identity);
   const roleId = params.roleId ?? params.role_id;
-  const row = db.findById(roleId);
+  const row = await db.findById(roleId);
   if (!row || row.tenant_id !== identity.tenantId) {
     return { statusCode: 404, body: errorBody('NOT_FOUND', 'Custom role not found.') };
   }
@@ -321,7 +325,7 @@ export async function getTenantCustomRole(params = {}, overrides = {}) {
  * Same validation as create; triggers recalculate on success.
  */
 export async function updateTenantCustomRole(params = {}, overrides = {}) {
-  const db = overrides.db ?? params.db;
+  let db = overrides.db ?? params.db;
   if (!db) {
     return { statusCode: 500, body: errorBody('CONFIG_ERROR', 'Custom role storage is not configured.') };
   }
@@ -331,8 +335,9 @@ export async function updateTenantCustomRole(params = {}, overrides = {}) {
     return { statusCode: 401, body: errorBody('UNAUTHORIZED', 'Missing tenant identity headers.') };
   }
 
+  db = tenantRoleStorage(db, identity);
   const roleId = params.roleId ?? params.role_id;
-  const row = db.findById(roleId);
+  const row = await db.findById(roleId);
   if (!row || row.tenant_id !== identity.tenantId) {
     return { statusCode: 404, body: errorBody('NOT_FOUND', 'Custom role not found.') };
   }
@@ -347,6 +352,7 @@ export async function updateTenantCustomRole(params = {}, overrides = {}) {
   row.role_name = roleName;
   row.allowed_actions = validation.allowed_actions;
   row.updated_at = overrides.now ?? new Date().toISOString();
+  if (db.update) await db.update(row);
 
   await triggerRecalculate(overrides, identity, row);
 
@@ -358,7 +364,7 @@ export async function updateTenantCustomRole(params = {}, overrides = {}) {
  * Triggers recalculate so downstream resolution drops the binding.
  */
 export async function deleteTenantCustomRole(params = {}, overrides = {}) {
-  const db = overrides.db ?? params.db;
+  let db = overrides.db ?? params.db;
   if (!db) {
     return { statusCode: 500, body: errorBody('CONFIG_ERROR', 'Custom role storage is not configured.') };
   }
@@ -368,13 +374,15 @@ export async function deleteTenantCustomRole(params = {}, overrides = {}) {
     return { statusCode: 401, body: errorBody('UNAUTHORIZED', 'Missing tenant identity headers.') };
   }
 
+  db = tenantRoleStorage(db, identity);
   const roleId = params.roleId ?? params.role_id;
-  const row = db.findById(roleId);
+  const row = await db.findById(roleId);
   if (!row || row.tenant_id !== identity.tenantId) {
     return { statusCode: 404, body: errorBody('NOT_FOUND', 'Custom role not found.') };
   }
 
   row.deleted_at = overrides.now ?? new Date().toISOString();
+  if (db.softDelete) await db.softDelete(row);
 
   await triggerRecalculate(overrides, identity, row);
 

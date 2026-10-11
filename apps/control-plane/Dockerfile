@@ -23,6 +23,7 @@ RUN npm install --omit=dev --no-audit --no-fund \
 
 # Server source + domain-B modules + the verified runtime route table.
 COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
+     apps/control-plane/route-table.mjs apps/control-plane/route-invoke.mjs \
      apps/control-plane/runtime-teardown-coordinator.mjs \
      apps/control-plane/jwt-verify.mjs apps/control-plane/sa-revocation.mjs \
      apps/control-plane/kc-admin.mjs apps/control-plane/social-providers.mjs \
@@ -70,6 +71,8 @@ COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
 # families are wired.
 COPY packages/provisioning-orchestrator /repo/packages/provisioning-orchestrator
 COPY packages/internal-contracts        /repo/packages/internal-contracts
+COPY packages/adapters                  /repo/packages/adapters
+COPY packages/event-gateway             /repo/packages/event-gateway
 COPY packages/scheduling-engine         /repo/packages/scheduling-engine
 COPY packages/webhook-engine            /repo/packages/webhook-engine
 # workspace-docs-service supplies migration 087 in the boot schema/recovery set
@@ -96,6 +99,10 @@ RUN ln -sfn /repo/packages /packages
 # request 500'd with ERR_MODULE_NOT_FOUND at runtime. This static check turns a
 # missing COPY into a build failure instead of a runtime 500.
 RUN node -e "const fs=require('fs');const list=JSON.parse(fs.readFileSync('./route-map.runtime.json','utf8'));const mods=[...new Set(list.filter(r=>typeof r.module==='string').map(r=>r.module))];const miss=mods.filter(p=>!fs.existsSync(p));if(miss.length){console.error('[build] route map references missing handler modules:\n  '+miss.join('\n  '));process.exit(1)}console.log('[build] all '+mods.length+' route handler modules resolve')"
+
+# Reconcile using a read-only build context mount; the catalog is never shipped
+# in the runtime image. The installed runtime dependencies resolve via /node_modules.
+RUN --mount=type=bind,source=.,target=/source node /source/scripts/check-control-plane-routes.mjs
 
 # Import the side-effect-free database-startup seam that server.mjs imports at
 # boot. This makes an incomplete explicit COPY list fail during image build,

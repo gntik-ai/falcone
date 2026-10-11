@@ -94,4 +94,35 @@ function errorResponse(statusCode, code, message) {
   };
 }
 
-export const main = createWorkspaceCapabilityCatalogAction();
+// Runtime entry point: membership comes from verified auth, and workspace ownership
+// is checked in the database before loading catalog metadata.
+export async function main(params = {}, { db } = {}) {
+  const auth = params.auth;
+  if (!auth?.actorId || !auth?.tenantId) return errorResponse(401, 'UNAUTHORIZED', 'Missing JWT context.');
+  const workspaceIds = auth.workspaceIds ?? [auth.workspaceId];
+  if (!workspaceIds.includes(params.workspaceId)) return errorResponse(403, 'FORBIDDEN', 'Workspace access denied.');
+  const action = createWorkspaceCapabilityCatalogAction({
+    fetchCapabilities: async ({ workspaceId, capabilityId }) => {
+      const workspace = (await db.query(
+        'SELECT id, tenant_id FROM workspaces WHERE id = $1 AND tenant_id = $2',
+        [workspaceId, auth.tenantId]
+      )).rows[0];
+      if (!workspace) return [];
+      const { rows } = await db.query(`
+        SELECT catalog.*, CASE catalog.capability_key
+          WHEN 'postgres-database' THEN EXISTS (SELECT 1 FROM workspace_databases WHERE workspace_id=$1 AND tenant_id=$2 AND status='active')
+          WHEN 'mongo-collection' THEN EXISTS (SELECT 1 FROM workspace_mongo_databases WHERE workspace_id=$1 AND tenant_id=$2)
+          WHEN 'kafka-events' THEN EXISTS (SELECT 1 FROM workspace_topics WHERE workspace_id=$1 AND tenant_id=$2)
+          WHEN 'realtime-subscription' THEN EXISTS (SELECT 1 FROM realtime_channels WHERE workspace_id::text=$1 AND tenant_id::text=$2 AND status='active')
+          WHEN 'serverless-function' THEN EXISTS (SELECT 1 FROM workspace_functions WHERE workspace_id=$1 AND tenant_id=$2)
+          WHEN 'storage-bucket' THEN EXISTS (SELECT 1 FROM workspace_buckets WHERE workspace_id=$1 AND tenant_id=$2)
+          ELSE false END AS enabled
+        FROM capability_catalog_metadata catalog ORDER BY capability_key`, [workspaceId, auth.tenantId]);
+      return rows.filter(row => !capabilityId || row.capability_key === capabilityId).map(row => ({
+        ...row, enabled: Boolean(row.enabled),
+        status: row.enabled ? 'active' : 'disabled'
+      }));
+    }
+  });
+  return action({ ...params, auth: { ...auth, workspaceId: params.workspaceId } });
+}
