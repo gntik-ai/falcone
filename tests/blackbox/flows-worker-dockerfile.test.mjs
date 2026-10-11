@@ -20,7 +20,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -52,11 +52,22 @@ function specToRepoPath(spec) {
 //        apps/control-plane-executor/src/runtime/byok-provider-guard.mjs \
 //        /app/apps/control-plane-executor/src/runtime/
 // Join continued lines, then inspect only COPY sources (not comments or RUN guards).
-// Both apps/* and packages/* modules resolve from the shipped dist/ directory.
+// Both apps/* and packages/* modules must land at /app/<repo path> to resolve from
+// the shipped dist/ directory. Merely appearing as a source is not sufficient.
 const copiedModules = new Set(
   [...dockerfile.replace(/\\\s*\r?\n/g, ' ').matchAll(/^\s*COPY\s+([^\r\n]+)/gim)]
-    .flatMap((m) => m[1].trim().split(/\s+/).slice(0, -1))
-    .filter((source) => /^(?:apps|packages)\/[^\s]+\.mjs$/.test(source)),
+    .flatMap((m) => {
+      const tokens = m[1].trim().split(/\s+/);
+      const destination = tokens.at(-1);
+      const sources = tokens.slice(0, -1);
+      return sources.filter((source) => {
+        if (!/^(?:apps|packages)\/[^\s]+\.mjs$/.test(source)) return false;
+        const imagePath = sources.length > 1 || destination.endsWith('/')
+          ? posix.join(destination, posix.basename(source))
+          : posix.normalize(destination);
+        return imagePath === posix.join('/app', source);
+      });
+    }),
 );
 
 test('bbx-flows-worker-dockerfile-01: every module worker-deps.mjs dynamic-imports is COPYed into the image (no drift)', () => {

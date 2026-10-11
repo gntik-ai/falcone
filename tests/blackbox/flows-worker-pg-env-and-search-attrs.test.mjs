@@ -12,7 +12,7 @@
  *
  * Former subtests 03 and 04 are removed because tests/live-campaign/advanced-caps.sh
  * is untracked and gitignored. Deployment assertions belong in falcone-charts:
- *   - the workflowWorker PG env chart test under tests/blackbox/ owns the env in
+ *   - tests/workflow-worker-pg-env-chart.test.mjs owns the workflowWorker env in
  *     charts/in-falcone/values.yaml (the executor deployment is not the worker);
  *   - tests/blackbox/temporal-bootstrap/temporal-bootstrap-readiness-contract.test.mjs
  *     already owns registration of the five Temporal search attributes.
