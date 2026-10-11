@@ -349,14 +349,12 @@ export async function updateTenantCustomRole(params = {}, overrides = {}) {
     return { statusCode: validation.statusCode, body: validation.body };
   }
 
-  row.role_name = roleName;
-  row.allowed_actions = validation.allowed_actions;
-  row.updated_at = overrides.now ?? new Date().toISOString();
-  if (db.update) await db.update(row);
+  const updated = await db.update({ ...row, role_name: roleName,
+    allowed_actions: validation.allowed_actions, updated_at: overrides.now ?? new Date().toISOString() });
 
-  await triggerRecalculate(overrides, identity, row);
+  await triggerRecalculate(overrides, identity, updated);
 
-  return { statusCode: 200, body: serializeRole(row) };
+  return { statusCode: 200, body: serializeRole(updated) };
 }
 
 /**
@@ -381,8 +379,7 @@ export async function deleteTenantCustomRole(params = {}, overrides = {}) {
     return { statusCode: 404, body: errorBody('NOT_FOUND', 'Custom role not found.') };
   }
 
-  row.deleted_at = overrides.now ?? new Date().toISOString();
-  if (db.softDelete) await db.softDelete(row);
+  await db.softDelete({ ...row, deleted_at: overrides.now ?? new Date().toISOString() });
 
   await triggerRecalculate(overrides, identity, row);
 

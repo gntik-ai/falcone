@@ -98,7 +98,7 @@ test('privilege-domain PUT preserves last-admin rejection with token auth and in
   } };
   const result = await invokeRoute({ invoke: 'params-auth-overrides', deps: ['db'] }, main,
     { tenantId: 'tenant-a', workspaceId: 'workspace-a', memberId: 'actor-a', structural_admin: false, data_access: false }, null,
-    { ...identity, roles: ['platform_admin'] }, db);
+    { ...identity, trustKind: 'platform', roles: ['platform_admin'] }, db);
   assert.equal(result.statusCode, 400);
   assert.equal(result.body.error, 'LAST_STRUCTURAL_ADMIN');
 });

@@ -29,9 +29,7 @@ function toStatusResponse(saga, steps) {
 }
 
 export async function getSagaStatus(sagaId, callerContext = {}, { db } = {}) {
-  const saga = db
-    ? (await db.query('SELECT * FROM saga_instances WHERE saga_id = $1', [sagaId])).rows[0]
-    : await getSagaById(sagaId);
+  const saga = await getSagaById(sagaId, { db });
   if (!saga) return null;
   if (callerContext.role !== 'superadmin' && (saga.tenant_id !== callerContext.tenantId
       || (callerContext.workspaceId && saga.workspace_id !== callerContext.workspaceId))) {
@@ -39,9 +37,7 @@ export async function getSagaStatus(sagaId, callerContext = {}, { db } = {}) {
     error.code = 'FORBIDDEN';
     throw error;
   }
-  const steps = db
-    ? (await db.query('SELECT * FROM saga_steps WHERE saga_id = $1 ORDER BY step_ordinal ASC', [sagaId])).rows
-    : await listStepsForSaga(sagaId);
+  const steps = await listStepsForSaga(sagaId, { db });
   return toStatusResponse(saga, steps);
 }
 

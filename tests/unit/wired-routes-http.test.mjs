@@ -8,6 +8,83 @@ const paths = JSON.parse(readFileSync(new URL('../../apps/control-plane/route-ma
     || route.path === '/v1/workspaces/{workspaceId}/capability-catalog'
     || (route.method === 'PUT' && route.path.includes('/members/{memberId}/privilege-domains')));
 
+test('tenant-realm platform roles cannot authorize platform secrets or foreign privilege assignments', async t => {
+  const privilegeWrites = [];
+  const databasePool = {
+    async connect() { return this; }, release() {},
+    async query(sql) {
+      if (sql.includes('secret_version_states')) return { rows: [{ tenant_id: null, vault_version: 1 }] };
+      if (sql.includes('secret_metadata')) return { rows: [{ domain: 'platform', tenant_id: null }] };
+      if (sql.startsWith('INSERT INTO privilege_domain_assignments')) {
+        privilegeWrites.push(sql);
+        return { rows: [{ id: 'assignment', tenant_id: 'tenant-other', workspace_id: 'ws-foreign', member_id: 'm1', structural_admin: false, data_access: false }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const server = await startMetricsServer({ databasePool });
+  for (const role of ['superadmin', 'platform_admin', 'platform_operator', 'platform_auditor', 'platform-admin', 'platform-operator', 'platform-auditor']) {
+    for (const [method, path, body] of [
+      ['GET', '/v1/platform/secrets/platform/db-root/history'],
+      ['GET', '/v1/platform/secrets/platform/db-root/consumer-status'],
+      ['PUT', '/api/workspaces/ws-foreign/members/m1/privilege-domains', { tenantId: 'tenant-other', structural_admin: false, data_access: false }],
+    ]) {
+      await t.test(`${role}: ${method} ${path}`, async () => {
+        const response = await server.request(path, { method, body, bearer: server.token({ realm_access: { roles: [role] } }) });
+        assert.equal(response.status, 403);
+      });
+    }
+  }
+  assert.deepEqual(privilegeWrites, []);
+});
+
+test('platform-trust tokens retain platform secret access through HTTP dispatch', async () => {
+  const databasePool = {
+    async connect() { return this; }, release() {},
+    async query(sql) {
+      if (sql.includes('secret_version_states')) return { rows: [{ tenant_id: null, vault_version: 1 }] };
+      if (sql.includes('secret_metadata')) return { rows: [{ domain: 'platform', tenant_id: null }] };
+      if (sql.includes('secret_rotation_events')) return { rows: [{ event_type: 'initiated', __total: 1 }] };
+      return { rows: [] };
+    }
+  };
+  const server = await startMetricsServer({ databasePool });
+  for (const role of ['superadmin', 'platform_operator']) {
+    const bearer = server.token({ iss: 'http://fixture/realms/platform', realm_access: { roles: [role] } });
+    assert.equal((await server.request('/v1/platform/secrets/platform/db-root/history', { bearer })).status, 200);
+    assert.equal((await server.request('/v1/platform/secrets/platform/db-root/consumer-status', { bearer })).status, 200);
+  }
+});
+
+test('privilege PUT denies foreign tenant structural admins and preserves the last-admin guard over HTTP', async () => {
+  const databasePool = {
+    async connect() { return this; }, release() {},
+    async query(sql) {
+      if (sql.includes('scope_enforcement_denials')) return { rows: [] };
+      if (sql.includes('FOR UPDATE')) return { rows: [{ structural_admin_count: 1 }] };
+      if (sql.startsWith('SELECT')) return { rows: [{ structural_admin: true }] };
+      if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [] };
+      throw Error(`Guard must reject before writing: ${sql}`);
+    }
+  };
+  const server = await startMetricsServer({ databasePool });
+  const body = { tenantId: TENANT, structural_admin: false, data_access: false };
+  const path = '/api/workspaces/workspace-a/members/m1/privilege-domains';
+  const bearer = server.token({ privilege_domains: { 'workspace-a': ['structural_admin'] } });
+  const own = await server.request(path, { bearer, method: 'PUT', body });
+  assert.equal(own.status, 400);
+  assert.equal(JSON.parse(own.body).error, 'LAST_STRUCTURAL_ADMIN');
+  const foreign = await server.request(path, { bearer, method: 'PUT', body: { ...body, tenantId: 'tenant-other' } });
+  assert.equal(foreign.status, 403);
+  const foreignCaller = await server.request(path, { method: 'PUT', body,
+    bearer: server.token({ iss: 'http://fixture/realms/tenant-other', privilege_domains: { 'workspace-a': ['structural_admin'] } }) });
+  assert.equal(foreignCaller.status, 403);
+  const platform = await server.request(path, { method: 'PUT', body,
+    bearer: server.token({ iss: 'http://fixture/realms/platform', realm_access: { roles: ['platform_admin'] } }) });
+  assert.equal(platform.status, 400);
+  assert.equal(JSON.parse(platform.body).error, 'LAST_STRUCTURAL_ADMIN');
+});
+
 test('every newly wired route returns HTTP 401 without a Bearer token', async () => {
   const server = await startMetricsServer();
   assert.equal(paths.length, 13);

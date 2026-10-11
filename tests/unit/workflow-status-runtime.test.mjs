@@ -6,8 +6,16 @@ const identity = { sub: 'actor-a', tenantId: 'tenant-a', workspaceId: 'workspace
 const context = { tenantId: 'tenant-a', workspaceId: 'workspace-a', actor: { id: 'actor-a' } };
 const db = { async query(sql, values) {
   if (sql.includes('saga_instances')) return { rows: [{ saga_id: values[0], workflow_id: 'WF-CON-003', tenant_id: 'tenant-a', workspace_id: 'workspace-a', status: 'completed' }] };
-  return { rows: [] };
+  return { rows: [{ step_ordinal: 1, step_key: 'create-workspace', status: 'completed', updated_at: '2026-01-01' }] };
 } };
+
+test('workflow status maps malformed UUID job references to HTTP 404', async () => {
+  const result = await invokeRoute({ invoke: 'workflow-status' }, getSagaStatus,
+    { workspaceId: 'workspace-a', jobRef: 'not-a-uuid' }, context, identity,
+    { async query() { throw Object.assign(new Error('invalid input syntax for type uuid'), { code: '22P02' }); } });
+  assert.equal(result.statusCode, 404);
+  assert.equal(result.body.code, 'NOT_FOUND');
+});
 
 test('workflow-status returns a saga through supported invoke with trusted scope', async () => {
   const result = await invokeRoute({ invoke: 'workflow-status' }, getSagaStatus,
@@ -15,6 +23,7 @@ test('workflow-status returns a saga through supported invoke with trusted scope
   assert.equal(result.statusCode, 200);
   assert.equal(result.body.sagaId, 'saga-a');
   assert.equal(result.body.status, 'completed');
+  assert.deepEqual(result.body.steps, [{ ordinal: 1, key: 'create-workspace', status: 'completed', updatedAt: '2026-01-01' }]);
 });
 
 for (const params of [{ tenantId: 'tenant-b', jobRef: 'saga-a' }, { workspaceId: 'workspace-b', jobRef: 'saga-a' }]) {

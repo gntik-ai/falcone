@@ -96,7 +96,7 @@
     "deps": [],
     "auth": "public",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler getConsoleAccountStatusView; receives verified identity in ctx.",
+    "notes": "console-auth.ts::fetchConsoleAccountStatusView (PendingActivationPage/LoginPage). Public static ConsoleAccountStatusView handler for canonical auth edge-state copy; no Keycloak or DB dependency.",
     "consoleUsed": true
   },
   {
@@ -825,9 +825,9 @@
     "export": "LOCAL_HANDLERS.metricsTenantAudit",
     "invoke": "ctx",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "tenant_owner own; superadmin",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler metricsTenantAudit; receives verified identity in ctx.",
+    "notes": "console-metrics.ts audit list. queryTenantAuditRecords(context,params) returns a normalized QUERY spec, not a DB result - needs a repo to execute it. PARTIAL/GAP.",
     "consoleUsed": true
   },
   {
@@ -839,9 +839,9 @@
     "export": "LOCAL_HANDLERS.metricsTenantAuditExport",
     "invoke": "ctx",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "tenant_owner own; superadmin",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler metricsTenantAuditExport; receives verified identity in ctx.",
+    "notes": "console-metrics.ts::requestAuditExport. Module builds an export manifest + masking preview, no executor/storage write. PARTIAL/GAP (needs object store).",
     "consoleUsed": true
   },
 
@@ -896,9 +896,9 @@
     "export": "LOCAL_HANDLERS.iamListScopes",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "tenant scope",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler iamListScopes; receives verified identity in ctx.",
+    "notes": "ConsoleAuthPage. Realm owner/admin or superadmin; reads Keycloak client scopes.",
     "consoleUsed": true
   },
   {
@@ -1107,9 +1107,9 @@
     "export": "LOCAL_HANDLERS.createWorkspace",
     "invoke": "ctx",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "tenant_owner / workspace_admin (create_workspace)",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler createWorkspace; receives verified identity in ctx.",
+    "notes": "CreateWorkspaceWizard.tsx -> submitWizardRequest('/v1/tenants/{tenantId}/workspaces',{name,description,initialLimits}). Facade WF-CON-003 (representativeOperationId createWorkspace) runs executeSaga. Catalog createWorkspace is at /v1/workspaces. Saga-backed - PARTIAL (needs saga + Keycloak realm).",
     "consoleUsed": true
   },
   {
@@ -1193,7 +1193,7 @@
     "deps": [],
     "auth": "authenticated",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler createInvitation; receives verified identity in ctx.",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
     "consoleUsed": true
   },
   {
@@ -1205,9 +1205,9 @@
     "export": "LOCAL_HANDLERS.getWorkspaceRealtime",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; tenant scope verified against workspace owner",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler getWorkspaceRealtime; receives verified identity in ctx.",
+    "notes": "ConsoleRealtimePage. Returns {workspaceId,realtimeEndpointUrl,features:{realtime},dataSources:[{type,...}]} from realtime_channels rows owned by the verified tenant. Owned workspace with no rows returns 200 empty config instead of 404 NO_ROUTE.",
     "consoleUsed": true
   },
   {
@@ -1219,9 +1219,9 @@
     "export": "LOCAL_HANDLERS.listExternalApplications",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; same-tenant read, platform any",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler listExternalApplications; receives verified identity in ctx.",
+    "notes": "ConsoleAuthPage external applications section. Resolves workspace first, hides foreign workspaces as 404, and returns a real collection (possibly empty) instead of 404 NO_ROUTE.",
     "consoleUsed": true
   },
   {
@@ -1233,9 +1233,9 @@
     "export": "LOCAL_HANDLERS.createExternalApplication",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; tenant_owner/admin of workspace tenant or platform",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler createExternalApplication; receives verified identity in ctx.",
+    "notes": "ConsoleAuthPage create external application. Persists the canonical JSONB document and returns 202 or structured 400 VALIDATION_ERROR, not NO_ROUTE.",
     "consoleUsed": true
   },
   {
@@ -1247,9 +1247,9 @@
     "export": "LOCAL_HANDLERS.listExternalApplicationStarterTemplates",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; same-tenant read, platform any",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler listExternalApplicationStarterTemplates; receives verified identity in ctx.",
+    "notes": "Lists starter templates from apps/control-plane-executor external-application IAM helper after workspace scope verification.",
     "consoleUsed": false
   },
   {
@@ -1261,9 +1261,9 @@
     "export": "LOCAL_HANDLERS.getExternalApplication",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; same-tenant read, platform any",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler getExternalApplication; receives verified identity in ctx.",
+    "notes": "Reads one persisted external application after workspace scope verification.",
     "consoleUsed": true
   },
   {
@@ -1275,9 +1275,9 @@
     "export": "LOCAL_HANDLERS.updateExternalApplication",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; tenant_owner/admin of workspace tenant or platform",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler updateExternalApplication; receives verified identity in ctx.",
+    "notes": "Updates or soft-deletes one persisted external application with structured validation errors.",
     "consoleUsed": true
   },
   {
@@ -1289,9 +1289,9 @@
     "export": "LOCAL_HANDLERS.listExternalApplicationFederatedProviders",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; same-tenant read, platform any",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler listExternalApplicationFederatedProviders; receives verified identity in ctx.",
+    "notes": "Lists embedded federated providers for one persisted external application.",
     "consoleUsed": true
   },
   {
@@ -1303,9 +1303,9 @@
     "export": "LOCAL_HANDLERS.createExternalApplicationFederatedProvider",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; tenant_owner/admin of workspace tenant or platform",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler createExternalApplicationFederatedProvider; receives verified identity in ctx.",
+    "notes": "Adds one embedded federated provider to an external application with structured validation errors.",
     "consoleUsed": true
   },
   {
@@ -1317,9 +1317,9 @@
     "export": "LOCAL_HANDLERS.getExternalApplicationFederatedProvider",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; same-tenant read, platform any",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler getExternalApplicationFederatedProvider; receives verified identity in ctx.",
+    "notes": "Reads one embedded federated provider after workspace and application scope verification.",
     "consoleUsed": true
   },
   {
@@ -1331,9 +1331,9 @@
     "export": "LOCAL_HANDLERS.updateExternalApplicationFederatedProvider",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; tenant_owner/admin of workspace tenant or platform",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler updateExternalApplicationFederatedProvider; receives verified identity in ctx.",
+    "notes": "Updates one embedded federated provider and rejects providerId changes.",
     "consoleUsed": true
   },
   {
@@ -1388,9 +1388,9 @@
     "export": "LOCAL_HANDLERS.createServiceAccount",
     "invoke": "ctx",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "workspace_admin",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler createServiceAccount; receives verified identity in ctx.",
+    "notes": "console-service-accounts.ts::createServiceAccount. Facade WF-CON-006. Returns MutationAccepted (202). Saga + Keycloak. PARTIAL/GAP.",
     "consoleUsed": true
   },
   {
@@ -1402,9 +1402,9 @@
     "export": "LOCAL_HANDLERS.listServiceAccounts",
     "invoke": "ctx",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "workspace member",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler listServiceAccounts; receives verified identity in ctx.",
+    "notes": "console-service-accounts.ts::useConsoleServiceAccounts. Backend collection source of truth for the Service Accounts page; returns workspace service accounts independent of browser sessionStorage.",
     "consoleUsed": true
   },
   {
@@ -1416,9 +1416,9 @@
     "export": "LOCAL_HANDLERS.getServiceAccount",
     "invoke": "ctx",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "workspace member",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler getServiceAccount; receives verified identity in ctx.",
+    "notes": "Direct service-account detail reader; the console list page uses listServiceAccounts as its collection source.",
     "consoleUsed": false
   },
   {
@@ -1430,9 +1430,9 @@
     "export": "LOCAL_HANDLERS.issueCredential",
     "invoke": "ctx",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "workspace_admin",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler issueCredential; receives verified identity in ctx.",
+    "notes": "console-service-accounts.ts::issueCredential. Facade WF-CON-004. Keycloak. GAP.",
     "consoleUsed": true
   },
   {
@@ -1444,9 +1444,9 @@
     "export": "LOCAL_HANDLERS.rotateCredential",
     "invoke": "ctx",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "workspace_admin",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler rotateCredential; receives verified identity in ctx.",
+    "notes": "console-service-accounts.ts::rotateCredential. Facade WF-CON-004. GAP.",
     "consoleUsed": true
   },
   {
@@ -1458,9 +1458,9 @@
     "export": "LOCAL_HANDLERS.revokeCredential",
     "invoke": "ctx",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "workspace_admin",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler revokeCredential; receives verified identity in ctx.",
+    "notes": "console-service-accounts.ts::revokeCredential. Facade WF-CON-004. GAP.",
     "consoleUsed": true
   },
 
@@ -1841,9 +1841,9 @@
     "export": "LOCAL_HANDLERS.eventsListTopics",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; tenant scope verified against workspace owner",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler eventsListTopics; receives verified identity in ctx.",
+    "notes": "EventsConsole data page. Lists workspace_topics rows for the owned workspace and returns {items:[{topic,partitions,resourceId,topicName}]} instead of 404 NO_ROUTE.",
     "consoleUsed": true
   },
   {
@@ -1855,9 +1855,9 @@
     "export": "LOCAL_HANDLERS.eventsProvisionTopic",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "tenant owner/admin of workspace tenant or platform",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler eventsProvisionTopic; receives verified identity in ctx.",
+    "notes": "EventsConsole create-topic request sends body.name. Handler provisions the managed Kafka topic and returns 201; old {topic} console body caused 400 VALIDATION_ERROR.",
     "consoleUsed": true
   },
   {
@@ -1869,9 +1869,9 @@
     "export": "LOCAL_HANDLERS.eventsWorkspaceTopicPublish",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "tenant owner/admin of workspace tenant or platform",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler eventsWorkspaceTopicPublish; receives verified identity in ctx.",
+    "notes": "EventsConsole publish. Resolves the owned workspace and logical topic row, normalizes body {key,value} to Kafka payload semantics, and returns 202 instead of 404 NO_ROUTE.",
     "consoleUsed": true
   },
   {
@@ -1883,9 +1883,9 @@
     "export": "LOCAL_HANDLERS.eventsWorkspaceTopicMessages",
     "invoke": "localHandler",
     "deps": [],
-    "auth": "authenticated",
+    "auth": "authenticated; tenant scope verified against workspace owner",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler eventsWorkspaceTopicMessages; receives verified identity in ctx.",
+    "notes": "EventsConsole message poll. Resolves the owned workspace and logical topic row, consumes a bounded Kafka batch, and returns {items:[{key,value,partition,offset,timestamp}]} instead of 404 NO_ROUTE.",
     "consoleUsed": true
   },
   {
@@ -1942,7 +1942,7 @@
     "deps": [],
     "auth": "authenticated",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler listInvitations; receives verified identity in ctx.",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
     "consoleUsed": true
   },
   {
@@ -1956,7 +1956,7 @@
     "deps": [],
     "auth": "authenticated",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler getInvitation; receives verified identity in ctx.",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
     "consoleUsed": true
   },
   {
@@ -1970,7 +1970,7 @@
     "deps": [],
     "auth": "public",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler acceptInvitation; receives verified identity in ctx.",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
     "consoleUsed": true
   },
   {
@@ -1984,7 +1984,7 @@
     "deps": [],
     "auth": "authenticated",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler revokeInvitation; receives verified identity in ctx.",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
     "consoleUsed": true
   },
   {
@@ -1998,7 +1998,7 @@
     "deps": [],
     "auth": "authenticated",
     "subroutes": "no",
-    "notes": "Served by the existing control-plane local handler resendInvitation; receives verified identity in ctx.",
+    "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
     "consoleUsed": true
   }
 ]
