@@ -28,15 +28,16 @@ function toStatusResponse(saga, steps) {
   };
 }
 
-export async function getSagaStatus(sagaId, callerContext = {}) {
-  const saga = await getSagaById(sagaId);
+export async function getSagaStatus(sagaId, callerContext = {}, { db } = {}) {
+  const saga = await getSagaById(sagaId, { db });
   if (!saga) return null;
-  if (callerContext.role !== 'superadmin' && saga.tenant_id !== callerContext.tenantId) {
+  if (callerContext.role !== 'superadmin' && (saga.tenant_id !== callerContext.tenantId
+      || (callerContext.workspaceId && saga.workspace_id !== callerContext.workspaceId))) {
     const error = new Error('Cross-tenant saga access denied');
     error.code = 'FORBIDDEN';
     throw error;
   }
-  const steps = await listStepsForSaga(sagaId);
+  const steps = await listStepsForSaga(sagaId, { db });
   return toStatusResponse(saga, steps);
 }
 

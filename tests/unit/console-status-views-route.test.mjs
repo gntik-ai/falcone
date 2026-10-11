@@ -79,8 +79,8 @@ test('fix-728-01: public route-map catalog marks the status-view route as a loca
   assert.equal(route.method, 'GET');
   assert.equal(route.path, ROUTE_PATH);
   assert.equal(route.invoke, 'localHandler');
-  assert.equal(route.module, 'apps/control-plane/auth-handlers.mjs');
-  assert.equal(route.export, HANDLER);
+  assert.equal(route.module, 'apps/control-plane/b-handlers.mjs');
+  assert.equal(route.export, `LOCAL_HANDLERS.${HANDLER}`);
   assert.equal(route.auth, 'public');
   assert.doesNotMatch(route.notes, /\bGAP\b/);
 });

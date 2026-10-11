@@ -5,7 +5,7 @@ import { main } from '../src/actions/secret-rotation-revoke.mjs';
 const db = { async query() { return { rows: [] }; } };
 
 test('secret-rotation-revoke returns 404 when version missing', async () => {
-  const result = await main({ auth: { sub: 'u', roles: ['superadmin'] }, secretPath: 'platform/a', domain: 'platform', vaultVersion: 9, justification: 'x', db, repo: { async getVersionByVaultVersion() { return null; } } });
+  const result = await main({ auth: { sub: 'u', roles: ['superadmin'] }, secretPath: 'platform/a', domain: 'platform', vaultVersion: 9, justification: 'x', db, vaultClient: { async deleteSecretVersion() { throw new Error('missing version must prevent revocation'); } }, repo: { async getVersionByVaultVersion() { return null; } } });
   assert.equal(result.error.code, 'VERSION_NOT_FOUND');
 });
 
@@ -17,6 +17,7 @@ test('secret-rotation-revoke requires force when last valid version', async () =
     vaultVersion: 1,
     justification: 'x',
     db,
+    vaultClient: { async deleteSecretVersion() { throw new Error('last-version guard must prevent revocation'); } },
     repo: {
       async getVersionByVaultVersion() { return { id: '1' }; },
       async getActiveVersion() { return { id: '1' }; },

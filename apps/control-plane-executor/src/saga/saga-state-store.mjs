@@ -104,13 +104,20 @@ export async function getInFlightSagas(stalenessMs) {
   return result.rows ?? [];
 }
 
-export async function getSagaById(sagaId) {
-  const result = await adapterQuery('SELECT * FROM saga_instances WHERE saga_id = $1', [sagaId]);
-  return result.rows?.[0] ?? null;
+export async function getSagaById(sagaId, { db } = {}) {
+  const query = db ? db.query.bind(db) : adapterQuery;
+  try {
+    const result = await query('SELECT * FROM saga_instances WHERE saga_id = $1', [sagaId]);
+    return result.rows?.[0] ?? null;
+  } catch (error) {
+    if (error.code === '22P02') return null;
+    throw error;
+  }
 }
 
-export async function listStepsForSaga(sagaId) {
-  const result = await adapterQuery('SELECT * FROM saga_steps WHERE saga_id = $1 ORDER BY step_ordinal ASC', [sagaId]);
+export async function listStepsForSaga(sagaId, { db } = {}) {
+  const query = db ? db.query.bind(db) : adapterQuery;
+  const result = await query('SELECT * FROM saga_steps WHERE saga_id = $1 ORDER BY step_ordinal ASC', [sagaId]);
   return result.rows ?? [];
 }
 

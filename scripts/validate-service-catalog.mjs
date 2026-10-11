@@ -1,6 +1,7 @@
-import { collectServiceCatalogViolations, readServiceCatalog } from './lib/service-catalog.mjs';
+import { collectServiceCatalogViolations, readServiceCatalog, collectControlPlaneRouteViolations } from './lib/service-catalog.mjs';
 
 const violations = collectServiceCatalogViolations(readServiceCatalog());
+violations.push(...await collectControlPlaneRouteViolations());
 
 if (violations.length > 0) {
   console.error('Service catalog/layout validation failed:');

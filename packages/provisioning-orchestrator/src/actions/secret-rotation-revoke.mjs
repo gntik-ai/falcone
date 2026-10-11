@@ -13,7 +13,7 @@ export function resolveDependencies(params = {}) {
   return {
     db: params.db,
     repo: params.repo ?? repo,
-    vaultClient: params.vaultClient ?? { async deleteSecretVersion() {} },
+    vaultClient: params.vaultClient ?? null,
     publishEvent: params.publishEvent ?? (async () => {})
   };
 }
@@ -28,6 +28,10 @@ export async function main(params = {}) {
   const ownership = await assertSecretRotationOwnership({ auth, secretPath, domain, tenantId, dataRepo, db });
   if (ownership.error) return { error: ownership.error };
   const ownerTenantId = ownership.ownerTenantId;
+
+  if (typeof vaultClient?.deleteSecretVersion !== 'function') {
+    return { error: { code: 'SECRET_BACKEND_UNAVAILABLE', status: 503 } };
+  }
 
   const target = await dataRepo.getVersionByVaultVersion(db, { secretPath, vaultVersion, tenantId: ownerTenantId });
   if (!target) return { error: { code: 'VERSION_NOT_FOUND', status: 404 } };

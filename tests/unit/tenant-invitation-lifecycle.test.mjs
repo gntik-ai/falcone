@@ -322,7 +322,8 @@ test('975: every invitation contract operation has a local route mapping and IAM
     assert.equal(iam.paths[path]?.[method]?.operationId, op.operationId);
     const mapping = mapped.find(r => r.operationId === op.operationId && r.path === path && r.method === method.toUpperCase());
     assert.ok(mapping);
-    assert.equal(mapping.module, 'apps/control-plane/invitation-handlers.mjs');
+    assert.equal(mapping.module, 'apps/control-plane/b-handlers.mjs');
+    assert.equal(mapping.export, `LOCAL_HANDLERS.${op.operationId}`);
     const route = runtime.find(r => r.path === path && r.method === method.toUpperCase());
     assert.equal(route?.localHandler, op.operationId);
     assert.equal(typeof INVITATION_HANDLERS[route.localHandler], 'function');

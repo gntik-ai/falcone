@@ -726,5 +726,174 @@
     "localHandler": "resendInvitation",
     "auth": "authenticated",
     "notes": "975: single-use invitation lifecycle; keyed HMAC only, scoped management and body-only acceptance proof."
+  },
+  {
+    "method": "GET",
+    "path": "/v1/tenants/{tenantId}/workflow-jobs/{jobRef}",
+    "module": "/repo/apps/control-plane-executor/src/console-backend-functions.mjs",
+    "export": "queryWorkflowStatus",
+    "invoke": "workflow-status",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": false,
+    "mergeQueryIntoParams": true
+  },
+  {
+    "method": "GET",
+    "path": "/v1/iam/tenant-roles",
+    "module": "/repo/apps/control-plane-executor/src/iam-tenant-roles.mjs",
+    "export": "listTenantCustomRoles",
+    "invoke": "identity-overrides",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": false,
+    "mergeQueryIntoParams": true
+  },
+  {
+    "method": "POST",
+    "path": "/v1/iam/tenant-roles",
+    "module": "/repo/apps/control-plane-executor/src/iam-tenant-roles.mjs",
+    "export": "createTenantCustomRole",
+    "invoke": "identity-overrides",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": true,
+    "mergeQueryIntoParams": false
+  },
+  {
+    "method": "GET",
+    "path": "/v1/iam/tenant-roles/{roleId}",
+    "module": "/repo/apps/control-plane-executor/src/iam-tenant-roles.mjs",
+    "export": "getTenantCustomRole",
+    "invoke": "identity-overrides",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": false,
+    "mergeQueryIntoParams": true
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/iam/tenant-roles/{roleId}",
+    "module": "/repo/apps/control-plane-executor/src/iam-tenant-roles.mjs",
+    "export": "updateTenantCustomRole",
+    "invoke": "identity-overrides",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": true,
+    "mergeQueryIntoParams": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/iam/tenant-roles/{roleId}",
+    "module": "/repo/apps/control-plane-executor/src/iam-tenant-roles.mjs",
+    "export": "deleteTenantCustomRole",
+    "invoke": "identity-overrides",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": false,
+    "mergeQueryIntoParams": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/workspaces/{workspaceId}/members/{memberId}/privilege-domains",
+    "module": "/repo/packages/provisioning-orchestrator/src/actions/privilege-domain-assign.mjs",
+    "export": "main",
+    "invoke": "params-auth-overrides",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": true,
+    "mergeQueryIntoParams": false
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/workflow-jobs/{jobRef}",
+    "module": "/repo/apps/control-plane-executor/src/console-backend-functions.mjs",
+    "export": "queryWorkflowStatus",
+    "invoke": "workflow-status",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": false,
+    "mergeQueryIntoParams": true
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/capability-catalog",
+    "module": "/repo/packages/provisioning-orchestrator/src/actions/workspace-capability-catalog.mjs",
+    "export": "main",
+    "invoke": "params-auth-overrides",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": false,
+    "mergeQueryIntoParams": true
+  },
+  {
+    "method": "POST",
+    "path": "/v1/platform/secrets/{domain}/{secretName}/rotate",
+    "module": "/repo/packages/provisioning-orchestrator/src/actions/secret-rotation-initiate.mjs",
+    "export": "main",
+    "invoke": "params-auth-db",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": true,
+    "mergeQueryIntoParams": false
+  },
+  {
+    "method": "POST",
+    "path": "/v1/platform/secrets/{domain}/{secretName}/versions/{vaultVersion}/revoke",
+    "module": "/repo/packages/provisioning-orchestrator/src/actions/secret-rotation-revoke.mjs",
+    "export": "main",
+    "invoke": "params-auth-db",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": true,
+    "mergeQueryIntoParams": false
+  },
+  {
+    "method": "GET",
+    "path": "/v1/platform/secrets/{domain}/{secretName}/consumer-status",
+    "module": "/repo/packages/provisioning-orchestrator/src/actions/secret-rotation-consumer-status.mjs",
+    "export": "main",
+    "invoke": "params-auth-db",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": false,
+    "mergeQueryIntoParams": true
+  },
+  {
+    "method": "GET",
+    "path": "/v1/platform/secrets/{domain}/{secretName}/history",
+    "module": "/repo/packages/provisioning-orchestrator/src/actions/secret-rotation-history.mjs",
+    "export": "main",
+    "invoke": "params-auth-db",
+    "deps": [
+      "db"
+    ],
+    "auth": "authenticated",
+    "mergeBodyIntoParams": false,
+    "mergeQueryIntoParams": true
   }
 ]

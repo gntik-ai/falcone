@@ -20,6 +20,8 @@ import { reserveHttpRequest } from '../../packages/internal-contracts/src/http-i
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 import { createMultiRealmVerifier, deriveRealmTopology } from './jwt-verify.mjs';
+import { loadRoutes as compileRoutes, matchRoute as matchCompiledRoute } from './route-table.mjs';
+import { invokeRoute } from './route-invoke.mjs';
 import { routes as seedRoutes } from './routes.mjs';
 import { LOCAL_HANDLERS } from './b-handlers.mjs';
 import * as tenantStore from './tenant-store.mjs';
@@ -150,36 +152,12 @@ const jwtVerifier = createMultiRealmVerifier({
 //   mergeBodyIntoParams?, mergeQueryIntoParams?, defaults?, setClientModule? }.
 // `path` is an Express-ish template: `{param}` -> named capture, trailing `/*`
 // or `*` -> match-rest. Compiled to a RegExp with named groups once at load.
-function compilePath(tmpl) {
-  const rx = tmpl
-    .replace(/[.+^${}()|[\]\\]/g, (m) => '\\' + m)         // escape regex metas (our { } handled next)
-    .replace(/\\\{([a-zA-Z0-9_]+)\\\}/g, '(?<$1>[^/]+)')    // {param} -> named group
-    .replace(/\/\\\*$/, '(?:/.*)?')                          // trailing /* -> optional rest
-    .replace(/\\\*/g, '.*');                                 // bare * -> rest
-  return new RegExp('^' + rx + '/?$');
-}
-
 let ROUTES = [];
 function loadRoutes(extra = []) {
-  // Dedupe by `METHOD path`. Seed routes (curated: domain B local handlers +
-  // proven A routes) take precedence over the generated runtime map on collision.
-  const byKey = new Map();
-  for (const r of [...extra, ...seedRoutes]) byKey.set(`${r.method} ${r.path}`, r);
-  ROUTES = [...byKey.values()].map((r) => ({ ...r, _rx: compilePath(r.path) }));
-  // Most-specific first: more path segments win; wildcard routes sink.
-  ROUTES.sort((a, b) => (b.path.split('/').length - a.path.split('/').length)
-    || ((a.path.includes('*') ? 1 : 0) - (b.path.includes('*') ? 1 : 0)));
-  setHttpRouteTemplates(ROUTES.map((route) => route.path));
+  ROUTES = compileRoutes(extra, seedRoutes);
+  setHttpRouteTemplates(ROUTES.map(route => route.path));
 }
-
-function matchRoute(method, path) {
-  for (const r of ROUTES) {
-    if (r.method !== method && r.method !== 'ANY') continue;
-    const m = r._rx.exec(path);
-    if (m) return { route: r, params: m.groups ?? {} };
-  }
-  return null;
-}
+function matchRoute(method, path) { return matchCompiledRoute(ROUTES, method, path); }
 
 // ---- helpers (shared shape with tests/env/action-runner) -------------------
 function lowercaseHeaders(raw) {
@@ -245,6 +223,7 @@ async function authenticate(headers) {
     workspaceId: payload.workspace_id ?? null,
     workspaceIds,
     actorType: deriveActorType(payload),
+    privilegeDomains: payload.privilegeDomains ?? payload.privilege_domains ?? {},
     isServiceAccount: isServiceAccountClientId(clientIdFromClaims(payload)),
     trustKind: trust.kind,
     roles, scopes,
@@ -292,24 +271,6 @@ async function ensureSetClient(route) {
 function routeNeedsDb(route) {
   return (route.deps ?? []).some((d) => d === 'db' || d === 'pg') || (route.invoke === 'params-pg');
 }
-function buildOverrides(route, db) {
-  const o = {};
-  for (const dep of route.deps ?? []) {
-    if (dep === 'db' || dep === 'pg') o.db = db;
-    // kafka/minio/vault are optional: the actions no-op event emission when their
-    // producer is absent, and the few minio/vault writers degrade gracefully.
-  }
-  return o;
-}
-// Build the `params.auth` object the params-auth* actions read, from the verified
-// identity (subject/tenant/roles/scopes/actorType).
-function authFrom(identity) {
-  return {
-    subject: identity.sub, sub: identity.sub,
-    tenantId: identity.tenantId, workspaceId: identity.workspaceId,
-    actorType: identity.actorType, roles: identity.roles, scopes: identity.scopes
-  };
-}
 const handlerCache = new Map();
 async function loadHandler(route) {
   const key = route.module + '#' + route.export;
@@ -324,27 +285,6 @@ async function loadHandler(route) {
 // `db` is a DEDICATED pooled client (not the Pool) for routes that need it, so
 // the actions' multi-statement transactions (BEGIN/INSERT/COMMIT) run on one
 // connection. Released by the caller after the handler resolves.
-async function invokeRoute(route, handler, params, callerContext, identity, db) {
-  switch (route.invoke ?? 'callercontext-overrides') {
-    case 'params-pg': return handler({ ...params, pg: db });
-    case 'params-only': return handler(params);
-    case 'params-overrides': return handler(params, buildOverrides(route, db));
-    case 'callercontext-overrides':
-      return handler({ ...params, callerContext }, buildOverrides(route, db));
-    case 'owhttp-overrides':
-      return handler({ ...params, __ow_method: String(params.__ow_method ?? '').toLowerCase() }, buildOverrides(route, db));
-    case 'params-auth':
-      return handler({ ...params, auth: identity ? authFrom(identity) : null });
-    case 'params-auth-overrides':
-      return handler({ ...params, auth: identity ? authFrom(identity) : null }, buildOverrides(route, db));
-    case 'owhttp':
-      await ensureSetClient(route);
-      return handler({ ...params, __ow_method: String(params.__ow_method ?? '').toLowerCase() });
-    default:
-      throw Object.assign(new Error(`route ${route.path} unknown invoke ${route.invoke}`), { statusCode: 500 });
-  }
-}
-
 // ---- request handler -------------------------------------------------------
 const server = http.createServer(async (req, res) => {
   const method = (req.method ?? 'GET').toUpperCase();
@@ -513,7 +453,7 @@ const server = http.createServer(async (req, res) => {
     let client = null, result;
     try {
       if (routeNeedsDb(route)) client = await pool.connect();
-      result = await invokeRoute(route, handler, params, callerContext, identity, client ?? pool);
+      result = await invokeRoute(route, handler, params, callerContext, identity, client ?? pool, ensureSetClient);
     } finally {
       if (client) client.release();
     }

@@ -1,3 +1,4 @@
+import { collectRouteCatalogViolations, readRouteReconciliationInputs } from './control-plane-routes.mjs';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
@@ -425,4 +426,8 @@ export function collectServiceCatalogViolations(catalog = readServiceCatalog(), 
   violations.push(...collectNonRootUserViolations(catalog));
 
   return violations;
+}
+
+export async function collectControlPlaneRouteViolations() {
+  return collectRouteCatalogViolations(await readRouteReconciliationInputs());
 }

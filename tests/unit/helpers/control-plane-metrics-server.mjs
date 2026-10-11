@@ -5,6 +5,8 @@ import http from 'node:http';
 import { Readable, Writable } from 'node:stream';
 import { readFile } from 'node:fs/promises';
 import { generateKeyPairSync, sign } from 'node:crypto';
+import { loadRoutes as compileRoutes, matchRoute as matchCompiledRoute } from '../../../apps/control-plane/route-table.mjs';
+import { invokeRoute } from '../../../apps/control-plane/route-invoke.mjs';
 import { routes } from '../../../apps/control-plane/routes.mjs';
 import * as store from '../../../apps/control-plane/tenant-store.mjs';
 import * as audit from '../../../apps/control-plane/audit-writer.mjs';
@@ -30,8 +32,8 @@ function declaration(source, name) {
   return source.slice(start, source.indexOf('\n}', start) + 2);
 }
 
-export async function startMetricsServer() {
-  const pool = {
+export async function startMetricsServer({ databasePool } = {}) {
+  const pool = databasePool ?? {
     async query(sql, values = []) {
       if (sql === 'SELECT 1') return { rows: [{ '?column?': 1 }] };
       if (sql.includes('FROM tenants')) return { rows: [{ id: values[0], iam_realm: values[0] }] };
@@ -62,7 +64,7 @@ export async function startMetricsServer() {
     'return { getTenant };',
   ].join('\n'))(store);
   const bindings = {
-    http, pool, jwtVerifier, reserveHttpRequest, PORT: 0, seedRoutes: routes, LOCAL_HANDLERS: locals,
+    http, pool, jwtVerifier, reserveHttpRequest, compileRoutes, matchCompiledRoute, invokeRoute, PORT: 0, seedRoutes: routes, LOCAL_HANDLERS: locals,
     console: { error() {}, warn() {} },
     webhookRuntimePool: null, webhookWritePool: null, knativeRuntime: null, runtimeTeardownCoordinator: null,
     createRuntimeCleanupRepository, secretBackendHealth, respondHealth,
@@ -73,12 +75,14 @@ export async function startMetricsServer() {
   const core = serverSource.slice(serverSource.indexOf('// ---- route table'),
     serverSource.indexOf('export async function bootstrapControlPlane'));
   const server = new Function(...Object.keys(bindings), 'runtimeRoutes',
-    `${core}\nloadRoutes(runtimeRoutes); return server;`)(...Object.values(bindings), runtimeRoutes);
+    `${core}\nloadRoutes(runtimeRoutes); return server;`)(...Object.values(bindings), runtimeRoutes.map(route => ({ ...route,
+    module: route.module?.startsWith('/repo/') ? new URL(`../../../${route.module.slice('/repo/'.length)}`, import.meta.url).href : route.module,
+  })));
   return {
     token, executorJwtVerifier: createJwtVerifier(verifierOptions),
-    async request(path, { bearer = null, method = 'GET' } = {}) {
-      const req = Readable.from([]);
-      Object.assign(req, { method, url: path, headers: bearer ? { authorization: `Bearer ${bearer}` } : {} });
+    async request(path, { bearer = null, method = 'GET', headers = {}, body } = {}) {
+      const req = Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))]);
+      Object.assign(req, { method, url: path, headers: { ...headers, ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) } });
       const chunks = [];
       const res = new Writable({ write(chunk, encoding, done) { chunks.push(chunk); done(); } });
       res.writeHead = (status, headers) => { res.statusCode = status; res.headers = new Headers(headers); };
