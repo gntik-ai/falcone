@@ -72,7 +72,6 @@
       "qosBurst": 40,
       "rateLimitClass": "catalog",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -155,7 +154,6 @@
       "qosBurst": 40,
       "rateLimitClass": "auth-login",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -238,7 +236,6 @@
       "qosBurst": 40,
       "rateLimitClass": "auth-logout",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -321,7 +318,6 @@
       "qosBurst": 40,
       "rateLimitClass": "auth-refresh",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -404,7 +400,6 @@
       "qosBurst": 40,
       "rateLimitClass": "auth-recovery",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -487,7 +482,6 @@
       "qosBurst": 40,
       "rateLimitClass": "auth-recovery",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -570,7 +564,6 @@
       "qosBurst": 40,
       "rateLimitClass": "auth-signup",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -729,7 +722,6 @@
       "qosBurst": 40,
       "rateLimitClass": "auth-activation",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -978,7 +970,6 @@
       "qosBurst": 60,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -1229,7 +1220,6 @@
       "qosBurst": 60,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -1399,7 +1389,6 @@
       "qosBurst": 60,
       "rateLimitClass": "event-gateway-publish",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -1568,7 +1557,6 @@
       "qosBurst": 60,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -1904,7 +1892,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -1988,7 +1975,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -2092,7 +2078,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -2283,7 +2268,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -2633,7 +2617,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -2882,7 +2865,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -2965,7 +2947,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -3226,7 +3207,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -3390,7 +3370,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -3635,7 +3614,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -3717,7 +3695,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -3880,7 +3857,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -4042,7 +4018,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -4124,7 +4099,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -4287,7 +4261,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -4450,7 +4423,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -4532,7 +4504,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -4695,7 +4666,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -4777,7 +4747,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -4940,7 +4909,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -5185,7 +5153,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -5267,7 +5234,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -5430,7 +5396,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -5593,7 +5558,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -5675,7 +5639,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -5838,7 +5801,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -5920,7 +5882,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -6083,7 +6044,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -6165,7 +6125,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -6328,7 +6287,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -6410,7 +6368,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -6574,7 +6531,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -6657,7 +6613,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -6740,7 +6695,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -6823,7 +6777,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -6988,7 +6941,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -7151,7 +7103,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -7233,7 +7184,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -7396,7 +7346,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -7733,7 +7682,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -7815,7 +7763,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -8070,7 +8017,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -8154,7 +8100,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -8238,7 +8183,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -8321,7 +8265,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -8403,7 +8346,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -8556,7 +8498,6 @@
       "qosBurst": 80,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -9020,7 +8961,6 @@
       "qosBurst": 80,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -9901,7 +9841,6 @@
       "qosBurst": 80,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -10062,7 +10001,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -10141,7 +10079,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -10380,7 +10317,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -10459,7 +10395,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -10618,7 +10553,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -10777,7 +10711,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -10856,7 +10789,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -11015,7 +10947,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -11094,7 +11025,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -11253,7 +11183,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -11332,7 +11261,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -11491,7 +11419,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -11570,7 +11497,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -11649,7 +11575,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -11808,7 +11733,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -11887,7 +11811,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -12046,7 +11969,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -12128,7 +12050,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-read",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -12209,7 +12130,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -12290,7 +12210,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -12452,7 +12371,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -12533,7 +12451,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -12695,7 +12612,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -12776,7 +12692,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -12858,7 +12773,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-read",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -12939,7 +12853,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -13100,7 +13013,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -13181,7 +13093,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -13342,7 +13253,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -13580,7 +13490,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -13659,7 +13568,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -13818,7 +13726,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -14064,7 +13971,6 @@
       "qosBurst": 80,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -14294,7 +14200,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -14447,7 +14352,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -14600,7 +14504,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -14753,7 +14656,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -15216,7 +15118,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -15458,7 +15359,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -15540,7 +15440,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -15705,7 +15604,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -15871,7 +15769,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -15954,7 +15851,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -16120,7 +16016,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -16285,7 +16180,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -16367,7 +16261,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -16532,7 +16425,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -16698,7 +16590,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -16781,7 +16672,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -16947,7 +16837,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -17113,7 +17002,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -17196,7 +17084,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -17362,7 +17249,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -17528,7 +17414,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -17611,7 +17496,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -17777,7 +17661,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -17943,7 +17826,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -18026,7 +17908,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -18192,7 +18073,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -18358,7 +18238,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -18441,7 +18320,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -18607,7 +18485,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -18773,7 +18650,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -18856,7 +18732,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -19022,7 +18897,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -19188,7 +19062,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -19271,7 +19144,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -19437,7 +19309,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -19603,7 +19474,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -19686,7 +19556,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -19852,7 +19721,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -20018,7 +19886,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -20184,7 +20051,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -20267,7 +20133,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -20433,7 +20298,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -20517,7 +20381,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -20767,7 +20630,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -20849,7 +20711,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -21014,7 +20875,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -21179,7 +21039,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -21261,7 +21120,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -21426,7 +21284,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -21509,7 +21366,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -21679,7 +21535,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -21763,7 +21618,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -22011,7 +21865,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -22094,7 +21947,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -22259,7 +22111,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -22343,7 +22194,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-read",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -22508,7 +22358,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -22591,7 +22440,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -22756,7 +22604,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -22840,7 +22687,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-read",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -22924,7 +22770,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -23007,7 +22852,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -23090,7 +22934,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -23173,7 +23016,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -23257,7 +23099,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-read",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -23340,7 +23181,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -23506,7 +23346,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -23589,7 +23428,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -23755,7 +23593,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -23921,7 +23758,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -24004,7 +23840,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -24170,7 +24005,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -24418,7 +24252,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -24501,7 +24334,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -24667,7 +24499,6 @@
       "qosBurst": 30,
       "rateLimitClass": "provisioning",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -24997,7 +24828,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -25080,7 +24910,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -25332,7 +25161,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -25500,7 +25328,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -25668,7 +25495,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -25752,7 +25578,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -25836,7 +25661,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -25920,7 +25744,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -26004,7 +25827,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-control",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -26165,7 +25987,6 @@
       "qosBurst": 30,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -26487,7 +26308,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -26650,7 +26470,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -26896,7 +26715,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -26979,7 +26797,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -27144,7 +26961,6 @@
       "qosBurst": 30,
       "rateLimitClass": "data-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -27380,7 +27196,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -27457,7 +27272,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -27613,7 +27427,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -27847,7 +27660,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -27926,7 +27738,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -28162,7 +27973,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -28319,7 +28129,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -28397,7 +28206,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -28475,7 +28283,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -28554,7 +28361,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -28709,7 +28515,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -28864,7 +28669,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -29019,7 +28823,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -29109,7 +28912,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -29261,7 +29063,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -29425,7 +29226,6 @@
       "qosBurst": 80,
       "rateLimitClass": "realtime",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -29670,7 +29470,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -29749,7 +29548,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -29921,7 +29719,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -30162,7 +29959,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -30324,7 +30120,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -30486,7 +30281,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -30648,7 +30442,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -30809,7 +30602,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -30965,7 +30757,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -31041,7 +30832,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -31117,7 +30907,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -31278,7 +31067,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -31441,7 +31229,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -31762,7 +31549,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -31844,7 +31630,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -32005,7 +31790,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -32085,7 +31869,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],
@@ -32166,7 +31949,6 @@
       "qosBurst": 60,
       "rateLimitClass": "control-write",
       "requiredHeaders": [
-        "Idempotency-Key",
         "X-API-Version",
         "X-Correlation-Id"
       ],

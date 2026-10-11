@@ -31,10 +31,10 @@
         }
       },
       "IdempotencyKey": {
-        "description": "Stable idempotency token for safe retries of POST, PUT, PATCH, and DELETE operations routed through the gateway. Replays are retained for 24h and surfaced through X-Idempotency-Replayed.",
+        "description": "Optional key for safe retries of authenticated, non-streaming POST, PUT, PATCH, and DELETE requests, scoped per tenant and verified principal (API-key credential ID or subject). Final 2xx and 4xx responses are retained for 24h. Identical retries replay the original status and body with X-Idempotency-Replayed: true; original responses omit that header. A different method, normalized request target or raw body returns 422 IDEMPOTENCY_KEY_MISMATCH; an in-flight duplicate returns 409 IDEMPOTENCY_KEY_IN_PROGRESS with Retry-After. Secret-returning routes and responses over the configured size cap (default 256 KiB) block duplicate execution with 409 IDEMPOTENCY_REPLAY_UNAVAILABLE. Failed 5xx attempts can be retried. Omitted keys and GET requests retain existing behavior.",
         "in": "header",
         "name": "Idempotency-Key",
-        "required": true,
+        "required": false,
         "schema": {
           "maxLength": 128,
           "minLength": 8,

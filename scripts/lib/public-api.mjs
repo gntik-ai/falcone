@@ -223,7 +223,7 @@ export function buildRouteCatalog(
       const { routing, qosProfileName, requestValidationProfileName, qosProfile, requestValidationProfile } =
         resolveGatewayProfiles(gatewayRouting, operation['x-family']);
       const requiredHeaders = normalizeRequiredHeaders(document, operation);
-      const supportsIdempotencyKey = requiredHeaders.includes('Idempotency-Key');
+      const supportsIdempotencyKey = resolveParameters(document, operation).some(parameter => parameter?.in === 'header' && parameter.name === 'Idempotency-Key');
 
       return {
         family: operation['x-family'],
@@ -408,7 +408,7 @@ export function writeGeneratedPublicApiDocs(document = readJson(OPENAPI_PATH), t
 function collectOperationViolations(document, taxonomy, violations) {
   const familyIds = new Set(taxonomy.families.map((family) => family.id));
   const familyPrefixes = new Map(taxonomy.families.map((family) => [family.id, family.prefix]));
-  const requiredMutationMethods = new Set(taxonomy.shared_http.headers.idempotency_key.required_for_methods);
+  const declaredMutationMethods = new Set(taxonomy.shared_http.headers.idempotency_key.declared_for_methods);
   const validConsoleTiers = new Set(['spa', 'backend', 'platform']);
 
   function allowedPrefixesForOperation(familyId, operation) {
@@ -456,8 +456,8 @@ function collectOperationViolations(document, taxonomy, violations) {
       violations.push(`${method.toUpperCase()} ${path} must require ${taxonomy.shared_http.headers.correlation_id.name}.`);
     }
 
-    if (requiredMutationMethods.has(method) && !headers.includes(taxonomy.shared_http.headers.idempotency_key.name)) {
-      violations.push(`${method.toUpperCase()} ${path} must require ${taxonomy.shared_http.headers.idempotency_key.name}.`);
+    if (declaredMutationMethods.has(method) && !resolveParameters(document, operation).some(parameter => parameter?.in === 'header' && parameter.name === taxonomy.shared_http.headers.idempotency_key.name)) {
+      violations.push(`${method.toUpperCase()} ${path} must declare ${taxonomy.shared_http.headers.idempotency_key.name}.`);
     }
 
     if (!operation['x-scope']) {
@@ -479,7 +479,7 @@ function collectOperationViolations(document, taxonomy, violations) {
       }
     }
 
-    if ((operation.requestBody || requiredMutationMethods.has(method)) && !responseCodes.has('413')) {
+    if ((operation.requestBody || declaredMutationMethods.has(method)) && !responseCodes.has('413')) {
       violations.push(`${method.toUpperCase()} ${path} must declare oversized-body response 413.`);
     }
   }

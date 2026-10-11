@@ -1328,7 +1328,7 @@ export async function purgeTenant(pool, tenantId) {
                    'workspace_databases', 'workspace_mongo_databases', 'workspace_api_keys', 'service_accounts',
                    'external_applications', 'tenant_invitations',
                    'async_operation_log_entries', 'async_operation_transitions', 'async_operations',
-                   'tenant_plan_assignments', 'tenant_custom_roles', 'effective_entitlements']) {
+                   'tenant_plan_assignments', 'tenant_custom_roles', 'effective_entitlements', 'public.http_idempotency_records']) {
     await del(`DELETE FROM ${t} WHERE tenant_id = $1`, [tenantId]);
   }
   await del('DELETE FROM workspaces WHERE tenant_id = $1', [tenantId]);
