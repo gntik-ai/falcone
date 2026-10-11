@@ -127,6 +127,11 @@ function fakePurgePool({ tenant, workspaces = {}, mongoByTenant = {}, mongoByWor
 
 // Stub the Postgres/storage/kafka teardown deps so only the mongo cascade is asserted.
 const noopTeardown = {
+  // Runtime cleanup is a prerequisite; this fixture isolates document teardown.
+  runtimeTeardownCoordinator: {
+    purgeTenant: async () => ({ pending: false }),
+    purgeWorkspace: async () => ({ pending: false }),
+  },
   dropWorkspaceDatabase: async () => {},
   deleteBucket: async () => {},
   deleteTopics: async () => {},

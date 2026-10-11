@@ -4,8 +4,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as store from '../../apps/control-plane/tenant-store.mjs';
 
-// Scan SQL and embedded ensureSchema DDL. Balance parentheses so types and FK
-// clauses cannot truncate a CREATE TABLE before a later tenant_id column.
+// Scan SQL and embedded ensureSchema DDL, including tenant scope added later.
+// Balance parentheses so types and FK clauses cannot truncate a CREATE TABLE.
 function tenantTables(source) {
   const sql = source.replace(/\/\*[\s\S]*?\*\/|--[^\n]*|\/\/[^\n]*/g, '');
   const tables = [];
@@ -19,6 +19,12 @@ function tenantTables(source) {
       if (sql[end] === ')') depth--;
     }
     if (/(?:^|,)\s*"?tenant_id"?\s+\w+/i.test(sql.slice(start, end - 1))) {
+      tables.push(match[1].replaceAll('"', ''));
+    }
+  }
+  const alter = /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?((?:"?\w+"?\.)?"?\w+"?)\s+([^;]+);/gi;
+  for (const match of sql.matchAll(alter)) {
+    if (/(?:^|,)\s*ADD\s+(?:COLUMN\s+)?(?:IF\s+NOT\s+EXISTS\s+)?"?tenant_id"?\s+\w+/i.test(match[2])) {
       tables.push(match[1].replaceAll('"', ''));
     }
   }
@@ -53,12 +59,21 @@ test('every tenant_id-keyed source schema table is covered by the purge or audit
   assert.ok(discovered.includes('flow_versions'));
   assert.ok(discovered.includes('scheduled_executions'));
   assert.ok(discovered.includes('backup_operations'));
+  assert.ok(discovered.includes('webhook_signing_secrets'));
   assertCovered(discovered);
 });
 
 test('a newly seeded tenant-derived schema table fails the completeness guard', () => {
   const negative = 'CREATE TABLE purge_guard_negative_fixture (id VARCHAR(255), tenant_id TEXT NOT NULL);';
   assert.throws(() => assertCovered(tenantTables(negative)), /purge_guard_negative_fixture/);
+});
+
+test('adding tenant_id to an existing table cannot bypass the completeness guard', () => {
+  const negative = `
+    CREATE TABLE purge_guard_altered_fixture (id TEXT);
+    ALTER TABLE purge_guard_altered_fixture ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+  `;
+  assert.throws(() => assertCovered(tenantTables(negative)), /purge_guard_altered_fixture/);
 });
 
 test('audit tables have explicit retention reasons and plan-change history is purged', () => {

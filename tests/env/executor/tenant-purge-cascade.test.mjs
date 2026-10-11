@@ -1,7 +1,6 @@
 // Real-Postgres proof for add-tenant-delete-purge-cascade (#501): store.purgeTenant removes
-// EVERY row a tenant owns across all registry tables (workspaces, databases, buckets, topics,
-// service accounts, api keys, functions, async-ops) and returns the physical resources to tear
-// down — without touching another tenant's rows. Run via tests/env/executor/run.sh.
+// every accessible row a tenant owns and discloses protected tables. Returns the physical
+// resources to tear down without touching another tenant's rows. Run via tests/env/executor/run.sh.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
@@ -27,7 +26,9 @@ const EXTRA_TABLES = ['workspace_doc_notes', 'workspace_openapi_versions', 'work
   'backup_operations', 'backup_status_snapshots', 'quota_last_known_posture'];
 const FORCED_RLS = ['flow_definitions', 'flow_versions', 'flow_trigger_secrets',
   'flow_trigger_registrations', 'service_account_rotation_states', 'service_account_rotation_history',
-  'tenant_rotation_policies'];
+  'tenant_rotation_policies', 'webhook_subscriptions', 'webhook_signing_secrets',
+  'webhook_deliveries', 'webhook_delivery_attempts', 'scheduled_jobs', 'scheduled_executions',
+  'scheduling_configurations', 'realtime_sessions'];
 
 // Tenant purge database seam: published versions, dependency order, role policy and isolation.
 const SCHEMA = `
@@ -56,7 +57,7 @@ const SCHEMA = `
   CREATE TABLE service_account_rotation_states (id text PRIMARY KEY, tenant_id text, workspace_id text);
   CREATE TABLE service_account_rotation_history (id text PRIMARY KEY, tenant_id text, workspace_id text, state_id text REFERENCES service_account_rotation_states(id));
   CREATE TABLE tenant_rotation_policies (id text PRIMARY KEY, tenant_id text);
-  ${EXTRA_TABLES.map((table) => `CREATE TABLE ${table} (id text PRIMARY KEY, tenant_id text);`).join('\n')}
+  ${EXTRA_TABLES.map((table) => `CREATE TABLE ${table} (id text PRIMARY KEY, tenant_id text, workspace_id text);`).join('\n')}
   ALTER TABLE webhook_deliveries ADD COLUMN subscription_id text REFERENCES webhook_subscriptions(id);
   ALTER TABLE webhook_signing_secrets ADD COLUMN subscription_id text REFERENCES webhook_subscriptions(id);
   ALTER TABLE scheduled_executions ADD COLUMN job_id text REFERENCES scheduled_jobs(id);
@@ -92,7 +93,7 @@ async function seed(ten, ws, dbname) {
   }
   await pool.query('INSERT INTO workspace_sub_quotas VALUES ($1,$2,$3)', [`quota_${ws}`, ws, ten]);
   for (const table of EXTRA_TABLES) {
-    await pool.query(`INSERT INTO ${table} (id,tenant_id) VALUES ($1,$2)`, [`extra_${ws}`, ten]);
+    await pool.query(`INSERT INTO ${table} (id,tenant_id,workspace_id) VALUES ($1,$2,$3)`, [`extra_${ws}`, ten, ws]);
   }
   await pool.query('UPDATE webhook_deliveries SET subscription_id=$1 WHERE tenant_id=$2', [`extra_${ws}`, ten]);
   await pool.query('UPDATE webhook_signing_secrets SET subscription_id=$1 WHERE tenant_id=$2', [`extra_${ws}`, ten]);
@@ -114,8 +115,9 @@ before(async () => {
   await pool.query(SCHEMA);
   await seed(TEN, WS, 'wsdb_purge_me');
   await seed(OTHER, OWS, 'wsdb_keep_me');
-  // Mirrors chart migration 20260612-004-flow-rls.sql: FORCE RLS and immutable
-  // versions for the application role. Use an isolated NOLOGIN probe role.
+  // Mirror the FORCE RLS table set from chart migration 20260612-004-flow-rls.sql
+  // and the rotation, webhook, scheduling and realtime source migrations.
+  // Keep published versions immutable for the isolated NOLOGIN application role.
   await bootstrap.query('CREATE ROLE cp_purge_app_probe NOLOGIN');
   await pool.query('GRANT USAGE ON SCHEMA public TO cp_purge_app_probe');
   await pool.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ${[...TABLES, 'tenants', 'fn_activations', 'saga_steps', 'saga_compensation_log'].filter((t) => t !== 'flow_versions').join(', ')} TO cp_purge_app_probe`);
@@ -123,9 +125,11 @@ before(async () => {
   for (const table of FORCED_RLS) {
     await pool.query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
     await pool.query(`ALTER TABLE ${table} FORCE ROW LEVEL SECURITY`);
-    const scope = table === 'tenant_rotation_policies'
-      ? "tenant_id = current_setting('app.tenant_id', true)"
-      : "tenant_id = current_setting('app.tenant_id', true) AND workspace_id = current_setting('app.workspace_id', true)";
+    const scope = table === 'webhook_delivery_attempts'
+      ? "EXISTS (SELECT 1 FROM webhook_deliveries d WHERE d.id = webhook_delivery_attempts.delivery_id AND d.tenant_id = current_setting('app.tenant_id', true) AND d.workspace_id = current_setting('app.workspace_id', true))"
+      : ['tenant_rotation_policies', 'scheduling_configurations'].includes(table)
+        ? "tenant_id = current_setting('app.tenant_id', true)"
+        : "tenant_id = current_setting('app.tenant_id', true) AND workspace_id = current_setting('app.workspace_id', true)";
     await pool.query(`CREATE POLICY ${table}_tenant_isolation ON ${table} USING (${scope}) WITH CHECK (${scope})`);
   }
   // The chart metadata role owns tables but has neither superuser nor BYPASSRLS.
@@ -144,7 +148,7 @@ after(async () => {
 
 const TABLES = ['workspaces', 'workspace_databases', 'workspace_buckets', 'workspace_topics', 'workspace_functions', 'fn_actions', 'service_accounts', 'workspace_api_keys', 'async_operations', 'async_operation_transitions', 'flow_definitions', 'flow_versions', 'flow_schedules', 'flow_trigger_secrets', 'flow_trigger_registrations', 'tenant_plan_assignments', 'tenant_plan_change_history', 'tenant_plan_quota_impacts', 'tenant_plan_capability_impacts', 'workspace_sub_quotas', 'saga_instances', 'service_account_rotation_states', 'service_account_rotation_history', 'tenant_rotation_policies', ...EXTRA_TABLES];
 
-test('deployed metadata owner role discloses all seven FORCE RLS tables and succeeds idempotently', async () => {
+test('metadata owner without BYPASSRLS discloses all fifteen FORCE RLS tables and succeeds idempotently', async () => {
   const tenant = 'tenant_restricted'; const workspace = 'ws_restricted';
   await seed(tenant, workspace, 'wsdb_restricted');
   const restricted = {
@@ -164,14 +168,19 @@ test('deployed metadata owner role discloses all seven FORCE RLS tables and succ
     assert.equal((await pool.query(`SELECT count(*)::int n FROM ${table} WHERE tenant_id=$1`, [OTHER])).rows[0].n,
       table === 'flow_versions' ? 2 : 1, `${table}: other tenant remains intact`);
   }
+  for (const ws of [workspace, OWS]) {
+    assert.equal((await pool.query('SELECT count(*)::int n FROM webhook_delivery_attempts WHERE delivery_id=$1', [`extra_${ws}`])).rows[0].n, 1,
+      'protected delivery attempts and the other tenant remain intact');
+  }
   const again = await store.purgeTenant(restricted, tenant);
   assert.deepEqual(again.databaseResidual, result.databaseResidual);
   const { rows } = await pool.query("SELECT has_table_privilege('cp_purge_app_probe', 'flow_versions', 'DELETE') AS allowed");
   assert.equal(rows[0].allowed, false, 'normal API version immutability stays enforced');
   await store.purgeTenant(pool, tenant); // privileged path can finish the disclosed cleanup
-  for (const table of FORCED_RLS) {
+  for (const table of FORCED_RLS.filter((table) => table !== 'webhook_delivery_attempts')) {
     assert.equal((await pool.query(`SELECT count(*)::int n FROM ${table} WHERE tenant_id=$1`, [tenant])).rows[0].n, 0);
   }
+  assert.equal((await pool.query('SELECT count(*)::int n FROM webhook_delivery_attempts WHERE delivery_id=$1', [`extra_${workspace}`])).rows[0].n, 0);
 });
 
 test('purgeTenant removes every owned row + returns the physical resources to tear down', async () => {
