@@ -27,6 +27,7 @@ COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
      apps/control-plane/runtime-teardown-coordinator.mjs \
      apps/control-plane/jwt-verify.mjs apps/control-plane/sa-revocation.mjs \
      apps/control-plane/kc-admin.mjs apps/control-plane/social-providers.mjs \
+     apps/control-plane/keycloak-public-base.mjs \
      apps/control-plane/tenant-store.mjs \
      apps/control-plane/invitation-handlers.mjs apps/control-plane/tenant-user-handlers.mjs \
      apps/control-plane/b-handlers.mjs apps/control-plane/auth-handlers.mjs \
@@ -86,6 +87,7 @@ COPY apps/control-plane/audit-store.mjs           /repo/apps/control-plane/audit
 COPY apps/control-plane/audit-hash.mjs            /repo/apps/control-plane/audit-hash.mjs
 COPY apps/control-plane/kc-admin.mjs              /repo/apps/control-plane/kc-admin.mjs
 COPY apps/control-plane/social-providers.mjs      /repo/apps/control-plane/social-providers.mjs
+COPY apps/control-plane/keycloak-public-base.mjs  /repo/apps/control-plane/keycloak-public-base.mjs
 COPY scripts/backfill-tenant-realm-audience.mjs    /repo/scripts/backfill-tenant-realm-audience.mjs
 
 # Source modules under apps/control-plane use repository-relative ../../packages imports.
