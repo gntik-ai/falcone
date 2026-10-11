@@ -1,1 +1,1 @@
-{"type":"object","required":["tenantId","planSlug","planStatus","effectiveLimits"],"properties":{"tenantId":{"type":"string"},"planSlug":{"type":"string"},"planStatus":{"type":"string"},"effectiveLimits":{"type":"array"}}}
+{"type":"object","required":["tenantId","planSlug","planStatus","effectiveLimits"],"properties":{"tenantId":{"type":"string"},"planSlug":{"type":["string","null"]},"planStatus":{"type":["string","null"]},"noAssignment":{"type":"boolean"},"effectiveLimits":{"type":"array"}}}
