@@ -17,10 +17,10 @@ import { STORAGE_HANDLERS } from '../../apps/control-plane/storage-handlers.mjs'
 
 const { storageGetObject, storageObjectMetadata } = STORAGE_HANDLERS;
 
-// Identity owns the bucket; the mock pool returns a workspace_buckets row owned by the caller so
-// the ownership gate (getBucketRecord → rec.tenant_id === identity.tenantId) PASSES and the
+// Verified tenant_owner role grants tenant-wide bucket access (#973); the mock pool
+// returns a workspace_buckets row owned by the caller so the authorization gate PASSES and the
 // handler proceeds to the S3 call (where our fetch stub returns the 404 we want to test).
-const owner = { actorType: 'tenant_owner', tenantId: 'ten_1' };
+const owner = { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: 'ten_1', workspaceIds: [] };
 const ownedBucketPool = {
   query: async () => ({
     rows: [{ id: 'b', workspace_id: 'w', tenant_id: 'ten_1', bucket_name: 'b1', region: 'us-east-1', created_at: new Date().toISOString() }]

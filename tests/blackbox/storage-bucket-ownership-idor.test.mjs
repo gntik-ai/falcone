@@ -96,9 +96,9 @@ function makeMockPool({ buckets = BUCKET_ROWS, workspaces = WORKSPACE_ROWS } = {
   };
 }
 
-// identity helpers
-const tenantAIdentity = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, actorType: 'tenant_developer' };
-const tenantBIdentity = { sub: 'user-b', tenantId: TENANT_B, workspaceId: WS_B, actorType: 'tenant_developer' };
+// Verified developer roles and bindings mirror server.mjs authentication (#973).
+const tenantAIdentity = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, workspaceIds: [WS_A], roles: ['tenant_developer'], actorType: 'tenant_member' };
+const tenantBIdentity = { sub: 'user-b', tenantId: TENANT_B, workspaceId: WS_B, workspaceIds: [WS_B], roles: ['tenant_developer'], actorType: 'tenant_member' };
 const superadminIdentity = { sub: 'sa', tenantId: null, actorType: 'superadmin' };
 
 // Stub globalThis.fetch so no real S3 calls are made.

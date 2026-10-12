@@ -35,6 +35,11 @@ Existing users without workspace_id must be rebound through createTenantUser's
 workspaceId before reading workspace buckets. Bound tenant roles retain reads in
 their assigned workspace. Workspace grants do not widen PUT/DELETE authority.
 
+The gate requires verified realm roles for tenant owner/admin grants. A token
+carrying actor_type=tenant_owner without a tenant_owner or tenant_admin realm role
+loses bucket access, including the initial read gate before structural writes.
+The current charts do not mint actor_type; clients must rely on verified roles.
+
 No claim minting, membership table, migration, dependency change, deployment chart,
 shared tenant management gate or non-storage resolver is included. Functions,
 MongoDB, PostgreSQL, Kafka, webhooks and route-auth tier enforcement remain separate

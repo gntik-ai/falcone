@@ -87,6 +87,15 @@ jobs:
             tests/blackbox/storage-quota-handlers.test.mjs \
             tests/blackbox/storage-object-io-completeness.test.mjs
 
+      - name: Storage workspace authorization and regression tests
+        run: |
+          node --test tests/blackbox/storage-workspace-authz.test.mjs \
+            tests/blackbox/storage-bucket-ownership-idor.test.mjs \
+            tests/blackbox/storage-object-not-found-clean-error.test.mjs \
+            tests/blackbox/storage-object-write-envelope.test.mjs \
+            tests/blackbox/storage-per-bucket-credential-scope.test.mjs \
+            tests/blackbox/storage-handlers-object-key-validation.test.mjs
+
       - name: Adapter integration scaffolding
         run: pnpm test:adapters
 
