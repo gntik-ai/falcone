@@ -363,13 +363,27 @@ function isSuperOrInternal(identity) {
   return identity.actorType === 'superadmin' || identity.actorType === 'internal';
 }
 
-// Shared bucket-ownership gate for object I/O: superadmin/internal bypass; others must own the
-// bucket (else 404, no existence leak). Returns an error response to short-circuit, or null.
+// #973: bucket reads require model authority or a tenant role with a verified workspace binding.
+// Return the existing 404 shape before S3; request fields never grant workspace authority.
+function denyUnlessWorkspaceBucketReader(ctx, bucket, rec) {
+  if (isSuperOrInternal(ctx.identity)) return null;
+  if (rec) {
+    const scope = { tenantId: rec.tenant_id, workspaceId: rec.workspace_id };
+    if (['bucket.read', 'bucket.write', 'bucket.admin'].some((action) => can(ctx.identity, action, scope))) return null;
+    const identity = ctx.identity;
+    if (rec.tenant_id && identity.tenantId === rec.tenant_id && rec.workspace_id
+      && Array.isArray(identity.roles)
+      && identity.roles.some((role) => ['tenant_owner', 'tenant_admin', 'tenant_developer', 'tenant_viewer'].includes(role))
+      && Array.isArray(identity.workspaceIds) && identity.workspaceIds.includes(rec.workspace_id)) return null;
+  }
+  return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+}
+
+// Shared registry lookup for object I/O; platform bypass remains unchanged (#973).
 async function denyUnlessBucketOwner(ctx, bucket) {
   if (isSuperOrInternal(ctx.identity)) return null;
   const rec = await store.getBucketRecord(ctx.pool, bucket);
-  if (!rec || rec.tenant_id !== ctx.identity.tenantId) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
-  return null;
+  return denyUnlessWorkspaceBucketReader(ctx, bucket, rec);
 }
 
 function denyUnlessStructuralAdmin(ctx, tenantId) {
@@ -378,9 +392,10 @@ function denyUnlessStructuralAdmin(ctx, tenantId) {
 }
 
 async function requireOwnedBucketForStructuralWrite(ctx, bucket) {
-  const deny = await denyUnlessBucketOwner(ctx, bucket);
-  if (deny) return { error: deny };
   const rec = await store.getBucketRecord(ctx.pool, bucket);
+  // #973: reuse this record for workspace and structural gates (one lookup).
+  const deny = denyUnlessWorkspaceBucketReader(ctx, bucket, rec);
+  if (deny) return { error: deny };
   if (!rec) return { error: err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`) };
   const roleDeny = denyUnlessStructuralAdmin(ctx, rec.tenant_id);
   if (roleDeny) return { error: roleDeny };
@@ -593,10 +608,14 @@ async function storageDeleteObject(ctx) {
   } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_DELETE_FAILED', String(e.message ?? e)); }
 }
 async function storageListBuckets(ctx) {
-  const all = await listBuckets();
   const map = await store.bucketWorkspaceMap(ctx.pool);
   const isSuperadmin = isSuperOrInternal(ctx.identity);
+  // #973: authorize registry mappings before S3, using the same gate as object reads.
+  const readable = new Set(Object.keys(map).filter((bucket) => !denyUnlessWorkspaceBucketReader(ctx, bucket, map[bucket])));
+  if (!isSuperadmin && readable.size === 0) return ok(200, { items: [], page: { size: 0 } });
+  const all = await listBuckets();
   const items = all
+    .filter((b) => isSuperadmin || readable.has(b.name))
     .map((b) => {
       const m = map[b.name];
       return {
@@ -605,21 +624,12 @@ async function storageListBuckets(ctx) {
         region: REGION, status: 'active',
         timestamps: { createdAt: m?.created_at ?? b.creationDate, lastModifiedAt: b.creationDate }
       };
-    })
-    // Non-superadmin callers see only their own tenant's buckets.
-    .filter((item) => isSuperadmin || item.tenantId === ctx.identity.tenantId);
+    });
   return ok(200, { items, page: { size: items.length } });
 }
 async function storageListObjects(ctx) {
   const bucket = ctx.params.bucketId;
-  // Ownership check: look up the bucket's owning tenant and compare to caller.
-  // Superadmin/internal bypass the check. Non-owners get 404 (no existence leak).
-  if (!isSuperOrInternal(ctx.identity)) {
-    const rec = await store.getBucketRecord(ctx.pool, bucket);
-    if (!rec || rec.tenant_id !== ctx.identity.tenantId) {
-      return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
-    }
-  }
+  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
   const max = Number(ctx.query['page[size]'] ?? 50) || 50;
   const after = ctx.query['page[after]'] || undefined;
   try {
@@ -639,13 +649,7 @@ async function storageListObjects(ctx) {
 async function storageObjectMetadata(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
   const bucket = ctx.params.bucketId;
-  // Ownership check: same pattern as storageListObjects.
-  if (!isSuperOrInternal(ctx.identity)) {
-    const rec = await store.getBucketRecord(ctx.pool, bucket);
-    if (!rec || rec.tenant_id !== ctx.identity.tenantId) {
-      return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
-    }
-  }
+  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
   try {
     const meta = await headObject(bucket, key);
     return ok(200, { objectKey: key, bucketName: bucket, contentType: meta.contentType,
@@ -1016,8 +1020,7 @@ function isReservedKey(key) {
   return String(key ?? '').startsWith(EXPORT_MANIFEST_PREFIX) || /(^|\/)_platform\//.test(String(key ?? ''));
 }
 
-// Resolve + gate a workspace-addressed bucket: the bucket must exist, belong to the caller's tenant,
-// AND be mapped to the workspace in the path (so the workspace param is meaningful, not decorative).
+// #973: path mapping is necessary but does not grant workspace authority.
 // Superadmin/internal bypass. Returns { error } to short-circuit (404, no existence leak) or { rec }.
 async function ownedWorkspaceBucket(ctx, workspaceId, bucket) {
   const rec = await store.getBucketRecord(ctx.pool, bucket);
@@ -1025,9 +1028,11 @@ async function ownedWorkspaceBucket(ctx, workspaceId, bucket) {
     if (!rec) return { error: err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`) };
     return { rec };
   }
-  if (!rec || rec.tenant_id !== ctx.identity.tenantId || (workspaceId && rec.workspace_id !== workspaceId)) {
+  if (!rec || (workspaceId && rec.workspace_id !== workspaceId)) {
     return { error: err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`) };
   }
+  const deny = denyUnlessWorkspaceBucketReader(ctx, bucket, rec);
+  if (deny) return { error: deny };
   return { rec };
 }
 
