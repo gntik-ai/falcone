@@ -527,6 +527,7 @@ for path in paths:
     assert sum(matches(path, pattern) for pattern, _ in rules) == 1, path
 for pattern, count in rules:
     assert sum(matches(path, pattern) for path in paths) == count, pattern
+assert len(rules) == 138
 
 assert len(paths) == 3164
 assert len(run('ls-files', 'openspec').splitlines()) == 119
@@ -578,8 +579,18 @@ for line in hits:
     _, file, number, _ = line.split(':', 3)
     assert f'`{file}:{number}`' in design, (file, number)
 assert len(hits) == 41
+phase1 = '5ce1715d68cbdd5f72ce157a23fb88f5f28bd3ab'
+assert f'baseline **B** is `{phase1}`' in design
+phase1_hits = subprocess.check_output(git + ['grep', '-n', '-I', '-e', 'spikes/', '-e', 'falcone-loop-state', '-e', 'delivery-adapter', '-e', 'track-f', phase1, '--'], text=True).splitlines()
+for line in phase1_hits:
+    _, file, number, _ = line.split(':', 3)
+    assert f'`{file}:{number}`' in design, (file, number)
+assert len(phase1_hits) == 272
+# This refinement may touch only the new change; no historical candidate changes.
+refinement = run('diff', '--name-only', phase1).splitlines()
+assert all(path.startswith(change + '/') for path in refinement), refinement
 assert not run('diff', '--check', base)
-print('PASS: 3164 stored paths, 138 disjoint rules/counts, 41 reader citations, IDE ignore/scope, 11 manifest hashes; protected paths unchanged.')
+print('PASS: 3164 stored paths, 138 disjoint rules/counts, 272 phase-1 reader/declaration citations, literal baseline pin, IDE ignore/scope, 11 manifest hashes; protected paths unchanged.')
 PY
 ```
 
