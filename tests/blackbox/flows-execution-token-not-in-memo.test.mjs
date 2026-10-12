@@ -12,10 +12,11 @@ import assert from 'node:assert/strict';
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 import { createFlowExecutor } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
+import { createFlowTriggerRegistry } from '../../apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs';
 
 const TEN = 'ten_memo';
 const WS = 'ws_memo';
-const authHeaders = { 'content-type': 'application/json', 'x-tenant-id': TEN, 'x-workspace-id': WS, 'x-auth-subject': 'admin' };
+const authHeaders = { 'content-type': 'application/json', 'x-tenant-id': TEN, 'x-workspace-id': WS, 'x-auth-subject': 'admin', 'x-actor-roles': 'tenant_admin' };
 const DEF = { apiVersion: 'v1.0', name: 'memo-flow', nodes: [{ id: 's1', type: 'task', taskType: 'fetch-record' }] };
 
 // Minimal @temporalio/client-shaped fake that records every start()'s opts.
@@ -97,5 +98,45 @@ test('bbx-flow-memo-01: starting an execution does NOT write the execution token
 
     // And the plaintext token value never appears in the memo.
     assert.ok(!memoStr.includes(token), 'token value absent from the memo');
+    assert.ok(!JSON.stringify(opts.searchAttributes).includes(token), 'token value absent from search attributes');
   });
+});
+
+test('production flow-start returns 503 and starts no workflow when the secret is absent or empty', async () => {
+  const saved = { NODE_ENV: process.env.NODE_ENV, FLOW_EXECUTION_TOKEN_SECRET: process.env.FLOW_EXECUTION_TOKEN_SECRET };
+  try {
+    process.env.NODE_ENV = 'production';
+    await withServer(async ({ baseUrl, temporal }) => {
+      const create = await fetch(`${baseUrl}${flowsBase}`, { method: 'POST', headers: authHeaders, body: JSON.stringify({ name: 'unconfigured', definition: DEF }) });
+      assert.equal(create.status, 201);
+      const { flowId } = await create.json();
+      const pub = await fetch(`${baseUrl}${flowsBase}/${flowId}/versions`, { method: 'POST', headers: authHeaders });
+      assert.equal(pub.status, 201);
+      for (const secret of [undefined, '']) {
+        if (secret === undefined) delete process.env.FLOW_EXECUTION_TOKEN_SECRET;
+        else process.env.FLOW_EXECUTION_TOKEN_SECRET = secret;
+        const start = await fetch(`${baseUrl}${flowsBase}/${flowId}/executions`, { method: 'POST', headers: authHeaders, body: '{}' });
+        assert.equal(start.status, 503);
+        const body = await start.json();
+        assert.equal(body.code, 'EXECUTION_TOKEN_SECRET_UNCONFIGURED');
+        assert.equal(body.message, 'Internal server error');
+        assert.equal(temporal.started.length, 0);
+      }
+    });
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
+
+test('cron Schedule actions persist no execution token in args, memo, or search attributes', async () => {
+  let schedule;
+  const registry = createFlowTriggerRegistry({ temporalClient: { schedule: {
+    create: async (options) => { schedule = options; },
+  } } });
+  await registry.registerTriggers('flow_cron', 1, [{ kind: 'cron', schedule: '0 * * * *' }], { tenantId: TEN, workspaceId: WS });
+  assert.equal(schedule.action.args[0].tenant.executionToken, undefined);
+  assert.equal(schedule.action.memo, undefined);
+  assert.equal(JSON.stringify(schedule.action).includes('executionToken'), false);
 });

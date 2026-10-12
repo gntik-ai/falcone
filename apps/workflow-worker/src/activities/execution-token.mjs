@@ -8,28 +8,35 @@
 // with a NON-RETRYABLE Temporal ApplicationFailure (the failure is deterministic — retrying cannot
 // heal it).
 //
-// This module is SELF-CONTAINED: it re-implements the SAME token verification the control-plane
-// minting side uses, deriving the workspace-scoped signing key from the shared platform secret
+// This module is SELF-CONTAINED: it implements cron minting and the SAME token verification the
+// control-plane uses, deriving the workspace-scoped signing key from the shared platform secret
 // (FLOW_EXECUTION_TOKEN_SECRET). It does NOT import from `apps/control-plane-executor`, so the worker dist
 // artifact stays decoupled from the control-plane package (consistent with how the other
 // activities receive platform surfaces via dependency injection rather than cross-package imports).
 // The token wire format and key derivation MUST stay byte-for-byte identical to the control-plane
 // helper; both are exercised by the same black-box round-trip test.
 
-import { createHmac, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { toNonRetryable } from './errors.mjs';
 
 export const EXECUTION_TOKEN_EXPIRED = 'EXECUTION_TOKEN_EXPIRED';
 export const EXECUTION_TOKEN_TENANT_MISMATCH = 'EXECUTION_TOKEN_TENANT_MISMATCH';
 export const EXECUTION_TOKEN_INVALID = 'EXECUTION_TOKEN_INVALID';
+export const EXECUTION_TOKEN_SECRET_UNCONFIGURED = 'EXECUTION_TOKEN_SECRET_UNCONFIGURED';
 
 const EXECUTION_TOKEN_KEY_DERIVATION = 'scrypt-v1';
+export const DEFAULT_MAX_RUN_DURATION_MS = 24 * 60 * 60 * 1000;
 
 // MUST match apps/control-plane-executor/src/runtime/execution-token.mjs::DEV_SECRET.
 const DEV_SECRET = 'falcone-dev-flow-execution-token-secret';
 
 function platformSecret() {
-  return process.env.FLOW_EXECUTION_TOKEN_SECRET || DEV_SECRET;
+  const configured = process.env.FLOW_EXECUTION_TOKEN_SECRET;
+  if (process.env.NODE_ENV === 'production' && (!configured || Buffer.byteLength(configured, 'utf8') < 32)) {
+    throw Object.assign(new Error('FLOW_EXECUTION_TOKEN_SECRET is not configured'),
+      { code: EXECUTION_TOKEN_SECRET_UNCONFIGURED, statusCode: 503 });
+  }
+  return configured || DEV_SECRET;
 }
 
 // Workspace-scoped signing key derived from the platform secret and tenant identity.
@@ -39,6 +46,22 @@ function signingKey(tenantId, workspaceId, secret) {
 
 function expectedSignature(payloadJson, tenantId, workspaceId, secret) {
   return createHmac('sha256', signingKey(tenantId, workspaceId, secret)).update(payloadJson).digest();
+}
+
+// Cron runs mint inside an activity, never inside the deterministic workflow sandbox.
+export function mintExecutionToken(tenantId, workspaceId, maxRunDurationMs = DEFAULT_MAX_RUN_DURATION_MS, { now = Date.now() } = {}) {
+  let secret;
+  try { secret = platformSecret(); } catch (err) {
+    throw toNonRetryable(err.code, err.message);
+  }
+  if (!tenantId || !workspaceId) {
+    throw toNonRetryable(EXECUTION_TOKEN_INVALID, 'execution token requires tenantId and workspaceId');
+  }
+  const ttl = Math.max(0, Math.min(Number(maxRunDurationMs) || 0, DEFAULT_MAX_RUN_DURATION_MS));
+  const payloadJson = JSON.stringify({ tenantId, workspaceId, expiresAt: now + ttl,
+    jti: randomUUID(), keyDerivation: EXECUTION_TOKEN_KEY_DERIVATION });
+  const sig = expectedSignature(payloadJson, tenantId, workspaceId, secret);
+  return `${Buffer.from(payloadJson).toString('base64url')}.${sig.toString('base64url')}`;
 }
 
 function decodePayload(token) {
@@ -66,10 +89,13 @@ function decodePayload(token) {
  * @param {{ now?: number }} [opts]
  */
 export function assertExecutionToken(token, expectedTenantId, expectedWorkspaceId, { now = Date.now() } = {}) {
-  const secret = platformSecret();
   const decoded = decodePayload(token);
   if (!decoded) {
     throw toNonRetryable(EXECUTION_TOKEN_INVALID, 'execution token is missing or malformed');
+  }
+  let secret;
+  try { secret = platformSecret(); } catch (err) {
+    throw toNonRetryable(err.code, err.message);
   }
   const { obj, payloadJson, sig } = decoded;
   if (!obj.tenantId || !obj.workspaceId || typeof obj.expiresAt !== 'number') {

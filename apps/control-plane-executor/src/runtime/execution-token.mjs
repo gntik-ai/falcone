@@ -16,7 +16,7 @@
 // (FLOW_EXECUTION_TOKEN_SECRET) so the control-plane (minting) and the worker (validating) share
 // it without distributing per-workspace material. A missing secret in test/black-box mode falls
 // back to a fixed dev key so the round-trip is exercisable without infra (the same backend split
-// api-keys.mjs uses).
+// api-keys.mjs uses). Production refuses an absent or shorter-than-32-byte secret.
 
 import { randomUUID, scryptSync, timingSafeEqual, webcrypto } from 'node:crypto';
 
@@ -28,12 +28,18 @@ export const DEFAULT_MAX_RUN_DURATION_MS = 24 * 60 * 60 * 1000; // 24h
 export const EXECUTION_TOKEN_EXPIRED = 'EXECUTION_TOKEN_EXPIRED';
 export const EXECUTION_TOKEN_TENANT_MISMATCH = 'EXECUTION_TOKEN_TENANT_MISMATCH';
 export const EXECUTION_TOKEN_INVALID = 'EXECUTION_TOKEN_INVALID';
+export const EXECUTION_TOKEN_SECRET_UNCONFIGURED = 'EXECUTION_TOKEN_SECRET_UNCONFIGURED';
 export const EXECUTION_TOKEN_KEY_DERIVATION = 'scrypt-v1';
 
 const DEV_SECRET = 'falcone-dev-flow-execution-token-secret';
 
 function platformSecret() {
-  return process.env.FLOW_EXECUTION_TOKEN_SECRET || DEV_SECRET;
+  const configured = process.env.FLOW_EXECUTION_TOKEN_SECRET;
+  if (process.env.NODE_ENV === 'production' && (!configured || Buffer.byteLength(configured, 'utf8') < 32)) {
+    throw Object.assign(new Error('FLOW_EXECUTION_TOKEN_SECRET is not configured'),
+      { code: EXECUTION_TOKEN_SECRET_UNCONFIGURED, statusCode: 503 });
+  }
+  return configured || DEV_SECRET;
 }
 
 // Derive a workspace-scoped signing key from the platform secret and workspace identity. The

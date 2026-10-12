@@ -13,6 +13,7 @@ import {
   taskTypeNames,
   llmComplete,
 } from '../../apps/workflow-worker/src/activities/index.mjs';
+import { mintExecutionToken } from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
 
 const TENANT = { tenantId: 'ten_a', workspaceId: 'ws_llm' };
 const base = { nodeId: 'n1', taskType: 'llm.complete', tenant: TENANT };
@@ -30,6 +31,7 @@ test('bbx-llm-act-01: llm.complete is registered with input/output schemas', () 
 });
 
 test('bbx-llm-act-02: a wired completion returns { status, content, usage, model }', async () => {
+  const tenant = { ...TENANT, executionToken: await mintExecutionToken(TENANT.tenantId, TENANT.workspaceId) };
   const deps = {
     executeLlmComplete: async (req) => {
       assert.equal(req.workspaceId, 'ws_llm');
@@ -38,7 +40,7 @@ test('bbx-llm-act-02: a wired completion returns { status, content, usage, model
       return { content: 'hello', usage: { promptTokens: 2, completionTokens: 3, totalTokens: 5 }, model: 'gpt-allowed' };
     },
   };
-  const out = await dispatchTask({ ...base, params: { model: 'gpt-allowed', messages: [{ role: 'user', content: 'hi' }] } }, deps);
+  const out = await dispatchTask({ ...base, tenant, params: { model: 'gpt-allowed', messages: [{ role: 'user', content: 'hi' }] } }, deps);
   assert.equal(out.output.status, 'success');
   assert.equal(out.output.content, 'hello');
   assert.equal(out.output.model, 'gpt-allowed');

@@ -20,6 +20,7 @@
  * current poll, and exits 0 within terminationGracePeriodSeconds.
  */
 import { Worker, NativeConnection } from '@temporalio/worker';
+import { Client, Connection } from '@temporalio/client';
 import { createServer, type Server } from 'node:http';
 import * as activities from './activities';
 
@@ -68,11 +69,15 @@ async function run(): Promise<void> {
   // execution's tenant RLS context (fix-flows-worker-db-activity-wiring / #563).
   const { wireActivityDeps } = await dynamicImport('./worker-deps.mjs');
   const { deps, close: closeRegistry } = await wireActivityDeps();
-  activities.setActivityDeps(deps);
   // eslint-disable-next-line no-console
   console.log('[workflow-worker] postgres executor wired into db.query activity');
 
   const connection = await NativeConnection.connect({ address: ADDRESS });
+  const clientConnection = await Connection.connect({ address: ADDRESS });
+  const client = new Client({ connection: clientConnection, namespace: NAMESPACE });
+  activities.setActivityDeps({ ...deps,
+    describeWorkflow: (workflowId: string, runId: string) => client.workflow.getHandle(workflowId, runId).describe(),
+  });
   const worker = await Worker.create({
     connection,
     namespace: NAMESPACE,
@@ -97,6 +102,7 @@ async function run(): Promise<void> {
     await worker.run();
   } finally {
     await connection.close();
+    await clientConnection.close();
     health.close();
     await closeRegistry();
   }

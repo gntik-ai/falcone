@@ -160,3 +160,30 @@ test('bbx-flows-ten-cred-10: sanitizeClientQuery strips tenant/workspace clauses
   assert.equal(sanitizeClientQuery(''), '');
   assert.equal(sanitizeClientQuery(undefined), '');
 });
+
+test('production executor/worker fail closed without a strong secret and reject the public dev key', async () => {
+  const saved = { NODE_ENV: process.env.NODE_ENV, FLOW_EXECUTION_TOKEN_SECRET: process.env.FLOW_EXECUTION_TOKEN_SECRET };
+  try {
+    process.env.NODE_ENV = 'test';
+    delete process.env.FLOW_EXECUTION_TOKEN_SECRET;
+    const forged = await mintExecutionToken('tenant_A', 'ws_A');
+    process.env.NODE_ENV = 'production';
+    for (const secret of [undefined, '', 'short']) {
+      if (secret === undefined) delete process.env.FLOW_EXECUTION_TOKEN_SECRET;
+      else process.env.FLOW_EXECUTION_TOKEN_SECRET = secret;
+      await assert.rejects(() => mintExecutionToken('tenant_A', 'ws_A'),
+        (err) => err.code === 'EXECUTION_TOKEN_SECRET_UNCONFIGURED' && err.statusCode === 503);
+      assert.throws(() => assertExecutionToken(forged, 'tenant_A', 'ws_A'),
+        (err) => err.type === 'EXECUTION_TOKEN_SECRET_UNCONFIGURED' && err.nonRetryable === true);
+    }
+    process.env.FLOW_EXECUTION_TOKEN_SECRET = 'x'.repeat(32);
+    assert.throws(() => assertExecutionToken(forged, 'tenant_A', 'ws_A'),
+      (err) => err.type === EXECUTION_TOKEN_INVALID && err.nonRetryable === true);
+    const token = await mintExecutionToken('tenant_A', 'ws_A');
+    assert.equal(assertExecutionToken(token, 'tenant_A', 'ws_A').tenantId, 'tenant_A');
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});

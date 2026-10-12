@@ -10,7 +10,7 @@
 //   bbx-flows-ten-actgate-01: valid token → activity proceeds, downstream executor IS called
 //   bbx-flows-ten-actgate-02: expired token → EXECUTION_TOKEN_EXPIRED, NO downstream call
 //   bbx-flows-ten-actgate-03: cross-tenant token → EXECUTION_TOKEN_TENANT_MISMATCH, NO downstream call
-//   bbx-flows-ten-actgate-04: no token at all → gate is a no-op (legacy harness path)
+//   bbx-flows-ten-actgate-04: missing/null token → non-retryable INVALID, no downstream call
 //   bbx-flows-ten-actgate-05: unregistered taskType (echo seam) is not token-gated
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -58,10 +58,14 @@ test('bbx-flows-ten-actgate-03: cross-tenant token → EXECUTION_TOKEN_TENANT_MI
   assert.equal(called, false);
 });
 
-test('bbx-flows-ten-actgate-04: no token at all → gate is a no-op (legacy harness path)', async () => {
-  let called = false;
-  await dispatchTask(dbQueryInput(undefined), { executePostgresData: async () => { called = true; return { items: [] }; }, pgRegistry: {} });
-  assert.equal(called, true, 'a missing token does not block the legacy interpreter harness');
+test('bbx-flows-ten-actgate-04: missing/null token fails before downstream access', async () => {
+  for (const token of [undefined, null]) {
+    let called = false;
+    await assert.rejects(() => dispatchTask(dbQueryInput(token), {
+      executePostgresData: async () => { called = true; return { items: [] }; }, pgRegistry: {},
+    }), (err) => err.type === 'EXECUTION_TOKEN_INVALID' && err.nonRetryable === true);
+    assert.equal(called, false);
+  }
 });
 
 test('bbx-flows-ten-actgate-05: unregistered taskType (echo seam) is not token-gated', async () => {

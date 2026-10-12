@@ -25,6 +25,7 @@ import {
 } from '../../apps/workflow-worker/src/activities/index.mjs';
 import { classifyExecutorError } from '../../apps/workflow-worker/src/activities/errors.mjs';
 import { MAX_INPUT_BYTES } from '../../apps/workflow-worker/src/activities/limits.mjs';
+import { mintExecutionToken } from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
 
 const EXPECTED = ['db.query', 'storage.put', 'storage.get', 'functions.invoke', 'events.publish', 'http.request', 'email.send', 'llm.complete'];
 
@@ -105,9 +106,10 @@ test('bbx-flows-act-disp-01: dispatch requires a tenant context', async () => {
 });
 
 test('bbx-flows-act-email-01: email.send stub → non-retryable CAPABILITY_UNAVAILABLE', async () => {
+  const executionToken = await mintExecutionToken('t1', 'w1');
   try {
     await dispatchTask(
-      { nodeId: 'n1', taskType: 'email.send', params: { to: ['a@example.com'], subject: 's' }, tenant: { tenantId: 't1', workspaceId: 'w1' } },
+      { nodeId: 'n1', taskType: 'email.send', params: { to: ['a@example.com'], subject: 's' }, tenant: { tenantId: 't1', workspaceId: 'w1', executionToken } },
       {},
     );
     assert.fail('expected throw');
