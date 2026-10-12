@@ -67,6 +67,12 @@ export async function executeTask(input: ActivityInput): Promise<ActivityResult>
   return catalog.dispatchTask(input, activityDeps) as Promise<ActivityResult>;
 }
 
+/** Run-scoped cron credential; the activity checks server-recorded schedule ownership. */
+export async function mintCronExecutionToken(input: { tenant: ActivityInput['tenant'] }): Promise<string> {
+  const module = await dynamicImport('./cron-execution-token.mjs');
+  return module.mintCronExecutionToken(input, activityDeps) as Promise<string>;
+}
+
 /**
  * Evaluate a CEL boolean/data expression OUTSIDE the workflow sandbox (design.md D4).
  * cel-js is pure + side-effect-free, but delegating keeps any future engine internals

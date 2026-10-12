@@ -17,6 +17,12 @@ import { createConnectionRegistry } from '../../apps/control-plane-executor/src/
 import { executePostgresData } from '../../apps/control-plane-executor/src/runtime/postgres-data-executor.mjs';
 import { dispatchTask } from '../../apps/workflow-worker/src/activities/index.mjs';
 import { mintExecutionToken } from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
+import { createFlowExecutor } from '../../apps/control-plane-executor/src/runtime/flow-executor.mjs';
+import { createFlowTriggerRegistry } from '../../apps/control-plane-executor/src/runtime/flow-trigger-registry.mjs';
+import { computeSignature } from '../../packages/webhook-engine/src/webhook-signing.mjs';
+import { mintCronExecutionToken } from '../../apps/workflow-worker/src/activities/cron-execution-token.mjs';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 
 const { Pool } = pg;
 
@@ -135,4 +141,68 @@ test('env-flows-ten-cred-03: cross-tenant token → non-retryable TENANT_MISMATC
     (err) => err.type === 'EXECUTION_TOKEN_TENANT_MISMATCH' && err.nonRetryable === true,
   );
   assert.equal(dbHit, false);
+});
+
+test('production manual, verified webhook, retry, and cron starts reach the credential gate and tenant RLS', async (t) => {
+  if (!available) return t.skip('Postgres not reachable');
+  const workerRequire = createRequire(new URL('../../apps/workflow-worker/package.json', import.meta.url));
+  const { MockActivityEnvironment } = await import(pathToFileURL(workerRequire.resolve('@temporalio/testing')).href);
+  const saved = { NODE_ENV: process.env.NODE_ENV, FLOW_EXECUTION_TOKEN_SECRET: process.env.FLOW_EXECUTION_TOKEN_SECRET };
+  const started = [];
+  const handles = new Map();
+  let schedule;
+  const temporal = {
+    workflow: {
+      async start(_type, options) {
+        started.push(options);
+        const handle = { firstExecutionRunId: `run-${started.length}`,
+          describe: async () => ({ searchAttributes: options.searchAttributes }) };
+        handles.set(options.workflowId, handle);
+        return handle;
+      },
+      getHandle: (id) => handles.get(id),
+    },
+    schedule: { create: async (options) => { schedule = options; } },
+  };
+  const executor = createFlowExecutor({ temporalClient: temporal });
+  const triggers = createFlowTriggerRegistry({ temporalClient: temporal,
+    secretMasterKey: 'test-only-trigger-encryption-key', startTriggeredExecution: executor.startTriggeredExecution });
+  executor.setTriggerRegistry(triggers);
+  try {
+    process.env.NODE_ENV = 'production';
+    process.env.FLOW_EXECUTION_TOKEN_SECRET = 'x'.repeat(32);
+    const identity = { tenantId: TEN_A, workspaceId: WS_A, actorId: 'admin', roles: ['tenant_admin'] };
+    const task = { id: 'read', type: 'task', taskType: 'db.query', input: input().params };
+    const definition = { apiVersion: 'v1.0', name: 'credential-starts', nodes: [task], triggers: [
+      { kind: 'webhook', path: 'credential-starts' }, { kind: 'cron', schedule: '0 * * * *' },
+    ] };
+    const created = await executor.executeFlows({ operation: 'create_definition', identity, body: { name: definition.name, definition } });
+    const { flowId } = created;
+    const published = await executor.executeFlows({ operation: 'publish_version', identity, flowId });
+    const manual = await executor.executeFlows({ operation: 'start_execution', identity, flowId });
+    const webhook = published.triggers.webhooks[0];
+    const rawBody = '{}';
+    await executor.executeFlows({ operation: 'webhook_trigger', identity, triggerId: webhook.triggerId,
+      rawBody, payload: {}, signatureHeader: computeSignature(rawBody, webhook.secret), deliveryId: 'credential-proof' });
+    await executor.executeFlows({ operation: 'retry_execution', identity, flowId, executionId: manual.executionId });
+    assert.equal(started.length, 3);
+    const cronTenant = schedule.action.args[0].tenant;
+    assert.equal(cronTenant.executionToken, undefined);
+    const firedAt = new Date();
+    const activityEnv = new MockActivityEnvironment({ workflowExecution: { workflowId: 'cron-firing', runId: 'cron-run' } });
+    const cronToken = await activityEnv.run(mintCronExecutionToken, { tenant: cronTenant }, {
+      describeWorkflow: async () => ({ startTime: firedAt, searchAttributes: { TemporalScheduledById: [schedule.scheduleId] } }),
+    });
+    for (const tenant of [...started.map((options) => options.args[0].tenant), { ...cronTenant, executionToken: cronToken }]) {
+      const out = await dispatchTask({ ...input(), tenant }, deps());
+      const items = out.output.result.items ?? out.output.result.rows ?? [];
+      assert.ok(items.length > 0 && items.every((row) => row.tenant_id === TEN_A));
+      assert.ok(items.every((row) => row.name !== 'b-secret'));
+    }
+  } finally {
+    await executor.close();
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
 });

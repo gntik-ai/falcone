@@ -90,12 +90,9 @@ export async function dispatchTask(input, deps = {}) {
   // the control-plane minted at execution start MUST validate against the execution's tenant +
   // workspace. A missing / expired / cross-tenant token fails the activity NON-RETRYABLY and no
   // tenant data is accessed. The token is carried in the workflow argument's tenant envelope as
-  // `executionToken`. When no token is configured AT ALL (legacy interpreter
-  // harness with token enforcement off) the gate is a no-op — production always stamps one.
+  // `executionToken`. Missing credentials fail closed, including cron-fired runs.
   const token = input.tenant?.executionToken;
-  if (token !== undefined && token !== null) {
-    assertExecutionToken(token, input.tenant.tenantId, input.tenant.workspaceId);
-  }
+  assertExecutionToken(token, input.tenant?.tenantId, input.tenant?.workspaceId);
   const output = await entry.activity(
     { params: input.params ?? {}, tenant: input.tenant, credential: deps.credential },
     deps,

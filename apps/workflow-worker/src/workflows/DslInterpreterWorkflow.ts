@@ -34,6 +34,7 @@ import {
   defineQuery,
   ApplicationFailure,
   workflowInfo,
+  patched,
 } from '@temporalio/workflow';
 import type { Duration } from '@temporalio/common';
 import type * as activities from '../activities';
@@ -70,7 +71,7 @@ export const approvalSignal = defineSignal<[ApprovalSignalPayload]>('flowApprova
 /** Query the ordered trace of visited node ids (monitoring / tests). */
 export const traceQuery = defineQuery<string[]>('flowTrace');
 
-const { evaluateExpression, loadFlowDefinition } = proxyActivities<typeof activities>({
+const { evaluateExpression, loadFlowDefinition, mintCronExecutionToken } = proxyActivities<typeof activities>({
   startToCloseTimeout: '1 minute',
 });
 
@@ -103,11 +104,22 @@ export async function DslInterpreterWorkflow(input: WorkflowInput): Promise<Work
   // --- Resolve + PIN the definition for the life of this run (version pinning) ---------
   // The resolved definition is captured in a local const at workflow start. Publishing a
   // new version later never reaches this closure: nothing re-reads an external store.
-  const tenant: TenantContext = input.tenant;
+  let tenant: TenantContext = input.tenant;
+  // Temporal supplies this attribute for scheduled executions (also on pre-upgrade schedules).
+  // The activity independently reads THIS run's server metadata before minting anything.
+  const scheduledExecution = Boolean(workflowInfo().searchAttributes.TemporalScheduledById?.length) &&
+    patched('fix-976-cron-execution-token');
+  if (scheduledExecution && !tenant.executionToken) {
+    tenant = { ...tenant, executionToken: await mintCronExecutionToken({ tenant }) };
+  }
   let definition: FlowDefinition;
   if (isReferenceInput(input)) {
     // Load-by-reference: record the load in history so replay is deterministic.
     definition = await loadFlowDefinition({ flowId: input.flowId, version: input.version, tenant });
+  } else if (scheduledExecution && input.definition === undefined) {
+    // Pre-upgrade schedules persist only the tenant envelope. Resolve its pinned reference
+    // after the mint activity has verified that the envelope belongs to THIS schedule.
+    definition = await loadFlowDefinition({ flowId: tenant.flowId ?? '', version: tenant.flowVersion ?? '', tenant });
   } else {
     // Inline (default hot path). Guard the payload size (Temporal 4 MB limit headroom).
     const sizeBytes = JSON.stringify(input.definition).length;
