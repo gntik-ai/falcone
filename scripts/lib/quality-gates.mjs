@@ -55,6 +55,13 @@ export function listOperations(document) {
   });
 }
 
+export function isRealtimeChangesOperation(path, method, operation) {
+  return method === 'get' && operation?.['x-family'] === 'realtime-changes' && [
+    '/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes',
+    '/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes',
+  ].includes(path);
+}
+
 export function collectContractViolations(document) {
   const violations = [];
 
@@ -88,7 +95,7 @@ export function collectContractViolations(document) {
           parameter?.in === 'header' && parameter?.name === 'X-API-Version' && parameter?.required === true
       );
 
-      if (!versionHeader) {
+      if (!versionHeader && !isRealtimeChangesOperation(path, method, operation)) {
         violations.push(`${operationLabel} must require the X-API-Version header.`);
       }
 
@@ -97,7 +104,7 @@ export function collectContractViolations(document) {
           parameter?.in === 'header' && parameter?.name === 'X-Correlation-Id' && parameter?.required === true
       );
 
-      if (!correlationHeader) {
+      if (!correlationHeader && !isRealtimeChangesOperation(path, method, operation)) {
         violations.push(`${operationLabel} must require the X-Correlation-Id header.`);
       }
 

@@ -8,12 +8,6 @@ import {
   requiredProductPlugins
 } from '../../scripts/lib/gateway-policy.mjs';
 import { readGatewayRouting, readPublicRouteCatalog } from '../../scripts/lib/public-api.mjs';
-import {
-  listConsoleRoutesByTier,
-  listConsoleWorkflowRoutes,
-  summarizeConsoleEndpointSeparation
-} from '../../apps/control-plane-executor/src/public-api-catalog.mjs';
-
 test('gateway contract publishes APISIX policy for every public family and passthrough route', () => {
   const values = readGatewayPolicyValues();
   const enabledRoutes = listEnabledApisixRoutes(values);
@@ -90,7 +84,9 @@ test('route catalog exposes gateway-facing auth and context metadata for every o
   }
 });
 
-test('route catalog helpers can filter and summarize console endpoint separation metadata', () => {
+test('route catalog helpers can filter and summarize console endpoint separation metadata', async () => {
+  const { listConsoleRoutesByTier, listConsoleWorkflowRoutes, summarizeConsoleEndpointSeparation } =
+    await import('../../apps/control-plane-executor/src/public-api-catalog.mjs');
   const spaRoutes = listConsoleRoutesByTier('spa');
   const wf002Routes = listConsoleWorkflowRoutes('WF-CON-002');
   const summary = summarizeConsoleEndpointSeparation();
@@ -101,4 +97,30 @@ test('route catalog helpers can filter and summarize console endpoint separation
   assert.equal(wf002Routes.some((route) => route.operationId === 'getTenantWorkflowJobStatus'), true);
   assert.equal(summary.spa.operationIds.includes('createWorkspace'), true);
   assert.equal(summary.platform.operationIds.includes('getRouteCatalog'), true);
+});
+
+test('a hardened query-key change-stream values fixture passes gateway policy', async () => {
+  const { collectGatewayPolicyViolations } = await import('../../scripts/lib/gateway-policy.mjs');
+  const { realtimeChangesFixture } = await import('./fixtures/realtime-changes-values.mjs');
+  assert.deepEqual(collectGatewayPolicyViolations(realtimeChangesFixture()), []);
+});
+
+test('change-stream fixture routes GET/preflight only and excludes capture management', async () => {
+  const { realtimeChangesFixture } = await import('./fixtures/realtime-changes-values.mjs');
+  const { route } = realtimeChangesFixture();
+  const matches = (method, path) => route.methods.includes(method)
+    && route.vars.every(([variable, operator, pattern]) => variable === 'uri' && operator === '~~' && new RegExp(pattern).test(path));
+  for (const path of [
+    '/v1/realtime/workspaces/a/data/app/collections/notes/changes',
+    '/v1/realtime/workspaces/a/data/app/schemas/public/tables/notes/changes',
+  ]) {
+    assert.ok(matches('GET', path));
+    assert.ok(matches('OPTIONS', path));
+    assert.ok('cors' in route.plugins, 'APISIX cors short-circuits preflight');
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) assert.ok(!matches(method, path));
+  }
+  for (const path of ['/v1/realtime/workspaces/a/mongo-captures', '/v1/realtime/workspaces/a/mongo-captures/changes']) {
+    assert.ok(!matches('GET', path));
+  }
+  assert.equal(route.plugins['limit-count'].key, '$http_apikey$arg_apikey');
 });

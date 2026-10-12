@@ -48,6 +48,7 @@ Native operator passthrough routes under `/_native/*` are documented separately 
 | pg-captures | realtime | realtime | 131072 | realtime | mutations |
 | platform | platform_control | platform_control | 262144 | control_plane | mutations |
 | postgres | provisioning | provisioning | 1048576 | provisioning | mutations |
+| realtime-changes | realtime | realtime | 131072 | realtime | mutations |
 | storage | provisioning | provisioning | 1048576 | provisioning | mutations |
 | tenants | tenant_control | tenant_control | 262144 | control_plane | mutations |
 | websockets | realtime | realtime | 131072 | realtime | mutations |
@@ -454,6 +455,15 @@ Workspace- and tenant-aware PostgreSQL control, structural administration, inven
 | GET | `/v1/postgres/workspaces/{workspaceId}/templates/{templateId}` | workspace | postgres_template | Fetch one PostgreSQL database or schema onboarding template for a workspace |
 | PUT | `/v1/postgres/workspaces/{workspaceId}/templates/{templateId}` | workspace | postgres_template | Update one PostgreSQL database or schema onboarding template for a workspace |
 | GET | `/v1/postgres/workspaces/{workspaceId}/types` | workspace | postgres_type | List PostgreSQL types currently allowed for one workspace and target cluster profile |
+
+## Realtime Changes
+
+Executor-authenticated collection and table change streams over Server-Sent Events.
+
+| Method | Path | Scope | Resource | Summary |
+| --- | --- | --- | --- | --- |
+| GET | `/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes` | workspace | realtime_collection_changes | Stream collection changes over SSE |
+| GET | `/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes` | workspace | realtime_table_changes | Stream table changes over SSE |
 
 ## Storage
 

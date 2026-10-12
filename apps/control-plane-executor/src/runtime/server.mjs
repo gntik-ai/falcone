@@ -1100,6 +1100,13 @@ async function runMcpRpc(mcpEngine, params, runtime) {
 async function runRealtimeSse(realtimeExecutor, target, c) {
   if (!realtimeExecutor) throw Object.assign(new Error('Realtime is not enabled'), { statusCode: 501, code: 'REALTIME_DISABLED' });
   const { req, res, identity } = c;
+  let authorization;
+  if (target.tableName !== undefined) {
+    if (typeof realtimeExecutor.authorize !== 'function') {
+      throw Object.assign(new Error('Realtime authorization is not enabled'), { statusCode: 501, code: 'REALTIME_DISABLED' });
+    }
+    authorization = await realtimeExecutor.authorize({ ...target, identity });
+  }
   res.writeHead(200, {
     'content-type': 'text/event-stream',
     'cache-control': 'no-cache',
@@ -1113,6 +1120,7 @@ async function runRealtimeSse(realtimeExecutor, target, c) {
   const stop = () => { clearInterval(ping); controller.abort(); void sub?.close?.(); };
   req.on('close', stop);
   try {
+    if (authorization?.initializationError) throw authorization.initializationError;
     sub = await realtimeExecutor.subscribe({
       ...target,
       identity,

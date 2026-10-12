@@ -109,3 +109,20 @@ test('public API taxonomy, gateway routing, and generated route catalog remain a
   assert.ok(taxonomy.resource_taxonomy.some((entry) => entry.resource_type === 'storage_export_manifest'));
   assert.ok(taxonomy.resource_taxonomy.some((entry) => entry.resource_type === 'storage_import_result'));
 });
+
+test('only the two GET change streams may omit EventSource-incompatible required headers', async () => {
+  const { collectContractViolations } = await import('../../scripts/lib/quality-gates.mjs');
+  const document = readJson(OPENAPI_PATH);
+  const streamPath = '/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes';
+  assert.deepEqual(collectContractViolations(document), []);
+  const unknownPath = `${streamPath}-other`;
+  const changed = structuredClone(document);
+  changed.paths[unknownPath] = structuredClone(changed.paths[streamPath]);
+  assert.ok(collectContractViolations(changed).includes(`GET ${unknownPath} must require the X-API-Version header.`));
+  assert.ok(collectContractViolations(changed).includes(`GET ${unknownPath} must require the X-Correlation-Id header.`));
+  changed.paths[streamPath].post = structuredClone(changed.paths[streamPath].get);
+  assert.ok(collectContractViolations(changed).includes(`POST ${streamPath} must require the X-API-Version header.`));
+  const ordinary = Object.entries(changed.paths).find(([path, item]) => path.includes('/mongo-captures') && item.get);
+  ordinary[1].get.parameters = ordinary[1].get.parameters.filter(parameter => !['#/components/parameters/XApiVersion', '#/components/parameters/XCorrelationId'].includes(parameter.$ref));
+  assert.ok(collectContractViolations(changed).includes(`GET ${ordinary[0]} must require the X-API-Version header.`));
+});

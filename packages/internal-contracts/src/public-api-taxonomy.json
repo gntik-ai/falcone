@@ -500,6 +500,30 @@
       "apisix_route_class": "data-control"
     },
     {
+      "id": "realtime-changes",
+      "title": "Realtime Changes",
+      "prefix": "/v1/realtime/workspaces",
+      "summary": "Executor-authenticated collection and table change streams over Server-Sent Events.",
+      "owning_service": "control_api",
+      "downstream_contracts": [
+        "realtime_change_event"
+      ],
+      "resource_scopes": [
+        "workspace"
+      ],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "visibility": "public",
+      "apisix_route_class": "realtime"
+    },
+    {
       "id": "storage",
       "title": "Storage",
       "prefix": "/v1/storage",
@@ -1193,6 +1217,18 @@
       "scope": "workspace",
       "summary": "Workspace-scoped composite quota and usage overview.",
       "authorization_resource": "workspace"
+    },
+    {
+      "resource_type": "realtime_collection_changes",
+      "family": "realtime-changes",
+      "scope": "workspace",
+      "authorization_resource": "database"
+    },
+    {
+      "resource_type": "realtime_table_changes",
+      "family": "realtime-changes",
+      "scope": "workspace",
+      "authorization_resource": "database"
     }
   ]
 }

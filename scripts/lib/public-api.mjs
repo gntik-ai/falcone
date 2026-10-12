@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 
 import {
   listOperations,
+  isRealtimeChangesOperation,
   OPENAPI_PATH,
   readJson,
   readYaml,
@@ -237,6 +238,10 @@ export function buildRouteCatalog(
         visibility: operation['x-visibility'] ?? family?.visibility ?? 'public',
         audiences: operation['x-audiences'] ?? family?.audiences ?? [],
         authRequired: normalizeSecurity(operation),
+        ...(operation['x-realtime-event-types'] ? {
+          realtimeEventTypes: operation['x-realtime-event-types'],
+          responseContentTypes: Object.keys(operation.responses?.['200']?.content ?? {}),
+        } : {}),
         requiredHeaders,
         gatewayAllowedHeaders: Array.from(new Set([...requiredHeaders, ...allowedHeaders])).sort(),
         gatewayContextHeaders: routing.propagatedHeaders ?? [],
@@ -448,11 +453,11 @@ function collectOperationViolations(document, taxonomy, violations) {
       violations.push(`${method.toUpperCase()} ${path} must use one of the allowed prefixes (${allowedPrefixes.join(', ')}) for family ${familyId}.`);
     }
 
-    if (!headers.includes(taxonomy.shared_http.headers.api_version.name)) {
+    if (!headers.includes(taxonomy.shared_http.headers.api_version.name) && !isRealtimeChangesOperation(path, method, operation)) {
       violations.push(`${method.toUpperCase()} ${path} must require ${taxonomy.shared_http.headers.api_version.name}.`);
     }
 
-    if (!headers.includes(taxonomy.shared_http.headers.correlation_id.name)) {
+    if (!headers.includes(taxonomy.shared_http.headers.correlation_id.name) && !isRealtimeChangesOperation(path, method, operation)) {
       violations.push(`${method.toUpperCase()} ${path} must require ${taxonomy.shared_http.headers.correlation_id.name}.`);
     }
 

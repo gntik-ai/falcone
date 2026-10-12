@@ -24604,6 +24604,180 @@
         "application/json"
       ],
       "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "realtime-changes",
+      "familyTitle": "Realtime Changes",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "executor_verified_api_key",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "realtime",
+      "gatewayRequestValidationProfile": "realtime",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "realtime",
+      "gatewayTimeoutProfile": "realtime",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "GET",
+      "operationId": "subscribeRealtimeCollectionChanges",
+      "path": "/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes",
+      "planCapabilityAnyOf": [
+        "data.openwhisk.actions"
+      ],
+      "qosBurst": 80,
+      "rateLimitClass": "realtime",
+      "realtimeEventTypes": [
+        "insert",
+        "replace",
+        "delete"
+      ],
+      "requiredHeaders": [],
+      "requiredPlanFlags": [],
+      "resourceType": "realtime_collection_changes",
+      "responseContentTypes": [
+        "text/event-stream"
+      ],
+      "scope": "workspace",
+      "summary": "Stream collection changes over SSE",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Realtime"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": true,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "explicitConfirmationRequired": false,
+      "family": "realtime-changes",
+      "familyTitle": "Realtime Changes",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "executor_verified_api_key",
+      "gatewayContextHeaders": [
+        "X-Auth-Subject",
+        "X-Actor-Username",
+        "X-Tenant-Id",
+        "X-Workspace-Id",
+        "X-Plan-Id",
+        "X-Auth-Scopes",
+        "X-Actor-Roles"
+      ],
+      "gatewayQosProfile": "realtime",
+      "gatewayRequestValidationProfile": "realtime",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "realtime",
+      "gatewayTimeoutProfile": "realtime",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 131072,
+      "method": "GET",
+      "operationId": "subscribeRealtimeTableChanges",
+      "path": "/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes",
+      "planCapabilityAnyOf": [
+        "data.openwhisk.actions"
+      ],
+      "qosBurst": 80,
+      "rateLimitClass": "realtime",
+      "realtimeEventTypes": [
+        "insert",
+        "update",
+        "delete"
+      ],
+      "requiredHeaders": [],
+      "requiredPlanFlags": [],
+      "resourceType": "realtime_table_changes",
+      "responseContentTypes": [
+        "text/event-stream"
+      ],
+      "scope": "workspace",
+      "summary": "Stream table changes over SSE",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Realtime"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [
+        "application/json"
+      ],
+      "audiences": [
         "tenant_owner",
         "platform_team",
         "superadmin"

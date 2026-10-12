@@ -8,12 +8,9 @@
 // trigger reads OLD.tenant_id). Cross-tenant NOTIFY is impossible because the write path
 // (adapter + RLS) forbids writing another tenant's tenant_id in the first place.
 import crypto from 'node:crypto';
-import pg from 'pg';
 
 import { clientError } from './errors.mjs';
 import { withPostgresSsl } from '../../../../packages/internal-contracts/src/transport-security.mjs';
-
-const { Client } = pg;
 
 const NOTIFY_FUNCTION = 'flc_realtime_notify';
 
@@ -52,12 +49,66 @@ export function createPostgresRealtimeExecutor(options = {}) {
   if (typeof options.resolveConnection !== 'function') {
     throw new TypeError('createPostgresRealtimeExecutor requires a resolveConnection(workspaceId) function');
   }
+  // Injectable PostgreSQL I/O boundary; load the driver only for a real connection.
+  const makeClient = options.clientFactory ?? (async config => {
+    const { default: pg } = await import('pg');
+    return new pg.Client(config);
+  });
   const open = new Set(); // live LISTEN clients (for shutdown)
 
   async function resolve(workspaceId) {
     const conn = await options.resolveConnection(workspaceId);
     if (!conn || !conn.dsn) throw clientError(`No database for workspace ${workspaceId}`, 503, 'WORKSPACE_DB_UNRESOLVED');
     return conn;
+  }
+
+  // This public preflight runs before HTTP writes SSE headers. Catalog arguments,
+  // including the credential's role, are bound values rather than SQL identifiers.
+  async function authorize(params) {
+    // Capture DDL quotes these names. Refuse quoted/encoded/noncanonical names
+    // rather than passing untrusted identifiers to that existing DDL mechanism.
+    const identifier = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
+    if (!identifier.test(params.schemaName ?? 'public') || !identifier.test(params.tableName ?? '')) {
+      throw clientError('Table not found', 404, 'NOT_FOUND');
+    }
+    const apiKeyIdentity = Boolean(params.identity?.dbRole || String(params.identity?.actorId ?? '').startsWith('apikey:'));
+    if (apiKeyIdentity && !params.identity?.dbRole) {
+      throw clientError('Missing database role', 403, 'FORBIDDEN');
+    }
+    let client;
+    try {
+      const connection = await resolve(params.workspaceId ?? params.identity?.workspaceId);
+      const { dsn, adminDsn, routed } = connection;
+      // The trigger/channel is tenant-scoped. Workspace isolation requires the
+      // resolver's dedicated workspace database, never its shared fallback.
+      if (routed !== true) throw clientError('A dedicated workspace database is required', 403, 'FORBIDDEN');
+      client = await makeClient(withPostgresSsl({ connectionString: adminDsn ?? dsn }));
+      await client.connect();
+      const { rows } = await client.query(`
+        SELECT c.oid, c.relrowsecurity,
+               has_schema_privilege(r.oid, n.oid, 'USAGE') AS schema_usage,
+               has_table_privilege(r.oid, c.oid, 'SELECT') AS can_select
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        LEFT JOIN pg_roles r ON r.rolname = COALESCE($3::text, current_user::text)
+        WHERE n.nspname = $1 AND c.relname = $2 AND c.relkind IN ('r', 'p')`,
+      [params.schemaName ?? 'public', params.tableName, params.identity?.dbRole ?? null]);
+      if (!rows[0]) throw clientError('Table not found', 404, 'NOT_FOUND');
+      if (!rows[0]?.schema_usage || !rows[0]?.can_select) {
+        throw clientError('Table change stream is not permitted', 403, 'FORBIDDEN');
+      }
+      if (apiKeyIdentity && rows[0].relrowsecurity) {
+        throw clientError('API-key change streams cannot enforce row policies', 403, 'FORBIDDEN');
+      }
+      return { connection };
+    } catch (error) {
+      if (error.statusCode === 403 || error.statusCode === 404) throw error;
+      // Connection/resolution failures remain subscription-initialization errors,
+      // reported after the 200 as one terminal SSE error frame.
+      return { initializationError: error };
+    } finally {
+      await client?.end().catch(() => {});
+    }
   }
 
   // params: { workspaceId, databaseName, schemaName, tableName, identity:{tenantId}, onChange, onError, signal }
@@ -69,10 +120,14 @@ export function createPostgresRealtimeExecutor(options = {}) {
     const schemaName = params.schemaName ?? 'public';
     const tableName = params.tableName;
 
-    const { dsn, adminDsn } = await resolve(workspaceId);
+    const authorization = await authorize(params);
+    if (authorization?.initializationError) throw authorization.initializationError;
+
+    // Capture and LISTEN must use the connection whose catalog was checked.
+    const { dsn, adminDsn } = authorization.connection;
 
     // 1. Ensure the capture trigger exists (admin connection; one-shot, idempotent).
-    const admin = new Client(withPostgresSsl({ connectionString: adminDsn ?? dsn }));
+    const admin = await makeClient(withPostgresSsl({ connectionString: adminDsn ?? dsn }));
     await admin.connect();
     try {
       for (const sql of ensureCaptureSql(schemaName, tableName)) await admin.query(sql);
@@ -82,7 +137,7 @@ export function createPostgresRealtimeExecutor(options = {}) {
 
     // 2. Dedicated LISTEN connection on the tenant-scoped channel.
     const channel = channelFor(schemaName, tableName, tenantId);
-    const listener = new Client(withPostgresSsl({ connectionString: adminDsn ?? dsn }));
+    const listener = await makeClient(withPostgresSsl({ connectionString: adminDsn ?? dsn }));
     await listener.connect();
     open.add(listener);
 
@@ -117,5 +172,5 @@ export function createPostgresRealtimeExecutor(options = {}) {
     open.clear();
   }
 
-  return { subscribe, close: closeAll };
+  return { authorize, subscribe, close: closeAll };
 }

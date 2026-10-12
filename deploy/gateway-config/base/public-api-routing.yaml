@@ -463,6 +463,28 @@ spec:
         - data.openwhisk.actions
       qosProfile: realtime
       requestValidationProfile: realtime
+    # Executor-authenticated EventSource streams. No OIDC/request-validation:
+    # blank identity headers and set x-gateway-auth; the dispatcher verifies keys.
+    - id: realtime-changes
+      pathPrefix: /v1/realtime/workspaces
+      upstreamService: control_api
+      routeClass: realtime
+      authMode: executor_verified_api_key
+      discoveryEnabled: false
+      corsProfile: product_api
+      allowAnonymousOptions: true
+      methods: [GET, OPTIONS]
+      uriConstraint: ^/v1/realtime/workspaces/[^/]+/data/[^/]+/(collections/[^/]+|schemas/[^/]+/tables/[^/]+)/changes$
+      blankIdentityHeaders: [x-tenant-id, x-workspace-id, x-auth-subject, x-actor-roles]
+      gatewayAttestationHeader: x-gateway-auth
+      rateLimitKey: $http_apikey$arg_apikey
+      tenantBinding: required
+      workspaceBinding: required
+      propagatedHeaders: *a1
+      planCapabilityAnyOf:
+        - data.openwhisk.actions
+      qosProfile: realtime
+      requestValidationProfile: realtime
     - id: mongo-captures
       pathPrefix: /v1/realtime/workspaces/{workspaceId}/mongo-captures
       upstreamService: control_api
@@ -528,6 +550,16 @@ spec:
         requirementsCacheTtlSeconds: ${SCOPE_ENFORCEMENT_REQUIREMENTS_CACHE_TTL_SECONDS:-60}
         planCacheTtlSeconds: ${SCOPE_ENFORCEMENT_PLAN_CACHE_TTL_SECONDS:-30}
   publicRoutes:
+    - id: public-api-realtime-collection-changes
+      path: /v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes
+      methods: [GET]
+      upstreamService: control_api
+      authMode: executor_verified_api_key
+    - id: public-api-realtime-table-changes
+      path: /v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes
+      methods: [GET]
+      upstreamService: control_api
+      authMode: executor_verified_api_key
     - id: health
       path: /health
       methods:

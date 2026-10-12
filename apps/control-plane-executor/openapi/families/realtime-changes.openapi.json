@@ -1,0 +1,574 @@
+{
+  "components": {
+    "parameters": {
+      "WorkspaceId": {
+        "description": "Stable workspace identifier.",
+        "in": "path",
+        "name": "workspaceId",
+        "required": true,
+        "schema": {
+          "minLength": 3,
+          "pattern": "^wrk_[0-9a-z]+$",
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "ErrorDetail": {
+        "additionalProperties": true,
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "violations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ErrorResource": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "pattern": "^GW_[A-Z0-9_]+$",
+            "type": "string"
+          },
+          "correlationId": {
+            "maxLength": 128,
+            "minLength": 8,
+            "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+            "type": "string"
+          },
+          "detail": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          },
+          "message": {
+            "type": "string"
+          },
+          "requestId": {
+            "maxLength": 128,
+            "minLength": 8,
+            "type": "string"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/ErrorResource"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "maximum": 599,
+            "minimum": 400,
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "code",
+          "message",
+          "detail",
+          "requestId",
+          "correlationId",
+          "timestamp",
+          "resource"
+        ],
+        "type": "object"
+      },
+      "RealtimeCollectionChange": {
+        "description": "Source-specific change payload. Deletes carry the pre-image when available.",
+        "properties": {
+          "document": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "documentId": {},
+          "type": {
+            "enum": [
+              "insert",
+              "replace",
+              "delete"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "documentId",
+          "document"
+        ],
+        "type": "object"
+      },
+      "RealtimeStreamError": {
+        "description": "An event: error frame during subscription initialization; the stream then closes.",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "RealtimeTableChange": {
+        "description": "Source-specific change payload. Deletes carry the pre-image when available.",
+        "properties": {
+          "document": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "documentId": {},
+          "type": {
+            "enum": [
+              "insert",
+              "update",
+              "delete"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "documentId",
+          "document"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Executor-authenticated collection and table change streams over Server-Sent Events. Generated from the unified public API contract for v1.",
+    "summary": "Executor-authenticated collection and table change streams over Server-Sent Events.",
+    "title": "In Falcone Realtime Changes API",
+    "version": "1.22.0"
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes": {
+      "get": {
+        "description": "Header API keys take precedence over ?apikey=, including an invalid header key with a valid query key (401). Only flc_-prefixed query keys are considered; a non-flc_ query value is ignored. A valid bearer JWT is accepted when no API key is selected. Keys may be anon or service; each must be bound to the path workspace. No credential or only an unverifiable query key returns JSON 401 UNAUTHENTICATED. Gateway identity headers are blanked before forwarding. EventSource needs no additional request headers. Never log the apikey query value. OPTIONS is answered by gateway cors; POST, PUT, PATCH, DELETE and HEAD are not routed to this executor operation. Collection WAL updates are surfaced as replace; never update.",
+        "operationId": "subscribeRealtimeCollectionChanges",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "in": "path",
+            "name": "databaseName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Pinned additive contract version for the v1 public API release published with gateway QoS and hardening support.",
+            "in": "header",
+            "name": "X-API-Version",
+            "required": false,
+            "schema": {
+              "const": "2026-03-26",
+              "pattern": "^2026-03-26$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Stable request correlation identifier reused by downstream authorization, orchestration, audit flows, and backfilled by the gateway when recovery requires it.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "example": "event: insert\ndata: {\"type\":\"insert\",\"documentId\":\"example\",\"document\":{}}\n\n",
+                "schema": {
+                  "type": "string"
+                },
+                "x-error-payload": {
+                  "$ref": "#/components/schemas/RealtimeStreamError"
+                },
+                "x-event-payload": {
+                  "$ref": "#/components/schemas/RealtimeCollectionChange"
+                }
+              }
+            },
+            "description": "SSE change frames with {type, documentId, document}. Initialization failures after authorization (including WORKSPACE_DB_UNRESOLVED) emit one event: error frame with a code, then the stream ends."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "UNAUTHENTICATED: no credential or the selected credential could not be verified. JSON before any stream bytes."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: credential workspace mismatch; table streams also reject missing schema USAGE or SELECT, API-key access to RLS-enabled tables, and shared database fallback. JSON before any capture DDL or stream bytes."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_FOUND: nonexistent table or unsupported identifier. JSON before capture DDL or stream bytes."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "REALTIME_DISABLED: executor or table authorization is unset. JSON before any stream bytes."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "realtimeHeaderKey": []
+          },
+          {
+            "realtimeQueryKey": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Stream collection changes over SSE",
+        "tags": [
+          "Realtime"
+        ],
+        "x-audiences": [
+          "developer_external",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "platform_team"
+        ],
+        "x-family": "realtime-changes",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "realtime",
+        "x-realtime-event-types": [
+          "insert",
+          "replace",
+          "delete"
+        ],
+        "x-resource-type": "realtime_collection_changes",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes": {
+      "get": {
+        "description": "Header API keys take precedence over ?apikey=, including an invalid header key with a valid query key (401). Only flc_-prefixed query keys are considered; a non-flc_ query value is ignored. A valid bearer JWT is accepted when no API key is selected. Keys may be anon or service; each must be bound to the path workspace. No credential or only an unverifiable query key returns JSON 401 UNAUTHENTICATED. Gateway identity headers are blanked before forwarding. EventSource needs no additional request headers. Never log the apikey query value. OPTIONS is answered by gateway cors; POST, PUT, PATCH, DELETE and HEAD are not routed to this executor operation. Table updates are update; never replace. Catalog authorization checks the key dbRole for schema USAGE and table SELECT; API-key identities are refused when RLS is enabled. A dedicated workspace database prevents same-tenant cross-workspace notifications. Identifiers must be unquoted ASCII SQL names of at most 63 characters; encoded or quoted names are refused.",
+        "operationId": "subscribeRealtimeTableChanges",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "in": "path",
+            "name": "databaseName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "schemaName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tableName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Pinned additive contract version for the v1 public API release published with gateway QoS and hardening support.",
+            "in": "header",
+            "name": "X-API-Version",
+            "required": false,
+            "schema": {
+              "const": "2026-03-26",
+              "pattern": "^2026-03-26$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Stable request correlation identifier reused by downstream authorization, orchestration, audit flows, and backfilled by the gateway when recovery requires it.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "example": "event: insert\ndata: {\"type\":\"insert\",\"documentId\":\"example\",\"document\":{}}\n\n",
+                "schema": {
+                  "type": "string"
+                },
+                "x-error-payload": {
+                  "$ref": "#/components/schemas/RealtimeStreamError"
+                },
+                "x-event-payload": {
+                  "$ref": "#/components/schemas/RealtimeTableChange"
+                }
+              }
+            },
+            "description": "SSE change frames with {type, documentId, document}. Initialization failures after authorization (including WORKSPACE_DB_UNRESOLVED) emit one event: error frame with a code, then the stream ends."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "UNAUTHENTICATED: no credential or the selected credential could not be verified. JSON before any stream bytes."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: credential workspace mismatch; table streams also reject missing schema USAGE or SELECT, API-key access to RLS-enabled tables, and shared database fallback. JSON before any capture DDL or stream bytes."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_FOUND: nonexistent table or unsupported identifier. JSON before capture DDL or stream bytes."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "REALTIME_DISABLED: executor or table authorization is unset. JSON before any stream bytes."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "realtimeHeaderKey": []
+          },
+          {
+            "realtimeQueryKey": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Stream table changes over SSE",
+        "tags": [
+          "Realtime"
+        ],
+        "x-audiences": [
+          "developer_external",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "platform_team"
+        ],
+        "x-family": "realtime-changes",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "realtime",
+        "x-realtime-event-types": [
+          "insert",
+          "update",
+          "delete"
+        ],
+        "x-resource-type": "realtime_table_changes",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://{publicHost}",
+      "variables": {
+        "publicHost": {
+          "default": "api.dev.in-falcone.example.com",
+          "enum": [
+            "api.dev.in-falcone.example.com",
+            "api.sandbox.in-falcone.example.com",
+            "api.baas.musematic.ai",
+            "api.in-falcone.example.com"
+          ]
+        }
+      }
+    }
+  ],
+  "tags": []
+}

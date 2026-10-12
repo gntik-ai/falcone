@@ -10,6 +10,9 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { MongoClient } from 'mongodb'
+import pg from 'pg'
+import { createApiKeyStore } from '../../../apps/control-plane-executor/src/runtime/api-keys.mjs'
+import { realtimeRequest } from '../../unit/helpers/realtime-http.mjs'
 
 import { createMongoExecutor } from '../../../apps/control-plane-executor/src/runtime/mongo-data-executor.mjs'
 import { createRealtimeExecutor } from '../../../apps/control-plane-executor/src/runtime/realtime-executor.mjs'
@@ -32,6 +35,9 @@ const WS_B = 'ws_rt_b'
 let admin
 let dataExec
 let realtime
+let keyPool
+let keys
+let anonKey
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -44,6 +50,11 @@ before(async () => {
   await admin.db(DB).collection(COLL).insertOne({ _id: '__seed__', tenantId: '__seed__' })
   await admin.db(DB).collection(COLL).deleteOne({ _id: '__seed__' })
 
+  keyPool = new pg.Pool(PG)
+  keys = createApiKeyStore({ pool: keyPool })
+  await keys.ensureSchema()
+  anonKey = (await keys.issueKey({ tenantId: TEN_A, workspaceId: WS_A })).key
+
   dataExec = createMongoExecutor({ resolveUri: () => URI })
   realtime = createRealtimeExecutor({ engineConnectionConfig: PG, slotName: 'falcone_rt_test' })
 })
@@ -53,6 +64,7 @@ after(async () => {
   await dataExec?.close().catch(() => {})
   await admin?.db(DB).dropDatabase().catch(() => {})
   await admin?.close().catch(() => {})
+  await keyPool?.end().catch(() => {})
 })
 
 test('a tenant-scoped WAL subscription delivers the caller tenant changes and NOT another tenant', async () => {
@@ -135,4 +147,34 @@ test('subscribe without tenant identity → 401', async () => {
     () => realtime.subscribe({ workspaceId: WS_A, databaseName: DB, collectionName: COLL, identity: {}, onChange() {} }),
     (e) => e.statusCode === 401
   )
+})
+
+test('query-key collection SSE exposes real insert/replace/delete payloads and never update', async () => {
+  const response = await realtimeRequest({ apiKeyStore: keys, realtimeExecutor: realtime },
+    `/v1/realtime/workspaces/${WS_A}/data/${DB}/collections/${COLL}/changes?apikey=${anonKey}`)
+  const secondWorkspace = 'ws_rt_sse_a2'
+  const secondKey = (await keys.issueKey({ tenantId: TEN_A, workspaceId: secondWorkspace })).key
+  const second = await realtimeRequest({ apiKeyStore: keys, realtimeExecutor: realtime },
+    `/v1/realtime/workspaces/${secondWorkspace}/data/${DB}/collections/${COLL}/changes?apikey=${secondKey}`)
+  const secondFrames = () => [...second.body.matchAll(/event: (\w+)\ndata: ([^\n]+)\n\n/g)]
+    .map(match => JSON.parse(match[2]))
+  const frames = () => [...response.body.matchAll(/event: (\w+)\ndata: ([^\n]+)\n\n/g)]
+    .map(match => ({ event: match[1], data: JSON.parse(match[2]) }))
+  try {
+    assert.equal(response.res.statusCode, 200)
+    assert.equal(response.res.headers['content-type'], 'text/event-stream')
+    await delay(600)
+    const target = { databaseName: DB, collectionName: COLL, identity: { tenantId: TEN_A, workspaceId: WS_A } }
+    await dataExec.executeMongoData({ ...target, operation: 'insert', payload: { document: { _id: 'sse-doc', body: 'first' } } })
+    await dataExec.executeMongoData({ ...target, operation: 'update', documentId: 'sse-doc', payload: { update: { $set: { body: 'edited' } } } })
+    await dataExec.executeMongoData({ ...target, operation: 'delete', documentId: 'sse-doc' })
+    await dataExec.executeMongoData({ ...target, identity: { tenantId: TEN_A, workspaceId: secondWorkspace }, operation: 'insert', payload: { document: { _id: 'sse-other', body: 'a2-only' } } })
+    const deadline = Date.now() + 8000
+    while (Date.now() < deadline && (frames().length < 3 || secondFrames().length < 1)) await delay(50)
+    assert.deepEqual(frames().map(frame => frame.event), ['insert', 'replace', 'delete'])
+    assert.deepEqual(frames().map(frame => frame.data.type), ['insert', 'replace', 'delete'])
+    assert.ok(frames().every(frame => frame.data.documentId === 'sse-doc'))
+    assert.deepEqual(frames().map(frame => frame.data.document.body), ['first', 'edited', 'edited'])
+    assert.deepEqual(secondFrames().map(frame => frame.documentId), ['sse-other'])
+  } finally { response.close(); second.close() }
 })

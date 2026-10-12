@@ -12,6 +12,9 @@ export const REQUIRED_MONGO_PRODUCT_PLUGINS = REQUIRED_PRODUCT_PLUGINS.map((plug
   plugin === 'openid-connect' ? 'issuer-jwks-auth' : plugin
 );
 export function requiredProductPlugins(familyId) {
+  // EventSource query keys are verified by the executor's shared dispatcher.
+  // This exception belongs to one family; capture management retains OIDC.
+  if (familyId === 'realtime-changes') return ['cors', 'limit-count', 'client-control', 'proxy-rewrite'];
   return familyId === 'mongo' ? REQUIRED_MONGO_PRODUCT_PLUGINS : REQUIRED_PRODUCT_PLUGINS;
 }
 export const REQUIRED_PASSTHROUGH_PLUGINS = [
@@ -424,6 +427,29 @@ function collectApisixRouteViolations(values, gatewayRouting, violations) {
     }
     if (family.id === 'mongo' && 'openid-connect' in (route.plugins ?? {})) {
       violations.push('APISIX route public-api-mongo must use issuer-jwks-auth instead of openid-connect.');
+    }
+    if (family.id === 'realtime-changes') {
+      const prefix = 'APISIX route public-api-realtime-changes';
+      const headers = Object.fromEntries(Object.entries(route.plugins?.['proxy-rewrite']?.headers?.set ?? {})
+        .map(([name, value]) => [name.toLowerCase(), value]));
+      for (const header of ['x-tenant-id', 'x-workspace-id', 'x-auth-subject', 'x-actor-roles']) {
+        if (headers[header] !== '') violations.push(`${prefix} must blank ${header}.`);
+      }
+      if (typeof headers['x-gateway-auth'] !== 'string' || !headers['x-gateway-auth'].trim()) {
+        violations.push(`${prefix} must set x-gateway-auth.`);
+      }
+      const constraints = ['/changes$', '^/v1/realtime/workspaces/[^/]+/data/[^/]+/(collections/[^/]+|schemas/[^/]+/tables/[^/]+)/changes$'];
+      if (!(route.vars ?? []).some(condition => Array.isArray(condition) && condition.length === 3
+          && condition[0] === 'uri' && condition[1] === '~~' && constraints.includes(condition[2]))) {
+        violations.push(`${prefix} must constrain uri to /changes$.`);
+      }
+      if (JSON.stringify((route.methods ?? []).slice().sort()) !== JSON.stringify(['GET', 'OPTIONS'])) {
+        violations.push(`${prefix} must route only GET and OPTIONS.`);
+      }
+      const limiter = route.plugins?.['limit-count'];
+      if (limiter?.key_type !== 'var_combination' || limiter?.key !== '$http_apikey$arg_apikey') {
+        violations.push(`${prefix} must rate-limit header and query API keys.`);
+      }
     }
 
     if (route.labels?.['gateway.in-falcone.io/family'] !== family.id) {

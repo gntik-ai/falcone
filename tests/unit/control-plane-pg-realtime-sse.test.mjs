@@ -10,6 +10,7 @@ const registry = { withWorkspaceClient() { throw new Error('registry must not be
 let lastSubscribe;
 let closed = false;
 const pgRealtimeExecutor = {
+  async authorize() {},
   async subscribe(params) {
     lastSubscribe = params;
     setTimeout(() => params.onChange({ type: 'insert', documentId: 'r1', document: { id: 'r1', tenant_id: 'ten-a', body: 'hi' } }), 10);
