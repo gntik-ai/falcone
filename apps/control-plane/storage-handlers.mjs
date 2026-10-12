@@ -13,7 +13,11 @@ import { checkBucketQuota, checkTenantByteQuota, tenantByteLimit, usageLimits, d
 import { quotaDenial } from './dimension-quota.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { can } from './model-authz.mjs';
+import authorizationModel from '../../packages/internal-contracts/src/authorization-model.json' with { type: 'json' };
 import { isJsonBody } from './request-body.mjs';
+
+// #973: derive tenant-tier roles once from the same shipped model used by can().
+const TENANT_ROLES = new Set(authorizationModel.permission_matrix.tenant.map(({ role }) => role));
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, or any
 // S3-compatible backend). Legacy MINIO_* names remain as backward-compatible fallbacks;
@@ -58,9 +62,9 @@ const nowIso = () => new Date().toISOString();
 // raw text in `e.body`; surfacing either to the caller leaks SeaweedFS internals (the S3 XML
 // `NoSuchKey`/`<Resource>`/`<RequestId>` and the `ws-<hash>-…` physical bucket name) — #675.
 //
-// For object I/O the bucket-ownership gate (denyUnlessBucketOwner / the inline registry check)
+// For object I/O the bucket-read gate (denyUnlessBucketReader / the inline registry check)
 // ALWAYS runs BEFORE the S3 call, so a 404 here is unambiguously a MISSING OBJECT (NoSuchKey)
-// on a bucket the caller owns — mapped to the canonical `404 OBJECT_NOT_FOUND` with the exact
+// on a bucket the caller may read — mapped to the canonical `404 OBJECT_NOT_FOUND` with the exact
 // stable message from packages/adapters/src/storage-error-taxonomy.mjs (duplicated inline
 // because this kind-runtime image cannot import the services package). Any other backend
 // failure keeps the operation-specific failure code but with a generic message — the upstream
@@ -363,13 +367,27 @@ function isSuperOrInternal(identity) {
   return identity.actorType === 'superadmin' || identity.actorType === 'internal';
 }
 
-// Shared bucket-ownership gate for object I/O: superadmin/internal bypass; others must own the
-// bucket (else 404, no existence leak). Returns an error response to short-circuit, or null.
-async function denyUnlessBucketOwner(ctx, bucket) {
+// #973: bucket reads require model authority or a tenant role with a verified workspace binding.
+// Return the existing 404 shape before S3; request fields never grant workspace authority.
+function denyUnlessWorkspaceBucketReader(ctx, bucket, rec) {
+  if (isSuperOrInternal(ctx.identity)) return null;
+  if (rec) {
+    const scope = { tenantId: rec.tenant_id, workspaceId: rec.workspace_id };
+    if (['bucket.read', 'bucket.write', 'bucket.admin'].some((action) => can(ctx.identity, action, scope))) return null;
+    const identity = ctx.identity;
+    if (rec.tenant_id && identity.tenantId === rec.tenant_id && rec.workspace_id
+      && Array.isArray(identity.roles)
+      && identity.roles.some((role) => TENANT_ROLES.has(role))
+      && Array.isArray(identity.workspaceIds) && identity.workspaceIds.includes(rec.workspace_id)) return null;
+  }
+  return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+}
+
+// Shared registry lookup for object I/O; platform bypass remains unchanged (#973).
+async function denyUnlessBucketReader(ctx, bucket) {
   if (isSuperOrInternal(ctx.identity)) return null;
   const rec = await store.getBucketRecord(ctx.pool, bucket);
-  if (!rec || rec.tenant_id !== ctx.identity.tenantId) return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
-  return null;
+  return denyUnlessWorkspaceBucketReader(ctx, bucket, rec);
 }
 
 function denyUnlessStructuralAdmin(ctx, tenantId) {
@@ -378,9 +396,10 @@ function denyUnlessStructuralAdmin(ctx, tenantId) {
 }
 
 async function requireOwnedBucketForStructuralWrite(ctx, bucket) {
-  const deny = await denyUnlessBucketOwner(ctx, bucket);
-  if (deny) return { error: deny };
   const rec = await store.getBucketRecord(ctx.pool, bucket);
+  // #973: reuse this record for workspace and structural gates (one lookup).
+  const deny = denyUnlessWorkspaceBucketReader(ctx, bucket, rec);
+  if (deny) return { error: deny };
   if (!rec) return { error: err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`) };
   const roleDeny = denyUnlessStructuralAdmin(ctx, rec.tenant_id);
   if (roleDeny) return { error: roleDeny };
@@ -558,7 +577,7 @@ async function storagePutObject(ctx) {
 }
 async function storageGetObject(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
-  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketReader(ctx, bucket); if (deny) return deny;
   // HTTP Range / partial read (#676): when the client sends a Range header, forward it to the
   // backend and return 206 Partial Content with ONLY the requested bytes plus a Content-Range
   // header. Without a Range header behavior is unchanged (200, full body) — we still advertise
@@ -593,10 +612,14 @@ async function storageDeleteObject(ctx) {
   } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_DELETE_FAILED', String(e.message ?? e)); }
 }
 async function storageListBuckets(ctx) {
-  const all = await listBuckets();
   const map = await store.bucketWorkspaceMap(ctx.pool);
   const isSuperadmin = isSuperOrInternal(ctx.identity);
+  // #973: authorize registry mappings before S3, using the same gate as object reads.
+  const readable = new Set(Object.keys(map).filter((bucket) => !denyUnlessWorkspaceBucketReader(ctx, bucket, map[bucket])));
+  if (!isSuperadmin && readable.size === 0) return ok(200, { items: [], page: { size: 0 } });
+  const all = await listBuckets();
   const items = all
+    .filter((b) => isSuperadmin || readable.has(b.name))
     .map((b) => {
       const m = map[b.name];
       return {
@@ -605,21 +628,12 @@ async function storageListBuckets(ctx) {
         region: REGION, status: 'active',
         timestamps: { createdAt: m?.created_at ?? b.creationDate, lastModifiedAt: b.creationDate }
       };
-    })
-    // Non-superadmin callers see only their own tenant's buckets.
-    .filter((item) => isSuperadmin || item.tenantId === ctx.identity.tenantId);
+    });
   return ok(200, { items, page: { size: items.length } });
 }
 async function storageListObjects(ctx) {
   const bucket = ctx.params.bucketId;
-  // Ownership check: look up the bucket's owning tenant and compare to caller.
-  // Superadmin/internal bypass the check. Non-owners get 404 (no existence leak).
-  if (!isSuperOrInternal(ctx.identity)) {
-    const rec = await store.getBucketRecord(ctx.pool, bucket);
-    if (!rec || rec.tenant_id !== ctx.identity.tenantId) {
-      return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
-    }
-  }
+  const deny = await denyUnlessBucketReader(ctx, bucket); if (deny) return deny;
   const max = Number(ctx.query['page[size]'] ?? 50) || 50;
   const after = ctx.query['page[after]'] || undefined;
   try {
@@ -639,13 +653,7 @@ async function storageListObjects(ctx) {
 async function storageObjectMetadata(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
   const bucket = ctx.params.bucketId;
-  // Ownership check: same pattern as storageListObjects.
-  if (!isSuperOrInternal(ctx.identity)) {
-    const rec = await store.getBucketRecord(ctx.pool, bucket);
-    if (!rec || rec.tenant_id !== ctx.identity.tenantId) {
-      return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
-    }
-  }
+  const deny = await denyUnlessBucketReader(ctx, bucket); if (deny) return deny;
   try {
     const meta = await headObject(bucket, key);
     return ok(200, { objectKey: key, bucketName: bucket, contentType: meta.contentType,
@@ -1016,8 +1024,7 @@ function isReservedKey(key) {
   return String(key ?? '').startsWith(EXPORT_MANIFEST_PREFIX) || /(^|\/)_platform\//.test(String(key ?? ''));
 }
 
-// Resolve + gate a workspace-addressed bucket: the bucket must exist, belong to the caller's tenant,
-// AND be mapped to the workspace in the path (so the workspace param is meaningful, not decorative).
+// #973: path mapping is necessary but does not grant workspace authority.
 // Superadmin/internal bypass. Returns { error } to short-circuit (404, no existence leak) or { rec }.
 async function ownedWorkspaceBucket(ctx, workspaceId, bucket) {
   const rec = await store.getBucketRecord(ctx.pool, bucket);
@@ -1025,9 +1032,11 @@ async function ownedWorkspaceBucket(ctx, workspaceId, bucket) {
     if (!rec) return { error: err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`) };
     return { rec };
   }
-  if (!rec || rec.tenant_id !== ctx.identity.tenantId || (workspaceId && rec.workspace_id !== workspaceId)) {
+  if (!rec || (workspaceId && rec.workspace_id !== workspaceId)) {
     return { error: err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`) };
   }
+  const deny = denyUnlessWorkspaceBucketReader(ctx, bucket, rec);
+  if (deny) return { error: deny };
   return { rec };
 }
 

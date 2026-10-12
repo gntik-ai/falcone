@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '9368ce10e38dc00ad821a4905faf8a6b11193064'
+  FALCONE_CHARTS_REF: '78f884367ab7fe7c69bc912ac0552cc033edac2a'
 
 jobs:
   quality:
@@ -86,6 +86,17 @@ jobs:
             tests/blackbox/storage-quota-enforcement.test.mjs \
             tests/blackbox/storage-quota-handlers.test.mjs \
             tests/blackbox/storage-object-io-completeness.test.mjs
+
+      - name: Storage workspace authorization and regression tests
+        run: |
+          node --test tests/blackbox/storage-workspace-authz.test.mjs \
+            tests/blackbox/structural-write-role-gates-kind.test.mjs \
+            tests/blackbox/data-export-import-clone.test.mjs \
+            tests/blackbox/storage-bucket-ownership-idor.test.mjs \
+            tests/blackbox/storage-object-not-found-clean-error.test.mjs \
+            tests/blackbox/storage-object-write-envelope.test.mjs \
+            tests/blackbox/storage-per-bucket-credential-scope.test.mjs \
+            tests/blackbox/storage-handlers-object-key-validation.test.mjs
 
       - name: Adapter integration scaffolding
         run: pnpm test:adapters

@@ -49,7 +49,7 @@ function makeMockPool({ buckets = { ...BUCKET_ROWS } } = {}) {
   };
 }
 
-const tenantAIdentity = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, actorType: 'tenant_owner' };
+const tenantAIdentity = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, workspaceIds: [WS_A], roles: ['tenant_owner'], actorType: 'tenant_owner' };
 
 function ctxFor(params, { body = {}, pool, range } = {}) {
   return { params, query: {}, body, identity: tenantAIdentity, pool, req: { headers: range ? { range } : {} } };

@@ -26,8 +26,8 @@ const TOPIC = {
   created_at: '2026-06-30T00:00:00.000Z',
 };
 
-const developer = { sub: 'dev', tenantId: TENANT, workspaceId: WORKSPACE, actorType: 'tenant_member', roles: ['tenant_developer'] };
-const viewer = { sub: 'viewer', tenantId: TENANT, workspaceId: WORKSPACE, actorType: 'tenant_member', roles: ['tenant_viewer'] };
+const developer = { sub: 'dev', tenantId: TENANT, workspaceId: WORKSPACE, workspaceIds: [WORKSPACE], actorType: 'tenant_member', roles: ['tenant_developer'] };
+const viewer = { sub: 'viewer', tenantId: TENANT, workspaceId: WORKSPACE, workspaceIds: [WORKSPACE], actorType: 'tenant_member', roles: ['tenant_viewer'] };
 const owner = { sub: 'owner', tenantId: TENANT, workspaceId: WORKSPACE, actorType: 'tenant_owner', roles: ['tenant_owner'] };
 
 function storagePool() {
