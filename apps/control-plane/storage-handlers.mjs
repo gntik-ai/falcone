@@ -13,7 +13,11 @@ import { checkBucketQuota, checkTenantByteQuota, tenantByteLimit, usageLimits, d
 import { quotaDenial } from './dimension-quota.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { can } from './model-authz.mjs';
+import authorizationModel from '../../packages/internal-contracts/src/authorization-model.json' with { type: 'json' };
 import { isJsonBody } from './request-body.mjs';
+
+// #973: derive tenant-tier roles once from the same shipped model used by can().
+const TENANT_ROLES = new Set(authorizationModel.permission_matrix.tenant.map(({ role }) => role));
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, or any
 // S3-compatible backend). Legacy MINIO_* names remain as backward-compatible fallbacks;
@@ -58,9 +62,9 @@ const nowIso = () => new Date().toISOString();
 // raw text in `e.body`; surfacing either to the caller leaks SeaweedFS internals (the S3 XML
 // `NoSuchKey`/`<Resource>`/`<RequestId>` and the `ws-<hash>-…` physical bucket name) — #675.
 //
-// For object I/O the bucket-ownership gate (denyUnlessBucketOwner / the inline registry check)
+// For object I/O the bucket-read gate (denyUnlessBucketReader / the inline registry check)
 // ALWAYS runs BEFORE the S3 call, so a 404 here is unambiguously a MISSING OBJECT (NoSuchKey)
-// on a bucket the caller owns — mapped to the canonical `404 OBJECT_NOT_FOUND` with the exact
+// on a bucket the caller may read — mapped to the canonical `404 OBJECT_NOT_FOUND` with the exact
 // stable message from packages/adapters/src/storage-error-taxonomy.mjs (duplicated inline
 // because this kind-runtime image cannot import the services package). Any other backend
 // failure keeps the operation-specific failure code but with a generic message — the upstream
@@ -373,14 +377,14 @@ function denyUnlessWorkspaceBucketReader(ctx, bucket, rec) {
     const identity = ctx.identity;
     if (rec.tenant_id && identity.tenantId === rec.tenant_id && rec.workspace_id
       && Array.isArray(identity.roles)
-      && identity.roles.some((role) => ['tenant_owner', 'tenant_admin', 'tenant_developer', 'tenant_viewer'].includes(role))
+      && identity.roles.some((role) => TENANT_ROLES.has(role))
       && Array.isArray(identity.workspaceIds) && identity.workspaceIds.includes(rec.workspace_id)) return null;
   }
   return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
 }
 
 // Shared registry lookup for object I/O; platform bypass remains unchanged (#973).
-async function denyUnlessBucketOwner(ctx, bucket) {
+async function denyUnlessBucketReader(ctx, bucket) {
   if (isSuperOrInternal(ctx.identity)) return null;
   const rec = await store.getBucketRecord(ctx.pool, bucket);
   return denyUnlessWorkspaceBucketReader(ctx, bucket, rec);
@@ -573,7 +577,7 @@ async function storagePutObject(ctx) {
 }
 async function storageGetObject(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
-  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const bucket = ctx.params.bucketId; const deny = await denyUnlessBucketReader(ctx, bucket); if (deny) return deny;
   // HTTP Range / partial read (#676): when the client sends a Range header, forward it to the
   // backend and return 206 Partial Content with ONLY the requested bytes plus a Content-Range
   // header. Without a Range header behavior is unchanged (200, full body) — we still advertise
@@ -629,7 +633,7 @@ async function storageListBuckets(ctx) {
 }
 async function storageListObjects(ctx) {
   const bucket = ctx.params.bucketId;
-  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const deny = await denyUnlessBucketReader(ctx, bucket); if (deny) return deny;
   const max = Number(ctx.query['page[size]'] ?? 50) || 50;
   const after = ctx.query['page[after]'] || undefined;
   try {
@@ -649,7 +653,7 @@ async function storageListObjects(ctx) {
 async function storageObjectMetadata(ctx) {
   const { key, error } = decodeObjectKey(ctx.params.objectKey); if (error) return error;
   const bucket = ctx.params.bucketId;
-  const deny = await denyUnlessBucketOwner(ctx, bucket); if (deny) return deny;
+  const deny = await denyUnlessBucketReader(ctx, bucket); if (deny) return deny;
   try {
     const meta = await headObject(bucket, key);
     return ok(200, { objectKey: key, bucketName: bucket, contentType: meta.contentType,

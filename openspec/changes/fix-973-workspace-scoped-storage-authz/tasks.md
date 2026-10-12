@@ -55,6 +55,42 @@
       storage-object-key-traversal and storage-credential-rotation-policy need cel-js.
       These imports prevent tests from running and are not assertion failures.
 
+## Second Checker Follow-up
+
+- [x] Verify the assigned branch is clean at supplied prior HEAD
+      c531da721945957bb7430e06a1537434b91403d9 before editing.
+- [x] Attempt the two newly identified regression suites before corrections:
+      node --test tests/blackbox/structural-write-role-gates-kind.test.mjs cannot
+      import kafkajs; node --test tests/blackbox/data-export-import-clone.test.mjs
+      cannot import mongodb. These are environment skips, not observed assertion
+      failures. No dependency stubs or manifest changes were introduced.
+- [x] Add verified workspaceIds to the structural-write developer/viewer fixtures
+      so they reach the existing 403 role gate. Add verified tenant_owner roles
+      and workspaceIds to both export/import owner fixtures. Preserve assertions.
+- [x] Include both regression suites in the CI storage authorization job.
+- [x] Rename the manifest test to describe its positive read and path denial;
+      binding denials remain covered by the workspace-addressed route tests.
+- [x] Rename denyUnlessBucketOwner to denyUnlessBucketReader and derive tenant-tier
+      roles once from the shipped authorization model, preserving gate behavior.
+      The existing workspace authorization suite passes before and after these
+      review refactors. No contract is read per request.
+- [x] Expand verification beyond storage-* filenames: attempt all 14 storage
+      blackbox suites, structural-write-role-gates-kind, data-export-import-clone,
+      live-storage-function-quotas, seaweedfs-tenant-identities-default-on,
+      legacy-components-absent, and model-authz, workspace-model-authz,
+      tenant-role-storage and storage-handlers-xml-parsing unit suites.
+      Sixteen suites pass; six cannot import missing packages and one cannot
+      locate its default external chart checkout. No assertion regression is
+      observed in the runnable storage suites.
+- [ ] Run structural-write-role-gates-kind and workspace-model-authz with kafkajs,
+      data-export-import-clone with mongodb and its transitive dependencies,
+      storage-object-io-completeness with @temporalio/activity, and
+      storage-credential-rotation-policy/storage-object-key-traversal with cel-js
+      in dependency-installed CI. All packages are already declared.
+- [ ] Run legacy-components-absent with the CI deployment checkout. Its default
+      /srv/engineering/worktrees/falcone/falcone-charts/charts/in-falcone path
+      is absent here; the source artifact check passes in the detailed run.
+
 ## CI and Runtime Handoff
 
 - [ ] Run tests/unit/workspace-model-authz.test.mjs with installed dependencies.

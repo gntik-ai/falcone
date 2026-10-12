@@ -220,7 +220,7 @@ test('request fields, singular workspaceId and unknown roles cannot confer autho
   assert.equal(calls.length, 0);
 });
 
-test('manifest reads require binding as well as the correct workspace path', async (t) => {
+test('bound manifest readers must also use the correct workspace path', async (t) => {
   const calls = fakeS3(t);
   const ctx = context(identity('workspace_viewer', ['ws2']));
   ctx.params.manifestId = 'smf_0123456789abcdef01';

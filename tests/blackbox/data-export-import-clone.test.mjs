@@ -39,8 +39,8 @@ const BUCKET_B = 'ws-zzz999yyy888-assets';
 const DB_A = 'wsdb_a_app_dev';
 const DB_B = 'wsdb_b_app_dev';
 
-const ownerA = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, actorType: 'tenant_owner' };
-const ownerB = { sub: 'user-b', tenantId: TENANT_B, workspaceId: WS_B, actorType: 'tenant_owner' };
+const ownerA = { sub: 'user-a', tenantId: TENANT_A, workspaceId: WS_A, workspaceIds: [WS_A], actorType: 'tenant_owner', roles: ['tenant_owner'] };
+const ownerB = { sub: 'user-b', tenantId: TENANT_B, workspaceId: WS_B, workspaceIds: [WS_B], actorType: 'tenant_owner', roles: ['tenant_owner'] };
 
 const BUCKET_ROWS = {
   [BUCKET_A]: { id: 'id-a', workspace_id: WS_A, tenant_id: TENANT_A, bucket_name: BUCKET_A, region: 'us-east-1', created_at: '2026-01-01T00:00:00Z' },
