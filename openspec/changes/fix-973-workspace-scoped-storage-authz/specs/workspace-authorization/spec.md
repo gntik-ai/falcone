@@ -25,6 +25,16 @@ Non-admin callers SHALL be denied for a missing or null workspace mapping.
 - **AND** no S3 operation occurs
 - **AND** GET /v1/storage/buckets omits that bucket
 
+#### Scenario: Service-account registry ownership is insufficient authority
+
+- **WHEN** a tenant-realm service-account caller has no granting realm roles and
+  empty workspaceIds, even for the workspace owning its service-account record
+- **THEN** GET, HEAD, object listing and workspace-addressed bucket routes return
+  404 BUCKET_NOT_FOUND with no object bytes or metadata before any S3 operation
+- **AND** GET /v1/storage/buckets returns an empty list without calling S3
+- **AND** restoring reads requires a model-authorized role and verified workspace
+  binding through a separate IAM follow-up, followed by newly issued tokens
+
 #### Scenario: Development binding does not grant production access
 
 - **WHEN** a ws1-bound tenant_developer or workspace_viewer requests GET, HEAD or

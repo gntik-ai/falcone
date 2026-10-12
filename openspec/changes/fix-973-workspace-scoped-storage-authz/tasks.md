@@ -91,6 +91,27 @@
       /srv/engineering/worktrees/falcone/falcone-charts/charts/in-falcone path
       is absent here; the source artifact check passes in the detailed run.
 
+## Service-account Checker Follow-up
+
+- [x] Verify the assigned branch is clean at supplied prior HEAD
+      06b95f8412540c2629d31d2da9d55840b029c29d before editing.
+- [x] Confirm createServiceAccount creates a tenant-realm confidential client
+      without assigning a granting role or workspace claim. Authenticated storage
+      routes accept its token; server identity derivation yields tenant_member,
+      tenantId from the verified realm, no granting roles and empty workspaceIds.
+- [x] Pin that existing fail-closed behavior at the public STORAGE_HANDLERS seam:
+      GET, HEAD, object list and workspace-addressed routes deny both ws1 and ws2
+      with 404 and no bytes/metadata or S3 calls; bucket listing is empty before S3.
+      The new test passes against the existing source; this follow-up changes
+      documentation and tests only, so no new production fix or red cycle is needed.
+- [x] Document the machine-client compatibility break and separate IAM migration
+      requirement in the proposal and requirement delta. Credential rotation or
+      recreating a service account alone cannot supply the missing grants.
+- [x] Record storageWorkspaceUsage as a tenant-only AUTHZ-XWS-002 follow-up,
+      outside the current storage-data-read scope.
+- [ ] Confirm the service-account impact and IAM migration/rollout plan with
+      product through the control plane before delivery.
+
 ## CI and Runtime Handoff
 
 - [ ] Run tests/unit/workspace-model-authz.test.mjs with installed dependencies.

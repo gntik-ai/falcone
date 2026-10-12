@@ -35,6 +35,23 @@ Existing users without workspace_id must be rebound through createTenantUser's
 workspaceId before reading workspace buckets. Bound tenant roles retain reads in
 their assigned workspace. Workspace grants do not widen PUT/DELETE authority.
 
+Workspace service accounts also lose storage reads, including in their own
+workspace. createServiceAccount creates a confidential client in the tenant realm
+but assigns neither a tenant/workspace realm role nor a workspace_id mapper.
+Its verified identity therefore has the tenant realm as tenantId, no granting
+roles and empty workspaceIds. GET, HEAD, object listing and workspace-addressed
+bucket routes return 404 BUCKET_NOT_FOUND before S3; bucket listing returns an
+empty list. The service-account registry's workspace ownership grants no access.
+
+Restoring these machine clients' reads requires a separately approved IAM
+follow-up to assign a model-authorized role (for example workspace_service_account)
+and mint a verified workspace_id for the owning workspace, then obtain new
+client_credentials tokens. The existing createServiceAccount API does not provide
+that migration; recreating the client or rotating its credential alone does not
+add either grant. Product must confirm the service-account compatibility break
+and migration/rollout plan before delivery. Claim minting and migration stay
+outside this ChangeSet; the storage gate must remain fail closed.
+
 The gate requires verified realm roles for tenant owner/admin grants. A token
 carrying actor_type=tenant_owner without a tenant_owner or tenant_admin realm role
 loses bucket access, including the initial read gate before structural writes.
@@ -43,7 +60,9 @@ The current charts do not mint actor_type; clients must rely on verified roles.
 No claim minting, membership table, migration, dependency change, deployment chart,
 shared tenant management gate or non-storage resolver is included. Functions,
 MongoDB, PostgreSQL, Kafka, webhooks and route-auth tier enforcement remain separate
-follow-ups. Rollback is a source revert and the normal previous-image-digest release.
+follow-ups. storageWorkspaceUsage still checks tenant ownership only and returns
+workspace byte usage; its workspace authorization is a separate AUTHZ-XWS-002
+follow-up. Rollback is a source revert and the normal previous-image-digest release.
 
 ## Verification Seams
 

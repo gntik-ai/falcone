@@ -78,6 +78,32 @@ function assertBucketDenied(result) {
   assert.equal(result.headers, undefined, 'no metadata headers');
 }
 
+test('unbound tenant-realm service accounts cannot read even their own workspace buckets', async (t) => {
+  const calls = fakeS3(t);
+  // createServiceAccount records ws2 ownership but mints neither a workspace role nor binding.
+  const caller = { sub: 'service-account-sa-prod', actorType: 'tenant_member',
+    tenantId: TENANT, trustKind: 'tenant', isServiceAccount: true, roles: [],
+    workspaceId: null, workspaceIds: [] };
+  for (const bucket of BUCKETS) {
+    const ctx = context(caller);
+    ctx.params.bucketId = bucket.bucket_name;
+    ctx.params.workspaceId = bucket.workspace_id;
+    ctx.params.manifestId = 'smf_0123456789abcdef01';
+    for (const handler of ['storageGetObject', 'storageObjectMetadata', 'storageListObjects',
+      'storageBucketExportManifestGet', 'storageBucketExport', 'storageBucketImport']) {
+      const result = await STORAGE_HANDLERS[handler](ctx);
+      assert.equal(result.statusCode, 404, handler);
+      assert.deepEqual(result.body, { code: 'BUCKET_NOT_FOUND', message: `bucket ${bucket.bucket_name} not found` });
+      assert.equal(result.headers, undefined, 'no metadata headers');
+      assert.equal(calls.length, 0, `${handler}: authorization must precede S3`);
+    }
+  }
+  const listing = await STORAGE_HANDLERS.storageListBuckets(context(caller));
+  assert.equal(listing.statusCode, 200);
+  assert.deepEqual(listing.body, { items: [], page: { size: 0 } });
+  assert.equal(calls.length, 0, 'empty bucket list must not call S3');
+});
+
 test('production metadata is hidden from unbound and development callers', async (t) => {
   const calls = fakeS3(t);
   for (const [name, role, bindings] of DENIED) {
