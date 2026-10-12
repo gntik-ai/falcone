@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   requestConsoleSessionJson: vi.fn().mockResolvedValue({})
 }))
-vi.mock('@/lib/http', () => ({
+vi.mock('@in-falcone/console-api/http', () => ({
   requestJson: vi.fn().mockResolvedValue({})
 }))
 
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import { requestJson } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import { requestJson } from '@in-falcone/console-api/http'
 import {
   addColumn,
   buildCurlSnippet,

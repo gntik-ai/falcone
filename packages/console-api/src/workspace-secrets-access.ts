@@ -11,7 +11,7 @@
 //
 // "Fail-safe" means: an operator who is neither a member of the active workspace nor a tenant-admin/
 // platform-role operator is redirected away and does not see the entry.
-import type { ConsoleShellSession } from '@/lib/console-session'
+import type { ConsoleShellSession } from './session'
 
 // Tenant-admin / platform roles that may operate across a tenant's workspaces.
 const SECRETS_PRIVILEGED_ROLES = new Set([

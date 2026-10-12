@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getConsoleContextStatusBadgeClasses, useConsoleContext } from '@/lib/console-context'
-import type { ApiError } from '@/lib/http'
+import type { ApiError } from '@in-falcone/console-api/http'
 import {
   createSecret,
   deleteSecret,

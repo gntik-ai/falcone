@@ -15,7 +15,7 @@ import {
   type WorkspaceDocNote,
   type WorkspaceDocsResponse
 } from '@/lib/console-workspace-docs'
-import { readConsoleShellSession } from '@/lib/console-session'
+import { readConsoleShellSession } from '@in-falcone/console-api/session'
 
 export function ConsoleDocsPage() {
   const { workspaceId = '' } = useParams()

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ConsoleLoginSession } from '@/lib/console-auth'
+import type { ConsoleLoginSession } from '@in-falcone/console-api/auth'
 
 import {
   consumeConsoleAuthStatusHint,
@@ -8,7 +8,7 @@ import {
   readConsoleShellSession,
   refreshConsoleShellSession,
   requestConsoleSessionJson
-} from './console-session'
+} from '@in-falcone/console-api/session'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -55,7 +55,9 @@ describe('console-session', () => {
   })
 
   it('trata un snapshot inválido como sesión nula', () => {
-    window.sessionStorage.setItem('in-falcone.console-shell-session', JSON.stringify({ nope: true }))
+    persistConsoleShellSession(baseSession)
+    const storageKey = window.sessionStorage.key(0)!
+    window.sessionStorage.setItem(storageKey, JSON.stringify({ nope: true }))
 
     expect(readConsoleShellSession()).toBeNull()
   })

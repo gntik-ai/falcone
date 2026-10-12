@@ -5,7 +5,7 @@ import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { WorkspaceAllocationSummaryTable } from '@/components/console/WorkspaceAllocationSummaryTable'
 import { describeConsoleError } from '@/lib/console-errors'
 import { isTenantlessPlatformPrincipal } from '@/lib/console-principal'
-import { readConsoleShellSession } from '@/lib/console-session'
+import { readConsoleShellSession } from '@in-falcone/console-api/session'
 import * as api from '@/services/planManagementApi'
 
 export function ConsoleTenantAllocationSummaryPage() {

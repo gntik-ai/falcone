@@ -6,7 +6,7 @@
 // Purely presentational: the caller supplies the merged node detail + live status snapshot.
 import { Badge } from '@/components/ui/badge'
 import { NodeStatusBadge } from '@/components/flows/NodeStatusBadge'
-import type { JsonValue } from '@/lib/http'
+import type { JsonValue } from '@in-falcone/console-api/http'
 import type { ExecutionNodeDetail } from '@/services/flowsMonitoringApi'
 import type { NodeStatusSnapshot } from '@/lib/hooks/use-flow-execution'
 

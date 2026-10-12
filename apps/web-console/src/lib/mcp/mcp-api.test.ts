@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   requestConsoleSessionJson: vi.fn().mockResolvedValue({})
 }))
 
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import { fetchMcpServerDetail, invokeMcpTool } from './mcp-api'
 
 const requestMock = requestConsoleSessionJson as unknown as ReturnType<typeof vi.fn>

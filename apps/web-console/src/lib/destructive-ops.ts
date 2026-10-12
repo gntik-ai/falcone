@@ -1,4 +1,4 @@
-import { requestJson } from '@/lib/http'
+import { requestJson } from '@in-falcone/console-api/http'
 
 export type DestructiveOpLevel = 'CRITICAL' | 'WARNING'
 

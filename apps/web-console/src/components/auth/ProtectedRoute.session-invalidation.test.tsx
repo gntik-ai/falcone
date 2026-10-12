@@ -3,13 +3,13 @@ import { useEffect } from 'react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ConsoleLoginSession } from '@/lib/console-auth'
+import type { ConsoleLoginSession } from '@in-falcone/console-api/auth'
 import {
   persistConsoleShellSession,
   readConsoleShellSession,
   readProtectedRouteIntent,
   requestConsoleSessionJson
-} from '@/lib/console-session'
+} from '@in-falcone/console-api/session'
 
 import { ProtectedRoute } from './ProtectedRoute'
 

@@ -1,10 +1,10 @@
 import type * as React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import * as consoleSession from '@/lib/console-session'
-import { getConsolePermissions, type PermissionAction } from '@/lib/console-permissions'
+import * as consoleSession from '@in-falcone/console-api/session'
+import { getConsolePermissions, type PermissionAction } from '@in-falcone/console-api/permissions'
 import { useConsoleQuotas } from '@/lib/console-quotas'
-import { createRequestId, type ApiError, type JsonValue } from '@/lib/http'
+import { createRequestId, type ApiError, type JsonValue } from '@in-falcone/console-api/http'
 
 export interface WizardStepValidation {
   valid: boolean
@@ -41,7 +41,7 @@ export type WizardSubmitState =
 export type WizardPermission = 'create_tenant' | 'create_workspace' | 'manage_iam' | 'invite_member' | 'provision_database' | 'publish_function'
 
 // Maps each wizard's coarse permission key onto the shared `PermissionAction` matrix
-// (@/lib/console-permissions.ts) so there is ONE role→permission source, not a second one
+// (@in-falcone/console-api/permissions) so there is ONE role→permission source, not a second one
 // hand-rolled per wizard (#761). Behavior for every role tested so far (superadmin,
 // platform_operator, tenant_owner, tenant_admin, workspace_admin) is unchanged or extended to align
 // with `authorization-model.json` (tenant_admin gained `create_workspace`/`invite_member` parity

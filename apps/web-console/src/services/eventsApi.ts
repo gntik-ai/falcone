@@ -1,7 +1,7 @@
 // Events (Kafka) data client for the console (change: add-console-events-data-editor).
 // Calls the control-plane executor's event routes exactly: topic list/create, publish, consume.
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { JsonValue } from '@in-falcone/console-api/http'
 
 const enc = encodeURIComponent
 

@@ -1,8 +1,8 @@
 // Functions data client for the console (change: add-console-functions-data-editor).
 // Calls the published control-plane function routes exactly: list by workspace,
 // deploy at the actions collection, and operate by action resourceId.
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { JsonValue } from '@in-falcone/console-api/http'
 
 const enc = encodeURIComponent
 

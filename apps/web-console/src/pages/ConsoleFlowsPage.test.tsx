@@ -16,7 +16,7 @@ vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
 }))
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   readConsoleShellSession: () => mockReadConsoleShellSession()
 }))
 

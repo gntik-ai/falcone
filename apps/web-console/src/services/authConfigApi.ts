@@ -14,8 +14,8 @@
 // (`lib/console-openapi-sdk.ts`) — same pattern as the other `/v1/tenants/*` runtime surfaces (see
 // `apps/control-plane/routes.mjs`). There is therefore no contract artifact to keep in sync;
 // this module IS the console-side contract for this surface.
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { JsonValue } from '@in-falcone/console-api/http'
 
 const enc = encodeURIComponent
 

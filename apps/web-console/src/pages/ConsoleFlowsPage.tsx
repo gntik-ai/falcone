@@ -19,7 +19,7 @@ import { FlowRunTriggerButton } from '@/components/flows/FlowRunTriggerButton'
 import { FlowStatusBadge } from '@/components/flows/FlowStatusBadge'
 import { useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError } from '@/lib/console-errors'
-import { useConsolePermissions } from '@/lib/console-permissions'
+import { useConsolePermissions } from '@in-falcone/console-api/permissions'
 import { createFlowDraft, listFlows, type FlowScheduleTriggerAck, type FlowSummary } from '@/services/flowsApi'
 
 function formatTimestamp(value?: string): string {

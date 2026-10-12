@@ -13,7 +13,7 @@ import {
   type ConsoleTenantOption
 } from '@/lib/console-context'
 import { hasPlatformInventoryAccess } from '@/lib/console-principal'
-import { readConsoleShellSession } from '@/lib/console-session'
+import { readConsoleShellSession } from '@in-falcone/console-api/session'
 import { cn } from '@/lib/utils'
 
 export function ConsoleTenantsPage() {

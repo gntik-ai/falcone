@@ -11,7 +11,7 @@ const { requestConsoleSessionJsonMock, useConsoleContextMock, readConsoleShellSe
   readConsoleShellSessionMock: vi.fn()
 }))
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   requestConsoleSessionJson: requestConsoleSessionJsonMock,
   readConsoleShellSession: readConsoleShellSessionMock
 }))

@@ -31,8 +31,8 @@ import { READ_ONLY_AFFORDANCE_BADGE_TONE } from '@/components/console/ReadOnlyAc
 import { WorkspaceActivationAction } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { terminateConsoleLoginSession } from '@/lib/console-auth'
-import { consoleAuthConfig } from '@/lib/console-config'
+import { terminateConsoleLoginSession } from '@in-falcone/console-api/auth'
+import { consoleAuthConfig } from '@in-falcone/console-api/config'
 import {
   ConsoleContextProvider,
   formatConsoleContextEnumLabel,
@@ -43,16 +43,16 @@ import {
   useConsoleContext
 } from '@/lib/console-context'
 import { hasPlatformInventoryAccess } from '@/lib/console-principal'
-import { useConsolePermissions, type PermissionAction } from '@/lib/console-permissions'
+import { useConsolePermissions, type PermissionAction } from '@in-falcone/console-api/permissions'
 import {
   clearConsoleShellSession,
   getConsolePrincipalInitials,
   getConsolePrincipalLabel,
   getConsolePrincipalSecondary,
   readConsoleShellSession
-} from '@/lib/console-session'
+} from '@in-falcone/console-api/session'
 import { cn } from '@/lib/utils'
-import { canManageWorkspaceSecrets } from '@/lib/workspace-secrets-access'
+import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
 
 const consoleNavigationGroupLabels = {
   main: 'Principal',

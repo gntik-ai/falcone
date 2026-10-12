@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import { persistConsoleShellSession } from '@/lib/console-session'
+import { persistConsoleShellSession } from '@in-falcone/console-api/session'
 import { importDocuments } from './mongoApi'
 
 const fetchMock = vi.fn<typeof fetch>()

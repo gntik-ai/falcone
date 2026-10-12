@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { TenantSocialProviderDialog } from '@/components/console/TenantSocialProviderDialog'
-import { useConsolePermissions } from '@/lib/console-permissions'
+import { useConsolePermissions } from '@in-falcone/console-api/permissions'
 import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { DestructiveConfirmationDialog } from '@/components/console/DestructiveConfirmationDialog'
 import { useDestructiveOp } from '@/components/console/hooks/useDestructiveOp'

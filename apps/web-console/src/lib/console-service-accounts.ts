@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
 const STORAGE_PREFIX = 'in-falcone.console-service-account-index:'
 

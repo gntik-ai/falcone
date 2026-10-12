@@ -9,8 +9,8 @@ import {
   AUTH_PANEL_HEADING_CLASS_NAME,
   AUTH_PANEL_INTRO_CLASS_NAME
 } from '@/lib/console-auth-surface'
-import { consoleAuthConfig } from '@/lib/console-config'
-import { hasUsableConsoleSession, readConsoleShellSession } from '@/lib/console-session'
+import { consoleAuthConfig } from '@in-falcone/console-api/config'
+import { hasUsableConsoleSession, readConsoleShellSession } from '@in-falcone/console-api/session'
 
 // A "back" step only exists to offer when react-router has recorded a non-initial entry in this
 // document's session history (createBrowserRouter writes an incrementing { idx } into history.state).

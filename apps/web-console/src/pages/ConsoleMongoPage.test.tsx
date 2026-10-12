@@ -8,7 +8,7 @@ const mockRequestConsoleSessionJson = vi.fn()
 const mockUseConsoleContext = vi.fn()
 const mockReadConsoleShellSession = vi.fn()
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args),
   readConsoleShellSession: () => mockReadConsoleShellSession()
 }))

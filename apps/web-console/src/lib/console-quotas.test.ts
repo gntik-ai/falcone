@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { normalizeQuotaPosture, useConsoleQuotas } from './console-quotas'
 
 const mockRequestConsoleSessionJson = vi.fn()
-vi.mock('@/lib/console-session', () => ({ requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args) }))
+vi.mock('@in-falcone/console-api/session', () => ({ requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args) }))
 
 describe('console-quotas', () => {
   beforeEach(() => {

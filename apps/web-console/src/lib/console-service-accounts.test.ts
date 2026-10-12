@@ -14,7 +14,7 @@ import {
 } from './console-service-accounts'
 
 const mockRequestConsoleSessionJson = vi.fn()
-vi.mock('@/lib/console-session', () => ({ requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args) }))
+vi.mock('@in-falcone/console-api/session', () => ({ requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args) }))
 
 describe('console-service-accounts', () => {
   beforeEach(() => {

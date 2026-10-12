@@ -20,7 +20,7 @@ import {
   type ConsoleMetricRange
 } from '@/lib/console-metrics'
 import { useConsoleContext } from '@/lib/console-context'
-import { useConsolePermissions } from '@/lib/console-permissions'
+import { useConsolePermissions } from '@in-falcone/console-api/permissions'
 import { cn } from '@/lib/utils'
 
 const TENANT_SCOPE_METRICS_RANGE: ConsoleMetricRange = { preset: '24h' }

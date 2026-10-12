@@ -5,8 +5,8 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useConsoleContext } from '@/lib/console-context'
-import { useConsolePermissions } from '@/lib/console-permissions'
-import { getConsolePrincipalLabel, getConsolePrincipalSecondary, readConsoleShellSession } from '@/lib/console-session'
+import { useConsolePermissions } from '@in-falcone/console-api/permissions'
+import { getConsolePrincipalLabel, getConsolePrincipalSecondary, readConsoleShellSession } from '@in-falcone/console-api/session'
 
 export function ConsoleProfilePage() {
   const session = readConsoleShellSession()

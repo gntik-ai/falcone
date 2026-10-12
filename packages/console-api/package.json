@@ -1,0 +1,25 @@
+{
+  "name": "@in-falcone/console-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./http": "./src/http.ts",
+    "./session": "./src/session.ts",
+    "./auth": "./src/auth.ts",
+    "./config": "./src/config.ts",
+    "./permissions": "./src/permissions.ts",
+    "./workspace-secrets-access": "./src/workspace-secrets-access.ts",
+    "./loaders": "./src/loaders.ts",
+    "./clients": "./src/clients.ts",
+    "./fixtures": "./src/fixtures.ts"
+  },
+  "scripts": {
+    "test": "vitest run --environment node"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1",
+    "vitest": "^4.1.0"
+  }
+}

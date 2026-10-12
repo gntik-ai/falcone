@@ -8,8 +8,8 @@
 //      The hook reconnects with Last-Event-ID; `stream-end` signals the run is terminal → close().
 //   2. REST control — list/detail executions + cancel/retry/signal actions over the #361 flow API,
 //      threaded through requestConsoleSessionJson (bearer token + refresh) like flowsApi.ts.
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { JsonValue } from '@in-falcone/console-api/http'
 
 const enc = encodeURIComponent
 

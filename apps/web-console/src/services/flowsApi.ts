@@ -13,8 +13,8 @@
 //
 // The "publish" verb in this UI maps to POST .../versions (validate-then-pin), since the #361
 // API has no dedicated /publish route (see design.md DV4).
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { ApiError, JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { ApiError, JsonValue } from '@in-falcone/console-api/http'
 import type { FlowDefinition } from '@/types/flows'
 
 const enc = encodeURIComponent

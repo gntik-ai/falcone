@@ -54,7 +54,7 @@ vi.mock('@/lib/console-service-accounts', () => ({
     return 'No se pudo completar la operación.'
   }
 }))
-vi.mock('@/lib/console-session', () => ({ readConsoleShellSession: () => mockReadConsoleShellSession() }))
+vi.mock('@in-falcone/console-api/session', () => ({ readConsoleShellSession: () => mockReadConsoleShellSession() }))
 
 describe('ConsoleServiceAccountsPage', () => {
   beforeEach(() => {

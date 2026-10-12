@@ -6,7 +6,7 @@ import { EventsConsole } from '@/components/console/EventsConsole'
 import { WorkspaceRequiredState } from '@/components/console/WorkspaceRequiredState'
 import { Badge } from '@/components/ui/badge'
 import { useConsoleContext } from '@/lib/console-context'
-import { readConsoleShellSession } from '@/lib/console-session'
+import { readConsoleShellSession } from '@in-falcone/console-api/session'
 import { canPerformStructuralWrites } from '@/lib/structural-write-access'
 
 export function ConsoleEventsDataPage() {

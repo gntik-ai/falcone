@@ -9,7 +9,7 @@ const sessionMocks = vi.hoisted(() => ({
   subscribeConsoleSessionInvalidatedMock: vi.fn()
 }))
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   ensureConsoleSession: sessionMocks.ensureConsoleSessionMock,
   readConsoleShellSession: sessionMocks.readConsoleShellSessionMock,
   storeProtectedRouteIntent: sessionMocks.storeProtectedRouteIntentMock,

@@ -16,10 +16,10 @@ import {
   getConsoleSignupPolicy,
   type ConsoleSignupPolicy,
   type ConsoleSignupRegistration
-} from '@/lib/console-auth'
-import { consoleAuthConfig } from '@/lib/console-config'
+} from '@in-falcone/console-api/auth'
+import { consoleAuthConfig } from '@in-falcone/console-api/config'
 import { FORM_FIELD_ERROR_CLASS_NAME, INVALID_FORM_CONTROL_CLASS_NAME } from '@/lib/console-create-form-validation'
-import type { ApiError } from '@/lib/http'
+import type { ApiError } from '@in-falcone/console-api/http'
 
 type FeedbackState =
   | { variant: 'default' | 'success' | 'destructive'; title: string; message: string }

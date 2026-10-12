@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConsoleAuthPage, isRetryableRealmSectionError } from './ConsoleAuthPage'
 
 import { useConsoleContext } from '@/lib/console-context'
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   requestConsoleSessionJson: vi.fn()
 }))
 

@@ -25,8 +25,8 @@ import {
 } from '@/lib/console-service-accounts'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
 import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
-import { useConsolePermissions } from '@/lib/console-permissions'
-import { readConsoleShellSession } from '@/lib/console-session'
+import { useConsolePermissions } from '@in-falcone/console-api/permissions'
+import { readConsoleShellSession } from '@in-falcone/console-api/session'
 
 const credentialActionsHelpId = 'service-account-credential-actions-help'
 

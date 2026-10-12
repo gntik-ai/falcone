@@ -10,7 +10,7 @@ const sessionMocks = vi.hoisted(() => ({
 
 const navigateMock = vi.hoisted(() => vi.fn())
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   hasUsableConsoleSession: sessionMocks.hasUsableConsoleSessionMock,
   readConsoleShellSession: sessionMocks.readConsoleShellSessionMock
 }))
@@ -23,7 +23,7 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-import { consoleAuthConfig } from '@/lib/console-config'
+import { consoleAuthConfig } from '@in-falcone/console-api/config'
 
 import { NotFoundPage } from './NotFoundPage'
 

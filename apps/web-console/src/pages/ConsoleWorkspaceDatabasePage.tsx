@@ -5,8 +5,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError } from '@/lib/console-errors'
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { ApiError } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { ApiError } from '@in-falcone/console-api/http'
 
 interface WorkspaceDatabaseRecord {
   id: string

@@ -26,8 +26,8 @@ vi.mock('../../../apps/web-console/src/lib/console-context', async (importOrigin
   }
 })
 
-vi.mock('../../../apps/web-console/src/lib/console-session', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../../apps/web-console/src/lib/console-session')>()
+vi.mock('../../../packages/console-api/src/session', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../packages/console-api/src/session')>()
   return { ...original, requestConsoleSessionJson: publicApi.request }
 })
 

@@ -12,7 +12,7 @@ const mockPostgresDataEditor = vi.fn()
 vi.mock('@/lib/console-context', () => ({
   useConsoleContext: () => mockUseConsoleContext()
 }))
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   readConsoleShellSession: () => mockReadConsoleShellSession()
 }))
 vi.mock('@/components/console/PostgresDataEditor', () => ({

@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { publishFlow, validateFlow } from './flowsApi'
+import { persistConsoleShellSession } from '@in-falcone/console-api/session'
 
 beforeEach(() => {
   // Synthetic session: only the HTTP boundary is mocked, not console collaborators.
-  window.sessionStorage.setItem('in-falcone.console-shell-session', JSON.stringify({
+  persistConsoleShellSession({
     sessionId: 'synthetic-session', authenticationState: 'active', statusView: 'active',
-    issuedAt: '2026-01-01T00:00:00Z', expiresAt: '2099-01-01T00:00:00Z', refreshExpiresAt: '2099-01-01T00:00:00Z',
+    issuedAt: '2026-01-01T00:00:00Z', lastActivityAt: '2026-01-01T00:00:00Z', idleExpiresAt: '2099-01-01T00:00:00Z', sessionPolicy: {}, expiresAt: '2099-01-01T00:00:00Z', refreshExpiresAt: '2099-01-01T00:00:00Z',
     tokenSet: {
       accessToken: 'synthetic-access-token', refreshToken: 'synthetic-refresh-token', tokenType: 'Bearer',
       expiresIn: 3600, refreshExpiresIn: 7200, scope: 'openid',
       expiresAt: '2099-01-01T00:00:00Z', refreshExpiresAt: '2099-01-01T00:00:00Z'
     }
-  }))
+  })
 })
 
 afterEach(() => {

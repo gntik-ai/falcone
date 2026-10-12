@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ConsoleLoginSession } from '@/lib/console-auth'
+import type { ConsoleLoginSession } from '@in-falcone/console-api/auth'
 
 // --- Part 1: path/method/body assertions with a mocked session HTTP layer -----------------------
-vi.mock('@/lib/console-session', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/console-session')>('@/lib/console-session')
+vi.mock('@in-falcone/console-api/session', async () => {
+  const actual = await vi.importActual<typeof import('@in-falcone/console-api/session')>('@in-falcone/console-api/session')
   return { ...actual, requestConsoleSessionJson: vi.fn().mockResolvedValue({}) }
 })
 
-import { persistConsoleShellSession, requestConsoleSessionJson } from '@/lib/console-session'
+import { persistConsoleShellSession, requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import {
   createSecret,
   deleteSecret,
@@ -140,7 +140,7 @@ describe('secretsApi — inherits session headers on mutations (no per-call cons
   it('a create (POST) carries Idempotency-Key, X-API-Version, X-Correlation-Id and the bearer', async () => {
     // This part needs the REAL requestConsoleSessionJson (the mock above replaces only the named
     // export via importActual spread; restore by importing the real module dynamically).
-    const real = await vi.importActual<typeof import('@/lib/console-session')>('@/lib/console-session')
+    const real = await vi.importActual<typeof import('@in-falcone/console-api/session')>('@in-falcone/console-api/session')
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-03-28T19:00:00.000Z'))
     persistConsoleShellSession(baseSession)

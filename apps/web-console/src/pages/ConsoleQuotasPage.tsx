@@ -7,7 +7,7 @@ import { ConsoleQuotaPostureBadge } from '@/components/console/ConsoleQuotaPostu
 import { QuotaAdjustDialog, type QuotaAdjustTarget } from '@/components/console/QuotaAdjustDialog'
 import { useConsoleContext } from '@/lib/console-context'
 import { useConsoleQuotas, type ConsoleQuotaDimensionView } from '@/lib/console-quotas'
-import { useConsolePermissions } from '@/lib/console-permissions'
+import { useConsolePermissions } from '@in-falcone/console-api/permissions'
 import { formatDimensionValue } from '@/lib/format'
 import { cn } from '@/lib/utils'
 

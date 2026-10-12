@@ -2,8 +2,8 @@ import {
   refreshConsoleLoginSession,
   type ConsoleAuthStatusHint,
   type ConsoleLoginSession
-} from '@/lib/console-auth'
-import { requestJson, type ApiError, type JsonValue } from '@/lib/http'
+} from './auth'
+import { requestJson, type ApiError, type JsonValue } from './http'
 
 const CONSOLE_SHELL_SESSION_STORAGE_KEY = 'in-falcone.console-shell-session'
 const CONSOLE_PROTECTED_ROUTE_STORAGE_KEY = 'in-falcone.console-protected-route'

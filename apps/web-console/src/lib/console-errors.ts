@@ -12,7 +12,7 @@
 // Keep this module dependency-free and side-effect-free so it stays trivially tree-shakeable
 // and unit-testable in isolation from React/fetch.
 
-/** Minimal shape this module cares about — matches `ApiError` (see `@/lib/http`) structurally
+/** Minimal shape this module cares about — matches `ApiError` (see `@in-falcone/console-api/http`) structurally
  * without importing it, so this stays usable against any thrown value (including bare
  * `Error` instances, `PlanApiError`, or a plain object read off a non-JSON response). */
 interface ConsoleErrorLike {

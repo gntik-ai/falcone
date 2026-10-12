@@ -6,7 +6,7 @@ import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { RealtimeSnippetsPanel } from '@/components/console/snippets/RealtimeSnippetsPanel'
 import { useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError } from '@/lib/console-errors'
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
 type WorkspaceRealtimeResponse = {
   workspaceId: string
