@@ -9,6 +9,12 @@ agree on the lease identifier `6334d7a7-80ac-51f9-8076-050c34ed351c`.
 There is no `origin/main` ref in this offline checkout; use the immutable input above
 for the local scope check, and `origin/main...HEAD` in PR CI.
 
+The supplied phase-1 head is `5d04fdde9f31ebe31d0faac46cdfa2bab5e6b3ad`.
+It includes Hermes pin-convergence commit `5d04fdde`: the two workflow changes
+are pre-existing control-plane metadata, outside this maker's documentation scope.
+Do not revert or edit them. The validation below verifies their exact supplied-head
+blobs separately, then enforces the approved phase-1 paths on the remaining diff.
+
 Run from the source root with `LC_ALL=C` on the phase-1 head, after force-adding
 this directory. The following commands produce the three stored output sections
 below; compare them byte-for-byte, with LF line endings:
@@ -569,9 +575,14 @@ if not diff:
     diff = run('diff', '--name-status', base, 'HEAD')
 changes = [line.split('\t') for line in diff.splitlines()]
 allowed = removed | added | {'.gitignore', 'README.md'}
-assert {p for status, p in changes} == allowed
+supplied = '5d04fdde9f31ebe31d0faac46cdfa2bab5e6b3ad'
+hermes_pins = {'.github/workflows/ci.yml', '.github/workflows/integration.yml'}
+assert {p for status, p in changes} == allowed | hermes_pins
 for status, path in changes:
     assert status == ('D' if path in removed else 'A' if path in added else 'M'), path
+for path in hermes_pins:
+    assert run('rev-parse', ':' + path) == run('rev-parse', supplied + ':' + path), path
+    assert not run('diff', '--name-only', '--', path), path
 
 design = (root / change / 'design.md').read_text()
 hits = subprocess.run(git + ['grep', '-n', '-I', '-e', 'spikes/', '-e', 'falcone-loop-state', '-e', 'delivery-adapter', '-e', 'track-f', base, '--'], capture_output=True, text=True, check=True).stdout.splitlines()
@@ -579,18 +590,27 @@ for line in hits:
     _, file, number, _ = line.split(':', 3)
     assert f'`{file}:{number}`' in design, (file, number)
 assert len(hits) == 41
-phase1 = '5ce1715d68cbdd5f72ce157a23fb88f5f28bd3ab'
+phase1 = supplied
 assert f'baseline **B** is `{phase1}`' in design
 phase1_hits = subprocess.check_output(git + ['grep', '-n', '-I', '-e', 'spikes/', '-e', 'falcone-loop-state', '-e', 'delivery-adapter', '-e', 'track-f', phase1, '--'], text=True).splitlines()
 for line in phase1_hits:
     _, file, number, _ = line.split(':', 3)
     assert f'`{file}:{number}`' in design, (file, number)
-assert len(phase1_hits) == 272
+assert len(phase1_hits) == 278
+current_hits = run('grep', '-n', '-I', '-e', 'spikes/', '-e', 'falcone-loop-state', '-e', 'delivery-adapter', '-e', 'track-f', '--').splitlines()
+for line in current_hits:
+    file, number, _ = line.split(':', 2)
+    if file.startswith(change + '/'):
+        # Live declarations are covered by the recursive current-head table row.
+        assert file.rsplit('/', 1)[1] in {'design.md', 'inventory.md', 'proposal.md', 'tasks.md'}
+        assert 'Current-head declaration coverage' in design
+    else:
+        assert f'`{file}:{number}`' in design, (file, number)
 # This refinement may touch only the new change; no historical candidate changes.
 refinement = run('diff', '--name-only', phase1).splitlines()
 assert all(path.startswith(change + '/') for path in refinement), refinement
 assert not run('diff', '--check', base)
-print('PASS: 3164 stored paths, 138 disjoint rules/counts, 272 phase-1 reader/declaration citations, literal baseline pin, IDE ignore/scope, 11 manifest hashes; protected paths unchanged.')
+print('PASS: 3164 stored paths, 138 disjoint rules/counts, 278 supplied-head reader/declaration citations, literal baseline pin, IDE ignore/scope, 11 manifest hashes; protected paths and Hermes pins unchanged.')
 PY
 ```
 
