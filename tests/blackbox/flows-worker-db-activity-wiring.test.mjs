@@ -38,14 +38,16 @@ import assert from 'node:assert/strict';
 
 import { dispatchTask } from '../../apps/workflow-worker/src/activities/index.mjs';
 import { wireActivityDeps, buildDataDsn } from '../../apps/workflow-worker/src/worker-deps.mjs';
+import { mintExecutionToken } from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
 
 // Minimal valid db.query dispatch envelope.
-function makeInput(overrides = {}) {
+async function makeInput(overrides = {}) {
   return {
     nodeId: 'n1',
     taskType: 'db.query',
     params: { engine: 'postgres', operation: 'list', databaseName: 'db', schemaName: 'public', tableName: 't' },
-    tenant: { tenantId: 'tenant_A', workspaceId: 'ws_A' },
+    tenant: { tenantId: 'tenant_A', workspaceId: 'ws_A',
+      executionToken: await mintExecutionToken('tenant_A', 'ws_A') },
     ...overrides,
   };
 }
@@ -55,7 +57,7 @@ function makeInput(overrides = {}) {
 // ---------------------------------------------------------------------------
 test('bbx-flows-wdb-01: without wiring, db.query throws CAPABILITY_UNAVAILABLE "not wired"', async () => {
   await assert.rejects(
-    () => dispatchTask(makeInput(), {}),
+    async () => dispatchTask(await makeInput(), {}),
     (err) => {
       assert.equal(err.type, 'CAPABILITY_UNAVAILABLE',
         `expected CAPABILITY_UNAVAILABLE, got ${err.type}: ${err.message}`);
@@ -76,7 +78,7 @@ test('bbx-flows-wdb-02: dispatchTask with mock executePostgresData does not thro
     executePostgresData: async () => { executorCalled = true; return { items: [] }; },
     pgRegistry: {},
   };
-  await dispatchTask(makeInput(), mockDeps);
+  await dispatchTask(await makeInput(), mockDeps);
   assert.equal(executorCalled, true, 'mock executePostgresData must be called when wired');
 });
 
@@ -174,19 +176,15 @@ test('bbx-flows-wdb-06: deps from wireActivityDeps wired into activityDeps stops
   activitiesMod.setActivityDeps(deps);
 
   try {
-    await activitiesMod.executeTask({
-      nodeId: 'n6',
-      taskType: 'db.query',
-      params: { engine: 'postgres', operation: 'list', databaseName: 'db', schemaName: 'public', tableName: 't' },
-      tenant: { tenantId: 'tenant_A', workspaceId: 'ws_A' },
-    });
+    await activitiesMod.executeTask(await makeInput({ nodeId: 'n6' }));
   } catch (err) {
     if (err?.type === 'CAPABILITY_UNAVAILABLE' && /not wired/.test(err?.message ?? '')) {
       assert.fail(
         `setActivityDeps must inject the postgres executor, but db.query still threw: ${err.message}`,
       );
     }
-    // Any other error (e.g. plan building error from mock table) is acceptable.
+    assert.ok(!err?.type?.startsWith('EXECUTION_TOKEN_'), 'the wiring check must pass the credential gate');
+    // Other errors (e.g. plan building error from mock table) are acceptable.
   }
 
   await close();

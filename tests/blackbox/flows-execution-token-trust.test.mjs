@@ -92,6 +92,21 @@ test('cron fires more than 24h after registration with a fresh scoped activity t
   assert.equal(JSON.stringify(schedule).includes(token), false);
 });
 
+test('cron mint tolerates a worker clock behind the firing without extending expiry', async (t) => {
+  const firedAt = 200_000_000;
+  t.mock.timers.enable({ apis: ['Date'], now: firedAt - 5_000 });
+  const tenant = { tenantId: 'tenant_A', workspaceId: 'ws_A', flowId: 'flow_A' };
+  setRuntime({ activityInfo: { workflowExecution: { workflowId: 'skewed-firing', runId: 'skewed-run' } } });
+  const token = await cronTokens.mintCronExecutionToken({ tenant }, {
+    describeWorkflow: async () => ({ startTime: new Date(firedAt),
+      searchAttributes: { TemporalScheduledById: ['tenant_A:ws_A:flow_A'] } }),
+  });
+  const payload = assertExecutionToken(token, tenant.tenantId, tenant.workspaceId, { now: firedAt });
+  assert.equal(payload.expiresAt, firedAt + 86_400_000);
+  assert.throws(() => assertExecutionToken(token, tenant.tenantId, tenant.workspaceId,
+    { now: firedAt + 86_400_000 }), (err) => err.type === 'EXECUTION_TOKEN_EXPIRED' && err.nonRetryable === true);
+});
+
 test('production worker rejects the public dev key when its secret is unconfigured', async () => {
   const savedMode = process.env.NODE_ENV;
   const savedSecret = process.env.FLOW_EXECUTION_TOKEN_SECRET;

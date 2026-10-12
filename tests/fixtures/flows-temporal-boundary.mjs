@@ -2,6 +2,7 @@
 let runtime = {};
 export function setRuntime(value) { runtime = value; }
 export class ApplicationFailure extends Error {
+  constructor(message) { super(message); this.name = 'ApplicationFailure'; }
   static nonRetryable(message, type) { return Object.assign(new ApplicationFailure(message), { type, nonRetryable: true }); }
   static retryable(message, type) { return Object.assign(new ApplicationFailure(message), { type, nonRetryable: false }); }
 }

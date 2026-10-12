@@ -22,8 +22,9 @@ export async function mintCronExecutionToken({ tenant }, { describeWorkflow } = 
     throw toNonRetryable(EXECUTION_TOKEN_TENANT_MISMATCH, 'cron schedule does not own the tenant/workspace/flow');
   }
   const firedAt = description.startTime?.getTime?.();
-  const now = Date.now();
-  if (!Number.isFinite(firedAt) || now < firedAt || now >= firedAt + DEFAULT_MAX_RUN_DURATION_MS) {
+  // Temporal's firing time is authoritative when the worker clock lags behind it.
+  const now = Math.max(Date.now(), firedAt);
+  if (!Number.isFinite(firedAt) || now >= firedAt + DEFAULT_MAX_RUN_DURATION_MS) {
     throw toNonRetryable(EXECUTION_TOKEN_INVALID, 'cron firing time is invalid or expired');
   }
   return mintExecutionToken(tenant.tenantId, tenant.workspaceId, firedAt + DEFAULT_MAX_RUN_DURATION_MS - now, { now });

@@ -31,8 +31,10 @@ The worker needs describe permission in its existing namespace. A compromised wo
 possesses the shared key; delegating minting to the executor would not remove that trust.
 
 The run's server-recorded `startTime` defines the actual firing time. Mint using the activity
-clock and a remaining TTL ending at firing time plus `DEFAULT_MAX_RUN_DURATION_MS`. Reject
-future, missing, or already expired firing times. Activity delays/retries cannot extend expiry.
+clock clamped to at least the server-recorded firing time, and a remaining TTL ending at firing
+time plus `DEFAULT_MAX_RUN_DURATION_MS`. This tolerates worker/server clock skew while minting
+at or after the firing. Reject missing or already expired firing times. Activity delays/retries
+cannot extend expiry.
 Randomness, clock reads, HMAC, and server I/O occur only inside activities. The deterministic
 workflow threads the returned token into the tenant envelope before loading/dispatching tasks.
 
@@ -76,7 +78,9 @@ the real interpreter with a Temporal/CEL system-boundary adapter, real schedule 
 and HTTP flow-start error mapping. The adapter replaces only external SDK/runtime boundaries;
 Falcone workflow, activity, crypto, registry, and dispatch modules execute unchanged. The test
 adapter loads TypeScript with the existing worker compiler in CI and native stripping in the
-dependency-free Node 22 sandbox. The quality job runs the worker typecheck and token suites.
+dependency-free Node 22 sandbox. The quality job runs the worker typecheck/build, token suites,
+and credential-bearing catalog, database-wiring, and LLM activity regressions. Capability tests
+mint valid scoped credentials before dispatch so they exercise behavior behind the mandatory gate.
 The env suite uses the real SDK activity environment and Postgres RLS for manual, signed webhook,
 retry, and cron starts. CI must run frozen dependencies, worker typecheck/build, live Temporal
 schedule/replay checks, and the real database/HTTP suites. Release gates perform chart rendering,
