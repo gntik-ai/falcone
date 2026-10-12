@@ -286,7 +286,23 @@ service-catalog.json  Canonical release/non-release service catalog
 ../falcone-charts/  Companion repository for Kubernetes / Helm deployment (incl. temporal,
                     workflowWorker, mcp components)
 tests/           blackbox (contract) · e2e (Playwright, incl. mcp specs) · env (Compose stack)
+docs/            product documentation and retained track-f process plans/prompts
+docs-site/       published product documentation (VitePress)
+scripts/         repository validation and operational tooling
+internal-contracts/  retained schema baselines (separate from packages/internal-contracts)
+openspec/        tracked change proposals/specifications; kept at the OpenSpec root
+falcone-loop-state/  agent working memory: capabilities, coverage, findings, run log, tests
+spikes/          experiments and captured evidence used by ADRs and regression tests
+delivery-adapter/  versioned delivery-workflow snapshot and integrity manifest
 ```
+
+Agent memory and process evidence are preserved so contributors and automation can
+trace engineering decisions. Their current paths stay in place while Hermes delivery
+automation gains support for a future `.engineering/` layout. The
+[repository separation design](openspec/changes/restructure-repository-agent-material/design.md)
+records that later migration and its compatibility gates. OpenSpec stays at the root.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for where to put changes and how to retain evidence.
+Local IDE settings under `.idea/` are ignored.
 
 ---
 

@@ -57,3 +57,4 @@ kubeconfig*
 *.token
 byok-*.key
 secrets.local*
+/.idea/
