@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-export const snapshot = JSON.parse(readFileSync(new URL('../data/base-session.json', import.meta.url), 'utf8'))
+// Use a filesystem path so Vite's jsdom asset transform cannot rewrite it to an HTTP URL.
+const fixturePath = join(dirname(fileURLToPath(import.meta.url)), '../data/base-session.json')
+export const snapshot = JSON.parse(readFileSync(fixturePath, 'utf8'))
 export const sessionKey = 'in-falcone.console-shell-session'
 export const hintKey = 'in-falcone.console-auth-status-hint'
 export const routeKey = 'in-falcone.console-protected-route'
