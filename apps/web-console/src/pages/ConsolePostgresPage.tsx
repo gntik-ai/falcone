@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError } from '@/lib/console-errors'
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
 
 type PgDatabase = {

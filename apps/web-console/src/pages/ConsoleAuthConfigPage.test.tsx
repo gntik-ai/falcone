@@ -14,8 +14,8 @@ const authConfigApi = vi.hoisted(() => ({
   upsertTenantIdentityProvider: vi.fn()
 }))
 
-vi.mock('@/lib/console-permissions', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/console-permissions')>('@/lib/console-permissions')
+vi.mock('@in-falcone/console-api/permissions', async () => {
+  const actual = await vi.importActual<typeof import('@in-falcone/console-api/permissions')>('@in-falcone/console-api/permissions')
   return { ...actual, useConsolePermissions: () => actual.getConsolePermissions(mockRoles.current) }
 })
 vi.mock('@/lib/console-context', () => ({ useConsoleContext: () => mockUseConsoleContext() }))

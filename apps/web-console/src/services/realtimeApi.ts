@@ -3,7 +3,7 @@
 // for EITHER a Mongo collection or a Postgres table. A browser EventSource cannot set headers,
 // so the anon key is passed as ?apikey= (the gateway routes it to the executor, which verifies
 // the key). URLs match the executor's SSE routes exactly.
-import type { JsonValue } from '@/lib/http'
+import type { JsonValue } from '@in-falcone/console-api/http'
 
 const enc = encodeURIComponent
 

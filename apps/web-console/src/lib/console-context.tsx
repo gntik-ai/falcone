@@ -8,91 +8,12 @@ import {
   type ReactNode
 } from 'react'
 
-import { type ConsoleShellSession, requestConsoleSessionJson } from '@/lib/console-session'
+import type { ConsoleShellSession } from '@in-falcone/console-api/session'
+import type { Tenant, Workspace, TenantQuotaProfile, TenantInventoryResponse } from '@in-falcone/console-api/clients'
+import { listAccessibleTenants, listAccessibleWorkspaces } from '@in-falcone/console-api/loaders'
 import { getEffectiveCapabilities } from '@/services/planManagementApi'
 
 const CONSOLE_ACTIVE_CONTEXT_STORAGE_KEY = 'in-falcone.console-active-context'
-
-interface TenantCollectionResponse {
-  items: Tenant[]
-  page: PageInfo
-}
-
-interface WorkspaceCollectionResponse {
-  items: Workspace[]
-  page: PageInfo
-}
-
-interface PageInfo {
-  after?: string | null
-}
-
-interface ProvisioningSummary {
-  status?: string
-}
-
-interface TenantGovernanceProfile {
-  governanceStatus?: string
-}
-
-interface TenantIdentityContext {
-  consoleUserRealm?: string
-}
-
-interface TenantQuotaLimit {
-  metricKey: string
-  scope: string
-  limit: number
-  used: number
-  remaining: number
-  unit?: string
-}
-
-interface TenantQuotaProfile {
-  governanceStatus?: string
-  limits?: TenantQuotaLimit[]
-}
-
-interface TenantInventoryWorkspaceSummary {
-  workspaceId: string
-  workspaceSlug: string
-  environment?: string
-  state?: string
-  applicationCount: number
-  serviceAccountCount: number
-  managedResourceCount: number
-}
-
-interface TenantInventoryResponse {
-  tenantId: string
-  workspaceCount: number
-  applicationCount: number
-  managedResourceCount: number
-  serviceAccountCount: number
-  workspaces?: TenantInventoryWorkspaceSummary[]
-}
-
-interface Tenant {
-  tenantId: string
-  displayName: string
-  slug: string
-  state?: string
-  governance?: TenantGovernanceProfile
-  identityContext?: TenantIdentityContext
-  provisioning?: ProvisioningSummary
-  quotaProfile?: TenantQuotaProfile
-  inventorySummary?: TenantInventoryResponse
-}
-
-interface Workspace {
-  workspaceId: string
-  tenantId: string
-  displayName: string
-  slug: string
-  environment?: string
-  state?: string
-  provisioning?: ProvisioningSummary
-}
 
 export type ConsoleQuotaSeverity = 'nominal' | 'warning' | 'blocked'
 
@@ -877,41 +798,6 @@ export function formatConsoleContextEnumLabel(value: string | null | undefined):
   }
 
   return consoleContextEnumLabels[value] ?? formatConsoleEnumLabel(value)
-}
-
-// Fetch the list of tenants accessible to the current user.
-// Platform users (superadmin / platform_admin / platform_operator): use the collection
-// endpoint GET /v1/tenants. Tenant operators (tenant_owner / tenant_admin): use the
-// own-scope singular endpoint GET /v1/tenants/{tenantId} per tenantId in their session —
-// the collection endpoint is superadmin-only and 403s for them. A tenant operator with no
-// tenantIds returns an empty collection rather than calling the superadmin endpoint. (#569)
-async function listAccessibleTenants(options: {
-  isTenantOperator: boolean
-  ownTenantIds: string[]
-}): Promise<TenantCollectionResponse> {
-  if (options.isTenantOperator) {
-    if (options.ownTenantIds.length === 0) {
-      return { items: [], page: { after: null } }
-    }
-    const responses = await Promise.all(
-      options.ownTenantIds.map((tenantId) =>
-        requestConsoleSessionJson<{ tenant?: Tenant } & Tenant>(`/v1/tenants/${tenantId}`)
-      )
-    )
-    const items = responses
-      .map((res) => (res.tenant ? res.tenant : (res as Tenant)))
-      .filter((t): t is Tenant => Boolean(t?.tenantId))
-    return { items, page: { after: null } }
-  }
-  const searchParams = new URLSearchParams({ 'page[size]': '100', sort: 'displayName' })
-  return requestConsoleSessionJson<TenantCollectionResponse>(`/v1/tenants?${searchParams.toString()}`)
-}
-
-async function listAccessibleWorkspaces(tenantId: string): Promise<WorkspaceCollectionResponse> {
-  const searchParams = new URLSearchParams({ 'page[size]': '100', sort: 'displayName' })
-  searchParams.set('filter[tenantId]', tenantId)
-
-  return requestConsoleSessionJson<WorkspaceCollectionResponse>(`/v1/workspaces?${searchParams.toString()}`)
 }
 
 async function resolveRouteWorkspaceContext(

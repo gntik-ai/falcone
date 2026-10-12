@@ -16,12 +16,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleShellLayout } from '../../../apps/web-console/src/layouts/ConsoleShellLayout'
 import { McpServerPlayground } from '../../../apps/web-console/src/components/console/mcp/McpServerPlayground'
-import { clearConsoleShellSession, persistConsoleShellSession } from '../../../apps/web-console/src/lib/console-session'
+import { clearConsoleShellSession, persistConsoleShellSession } from '../../../packages/console-api/src/session'
 import { toMcpServerDetailViewModel } from '../../../apps/web-console/src/lib/mcp/mcp-server-detail'
 import { ConsoleRuntimePage } from '../../../apps/web-console/src/pages/ConsoleRuntimePage'
 import { appRoutes } from '../../../apps/web-console/src/router'
 import type { KnativeRuntimeStatus } from '../../../apps/web-console/src/services/knativeRuntimeApi'
-import type { ConsoleLoginSession } from '../../../apps/web-console/src/lib/console-auth'
+import type { ConsoleLoginSession } from '../../../packages/console-api/src/auth'
 
 const runtimeApi = vi.hoisted(() => ({ getStatus: vi.fn() }))
 

@@ -3,6 +3,8 @@ import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthLayout } from '@/layouts/AuthLayout'
+import type { ConsoleLoginSession } from '@in-falcone/console-api/auth'
+import { persistConsoleShellSession, readConsoleShellSession } from '@in-falcone/console-api/session'
 
 import { LoginPage } from './LoginPage'
 import { PasswordRecoveryPage } from './PasswordRecoveryPage'
@@ -133,7 +135,7 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }))
 
     expect(await screen.findByText('Workspace target')).toBeInTheDocument()
-    expect(JSON.parse(window.sessionStorage.getItem('in-falcone.console-shell-session') ?? '{}')).toMatchObject({
+    expect(readConsoleShellSession()).toMatchObject({
       sessionId: 'ses_abc123'
     })
 
@@ -162,7 +164,7 @@ describe('LoginPage', () => {
 
     expect(await screen.findByText('Overview target')).toBeInTheDocument()
     expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string)).toMatchObject({ tenantId: 'ten_acme' })
-    expect(JSON.parse(window.sessionStorage.getItem('in-falcone.console-shell-session') ?? '{}')).toMatchObject({
+    expect(readConsoleShellSession()).toMatchObject({
       tenantId: 'ten_acme'
     })
   })
@@ -279,7 +281,7 @@ describe('LoginPage', () => {
   })
 
   it('evita permanecer en login cuando ya existe una sesión válida', async () => {
-    window.sessionStorage.setItem('in-falcone.console-shell-session', JSON.stringify(activeConsoleSession()))
+    persistConsoleShellSession(activeConsoleSession())
     fetchMock.mockResolvedValueOnce(createJsonResponse(200, allowedSignupPolicy()))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -448,7 +450,7 @@ function allowedSignupPolicy() {
   }
 }
 
-function activeConsoleSession() {
+function activeConsoleSession(): ConsoleLoginSession {
   return {
     sessionId: 'ses_abc123',
     authenticationState: 'active',

@@ -3,13 +3,13 @@ import { Link, useLocation } from 'react-router-dom'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { getConsoleAccountStatusView, type ConsoleAccountStatusView } from '@/lib/console-auth'
+import { getConsoleAccountStatusView, type ConsoleAccountStatusView } from '@in-falcone/console-api/auth'
 import {
   AUTH_PANEL_CLASS_NAME,
   AUTH_PANEL_HEADING_CLASS_NAME,
   AUTH_PANEL_INTRO_CLASS_NAME
 } from '@/lib/console-auth-surface'
-import { consoleAuthConfig } from '@/lib/console-config'
+import { consoleAuthConfig } from '@in-falcone/console-api/config'
 
 interface PendingActivationLocationState {
   registrationId?: string

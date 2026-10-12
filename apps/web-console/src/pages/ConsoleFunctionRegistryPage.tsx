@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError } from '@/lib/console-errors'
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
 interface FunctionRecord {
   id: string

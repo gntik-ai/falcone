@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ReadOnlyActionBadge } from '@/components/console/ReadOnlyActionBadge'
 import { useConsoleContext } from '@/lib/console-context'
-import { useConsolePermissions } from '@/lib/console-permissions'
+import { useConsolePermissions } from '@in-falcone/console-api/permissions'
 
 export function ConsoleWorkspacesPage() {
   const [wizardOpen, setWizardOpen] = useState(false)

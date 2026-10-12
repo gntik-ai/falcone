@@ -18,7 +18,7 @@ vi.mock('@/layouts/ConsoleShellLayout', () => ({
     </div>
   )
 }))
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   readConsoleShellSession: () => ({ principal: { platformRoles: ['superadmin'] } })
 }))
 // The rotation page polls secret-rotation actions on mount; stub them so the behavioral render

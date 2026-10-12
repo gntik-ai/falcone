@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ConsoleShellSession } from '@/lib/console-session'
+import type { ConsoleShellSession } from '@in-falcone/console-api/session'
 
-import { canManageWorkspaceSecrets, hasWorkspaceSecretsPrivilegedRole } from './workspace-secrets-access'
+import { canManageWorkspaceSecrets, hasWorkspaceSecretsPrivilegedRole } from '@in-falcone/console-api/workspace-secrets-access'
 
 function session(principal: Partial<NonNullable<ConsoleShellSession['principal']>> | null): ConsoleShellSession {
   return {

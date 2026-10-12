@@ -1,5 +1,5 @@
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { ApiError, JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { ApiError, JsonValue } from '@in-falcone/console-api/http'
 
 export type PlanStatus = 'draft' | 'active' | 'deprecated' | 'archived'
 export type EffectiveValueKind = 'bounded' | 'unlimited' | 'missing'

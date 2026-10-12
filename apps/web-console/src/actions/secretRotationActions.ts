@@ -50,7 +50,7 @@ function parseSecretPath(secretPath: string) {
   }
 }
 
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
+async function requestSecretRotationJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     headers: {
       'content-type': 'application/json'
@@ -67,7 +67,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export async function initiateRotation(secretPath: string, { gracePeriodSeconds, justification, newValue }: InitiateRotationInput): Promise<RotationResult> {
   const { domain, secretName } = parseSecretPath(secretPath)
-  return requestJson(`/v1/platform/secrets/${encodeURIComponent(domain)}/${encodeURIComponent(secretName)}/rotate`, {
+  return requestSecretRotationJson(`/v1/platform/secrets/${encodeURIComponent(domain)}/${encodeURIComponent(secretName)}/rotate`, {
     method: 'POST',
     body: JSON.stringify({ secretPath, gracePeriodSeconds, justification, newValue })
   })
@@ -75,7 +75,7 @@ export async function initiateRotation(secretPath: string, { gracePeriodSeconds,
 
 export async function revokeSecretVersion(secretPath: string, vaultVersion: number, { justification, forceRevoke }: RevokeInput): Promise<RevokeResult> {
   const { domain, secretName } = parseSecretPath(secretPath)
-  return requestJson(`/v1/platform/secrets/${encodeURIComponent(domain)}/${encodeURIComponent(secretName)}/versions/${vaultVersion}/revoke`, {
+  return requestSecretRotationJson(`/v1/platform/secrets/${encodeURIComponent(domain)}/${encodeURIComponent(secretName)}/versions/${vaultVersion}/revoke`, {
     method: 'POST',
     body: JSON.stringify({ secretPath, justification, forceRevoke })
   })
@@ -83,11 +83,11 @@ export async function revokeSecretVersion(secretPath: string, vaultVersion: numb
 
 export async function listRotationHistory(secretPath: string, { limit = 20, offset = 0 }: PaginationInput): Promise<RotationHistoryPage> {
   const { domain, secretName } = parseSecretPath(secretPath)
-  return requestJson(`/v1/platform/secrets/${encodeURIComponent(domain)}/${encodeURIComponent(secretName)}/history?limit=${limit}&offset=${offset}`)
+  return requestSecretRotationJson(`/v1/platform/secrets/${encodeURIComponent(domain)}/${encodeURIComponent(secretName)}/history?limit=${limit}&offset=${offset}`)
 }
 
 export async function getConsumerStatus(secretPath: string, vaultVersion?: number): Promise<ConsumerStatusPage> {
   const { domain, secretName } = parseSecretPath(secretPath)
   const suffix = typeof vaultVersion === 'number' ? `?vaultVersion=${vaultVersion}` : ''
-  return requestJson(`/v1/platform/secrets/${encodeURIComponent(domain)}/${encodeURIComponent(secretName)}/consumer-status${suffix}`)
+  return requestSecretRotationJson(`/v1/platform/secrets/${encodeURIComponent(domain)}/${encodeURIComponent(secretName)}/consumer-status${suffix}`)
 }

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError, getConsoleErrorStatus } from '@/lib/console-errors'
 import { DESTRUCTIVE_OP_LEVELS } from '@/lib/destructive-ops'
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import type { SnippetContext } from '@/lib/snippets/snippet-types'
 
 type IamProviderCompatibility = {

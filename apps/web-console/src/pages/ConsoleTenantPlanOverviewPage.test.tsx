@@ -12,7 +12,7 @@ vi.mock('@/services/planManagementApi', () => ({
   getEffectiveEntitlements: getEffectiveEntitlementsMock
 }))
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   readConsoleShellSession: readConsoleShellSessionMock
 }))
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { fetchAsyncOperationQuery, type OperationListResponse, type OperationSummary } from '@/lib/console-operations'
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import { reconcileOperations, type ReconciliationDelta } from '@/lib/reconcile-operations'
 
 export interface ReconnectStateSyncOptions {

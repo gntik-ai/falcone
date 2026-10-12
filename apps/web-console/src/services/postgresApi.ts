@@ -1,8 +1,8 @@
 // PostgreSQL data + schema + API-key client for the console (change: add-console-postgres-data-editor).
 // Centralizes the calls to the control-plane executor (Phases 0-2): DDL execution, row CRUD,
 // and workspace API keys. URLs match the executor's HTTP routes exactly.
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import { requestJson, type JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import { requestJson, type JsonValue } from '@in-falcone/console-api/http'
 
 const enc = encodeURIComponent
 

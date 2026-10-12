@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import {
   canManageWorkspaceDocNotes,
   createDocNote,
@@ -8,7 +8,7 @@ import {
   updateDocNote
 } from '@/lib/console-workspace-docs'
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   requestConsoleSessionJson: vi.fn().mockResolvedValue({})
 }))
 

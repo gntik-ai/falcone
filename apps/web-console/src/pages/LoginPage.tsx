@@ -18,18 +18,18 @@ import {
   inferStatusViewFromError,
   type ConsoleAccountStatusView,
   type ConsoleSignupPolicy
-} from '@/lib/console-auth'
-import { consoleAuthConfig } from '@/lib/console-config'
+} from '@in-falcone/console-api/auth'
+import { consoleAuthConfig } from '@in-falcone/console-api/config'
 import { FORM_FIELD_ERROR_CLASS_NAME, INVALID_FORM_CONTROL_CLASS_NAME } from '@/lib/console-create-form-validation'
-import { getConsolePermissions } from '@/lib/console-permissions'
+import { getConsolePermissions } from '@in-falcone/console-api/permissions'
 import {
   consumeConsoleAuthStatusHint,
   consumeProtectedRouteIntent,
   ensureConsoleSession,
   persistConsoleShellSession,
   readConsoleShellSession
-} from '@/lib/console-session'
-import type { ApiError } from '@/lib/http'
+} from '@in-falcone/console-api/session'
+import type { ApiError } from '@in-falcone/console-api/http'
 
 type FeedbackState =
   | {

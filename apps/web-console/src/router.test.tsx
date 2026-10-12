@@ -42,7 +42,7 @@ vi.mock('@/pages/ConsolePlanCreatePage', () => ({ ConsolePlanCreatePage: () => <
 vi.mock('@/pages/ConsolePlanDetailPage', () => ({ ConsolePlanDetailPage: () => <h1>Plan detail</h1> }))
 vi.mock('@/pages/ConsoleTenantPlanPage', () => ({ ConsoleTenantPlanPage: () => <h1>Tenant plan admin</h1> }))
 vi.mock('@/pages/ConsoleTenantPlanOverviewPage', () => ({ ConsoleTenantPlanOverviewPage: () => <h1>My plan</h1> }))
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   readConsoleShellSession: readConsoleShellSessionMock,
   // NotFoundPage (#733) reads this to decide its auth-aware primary recovery action; the router
   // tests below aren't about that decision, so default it to match the always-present superadmin

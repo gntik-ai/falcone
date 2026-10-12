@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { useWizardPermissionCheck, useWizardQuotaCheck, createValidation, submitWizardRequest, type WizardStepProps } from '@/lib/console-wizards'
-import { readConsoleShellSession } from '@/lib/console-session'
+import { readConsoleShellSession } from '@in-falcone/console-api/session'
 import { listPlans, type PlanRecord } from '@/services/planManagementApi'
 
 interface TenantData { name: string; planId: string; region: string; locale: string }

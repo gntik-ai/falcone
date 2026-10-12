@@ -1,4 +1,4 @@
-import { requestJson, type ApiError } from '@/lib/http'
+import { requestJson, type ApiError } from './http'
 
 export type ConsoleAuthenticationState = 'active' | 'pending_activation' | 'suspended' | 'credentials_expired'
 export type ConsoleSignupActivationMode = 'self_service' | 'approval_required' | 'auto_activate'

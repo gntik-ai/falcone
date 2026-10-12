@@ -8,7 +8,7 @@ import { QuotaConsumptionTable } from '@/components/console/QuotaConsumptionTabl
 import { Alert } from '@/components/ui/alert'
 import { describeConsoleError } from '@/lib/console-errors'
 import { getConsolePlatformRoles, isTenantlessPlatformPrincipal } from '@/lib/console-principal'
-import { readConsoleShellSession } from '@/lib/console-session'
+import { readConsoleShellSession } from '@in-falcone/console-api/session'
 import * as api from '@/services/planManagementApi'
 
 export function ConsoleTenantPlanOverviewPage() {

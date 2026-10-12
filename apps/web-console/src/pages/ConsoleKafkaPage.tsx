@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError, getConsoleErrorStatus } from '@/lib/console-errors'
-import { readConsoleShellSession, requestConsoleSessionJson } from '@/lib/console-session'
+import { readConsoleShellSession, requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
 type KafkaNamingPolicy = {
   topicPrefix?: string

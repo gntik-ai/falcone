@@ -295,6 +295,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Console API unit tests (vitest)
+        run: pnpm --filter @in-falcone/console-api test
+
       - name: Web console unit tests (vitest)
         run: pnpm --filter @in-falcone/web-console test
 

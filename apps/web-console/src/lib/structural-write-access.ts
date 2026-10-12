@@ -8,7 +8,7 @@
 // `platform_operator`/`platform_team` (a console-wide platform bypass used for narrower,
 // console-only affordances elsewhere) — using it here would enable a control the backend then 403s
 // for those two roles (round-2 review, #761).
-import { STRUCTURAL_WRITE_ADMIN_ROLES } from '@/lib/console-permissions'
+import { STRUCTURAL_WRITE_ADMIN_ROLES } from '@in-falcone/console-api/permissions'
 
 export function canPerformStructuralWrites(roles: readonly string[] | undefined): boolean {
   return Array.isArray(roles) && roles.some((role) => STRUCTURAL_WRITE_ADMIN_ROLES.has(role))

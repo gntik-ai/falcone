@@ -2,7 +2,7 @@ import { isValidElement, type ReactElement } from 'react'
 import { describe, expect, it } from 'vitest'
 
 import { AuthLayout } from '@/layouts/AuthLayout'
-import { consoleAuthConfig } from '@/lib/console-config'
+import { consoleAuthConfig } from '@in-falcone/console-api/config'
 
 import { appRoutes } from './router'
 

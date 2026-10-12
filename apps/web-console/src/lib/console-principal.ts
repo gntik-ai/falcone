@@ -1,4 +1,4 @@
-import type { ConsoleShellSession } from '@/lib/console-session'
+import type { ConsoleShellSession } from '@in-falcone/console-api/session'
 
 export function getConsolePlatformRoles(principal: ConsoleShellSession['principal'] | undefined): string[] {
   return Array.isArray(principal?.platformRoles) ? principal.platformRoles : []

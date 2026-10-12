@@ -8,7 +8,7 @@ const sessionMocks = vi.hoisted(() => ({
   requestConsoleSessionJson: vi.fn()
 }))
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   readConsoleShellSession: sessionMocks.readConsoleShellSession,
   requestConsoleSessionJson: sessionMocks.requestConsoleSessionJson
 }))

@@ -1,7 +1,7 @@
 // MongoDB document data client for the console (change: add-console-mongo-data-editor).
 // Calls the control-plane executor's Mongo document routes exactly. URLs match the executor.
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import { requestJson, type JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import { requestJson, type JsonValue } from '@in-falcone/console-api/http'
 
 const enc = encodeURIComponent
 

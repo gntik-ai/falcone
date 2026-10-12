@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { exportAuditRecords, normalizeAuditRecord, normalizeMetricsOverview, useConsoleAuditRecords, useConsoleMetrics, type ConsoleMetricRange } from './console-metrics'
 
 const mockRequestConsoleSessionJson = vi.fn()
-vi.mock('@/lib/console-session', () => ({ requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args) }))
+vi.mock('@in-falcone/console-api/session', () => ({ requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args) }))
 
 describe('console-metrics', () => {
   beforeEach(() => {

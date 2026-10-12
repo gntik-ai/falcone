@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { JsonValue } from '@in-falcone/console-api/http'
 
 export const ASYNC_OPERATION_QUERY_ENDPOINT = '/v1/async-operation-query'
 const ASYNC_RESOURCE_ERROR_RETRY_DELAYS_MS = [1_000, 3_000] as const

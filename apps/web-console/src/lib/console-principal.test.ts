@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ConsoleSessionPrincipal } from '@/lib/console-auth'
+import type { ConsoleSessionPrincipal } from '@in-falcone/console-api/auth'
 import { hasPlatformInventoryAccess, isTenantlessPlatformPrincipal } from './console-principal'
 
 function principal(overrides: Partial<ConsoleSessionPrincipal> = {}): ConsoleSessionPrincipal {

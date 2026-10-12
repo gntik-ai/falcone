@@ -1,4 +1,4 @@
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
 // --- Types ---
 

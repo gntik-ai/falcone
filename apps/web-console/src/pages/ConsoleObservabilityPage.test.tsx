@@ -23,7 +23,7 @@ vi.mock('@/lib/console-metrics', () => ({
   useConsoleAuditRecords: (...args: unknown[]) => mockUseConsoleAuditRecords(...args),
   exportAuditRecords: (...args: unknown[]) => mockExportAuditRecords(...args)
 }))
-vi.mock('@/lib/console-session', () => ({ readConsoleShellSession: () => mockReadConsoleShellSession() }))
+vi.mock('@in-falcone/console-api/session', () => ({ readConsoleShellSession: () => mockReadConsoleShellSession() }))
 
 describe('ConsoleObservabilityPage', () => {
   beforeEach(() => {

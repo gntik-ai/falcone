@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConsoleShellLayout } from './ConsoleShellLayout'
 
 import { useConsoleContext } from '@/lib/console-context'
-import { clearConsoleShellSession, persistConsoleShellSession, readConsoleShellSession } from '@/lib/console-session'
+import { clearConsoleShellSession, persistConsoleShellSession, readConsoleShellSession } from '@in-falcone/console-api/session'
 
 const fetchMock = vi.fn<typeof fetch>()
 

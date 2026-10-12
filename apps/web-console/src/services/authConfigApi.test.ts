@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/lib/console-session', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/console-session')>('@/lib/console-session')
+vi.mock('@in-falcone/console-api/session', async () => {
+  const actual = await vi.importActual<typeof import('@in-falcone/console-api/session')>('@in-falcone/console-api/session')
   return { ...actual, requestConsoleSessionJson: vi.fn().mockResolvedValue({}) }
 })
 
-import { persistConsoleShellSession, requestConsoleSessionJson } from '@/lib/console-session'
-import type { ConsoleLoginSession } from '@/lib/console-auth'
+import { persistConsoleShellSession, requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { ConsoleLoginSession } from '@in-falcone/console-api/auth'
 import {
   deleteTenantIdentityProvider,
   getTenantAuthConfig,
@@ -112,7 +112,7 @@ describe('authConfigApi — inherits session headers on mutations (no per-call c
   })
 
   it('PUT auth-config carries Idempotency-Key, X-API-Version, X-Correlation-Id and the bearer', async () => {
-    const real = await vi.importActual<typeof import('@/lib/console-session')>('@/lib/console-session')
+    const real = await vi.importActual<typeof import('@in-falcone/console-api/session')>('@in-falcone/console-api/session')
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-03-28T19:00:00.000Z'))
     persistConsoleShellSession(baseSession)

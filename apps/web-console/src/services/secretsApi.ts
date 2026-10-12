@@ -10,8 +10,8 @@
 // server-side — the value is resolved only at function deploy, server-side). Read types mirror the
 // OpenAPI FunctionWorkspaceSecret / FunctionWorkspaceSecretCollection schemas and carry NO value
 // field; only the write-request type carries secretValue.
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { JsonValue } from '@in-falcone/console-api/http'
 
 const enc = encodeURIComponent
 

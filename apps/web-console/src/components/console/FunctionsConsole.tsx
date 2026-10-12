@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import type { ApiError, JsonValue } from '@/lib/http'
+import type { ApiError, JsonValue } from '@in-falcone/console-api/http'
 import { parseJsonObject, prettyJson } from '@/lib/editor-ux'
 import { cn } from '@/lib/utils'
 import {

@@ -14,7 +14,7 @@ import {
   clearConsoleShellSession,
   persistConsoleShellSession,
   type ConsoleShellSession
-} from '@/lib/console-session'
+} from '@in-falcone/console-api/session'
 
 const fetchMock = vi.fn<typeof fetch>()
 

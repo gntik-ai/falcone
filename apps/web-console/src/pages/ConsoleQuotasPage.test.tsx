@@ -29,7 +29,7 @@ vi.mock('@/lib/console-quotas', async () => {
   const actual = await vi.importActual<typeof import('@/lib/console-quotas')>('@/lib/console-quotas')
   return { ...actual, useConsoleQuotas: (...args: unknown[]) => mockUseConsoleQuotas(...args) }
 })
-vi.mock('@/lib/console-session', () => ({ readConsoleShellSession: () => mockReadConsoleShellSession() }))
+vi.mock('@in-falcone/console-api/session', () => ({ readConsoleShellSession: () => mockReadConsoleShellSession() }))
 vi.mock('@/services/planManagementApi', () => planApi)
 
 describe('ConsoleQuotasPage', () => {

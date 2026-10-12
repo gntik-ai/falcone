@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { InvitationProofView } from './InvitationProofView'
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import type { Invitation, InvitationProof } from '@/lib/invitations'
 
 export function ConsoleInvitationList({ tenantId, reloadKey }: { tenantId: string; reloadKey: number }) {

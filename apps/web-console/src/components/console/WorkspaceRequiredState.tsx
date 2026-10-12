@@ -11,7 +11,7 @@ import { ConsolePageState } from '@/components/console/ConsolePageState'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { type ConsoleWorkspaceOption, useConsoleContext } from '@/lib/console-context'
-import { useConsolePermissions } from '@/lib/console-permissions'
+import { useConsolePermissions } from '@in-falcone/console-api/permissions'
 
 export const WORKSPACE_REQUIRED_STATE_DEFAULT_TITLE = 'Selecciona un área de trabajo'
 

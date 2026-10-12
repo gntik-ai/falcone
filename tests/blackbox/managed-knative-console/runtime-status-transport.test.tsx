@@ -4,8 +4,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ConsoleLoginSession } from '../../../apps/web-console/src/lib/console-auth'
-import { clearConsoleShellSession, persistConsoleShellSession } from '../../../apps/web-console/src/lib/console-session'
+import type { ConsoleLoginSession } from '../../../packages/console-api/src/auth'
+import { clearConsoleShellSession, persistConsoleShellSession } from '../../../packages/console-api/src/session'
 import { getKnativeRuntimeStatus } from '../../../apps/web-console/src/services/knativeRuntimeApi'
 
 const activeSession: ConsoleLoginSession = {

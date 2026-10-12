@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleContextProvider } from '@/lib/console-context'
-import { clearConsoleShellSession, persistConsoleShellSession, type ConsoleShellSession } from '@/lib/console-session'
+import { clearConsoleShellSession, persistConsoleShellSession, type ConsoleShellSession } from '@in-falcone/console-api/session'
 
 import { ConsoleMembersPage } from './ConsoleMembersPage'
 

@@ -12,7 +12,7 @@ vi.mock('@/lib/console-context', async () => {
   const actual = await vi.importActual<typeof import('@/lib/console-context')>('@/lib/console-context')
   return { ...actual, useConsoleContext: () => mockUseConsoleContext() }
 })
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   readConsoleShellSession: () => mockReadConsoleShellSession(),
   requestConsoleSessionJson: vi.fn()
 }))

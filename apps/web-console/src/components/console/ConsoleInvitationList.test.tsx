@@ -1,8 +1,8 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
-import { persistConsoleShellSession, clearConsoleShellSession } from '@/lib/console-session'
-import type { ConsoleLoginSession } from '@/lib/console-auth'
+import { persistConsoleShellSession, clearConsoleShellSession } from '@in-falcone/console-api/session'
+import type { ConsoleLoginSession } from '@in-falcone/console-api/auth'
 import { ConsoleInvitationList } from './ConsoleInvitationList'
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); clearConsoleShellSession() })

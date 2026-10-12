@@ -15,7 +15,7 @@
 // the server continues to enforce the real authorization decision (403). Hiding/disabling an
 // affordance here shapes the experience so a role never has to "try and fail" to discover what it
 // cannot do; it does not, by itself, secure anything.
-import { readConsoleShellSession } from '@/lib/console-session'
+import { readConsoleShellSession } from './session'
 
 // Actions the console UI actually renders affordances for. Kept deliberately coarse — mirroring
 // every leaf action in authorization-model.json's `permission_matrix` would add drift risk for no

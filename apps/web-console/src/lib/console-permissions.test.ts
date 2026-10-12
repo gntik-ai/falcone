@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { getConsolePermissions, STRUCTURAL_WRITE_ADMIN_ROLES, useConsolePermissions } from './console-permissions'
+import { getConsolePermissions, STRUCTURAL_WRITE_ADMIN_ROLES, useConsolePermissions } from '@in-falcone/console-api/permissions'
 
 // A real cross-package import of apps/control-plane-executor/src/runtime/auth-roles.mjs (the pattern already
 // used by src/actions/*.mjs, e.g. tenant-management.mjs) resolves fine under vitest, but `tsc
@@ -22,7 +22,7 @@ const BACKEND_WRITE_CAPABLE_ADMIN_ROLES = new Set([
 
 const readConsoleShellSessionMock = vi.fn()
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   readConsoleShellSession: () => readConsoleShellSessionMock()
 }))
 

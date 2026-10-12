@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
-import { consoleAuthConfig } from '@/lib/console-config'
+import { consoleAuthConfig } from '@in-falcone/console-api/config'
 import {
   ensureConsoleSession,
   readConsoleShellSession,
   storeProtectedRouteIntent,
   subscribeConsoleSessionInvalidated
-} from '@/lib/console-session'
+} from '@in-falcone/console-api/session'
 
 type GuardState = 'checking' | 'allowed' | 'denied'
 

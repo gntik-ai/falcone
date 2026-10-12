@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { clearConsoleShellSession, persistConsoleShellSession } from '@/lib/console-session'
+import { clearConsoleShellSession, persistConsoleShellSession } from '@in-falcone/console-api/session'
 
 const useConsoleContextMock = vi.hoisted(() => vi.fn())
 

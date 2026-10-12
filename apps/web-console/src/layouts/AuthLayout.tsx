@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Link, Outlet, useLocation, useMatches } from 'react-router-dom'
 
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
-import { consoleAuthConfig } from '@/lib/console-config'
+import { consoleAuthConfig } from '@in-falcone/console-api/config'
 
 const DEFAULT_DOCUMENT_TITLE = 'Consola In Falcone'
 

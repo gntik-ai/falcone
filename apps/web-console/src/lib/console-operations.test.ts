@@ -10,7 +10,7 @@ import {
 
 const mockRequestConsoleSessionJson = vi.fn()
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   requestConsoleSessionJson: (...args: unknown[]) => mockRequestConsoleSessionJson(...args)
 }))
 

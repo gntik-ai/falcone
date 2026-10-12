@@ -12,8 +12,8 @@ import { ConsoleInvitationList } from '@/components/console/ConsoleInvitationLis
 import { InviteUserWizard } from '@/components/console/wizards/InviteUserWizard'
 import { formatConsoleEnumLabel, useConsoleContext } from '@/lib/console-context'
 import { describeConsoleError, getConsoleErrorStatus } from '@/lib/console-errors'
-import { useConsolePermissions } from '@/lib/console-permissions'
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { useConsolePermissions } from '@in-falcone/console-api/permissions'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
 interface PageInfo {
   after?: string | null

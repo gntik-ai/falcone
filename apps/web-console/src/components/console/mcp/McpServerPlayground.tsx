@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import type { JsonValue } from '@/lib/http'
+import type { JsonValue } from '@in-falcone/console-api/http'
 import { invokeMcpTool, type InvokeMcpToolResult } from '@/lib/mcp/mcp-api'
 import type { McpToolView } from '@/lib/mcp/mcp-server-detail'
 

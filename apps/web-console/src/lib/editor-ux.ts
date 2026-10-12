@@ -1,6 +1,6 @@
 // Shared, pure helpers for the executor data editors (change: add-console-richer-data-editors).
 // Kept framework-free so they are unit-testable without a DOM.
-import type { JsonValue } from '@/lib/http'
+import type { JsonValue } from '@in-falcone/console-api/http'
 
 export type JsonObject = Record<string, JsonValue>
 

@@ -9,7 +9,7 @@ const requestMock = vi.fn()
 const readConsoleShellSessionMock = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({ useConsoleContext: () => ({ activeWorkspaceId: 'wrk_a1', activeTenantId: 'ten_alpha' }) }))
-vi.mock('@/lib/console-session', () => ({ readConsoleShellSession: () => readConsoleShellSessionMock(), requestConsoleSessionJson: (...args: unknown[]) => requestMock(...args) }))
+vi.mock('@in-falcone/console-api/session', () => ({ readConsoleShellSession: () => readConsoleShellSessionMock(), requestConsoleSessionJson: (...args: unknown[]) => requestMock(...args) }))
 
 afterEach(() => {
   cleanup()

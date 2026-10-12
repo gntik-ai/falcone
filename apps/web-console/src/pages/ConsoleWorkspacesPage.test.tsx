@@ -7,7 +7,7 @@ import { ConsoleWorkspacesPage } from './ConsoleWorkspacesPage'
 const mockReadConsoleShellSession = vi.fn()
 
 vi.mock('@/lib/console-context', () => ({ useConsoleContext: () => ({ activeTenant: { label: 'Tenant Alpha' }, activeTenantId: 'ten_1' }) }))
-vi.mock('@/lib/console-session', () => ({ readConsoleShellSession: () => mockReadConsoleShellSession(), requestConsoleSessionJson: vi.fn() }))
+vi.mock('@in-falcone/console-api/session', () => ({ readConsoleShellSession: () => mockReadConsoleShellSession(), requestConsoleSessionJson: vi.fn() }))
 vi.mock('@/lib/console-quotas', () => ({ useConsoleQuotas: () => ({ posture: null, workspacePosture: null, loading: false }) }))
 
 describe('ConsoleWorkspacesPage', () => {

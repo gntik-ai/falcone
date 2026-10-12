@@ -2,8 +2,8 @@
 // console (change: add-data-export-import-clone, #683). Calls the control-plane routes exactly; URLs
 // match the published catalog. Mongo/Postgres/Functions export-import live in their own family API
 // modules (mongoApi / postgresApi / functionsApi).
-import { requestConsoleSessionJson } from '@/lib/console-session'
-import type { JsonValue } from '@/lib/http'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { JsonValue } from '@in-falcone/console-api/http'
 
 const enc = encodeURIComponent
 

@@ -27,7 +27,7 @@ const catalogPlans = [
   }
 ]
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   readConsoleShellSession: () => readConsoleShellSessionMock(),
   requestConsoleSessionJson: (...args: unknown[]) => requestMock(...args)
 }))

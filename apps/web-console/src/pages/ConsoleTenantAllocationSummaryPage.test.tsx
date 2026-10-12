@@ -12,7 +12,7 @@ vi.mock('@/services/planManagementApi', () => ({
   getTenantAllocationSummary: mockGetTenantAllocationSummary
 }))
 
-vi.mock('@/lib/console-session', () => ({
+vi.mock('@in-falcone/console-api/session', () => ({
   readConsoleShellSession: mockReadConsoleShellSession
 }))
 

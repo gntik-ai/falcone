@@ -3,8 +3,8 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { requestJson } from '@/lib/http'
-import { readConsoleShellSession, requestConsoleSessionJson } from '@/lib/console-session'
+import { requestJson } from '@in-falcone/console-api/http'
+import { readConsoleShellSession, requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
 export function InvitationAcceptancePage() {
   const { tenantId, invitationId } = useParams()

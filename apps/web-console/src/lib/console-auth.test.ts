@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { refreshConsoleLoginSession, terminateConsoleLoginSession } from './console-auth'
+import { refreshConsoleLoginSession, terminateConsoleLoginSession } from '@in-falcone/console-api/auth'
 
 // Regression for #667: console logout must carry the session's refresh token in
 // the DELETE body so the control plane can revoke it at Keycloak and end the SSO

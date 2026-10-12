@@ -5,7 +5,7 @@
 //   GET /v1/flows/workspaces/{workspaceId}/task-types -> { items: TaskTypeDescriptor[] }
 //
 // The palette is driven ENTIRELY by this response; no task type is hard-coded in the UI.
-import { requestConsoleSessionJson } from '@/lib/console-session'
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import type { TaskTypeDescriptor } from '@/types/flows'
 
 const enc = encodeURIComponent
