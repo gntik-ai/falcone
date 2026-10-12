@@ -32,3 +32,23 @@ and env round-trip suites need `pg`; full database wiring needs the compiled wor
 typecheck/build cannot start because spawning Node returns EPERM, and node_modules are absent.
 No dependency manifests or lockfiles changed. Live Temporal firing/replay, authorizer describe
 permission, image digests, and release approval remain integration/release obligations above.
+
+## Source revalidation after deployment-only findings
+
+Reviewed source HEAD `172a47c4b36bc2ebb10839a675090f82db90d8f6` in the assigned clean
+issue-976 worktree. The new checker findings belong to falcone-charts; no further source fix
+was identified. Preserve the existing implementation and its red-before-green evidence above.
+This follow-up changes only this handoff; dependency manifests, lockfiles, and chart pins remain
+unchanged.
+
+The production-secret and execution-token-trust blackbox suites pass offline. The latter's nine
+cases cover missing/null credentials, production executor/worker parity, late cron firings,
+clock skew, exact-run schedule ownership, expiry bounds, echo behavior, and the replay patch seam.
+The executor and worker secret resolvers remain byte-equivalent and minting stays in activities.
+
+The dependency-backed checks could not start: execution-credentials requires `yaml`;
+activity-token-gate, activities, worker-db-activity-wiring, and llm-complete-activity require
+`@temporalio/activity`; execution-token-not-in-memo and the env credential round-trip require
+`pg`. Worker typecheck and build both stop at `spawnSync /usr/local/bin/node EPERM`.
+These are sandbox skips, not assertion failures. PR CI must run those checks with installed
+dependencies; live Temporal firing/replay and all paired deployment/release gates remain pending.
