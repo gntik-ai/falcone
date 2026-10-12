@@ -54,21 +54,30 @@ async function assignPlanBestEffort(pool, { tenantId, planId, assignedBy }, deps
     ?? (() => import('/repo/packages/provisioning-orchestrator/src/repositories/plan-repository.mjs'));
   const loadPlanAssign = deps.loadPlanAssign
     ?? (async () => (await import('/repo/packages/provisioning-orchestrator/src/actions/plan-assign.mjs')).main);
+  let client = null;
   try {
+    // Like server.mjs:452-453, keep BEGIN/INSERT/COMMIT on one connection; the
+    // plan-assign action owns the transaction, so assigned:true means committed.
+    client = typeof pool.connect === 'function' ? await pool.connect() : pool;
     let resolvedPlanId = planId;
     if (!isPlanUuid(planId)) {
       const planRepo = await loadPlanRepo();
-      const plan = await planRepo.findBySlug(pool, planId);
+      const plan = await planRepo.findBySlug(client, planId);
       if (!plan) return { assigned: false, requestedPlanId: planId, reason: `no plan matches "${planId}"` };
       resolvedPlanId = plan.id;
     }
     const planAssign = await loadPlanAssign();
     const res = await planAssign(
       { tenantId, planId: resolvedPlanId, assignedBy, callerContext: { actor: { id: assignedBy, type: 'superadmin' } } },
-      { db: pool });
+      { db: client });
     return { assigned: true, ...(res?.body ?? {}) };
   } catch (e) {
-    return { assigned: false, requestedPlanId: planId, reason: String(e?.message ?? e) };
+    return { assigned: false, requestedPlanId: planId,
+      reason: client ? String(e?.message ?? e) : 'Plan assignment connection unavailable' };
+  } finally {
+    if (client && client !== pool) {
+      try { await client.release(); } catch { /* cleanup must not abort tenant creation */ }
+    }
   }
 }
 

@@ -26,6 +26,20 @@ control-plane implementation, `apps/control-plane/b-handlers.mjs` passes `body.p
 using the existing plan-management assignment action; the assignment is observable through
 `GET /v1/tenants/{tenantId}/plan`.
 
+The inline assignment checks out a dedicated connection from the PostgreSQL pool for slug
+resolution and every plan-assignment statement, then releases it in `finally`. The existing
+`insertWithHistory` repository operation owns BEGIN/COMMIT/ROLLBACK; `planAssignment.assigned=true`
+means the assignment and its change-history entry have committed on that connection. Follow-up
+`GET /v1/tenants/{tenantId}/plan` and `GET /v1/tenants/{tenantId}/plan/history` expose the returned
+assignment and history entry IDs. Other tenant-creation saga steps continue to use the pool.
+
+Assignment remains best-effort: an unknown slug, inactive plan, failed assignment, or unavailable
+pool connection still permits tenant creation to return 201 with `assigned=false` and a reason.
+Connection acquisition failures use a generic reason without connection details. Release failures
+cannot abort tenant creation or erase an already committed assignment. A directly supplied client
+is borrowed without being released by this helper. Issue #960 does not backfill previous missing
+assignments or add plan-assignment saga compensation.
+
 Because creation-time assignment is supported by the backend, the console must not invent fallback
 plans such as hardcoded Starter/Growth options. If the active catalog is loading, unavailable, or
 empty, the wizard keeps the Plan step in place with an accessible status/error/empty message and
