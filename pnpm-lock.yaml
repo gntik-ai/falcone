@@ -122,6 +122,9 @@ importers:
       '@fontsource-variable/inter':
         specifier: ^5.2.8
         version: 5.2.8
+      '@in-falcone/console-api':
+        specifier: workspace:*
+        version: link:../../packages/console-api
       '@in-falcone/internal-contracts':
         specifier: workspace:*
         version: link:../../packages/internal-contracts
@@ -294,6 +297,15 @@ importers:
       kafkajs:
         specifier: ^2.2.4
         version: 2.2.4
+
+  packages/console-api:
+    devDependencies:
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@22.19.15)(jsdom@25.0.1)(vite@6.4.3(@types/node@22.19.15)(jiti@1.21.7)(terser@5.48.0)(yaml@2.8.3))
 
   packages/event-gateway: {}
 
