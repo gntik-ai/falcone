@@ -123,3 +123,33 @@ validation need swagger-parser; Markdown lint needs markdownlint-cli2. The real
 PostgreSQL and DocumentDB tests cannot import pg and mongodb and require their
 stores. These checks, full CI, artifact uploads and live gateway behaviour remain
 the publication/runtime handoff. No added timeout wrapper is used.
+
+## Final source revalidation
+
+Starting HEAD `2a776a5f831a2a3998177c4f6be76cd658c74ba7` and the assigned
+issue/run branch were verified clean on 2026-10-13. Review found no remaining
+runtime implementation change needed for the supplied acceptance criteria.
+This follow-up records the current evidence and preserves the existing source,
+gateway safety gates, dependency manifests, lockfiles and Hermes chart pins.
+
+The bounded authorization, publication, gateway-policy unit, API-key route
+contract, public-API unit and testing-strategy unit/contract suites pass all 39
+assertions. Gateway-policy and testing-strategy validators also pass against the
+assigned paired chart values. Tests use an actual temporary directory containing
+symlinks to source entries and a sibling chart checkout, so relative chart reads
+match CI without modifying either worktree. The existing ignored tooling YAML
+link remains; CI must verify with the locked dependency installation.
+
+The complete gateway-policy contract suite is SKIPPED because its catalog-helper
+test cannot import `cel-js` (`ERR_MODULE_NOT_FOUND`); its other five assertions,
+including the hardened stream fixture and method/capture exclusions, pass.
+Public-API and OpenAPI validators are SKIPPED because
+`@apidevtools/swagger-parser` is missing. Real-store suites are SKIPPED because
+`pg` and `mongodb` are missing; live catalog, trigger and event isolation evidence
+still belongs to real-stack CI. These are environment limits, not confirmed code
+assertion failures, and require no dependency manifest changes.
+
+The paired chart's deployment CI repair, locked-dependency source CI and staging
+verification remain publisher/runtime handoffs. This documentation-only review
+introduces no runtime fix or new red-before-green claim. No deployment, merge,
+push, credential access or timeout wrapper is performed.
