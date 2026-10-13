@@ -704,7 +704,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runRealtimeSse(realtimeExecutor, { workspaceId: w, databaseName: db, collectionName: coll }, c), { sse: true }],
     // Postgres table change capture (trigger + LISTEN/NOTIFY):
     ['GET', new RegExp(`${pgrt}$`), templates.pgrt, ([w, db, s, t], c) =>
-      runRealtimeSse(pgRealtimeExecutor, { workspaceId: w, databaseName: db, schemaName: s, tableName: t }, c), { sse: true }],
+      runPostgresRealtimeSse(pgRealtimeExecutor, { workspaceId: w, databaseName: db, schemaName: s, tableName: t }, c), { sse: true }],
 
     // ---- Flows (Temporal-backed authoring + execution) — only when flowExecutor is wired ----
     // Definition management (control class). Identity (tenant/workspace) comes ONLY from
@@ -1095,7 +1095,28 @@ async function runMcpRpc(mcpEngine, params, runtime) {
   return { status: 200, body: result };
 }
 
-// Stream a tenant-scoped Mongo change stream to the client as Server-Sent Events. The handler
+async function runPostgresRealtimeSse(executor, target, c) {
+  if (!executor) throw Object.assign(new Error('Realtime is not enabled'), { statusCode: 501, code: 'REALTIME_DISABLED' });
+  const identifier = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
+  if (!identifier.test(target.schemaName) || !identifier.test(target.tableName)) {
+    throw Object.assign(new Error('Invalid schema or table identifier'), { statusCode: 400, code: 'INVALID_IDENTIFIER' });
+  }
+  if (isApiKeyIdentity(c.identity)) {
+    if (!c.identity.dbRole) throw Object.assign(new Error('Table SELECT privilege is required'), { statusCode: 403, code: 'FORBIDDEN' });
+    const allowed = await c.registry.withWorkspaceClient(target.workspaceId, {
+      tenantId: c.identity.tenantId, workspaceId: target.workspaceId,
+    }, async (client) => {
+      const result = await client.query('SELECT has_table_privilege($1, $2, $3) AS allowed', [
+        c.identity.dbRole, `"${target.schemaName}"."${target.tableName}"`, 'SELECT',
+      ]);
+      return result.rows[0]?.allowed === true;
+    });
+    if (!allowed) throw Object.assign(new Error('Table SELECT privilege is required'), { statusCode: 403, code: 'FORBIDDEN' });
+  }
+  return runRealtimeSse(executor, target, c);
+}
+
+// Stream a tenant-scoped change stream to the client as Server-Sent Events. The handler
 // owns the response (no sendJson); it cleans up the subscription when the client disconnects.
 async function runRealtimeSse(realtimeExecutor, target, c) {
   if (!realtimeExecutor) throw Object.assign(new Error('Realtime is not enabled'), { statusCode: 501, code: 'REALTIME_DISABLED' });

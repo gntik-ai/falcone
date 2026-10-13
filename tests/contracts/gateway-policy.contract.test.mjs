@@ -8,6 +8,7 @@ import {
   requiredProductPlugins
 } from '../../scripts/lib/gateway-policy.mjs';
 import { readGatewayRouting, readPublicRouteCatalog } from '../../scripts/lib/public-api.mjs';
+import { collectRealtimeSseRouteViolations, REALTIME_SSE_ROUTES } from '../../scripts/lib/realtime-sse-policy.mjs';
 import {
   listConsoleRoutesByTier,
   listConsoleWorkflowRoutes,
@@ -21,6 +22,14 @@ test('gateway contract publishes APISIX policy for every public family and passt
   const routeCatalog = readPublicRouteCatalog();
 
   for (const family of gatewayRouting.spec.families) {
+    if (family.id === 'realtime') {
+      for (const id of Object.keys(REALTIME_SSE_ROUTES)) {
+        const route = enabledRoutes.find((entry) => entry.name === id);
+        assert.ok(route, `missing APISIX SSE route ${id}`);
+        assert.deepEqual(collectRealtimeSseRouteViolations(route), []);
+      }
+      continue;
+    }
     const route = enabledRoutes.find((entry) => entry.name === `public-api-${family.id}`);
     assert.ok(route, `missing APISIX route for family ${family.id}`);
     assert.equal(route.uri, `${family.pathPrefix}/*`);

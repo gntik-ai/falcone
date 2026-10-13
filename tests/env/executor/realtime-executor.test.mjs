@@ -10,6 +10,8 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { MongoClient } from 'mongodb'
+import { randomBytes } from 'node:crypto'
+import { createControlPlaneServer } from '../../../apps/control-plane-executor/src/runtime/server.mjs'
 
 import { createMongoExecutor } from '../../../apps/control-plane-executor/src/runtime/mongo-data-executor.mjs'
 import { createRealtimeExecutor } from '../../../apps/control-plane-executor/src/runtime/realtime-executor.mjs'
@@ -135,4 +137,43 @@ test('subscribe without tenant identity → 401', async () => {
     () => realtime.subscribe({ workspaceId: WS_A, databaseName: DB, collectionName: COLL, identity: {}, onChange() {} }),
     (e) => e.statusCode === 401
   )
+})
+
+test('HTTP anon collection stream emits insert/replace/delete from real DocumentDB writes', async () => {
+  const key = `flc_anon_${randomBytes(24).toString('base64url')}`
+  const server = createControlPlaneServer({
+    registry: {}, realtimeExecutor: realtime,
+    apiKeyStore: { async verifyKey(candidate) { return candidate === key ? { tenantId: TEN_A, workspaceId: WS_A, keyType: 'anon', dbRole: 'falcone_anon', scopes: ['data:read'] } : undefined } },
+    logger: { error() {} },
+  })
+  const controller = new AbortController()
+  try {
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
+    const url = `http://127.0.0.1:${server.address().port}/v1/realtime/workspaces/${WS_A}/data/${DB}/collections/${COLL}/changes?apikey=${key}`
+    const response = await fetch(url, { signal: controller.signal })
+    assert.equal(response.status, 200)
+    assert.match(response.headers.get('content-type'), /text\/event-stream/)
+    await delay(600)
+    const params = { databaseName: DB, collectionName: COLL, identity: { tenantId: TEN_A, workspaceId: WS_A } }
+    await dataExec.executeMongoData({ ...params, operation: 'insert', payload: { document: { _id: 'rt-http', body: 'one' } } })
+    await dataExec.executeMongoData({ ...params, operation: 'update', documentId: 'rt-http', payload: { update: { $set: { body: 'two' } } } })
+    await dataExec.executeMongoData({ ...params, operation: 'delete', documentId: 'rt-http' })
+    const reader = response.body.getReader()
+    let text = ''
+    const decoder = new TextDecoder()
+    while (!text.includes('event: delete')) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      text += decoder.decode(chunk.value, { stream: true })
+    }
+    assert.deepEqual([...text.matchAll(/event: (\w+)/g)].map((match) => match[1]), ['insert', 'replace', 'delete'])
+    const events = [...text.matchAll(/data: (.+)\n/g)].map((match) => JSON.parse(match[1]))
+    assert.ok(events.every((event) => event.documentId === 'rt-http' && event.document.tenantId === TEN_A))
+    assert.deepEqual(events.map((event) => event.document.body), ['one', 'two', 'two'])
+    await reader.cancel()
+  } finally {
+    controller.abort()
+    server.closeAllConnections()
+    await new Promise((resolve) => server.close(resolve))
+  }
 })

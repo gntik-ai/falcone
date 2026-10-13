@@ -52,6 +52,7 @@ Native operator passthrough routes under `/_native/*` are documented separately 
 | tenants | tenant_control | tenant_control | 262144 | control_plane | mutations |
 | websockets | realtime | realtime | 131072 | realtime | mutations |
 | workspaces | workspace_control | workspace_control | 262144 | control_plane | mutations |
+| realtime | realtime_sse | realtime_sse | 1024 | realtime | mutations |
 
 ## Families
 
@@ -576,3 +577,12 @@ Workspace lifecycle, application inventory, workload identities, and managed-res
 | POST | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-revocations` | workspace | service_account | Revoke one or all active credential references for a workspace service account. |
 | POST | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}/credential-rotations` | workspace | service_account | Rotate the active credential reference for one workspace service account. |
 | GET | `/v1/workspaces/{workspaceId}/workflow-jobs/{jobRef}` | workspace | workflow_job | Get one workspace-scoped workflow job status. |
+
+## Realtime
+
+Workspace-scoped document collection and PostgreSQL table change streams over Server-Sent Events.
+
+| Method | Path | Scope | Resource | Summary |
+| --- | --- | --- | --- | --- |
+| GET | `/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes` | workspace | change_stream | Stream document collection changes |
+| GET | `/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes` | workspace | change_stream | Stream PostgreSQL table changes |

@@ -51,6 +51,31 @@ test('the Mongo verifier cannot replace OIDC on another product route', () => {
   ));
 });
 
+test('SSE plugin exceptions are named, never family-wide', () => {
+  for (const id of ['public-api-realtime-collection-changes', 'public-api-realtime-table-changes']) {
+    assert.ok(!requiredProductPlugins('realtime', id, 'query_api_key_sse').includes('openid-connect'));
+  }
+  assert.ok(requiredProductPlugins('realtime').includes('openid-connect'));
+  assert.ok(requiredProductPlugins('realtime', 'public-api-mongo-captures', 'query_api_key_sse').includes('openid-connect'));
+});
+
+test('full gateway validation rejects a widened SSE exception and missing safety plugins', () => {
+  const values = readGatewayPolicyValues();
+  const routes = values.bootstrap.reconcile.apisix.routes;
+  const route = routes.find((entry) => entry.name === 'public-api-realtime-collection-changes');
+  assert.ok(route, 'paired charts must publish the named stream route');
+  for (const plugin of ['cors', 'limit-count', 'proxy-rewrite']) {
+    const modified = structuredClone(values);
+    delete modified.bootstrap.reconcile.apisix.routes.find((entry) => entry.name === route.name).plugins[plugin];
+    assert.ok(collectGatewayPolicyViolations({ values: modified }).some((message) => message.includes(plugin)));
+  }
+  const widened = structuredClone(route);
+  widened.name = 'public-api-unrelated';
+  widened.authMode = 'query_api_key_sse';
+  routes.push(widened);
+  assert.ok(collectGatewayPolicyViolations({ values }).some((message) => message.includes('not allowlisted')));
+});
+
 test('enabled APISIX routes honor passthrough mode switches', () => {
   const values = readGatewayPolicyValues();
   const enabledNames = listEnabledApisixRoutes(values).map((route) => route.name);

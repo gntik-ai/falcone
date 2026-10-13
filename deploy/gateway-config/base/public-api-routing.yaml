@@ -127,6 +127,22 @@ spec:
       maxBodyBytes: 131072
       requireIdempotencyHeaderOnMutations: true
       rejectSpoofedContextHeaders: true
+    realtime_sse:
+      allowedContentTypes: []
+      maxBodyBytes: 1024
+      requireIdempotencyHeaderOnMutations: false
+      rejectSpoofedContextHeaders: true
+      allowedMethods:
+      - GET
+      allowedQueryParameters:
+      - apikey
+      requiredRequestHeaders: []
+      querySchema:
+        type: object
+        properties:
+          apikey:
+            type: string
+        additionalProperties: false
     native_admin:
       allowedContentTypes:
         - application/json
@@ -204,6 +220,15 @@ spec:
       timeoutProfile: realtime
       retryProfile: mutations
       limitKey: X-Tenant-Id:X-Workspace-Id
+      planQuotaSource: resolveTenantEffectiveCapabilities
+      limitCeiling: max_of_plan_and_static
+    realtime_sse:
+      rateLimitClass: realtime
+      requestsPerMinute: 120
+      burst: 30
+      timeoutProfile: realtime
+      retryProfile: mutations
+      limitKey: apikey
       planQuotaSource: resolveTenantEffectiveCapabilities
       limitCeiling: max_of_plan_and_static
     native_admin:
@@ -493,6 +518,20 @@ spec:
         - data.openwhisk.actions
       qosProfile: realtime
       requestValidationProfile: realtime
+    - id: realtime
+      pathPrefix: /v1/realtime
+      upstreamService: control_api
+      routeClass: realtime
+      authMode: query_api_key_sse
+      discoveryEnabled: false
+      corsProfile: product_api
+      allowAnonymousOptions: true
+      tenantBinding: required
+      workspaceBinding: required
+      propagatedHeaders: []
+      planCapabilityAnyOf: []
+      qosProfile: realtime_sse
+      requestValidationProfile: realtime_sse
   allowedRequestHeaders: &a2
     - Authorization
     - Content-Type
@@ -553,3 +592,91 @@ spec:
         - GET
       upstreamService: control_api
       authMode: bearer_oidc
+    - id: public-api-realtime-collection-changes
+      name: public-api-realtime-collection-changes
+      path: /v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes
+      uri: /v1/realtime/*
+      priority: 340
+      methods:
+      - GET
+      - OPTIONS
+      upstreamService: control_api
+      upstreamComponent: control-plane-executor
+      authMode: query_api_key_sse
+      timeoutProfile: realtime
+      vars:
+      - - uri
+        - ~~
+        - ^/v1/realtime/workspaces/[^/]+/data/[^/]+/collections/[^/]+/changes$
+      requestValidationProfile: realtime_sse
+      accessLog:
+        omitQueryString: true
+        redactQueryParameters:
+        - apikey
+        format: '{"method":"$request_method","path":"$uri","status":$status}'
+      plugins:
+        cors:
+          allow_methods: GET,OPTIONS
+        limit-count:
+          count: 120
+          time_window: 60
+          rejected_code: 429
+          key_type: var_combination
+          key: $http_apikey$arg_apikey
+          allow_degradation: false
+        client-control:
+          max_body_size: 1024
+        request-validation:
+          header_schema:
+            type: object
+        proxy-rewrite:
+          headers:
+            set: &id001
+              x-auth-subject: ''
+              x-actor-username: ''
+              x-tenant-id: ''
+              x-workspace-id: ''
+              x-plan-id: ''
+              x-auth-scopes: ''
+              x-actor-roles: ''
+              x-gateway-auth: ${{GATEWAY_SHARED_SECRET}}
+    - id: public-api-realtime-table-changes
+      name: public-api-realtime-table-changes
+      path: /v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes
+      uri: /v1/realtime/*
+      priority: 340
+      methods:
+      - GET
+      - OPTIONS
+      upstreamService: control_api
+      upstreamComponent: control-plane-executor
+      authMode: query_api_key_sse
+      timeoutProfile: realtime
+      vars:
+      - - uri
+        - ~~
+        - ^/v1/realtime/workspaces/[^/]+/data/[^/]+/schemas/[^/]+/tables/[^/]+/changes$
+      requestValidationProfile: realtime_sse
+      accessLog:
+        omitQueryString: true
+        redactQueryParameters:
+        - apikey
+        format: '{"method":"$request_method","path":"$uri","status":$status}'
+      plugins:
+        cors:
+          allow_methods: GET,OPTIONS
+        limit-count:
+          count: 120
+          time_window: 60
+          rejected_code: 429
+          key_type: var_combination
+          key: $http_apikey$arg_apikey
+          allow_degradation: false
+        client-control:
+          max_body_size: 1024
+        request-validation:
+          header_schema:
+            type: object
+        proxy-rewrite:
+          headers:
+            set: *id001

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import YAML from 'yaml';
+import { isRealtimeSseOperation } from './realtime-sse-policy.mjs';
 
 export const OPENAPI_PATH = 'apps/control-plane-executor/openapi/control-plane.openapi.json';
 export const IMAGE_VALUES_PATH = '../falcone-charts/charts/in-falcone/values.yaml';
@@ -88,7 +89,7 @@ export function collectContractViolations(document) {
           parameter?.in === 'header' && parameter?.name === 'X-API-Version' && parameter?.required === true
       );
 
-      if (!versionHeader) {
+      if (!versionHeader && !(method === 'get' && isRealtimeSseOperation(path, operation))) {
         violations.push(`${operationLabel} must require the X-API-Version header.`);
       }
 
@@ -97,7 +98,7 @@ export function collectContractViolations(document) {
           parameter?.in === 'header' && parameter?.name === 'X-Correlation-Id' && parameter?.required === true
       );
 
-      if (!correlationHeader) {
+      if (!correlationHeader && !(method === 'get' && isRealtimeSseOperation(path, operation))) {
         violations.push(`${operationLabel} must require the X-Correlation-Id header.`);
       }
 
