@@ -153,3 +153,19 @@ The paired chart's deployment CI repair, locked-dependency source CI and staging
 verification remain publisher/runtime handoffs. This documentation-only review
 introduces no runtime fix or new red-before-green claim. No deployment, merge,
 push, credential access or timeout wrapper is performed.
+
+## Review of the pinned source handoff
+
+The assigned branch was clean at supplied HEAD
+`f3c2cad4422efe053433d15d7322be8ff62bb230`. Review and bounded checks confirm the
+existing implementation needs no further runtime change. The 39 scoped assertions
+above and both gateway-policy and testing-strategy validators pass against the
+assigned paired chart values through a temporary sibling-layout harness.
+
+The gateway-policy contract cannot complete because `cel-js` is missing; its other
+five assertions pass. Public-API and OpenAPI validation cannot import
+`@apidevtools/swagger-parser`. Real-store tests cannot import `pg` and `mongodb`.
+These checks remain SKIPPED for environment limits and require locked-dependency
+CI and real stores. Staging gateway acceptance and log redaction remain conditional
+on the paired deployment change. This local commit records only the source review
+handoff; runtime files, dependencies, safety gates and Hermes chart pins are intact.
