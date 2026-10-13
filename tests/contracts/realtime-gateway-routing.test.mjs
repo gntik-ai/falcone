@@ -14,6 +14,7 @@ for (const [id, path] of [
     assert.deepEqual(collectRealtimeSseRouteViolations(route), []);
     assert.equal(route.upstreamComponent, 'control-plane-executor');
     assert.equal(route.timeoutProfile, 'realtime');
+    assert.equal(route.uri, '/v1/realtime/workspaces/*', 'SSE matching must not use the kind realtime catch-all');
     assert.deepEqual(route.methods, ['GET', 'OPTIONS']);
     assert.equal(route.plugins.cors.allow_methods, 'GET,OPTIONS');
     for (const method of ['POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) assert.equal(route.methods.includes(method), false);

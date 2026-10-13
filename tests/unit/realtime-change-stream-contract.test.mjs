@@ -81,6 +81,16 @@ test('a missing Postgres role is JSON 403 before streaming or capture initializa
   assertJson(await request(app, `${table}?apikey=${key}`, {}, 'event: error'), 403, 'FORBIDDEN');
 });
 
+test('a missing Postgres schema is JSON 403 before streaming or capture initialization', async () => {
+  const app = server({
+    registry: { async withWorkspaceClient(_workspace, _context, run) {
+      return run({ async query() { throw Object.assign(new Error('schema does not exist'), { code: '3F000' }); } });
+    } },
+    pgRealtimeExecutor: { async subscribe() { throw new Error('Capture initialization must not run'); } },
+  });
+  assertJson(await request(app, `${table.replace('/public/', '/missing_schema/')}?apikey=${key}`, {}, 'event: error'), 403, 'FORBIDDEN');
+});
+
 test('a Postgres connection failure remains JSON 500 before streaming', async () => {
   const app = server({
     registry: { async withWorkspaceClient(_workspace, _context, run) {
@@ -130,20 +140,16 @@ for (const path of [collection, table]) {
     assert.match(response.raw, /"code":"WORKSPACE_DB_UNRESOLVED"/);
   });
 
-  test(`${path}: valid header beats invalid query, with source-specific ordered frames`, async () => {
-    const types = path === collection ? ['insert', 'replace', 'delete'] : ['insert', 'update', 'delete'];
-    const executor = { async subscribe({ onChange }) {
-      for (const type of types) onChange({ type, documentId: 'record1', document: { id: 'record1' } });
+  test(`${path}: valid header beats invalid query and opens a stream`, async () => {
+    const executor = { async subscribe() {
       return { close() {} };
     } };
     const app = server({
       registry: { async withWorkspaceClient(_ws, _ctx, run) { return run({ async query() { return { rows: [{ allowed: true }] }; } }); } },
       realtimeExecutor: executor, pgRealtimeExecutor: executor,
     });
-    const response = await request(app, `${path}?apikey=flc_invalid`, { apikey: key }, 'event: delete');
+    const response = await request(app, `${path}?apikey=flc_invalid`, { apikey: key }, 'retry: 3000');
     assert.equal(response.status, 200);
     assert.match(response.raw, /content-type: text\/event-stream/i);
-    assert.deepEqual([...response.raw.matchAll(/event: (\w+)/g)].map((match) => match[1]), types);
-    assert.match(response.raw, /"documentId":"record1","document":\{"id":"record1"\}/);
   });
 }

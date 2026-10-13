@@ -585,7 +585,7 @@ spec:
     - id: public-api-realtime-collection-changes
       name: public-api-realtime-collection-changes
       path: /v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes
-      uri: /v1/realtime/*
+      uri: /v1/realtime/workspaces/*
       priority: 340
       methods:
       - GET
@@ -633,7 +633,7 @@ spec:
     - id: public-api-realtime-table-changes
       name: public-api-realtime-table-changes
       path: /v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes
-      uri: /v1/realtime/*
+      uri: /v1/realtime/workspaces/*
       priority: 340
       methods:
       - GET

@@ -25,6 +25,8 @@ for (const [path, operationId, eventTypes, schemaName] of [
     for (const status of ['401', '403', '501']) assert.ok(operation.responses[status].content['application/json']);
     if (operationId === 'streamTableChanges') {
       assert.ok(operation.responses['400'].content['application/json']);
+      assert.ok(operation.responses['500']?.content['application/json'], 'pre-stream database failures must declare a JSON error');
+      assert.match(operation.responses['500'].description, /CONTROL_PLANE_ERROR.*before streaming/i);
     } else {
       assert.equal(operation.responses['400'], undefined, 'collection stream does not validate PostgreSQL identifiers');
     }

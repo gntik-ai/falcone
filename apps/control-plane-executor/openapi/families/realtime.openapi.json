@@ -527,6 +527,16 @@
             },
             "description": "Invalid or oversized request headers."
           },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "CONTROL_PLANE_ERROR: database failure before streaming. No stream or capture DDL starts."
+          },
           "501": {
             "content": {
               "application/json": {

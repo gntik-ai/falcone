@@ -57753,16 +57753,6 @@
               }
             }
           },
-          "501": {
-            "description": "REALTIME_DISABLED: executor is unset. No stream starts.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429": {
             "description": "Gateway rate limit exceeded.",
             "content": {
@@ -57775,6 +57765,16 @@
           },
           "431": {
             "description": "Invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "REALTIME_DISABLED: executor is unset. No stream starts.",
             "content": {
               "application/json": {
                 "schema": {
@@ -57966,16 +57966,6 @@
               }
             }
           },
-          "501": {
-            "description": "REALTIME_DISABLED: executor is unset. No stream starts.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429": {
             "description": "Gateway rate limit exceeded.",
             "content": {
@@ -57988,6 +57978,26 @@
           },
           "431": {
             "description": "Invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "CONTROL_PLANE_ERROR: database failure before streaming. No stream or capture DDL starts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "REALTIME_DISABLED: executor is unset. No stream starts.",
             "content": {
               "application/json": {
                 "schema": {

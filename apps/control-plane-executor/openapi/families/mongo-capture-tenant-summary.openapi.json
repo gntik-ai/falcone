@@ -264,6 +264,10 @@
   "tags": [
     {
       "name": "Tenants"
+    },
+    {
+      "description": "Workspace-scoped document collection and PostgreSQL table change streams over Server-Sent Events.",
+      "name": "Realtime"
     }
   ]
 }

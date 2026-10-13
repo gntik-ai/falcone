@@ -1112,8 +1112,8 @@ async function runPostgresRealtimeSse(executor, target, c) {
         ]);
         return result.rows[0]?.allowed === true;
       } catch (error) {
-        // A missing relation or role cannot grant SELECT. Keep database failures distinct.
-        if (error.code === '42P01' || error.code === '42704') return false;
+        // A missing schema, relation or role cannot grant SELECT. Keep database failures distinct.
+        if (error.code === '3F000' || error.code === '42P01' || error.code === '42704') return false;
         throw error;
       }
     });
