@@ -61,6 +61,36 @@ test('Postgres SELECT denial is JSON 403 before any stream or capture initializa
   assertJson(await request(app, `${table}?apikey=${key}`, {}, 'event: error'), 403, 'FORBIDDEN');
 });
 
+test('a missing Postgres table is JSON 403 before streaming or capture initialization', async () => {
+  const app = server({
+    registry: { async withWorkspaceClient(_workspace, _context, run) {
+      return run({ async query() { throw Object.assign(new Error('relation does not exist'), { code: '42P01' }); } });
+    } },
+    pgRealtimeExecutor: { async subscribe() { throw new Error('Capture initialization must not run'); } },
+  });
+  assertJson(await request(app, `${table}?apikey=${key}`, {}, 'event: error'), 403, 'FORBIDDEN');
+});
+
+test('a missing Postgres role is JSON 403 before streaming or capture initialization', async () => {
+  const app = server({
+    registry: { async withWorkspaceClient(_workspace, _context, run) {
+      return run({ async query() { throw Object.assign(new Error('role does not exist'), { code: '42704' }); } });
+    } },
+    pgRealtimeExecutor: { async subscribe() { throw new Error('Capture initialization must not run'); } },
+  });
+  assertJson(await request(app, `${table}?apikey=${key}`, {}, 'event: error'), 403, 'FORBIDDEN');
+});
+
+test('a Postgres connection failure remains JSON 500 before streaming', async () => {
+  const app = server({
+    registry: { async withWorkspaceClient(_workspace, _context, run) {
+      return run({ async query() { throw Object.assign(new Error('connection failure'), { code: '08006' }); } });
+    } },
+    pgRealtimeExecutor: { async subscribe() { throw new Error('Capture initialization must not run'); } },
+  });
+  assertJson(await request(app, `${table}?apikey=${key}`, {}, 'event: error'), 500, 'CONTROL_PLANE_ERROR');
+});
+
 test('invalid Postgres identifiers are JSON 400 before database access or streaming', async () => {
   const app = server({ pgRealtimeExecutor: { async subscribe() { throw new Error('Capture must not run'); } } });
   for (const path of [table.replace('/public/', '/bad-schema/'), table.replace('/notes/', '/bad.table/'), table.replace('/notes/', `/${'a'.repeat(64)}/`)]) {

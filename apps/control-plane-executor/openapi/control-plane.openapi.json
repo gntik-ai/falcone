@@ -57733,16 +57733,6 @@
               "$ref": "#/components/schemas/RealtimeStreamError"
             }
           },
-          "400": {
-            "description": "INVALID_IDENTIFIER: invalid PostgreSQL schema or table identifier (tables only).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "UNAUTHENTICATED: no credential, or the selected credential cannot be verified. No stream starts.",
             "content": {

@@ -274,16 +274,6 @@
               "$ref": "#/components/schemas/RealtimeStreamError"
             }
           },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "INVALID_IDENTIFIER: invalid PostgreSQL schema or table identifier (tables only)."
-          },
           "401": {
             "content": {
               "application/json": {

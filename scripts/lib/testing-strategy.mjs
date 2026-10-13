@@ -1,4 +1,5 @@
 import { OPENAPI_PATH, listOperations, readJson, readYaml, resolveLocalRef, resolveParameters } from './quality-gates.mjs';
+import { isRealtimeSseOperation } from './realtime-sse-policy.mjs';
 
 export const TESTING_STRATEGY_PATH = 'tests/reference/testing-strategy.yaml';
 export const REFERENCE_DATASET_PATH = 'tests/reference/reference-dataset.json';
@@ -157,12 +158,13 @@ function collectApiAlignmentViolations(strategy, dataset, openapiDocument) {
     }
 
     const parameters = resolveParameters(openapiDocument, operation);
+    const isEventSource = method === 'get' && isRealtimeSseOperation(path, operation);
 
     const versionHeader = parameters.find(
       (parameter) => parameter?.in === 'header' && parameter?.name === headerName && parameter?.required === true
     );
 
-    if (!versionHeader) {
+    if (!versionHeader && !isEventSource) {
       violations.push(`${label} in OpenAPI must require ${String(headerName)}.`);
       continue;
     }
@@ -171,7 +173,7 @@ function collectApiAlignmentViolations(strategy, dataset, openapiDocument) {
       (parameter) => parameter?.in === 'header' && parameter?.name === 'X-Correlation-Id' && parameter?.required === true
     );
 
-    if (!correlationHeader) {
+    if (!correlationHeader && !isEventSource) {
       violations.push(`${label} in OpenAPI must require X-Correlation-Id.`);
     }
 

@@ -1106,10 +1106,16 @@ async function runPostgresRealtimeSse(executor, target, c) {
     const allowed = await c.registry.withWorkspaceClient(target.workspaceId, {
       tenantId: c.identity.tenantId, workspaceId: target.workspaceId,
     }, async (client) => {
-      const result = await client.query('SELECT has_table_privilege($1, $2, $3) AS allowed', [
-        c.identity.dbRole, `"${target.schemaName}"."${target.tableName}"`, 'SELECT',
-      ]);
-      return result.rows[0]?.allowed === true;
+      try {
+        const result = await client.query('SELECT has_table_privilege($1, $2, $3) AS allowed', [
+          c.identity.dbRole, `"${target.schemaName}"."${target.tableName}"`, 'SELECT',
+        ]);
+        return result.rows[0]?.allowed === true;
+      } catch (error) {
+        // A missing relation or role cannot grant SELECT. Keep database failures distinct.
+        if (error.code === '42P01' || error.code === '42704') return false;
+        throw error;
+      }
     });
     if (!allowed) throw Object.assign(new Error('Table SELECT privilege is required'), { statusCode: 403, code: 'FORBIDDEN' });
   }

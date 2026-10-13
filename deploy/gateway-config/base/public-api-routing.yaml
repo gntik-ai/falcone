@@ -132,17 +132,7 @@ spec:
       maxBodyBytes: 1024
       requireIdempotencyHeaderOnMutations: false
       rejectSpoofedContextHeaders: true
-      allowedMethods:
-      - GET
-      allowedQueryParameters:
-      - apikey
       requiredRequestHeaders: []
-      querySchema:
-        type: object
-        properties:
-          apikey:
-            type: string
-        additionalProperties: false
     native_admin:
       allowedContentTypes:
         - application/json

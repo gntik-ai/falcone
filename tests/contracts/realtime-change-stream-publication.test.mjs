@@ -22,7 +22,12 @@ for (const [path, operationId, eventTypes, schemaName] of [
     assert.equal(operation.responses['200'].content['text/event-stream'].schema.type, 'string');
     assert.deepEqual(document.components.schemas[schemaName].properties.type.enum, eventTypes);
     assert.deepEqual(document.components.schemas[schemaName].required, ['type', 'documentId', 'document']);
-    for (const status of ['400', '401', '403', '501']) assert.ok(operation.responses[status].content['application/json']);
+    for (const status of ['401', '403', '501']) assert.ok(operation.responses[status].content['application/json']);
+    if (operationId === 'streamTableChanges') {
+      assert.ok(operation.responses['400'].content['application/json']);
+    } else {
+      assert.equal(operation.responses['400'], undefined, 'collection stream does not validate PostgreSQL identifiers');
+    }
     assert.match(operation.description, /header.*query.*bearer/i);
     assert.match(operation.description, /exactly one.*error.*ends/i);
     const route = catalog.routes.find((entry) => entry.operationId === operationId);

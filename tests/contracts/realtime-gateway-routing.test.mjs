@@ -26,9 +26,9 @@ for (const [id, path] of [
     ]) assert.equal(guard.test(other), false, other);
     assert.equal(route.plugins['proxy-rewrite'].headers.set['x-tenant-id'], '');
     const profile = routing.requestValidationProfiles[route.requestValidationProfile];
-    assert.deepEqual(profile.allowedMethods, ['GET']);
-    assert.deepEqual(profile.allowedQueryParameters, ['apikey']);
     assert.deepEqual(profile.requiredRequestHeaders, []);
+    assert.equal(route.plugins['request-validation'].header_schema.type, 'object');
+    assert.deepEqual(route.plugins['request-validation'].header_schema.required ?? [], []);
   });
 }
 
