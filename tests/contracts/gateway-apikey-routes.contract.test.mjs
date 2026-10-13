@@ -1,8 +1,10 @@
 // Contract: anon/service API-key gateway routes (Supabase-style).
 //
 // The executor exposes a data API that frontend apps reach with an `apikey: flc_...` header
-// instead of a Keycloak JWT. These APISIX routes are selected by the apikey header, carry NO
-// openid-connect (the executor verifies the key), forward to the executor, and exist ONLY
+// instead of a Keycloak JWT. The data routes are selected by the apikey header; the
+// realtime-changes product_api family is selected by its anchored stream URI and also
+// accepts query keys for EventSource. Both carry NO openid-connect (the executor
+// verifies the key), forward to the executor, and exist ONLY
 // when the executor is enabled (upstream.requiresExecutor). This test pins that contract at
 // the values layer (template-level enable/disable gating is verified by helm render).
 import test from 'node:test';
@@ -63,21 +65,46 @@ test('api-key issuance route targets the executor with admin (JWT) auth, scoped 
 });
 
 test('realtime SSE route streams to the executor, anon-keyed, OIDC-free, long timeout', () => {
-  const route = byName('public-api-realtime-changes')
-  assert.ok(route, 'public-api-realtime-changes must be declared')
-  assert.equal(route.upstream?.requiresExecutor, true)
-  assert.equal(route.upstream?.dataPlane, true)
-  assert.equal(route.upstream?.sse, true) // template gives it a long upstream timeout
-  // matches any change-stream endpoint (Mongo collections + Postgres tables)
-  assert.deepEqual(route.vars, [['uri', '~~', '/changes$']])
+  const route = byName('public-api-realtime-changes');
+  assert.ok(route, 'public-api-realtime-changes must be declared');
+  assert.equal(route.upstream?.requiresExecutor, true);
+  assert.equal(route.upstream?.dataPlane, true);
+  assert.equal(route.upstream?.sse, true); // template gives it a long upstream timeout
+  assert.equal(route.labels?.['gateway.in-falcone.io/route-kind'], 'product_api');
+  assert.equal(route.labels?.['gateway.in-falcone.io/family'], 'realtime-changes');
+  assert.deepEqual(route.methods, ['GET', 'OPTIONS']);
+  assert.ok('cors' in (route.plugins ?? {}));
+  // Exercise the chart's actual URI constraint, including capture route exclusions.
+  const constraint = route.vars?.find(([variable, operator]) => variable === 'uri' && operator === '~~')?.[2];
+  assert.equal(typeof constraint, 'string', 'realtime route must constrain its URI');
+  assert.ok(constraint.startsWith('^/v1/realtime/workspaces/'));
+  assert.ok(constraint.endsWith('/changes$'));
+  const matches = new RegExp(constraint);
+  for (const path of [
+    '/v1/realtime/workspaces/workspace-a/data/database-a/collections/documents/changes',
+    '/v1/realtime/workspaces/workspace-a/data/database-a/schemas/public/tables/records/changes',
+  ]) {
+    assert.ok(matches.test(path), `stream route must match ${path}`);
+  }
+  for (const path of [
+    '/v1/realtime/workspaces/workspace-a/mongo-captures',
+    '/v1/realtime/workspaces/workspace-a/mongo-captures/changes',
+    '/v1/realtime/workspaces/workspace-a/pg-captures/changes',
+    '/v1/realtime/workspaces/workspace-a/data/database-a/changes',
+    '/v1/realtime/workspaces/workspace-a/data/database-a/collections/documents/changes/extra',
+    '/other/v1/realtime/workspaces/workspace-a/data/database-a/collections/documents/changes',
+  ]) {
+    assert.ok(!matches.test(path), `stream route must exclude ${path}`);
+  }
   // anon/read: no JWT at the gateway (EventSource sends ?apikey=, executor verifies)
-  assert.ok(!('openid-connect' in (route.plugins ?? {})), 'realtime route must not enable openid-connect')
+  assert.ok(!('openid-connect' in (route.plugins ?? {})), 'realtime route must not enable openid-connect');
   // rate-limited per key whether the key is a header or ?apikey=
-  const limit = route.plugins?.['limit-count']
-  assert.ok(limit && limit.rejected_code === 429, 'realtime route must rate-limit')
-  assert.equal(limit.key_type, 'var_combination')
-  assert.ok(String(limit.key).includes('$arg_apikey'), 'realtime rate limit must consider the ?apikey= query arg')
-})
+  const limit = route.plugins?.['limit-count'];
+  assert.ok(limit && limit.rejected_code === 429, 'realtime route must rate-limit');
+  assert.equal(limit.key_type, 'var_combination');
+  assert.ok(String(limit.key).includes('$http_apikey'), 'realtime rate limit must consider the apikey header');
+  assert.ok(String(limit.key).includes('$arg_apikey'), 'realtime rate limit must consider the ?apikey= query arg');
+});
 
 test('every requiresExecutor route is also a data-plane route (so the split sends it to the executor)', () => {
   for (const route of routes.filter((r) => r.upstream?.requiresExecutor)) {

@@ -90,3 +90,36 @@ lint failure: their generating steps were skipped. Preserve all CI jobs, tests,
 artifact requirements and Hermes-managed chart pins; the complete CI rerun must
 produce and upload those artifacts. Real-store and deployed acceptance remain
 the handoff checks above.
+
+## Anchored chart contract repair
+
+- [x] Verify the same assigned branch and clean starting HEAD
+  `637106ac1daa5997e765c617929a2889669407ff`.
+- [x] Reproduce the checker finding before editing with
+  `node --test tests/contracts/gateway-apikey-routes.contract.test.mjs`.
+  The direct runner confirms the stale `/changes$` equality assertion fails
+  against the paired chart's anchored stream constraint.
+- [x] Exercise the actual chart URI regex with both stream paths and negative
+  capture-management, malformed, prefixed and suffixed paths. Assert the current
+  `product_api` route kind, `realtime-changes` family, GET/OPTIONS, cors, and
+  header/query rate-limit keys. Update the contract header's description.
+- [x] Rerun the repaired contract, gateway-policy and public-API unit suites,
+  testing-strategy unit/contract suites, authorization and publication suites:
+  all pass. Gateway-policy and testing-strategy validators also pass.
+- [x] Run `pnpm test:unit` and `pnpm test:contracts`; both remain SKIPPED as full
+  gates because existing dependencies are unavailable. Detailed contract output
+  shows missing packages, including cel-js, swagger-parser, ajv and Temporal.
+- [x] Check the changed test with `node --check` and the patch with
+  `git diff --check`.
+
+Validation uses a temporary directory of symlinks to this source worktree and the
+assigned paired chart, preserving the repository's expected sibling layout.
+The only locally available YAML parser is the tooling copy of yaml 2.9.1, linked
+under ignored node_modules; PR CI must repeat validation with the locked packages.
+No dependency manifests, lockfiles, runtime source, CI gates or chart pins change.
+
+`pnpm lint` is SKIPPED because npm is absent. Public-API and structural OpenAPI
+validation need swagger-parser; Markdown lint needs markdownlint-cli2. The real
+PostgreSQL and DocumentDB tests cannot import pg and mongodb and require their
+stores. These checks, full CI, artifact uploads and live gateway behaviour remain
+the publication/runtime handoff. No added timeout wrapper is used.
