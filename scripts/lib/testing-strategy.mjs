@@ -1,4 +1,4 @@
-import { OPENAPI_PATH, listOperations, readJson, readYaml, resolveLocalRef, resolveParameters } from './quality-gates.mjs';
+import { OPENAPI_PATH, isRealtimeChangesOperation, listOperations, readJson, readYaml, resolveLocalRef, resolveParameters } from './quality-gates.mjs';
 
 export const TESTING_STRATEGY_PATH = 'tests/reference/testing-strategy.yaml';
 export const REFERENCE_DATASET_PATH = 'tests/reference/reference-dataset.json';
@@ -157,9 +157,12 @@ function collectApiAlignmentViolations(strategy, dataset, openapiDocument) {
     }
 
     const parameters = resolveParameters(openapiDocument, operation);
+    // EventSource cannot set headers; share the exact GET stream exception with
+    // the public API validators while retaining the pinned version check below.
+    const optionalHeaders = isRealtimeChangesOperation(path, method, operation);
 
     const versionHeader = parameters.find(
-      (parameter) => parameter?.in === 'header' && parameter?.name === headerName && parameter?.required === true
+      (parameter) => parameter?.in === 'header' && parameter?.name === headerName && (parameter?.required === true || optionalHeaders)
     );
 
     if (!versionHeader) {
@@ -168,7 +171,7 @@ function collectApiAlignmentViolations(strategy, dataset, openapiDocument) {
     }
 
     const correlationHeader = parameters.find(
-      (parameter) => parameter?.in === 'header' && parameter?.name === 'X-Correlation-Id' && parameter?.required === true
+      (parameter) => parameter?.in === 'header' && parameter?.name === 'X-Correlation-Id' && (parameter?.required === true || optionalHeaders)
     );
 
     if (!correlationHeader) {

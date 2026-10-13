@@ -55,3 +55,38 @@ The Node test subprocess runner reports only file-level results here; the direct
 runner with `--experimental-test-isolation=none` exposes individual assertions and
 is used to verify the available suites. No cluster, network, release credentials,
 deployment execution or historical campaign material is accessed.
+
+## Quality CI repair
+
+- [x] Verify the same source lease and clean branch at starting HEAD
+  `b404701bafb4981957711075e4efb073bb4e233c`.
+- [x] Use the supplied quality CI failure as red evidence: testing-strategy
+  validation rejects both GET streams for optional `X-API-Version` headers.
+- [x] Add the regression at the public testing-strategy validator seam before
+  changing its source; local execution cannot import the existing `yaml` package.
+- [x] Reuse the existing exact-path, GET-only `realtime-changes` exception in
+  testing-strategy validation. Keep the pinned version check and documentation of
+  both headers; retain required headers for every other operation.
+- [x] Add negative coverage for other paths, methods and families, capture
+  management, an incorrect optional version, and missing header declarations.
+- [x] Run the existing dependency-free authorization and publication suites:
+  all 12 assertions pass with
+  `node --test --experimental-test-isolation=none tests/unit/realtime-changes-publication.test.mjs tests/unit/realtime-changes-authorization.test.mjs`.
+- [x] Check both changed JavaScript files with `node --check` and check the patch
+  with `git diff --check`.
+- [ ] PR CI: rerun `pnpm lint`, `pnpm validate:testing-strategy`, and the
+  testing-strategy, public API and gateway-policy unit/contract suites.
+
+Confirmed cause: testing-strategy validation did not apply the EventSource header
+exception already used by the public API validators. Requiring custom headers
+would contradict the approved plain EventSource contract. The local matching
+command `pnpm validate:testing-strategy` cannot load `yaml`; `pnpm lint` cannot
+start its repository checks because `npm` is absent. The scoped unit/contract
+command also cannot import `yaml`. These checks are SKIPPED due to sandbox
+dependencies, not assertion failures. No manifests or lockfiles need changing.
+
+The quality job's missing workflow/restore upload artifacts follow the earlier
+lint failure: their generating steps were skipped. Preserve all CI jobs, tests,
+artifact requirements and Hermes-managed chart pins; the complete CI rerun must
+produce and upload those artifacts. Real-store and deployed acceptance remain
+the handoff checks above.
