@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {chmodSync, mkdtempSync, readFileSync, writeFileSync} from 'node:fs';
+import {chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -17,6 +17,78 @@ const steps = buildPush?.steps ?? [];
 function stepNamed(name) {
   return steps.find((step) => step.name === name);
 }
+
+test('console host and Docker builds receive the same validated version and source commit', () => {
+  const host = stepNamed('Build web-console SPA (vite)');
+  const build = steps.find((step) => step.id === 'build');
+  assert.equal(host?.env?.VITE_APP_VERSION, '${{ steps.meta.outputs.version }}');
+  assert.equal(host?.env?.VITE_APP_COMMIT_SHA, '${{ github.sha }}');
+  assert.match(build?.with?.['build-args'] ?? '', /^APP_VERSION=\$\{\{ steps.meta.outputs.version \}\}$/m);
+  assert.match(build?.with?.['build-args'] ?? '', /^APP_COMMIT_SHA=\$\{\{ github.sha \}\}$/m);
+});
+
+test('published console HTML is checked after digest verification with the same skip guard', () => {
+  const verify = stepNamed('Verify published image digests');
+  const check = stepNamed('Verify published web-console version');
+  assert.ok(check, 'published HTML verification step must exist');
+  assert.equal(check.if, `${verify.if} && matrix.image == 'in-falcone-web-console'`);
+  assert.ok(steps.indexOf(check) > steps.indexOf(verify));
+  assert.equal(check.env.VERSION_REF, '${{ steps.tags.outputs.version_ref }}');
+  assert.equal(check.env.VERSION, '${{ steps.meta.outputs.version }}');
+});
+
+test('published console check fails closed and appends the verified version to digest evidence', () => {
+  const check = stepNamed('Verify published web-console version');
+  assert.ok(check?.run, 'published HTML verification script must exist');
+  const directory = mkdtempSync(path.join(tmpdir(), 'console-published-'));
+  try {
+    const dockerPath = path.join(directory, 'docker');
+    const htmlPath = path.join(directory, 'fixture.html');
+    const summaryPath = path.join(directory, 'summary');
+    const callsPath = path.join(directory, 'calls');
+    writeFileSync(dockerPath, `#!/usr/bin/env bash
+echo "$*" >> "$CALLS"
+case "$1" in
+  create) echo fixture-container ;;
+  cp) cp "$HTML_FIXTURE" "$3" ;;
+  rm) exit 0 ;;
+  *) echo 'unexpected Docker mutation' >&2; exit 1 ;;
+esac
+`);
+    chmodSync(dockerPath, 0o755);
+    for (const [html, success] of [
+      ['<meta name="version" content="1.2.3" />', true],
+      ['<meta name="version" content="dev" />', false],
+      ['<html></html>', false],
+      ['<meta name="version" content="1.2.30" />', false],
+      ['<meta name="version" content="1.2.3" /><meta name="version" content="dev" />', false],
+    ]) {
+      writeFileSync(htmlPath, html);
+      writeFileSync(callsPath, '');
+      const evidence = '### in-falcone-web-console published\n\nregistry/image:1.2.3 and registry/image:sha-abcdef0 both resolve to `sha256:matching`.\n';
+      writeFileSync(summaryPath, evidence);
+      const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', check.run], {
+        encoding: 'utf8',
+        env: {...process.env, PATH: `${directory}:${process.env.PATH}`, VERSION_REF: 'registry/image:1.2.3',
+          VERSION: '1.2.3', HTML_FIXTURE: htmlPath, CALLS: callsPath, GITHUB_STEP_SUMMARY: summaryPath},
+      });
+      assert.equal(result.status, success ? 0 : 1, result.stderr);
+      const summary = readFileSync(summaryPath, 'utf8');
+      assert.ok(summary.startsWith(evidence), 'digest evidence is preserved');
+      if (success) assert.match(summary.slice(evidence.length), /Verified.*1\.2\.3/);
+      else {
+        assert.match(result.stdout + result.stderr, /::error::/);
+        assert.equal(summary, evidence);
+      }
+      const calls = readFileSync(callsPath, 'utf8');
+      assert.match(calls, /^create --pull=always registry\/image:1\.2\.3$/m);
+      assert.match(calls, /^cp fixture-container:\/app\/dist\/index\.html /m);
+      assert.match(calls, /^rm fixture-container$/m);
+    }
+  } finally {
+    rmSync(directory, {recursive: true, force: true});
+  }
+});
 
 test('bbx-1026-001: release images publishes tag pushes and serializes duplicate release events', () => {
   assert.deepEqual(workflow.on?.push?.tags, ['v*.*.*']);

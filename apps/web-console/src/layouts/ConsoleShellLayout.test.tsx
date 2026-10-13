@@ -264,6 +264,49 @@ describe('ConsoleShellLayout', () => {
     expect(await screen.findByRole('heading', { name: /perfil/i })).toBeInTheDocument()
   })
 
+  it('Acerca de muestra la versión y SHA corto, admite navegación de teclado y cierra el menú', async () => {
+    vi.stubGlobal('__APP_VERSION__', '1.2.3')
+    vi.stubGlobal('__APP_COMMIT_SHA__', '0123456789abcdef0123456789abcdef01234567')
+    stubShellApi()
+    persistConsoleShellSession(baseSession)
+    const user = userEvent.setup()
+    renderShell('/console/overview')
+    await user.click(await screen.findByTestId('console-shell-avatar'))
+
+    const about = screen.getByRole('menuitem', { name: /acerca de/i })
+    expect(about).toHaveAttribute('data-shell-menu-item', 'true')
+    expect(about).toHaveTextContent('1.2.3')
+    expect(about).toHaveTextContent('0123456')
+    expect(about).not.toHaveTextContent('0123456789abcdef')
+    screen.getByRole('menuitem', { name: /perfil/i }).focus()
+    await user.keyboard('{ArrowDown}{ArrowDown}')
+    expect(about).toHaveFocus()
+    await user.keyboard('{End}')
+    expect(screen.getByRole('menuitem', { name: /cerrar sesión/i })).toHaveFocus()
+    await user.keyboard('{ArrowUp}')
+    expect(about).toHaveFocus()
+    await user.keyboard('{Home}')
+    expect(screen.getByRole('menuitem', { name: /perfil/i })).toHaveFocus()
+    await user.click(about)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('console-shell-avatar'))
+    screen.getByRole('menuitem', { name: /acerca de/i }).focus()
+    await user.keyboard('{Enter}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('Acerca de muestra dev sin SHA en una compilación local', async () => {
+    vi.stubGlobal('__APP_VERSION__', 'dev')
+    vi.stubGlobal('__APP_COMMIT_SHA__', '')
+    stubShellApi()
+    persistConsoleShellSession(baseSession)
+    const user = userEvent.setup()
+    renderShell('/console/overview')
+    await user.click(await screen.findByTestId('console-shell-avatar'))
+    expect(screen.getByRole('menuitem', { name: /acerca de/i })).toHaveTextContent(/^Acerca de\s+dev$/)
+  })
+
   it('cambia de tenant manteniendo la ruta y reseteando el workspace anterior', async () => {
     stubShellApi({
       tenants: [

@@ -6,6 +6,7 @@ import {
   Database,
   FolderKanban,
   Gauge,
+  Info,
   KeyRound,
   KeySquare,
   LayoutDashboard,
@@ -53,6 +54,9 @@ import {
 } from '@in-falcone/console-api/session'
 import { cn } from '@/lib/utils'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
+
+declare const __APP_VERSION__: string
+declare const __APP_COMMIT_SHA__: string
 
 const consoleNavigationGroupLabels = {
   main: 'Principal',
@@ -742,6 +746,21 @@ export function ConsoleShellLayout() {
                       <Settings className="h-4 w-4" aria-hidden="true" />
                       Ajustes
                     </Link>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      data-shell-menu-item="true"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Info className="h-4 w-4" aria-hidden="true" />
+                      <span>
+                        <span className="block">Acerca de</span>{' '}
+                        <span className="block text-xs text-muted-foreground">
+                          {__APP_VERSION__}{__APP_COMMIT_SHA__ ? ` · ${__APP_COMMIT_SHA__.slice(0, 7)}` : ''}
+                        </span>
+                      </span>
+                    </button>
                     <button
                       type="button"
                       role="menuitem"
