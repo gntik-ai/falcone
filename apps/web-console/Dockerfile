@@ -1,7 +1,7 @@
 # Release runtime image for the Falcone web-console SPA.
 #
-# The SPA bundle (apps/web-console/dist) is built in CI with `vite build` BEFORE this image is
-# built (see .github/workflows/release-images.yml). The repo's `build` script is `tsc -b && vite
+# The SPA bundle is rebuilt in the builder stage with the same version and commit as the CI
+# host build (see .github/workflows/release-images.yml). The repo's `build` script is `tsc -b && vite
 # build`; the `tsc -b` type-check has a pre-existing error baseline that does NOT affect the
 # emitted bundle, so the release builds the deployable artifact with `vite build` directly.
 #
@@ -23,10 +23,12 @@
 # current Docker Hub base, so connected builds and release-images.yml are unchanged.
 ARG NODE_BASE_IMAGE=node:22-alpine
 FROM ${NODE_BASE_IMAGE} AS builder
+ARG APP_VERSION=dev
+ARG APP_COMMIT_SHA=
 WORKDIR /src
 COPY . .
 RUN corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console...
-RUN NODE_OPTIONS=--max-old-space-size=1536 pnpm --filter @in-falcone/web-console exec vite build
+RUN NODE_OPTIONS=--max-old-space-size=1536 VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console exec vite build
 
 FROM ${NODE_BASE_IMAGE}
 WORKDIR /app

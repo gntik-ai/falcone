@@ -1,9 +1,14 @@
 import '@testing-library/jest-dom/vitest'
-import { afterEach } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
 ensureWebStorage('localStorage')
 ensureWebStorage('sessionStorage')
+
+beforeEach(() => {
+  vi.stubGlobal('__APP_VERSION__', 'dev')
+  vi.stubGlobal('__APP_COMMIT_SHA__', '')
+})
 
 afterEach(() => {
   cleanup()

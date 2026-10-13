@@ -3,15 +3,32 @@ import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
-export default defineConfig({
-  plugins: [react()],
+const version = /^(?:[0-9]+\.[0-9]+\.[0-9]+|dev)$/.test(process.env.VITE_APP_VERSION ?? '')
+  ? process.env.VITE_APP_VERSION!
+  : 'dev'
+const commitSha = /^(?:[0-9a-f]{40}|[0-9a-f]{7})$/.test(process.env.VITE_APP_COMMIT_SHA ?? '')
+  ? process.env.VITE_APP_COMMIT_SHA!
+  : ''
+const escapedVersion = version.replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[character]!)
+
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), {
+    name: 'console-build-version',
+    transformIndexHtml(html) {
+      return html.replace(/<meta name="version" content="[^"]*"\s*\/>/, `<meta name="version" content="${escapedVersion}" />`)
+    }
+  }],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.VITE_APP_VERSION ?? 'dev')
+    // Tests supply release or local constants at the UI seam; production values stay JSON encoded.
+    __APP_VERSION__: mode === 'test' ? 'globalThis.__APP_VERSION__' : JSON.stringify(version),
+    __APP_COMMIT_SHA__: mode === 'test' ? 'globalThis.__APP_COMMIT_SHA__' : JSON.stringify(commitSha)
   },
   // Vite 6 worker output format: ES modules so monaco-yaml's yaml.worker and Monaco's
   // editor.worker (instantiated via `new Worker(new URL(...), { type: 'module' })`) are
@@ -72,4 +89,4 @@ export default defineConfig({
       ]
     }
   }
-})
+}))

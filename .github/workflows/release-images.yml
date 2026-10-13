@@ -120,8 +120,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Publishing $IMAGE:$version and sha-$short_sha to ghcr.io/${owner_lc}"
 
-      # The web-console SPA is built here (vite) so the thin Node static-server release image
-      # just copies the dist. Other images build straight from their Dockerfile (repo-root context).
+      # Keep the host SPA build aligned with the Docker builder's version and commit.
+      # Other images build straight from their Dockerfile (repo-root context).
       - name: Setup pnpm
         if: matrix.build_spa == 'true'
         uses: pnpm/action-setup@v4
@@ -141,6 +141,9 @@ jobs:
 
       - name: Build web-console SPA (vite)
         if: matrix.build_spa == 'true'
+        env:
+          VITE_APP_VERSION: ${{ steps.meta.outputs.version }}
+          VITE_APP_COMMIT_SHA: ${{ github.sha }}
         run: pnpm --filter @in-falcone/web-console exec vite build
 
       - name: Set up Docker Buildx
@@ -254,6 +257,9 @@ jobs:
           push: true
           provenance: false
           tags: ${{ steps.tags.outputs.value }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
+            APP_COMMIT_SHA=${{ github.sha }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -277,3 +283,32 @@ jobs:
             echo
             echo "${VERSION_REF} and ${SHA_REF} both resolve to \`${version_digest}\`."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify published web-console version
+        if: steps.existing.outputs.skip != 'true' && steps.build.outcome == 'success' && matrix.image == 'in-falcone-web-console'
+        env:
+          VERSION_REF: ${{ steps.tags.outputs.version_ref }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          INDEX_HTML="$(mktemp)"
+          container=""
+          cleanup() {
+            if [ -n "$container" ]; then docker rm "$container" >/dev/null; fi
+            rm -f "$INDEX_HTML"
+          }
+          trap cleanup EXIT
+          if ! container="$(docker create --pull=always "$VERSION_REF")"; then
+            echo "::error::could not create the published web-console container"
+            exit 1
+          fi
+          if ! docker cp "$container:/app/dist/index.html" "$INDEX_HTML"; then
+            echo "::error::could not read the published web-console index.html"
+            exit 1
+          fi
+          version_meta="$(grep -oE '<meta name="version" content="[^"]*" />' "$INDEX_HTML" || true)"
+          expected_meta="<meta name=\"version\" content=\"${VERSION}\" />"
+          if [ "$version_meta" != "$expected_meta" ]; then
+            echo "::error::published web-console HTML does not carry the expected release version"
+            exit 1
+          fi
+          printf '\nVerified web-console HTML version: `%s`.\n' "$VERSION" >> "$GITHUB_STEP_SUMMARY"
