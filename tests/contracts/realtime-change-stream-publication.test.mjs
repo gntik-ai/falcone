@@ -45,3 +45,36 @@ for (const [path, operationId, eventTypes, schemaName] of [
     assert.ok(taxonomy.families.some((family) => family.id === 'realtime'));
   });
 }
+
+test('route catalog exposes gateway-facing auth and context metadata for every operation', () => {
+  const routeCatalog = catalog;
+  const ssePaths = new Map([
+    ['streamCollectionChanges', '/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes'],
+    ['streamTableChanges', '/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes']
+  ]);
+
+  for (const route of routeCatalog.routes) {
+    assert.equal(typeof route.gatewayAuthMode, 'string');
+    assert.equal(typeof route.gatewayRouteClass, 'string');
+    assert.equal(typeof route.gatewayQosProfile, 'string');
+    assert.equal(typeof route.gatewayRequestValidationProfile, 'string');
+    assert.equal(Array.isArray(route.gatewayAllowedHeaders), true);
+    assert.equal(Array.isArray(route.gatewayContextHeaders), true);
+    assert.equal(Array.isArray(route.allowedContentTypes), true);
+    assert.equal(route.gatewayAllowedHeaders.includes('Authorization'), true);
+    assert.equal(route.gatewayAllowedHeaders.includes('X-API-Version'), true);
+    if (ssePaths.has(route.operationId)) {
+      assert.equal(route.path, ssePaths.get(route.operationId));
+      assert.equal(route.family, 'realtime');
+      assert.equal(route.method, 'GET');
+      assert.equal(route.gatewayAuthMode, 'query_api_key_sse');
+      assert.deepEqual(route.gatewayContextHeaders, [], 'SSE identity is resolved by the executor');
+    } else {
+      assert.notEqual(route.gatewayAuthMode, 'query_api_key_sse', 'SSE auth must remain limited to the two change-stream operations');
+      assert.equal(route.gatewayContextHeaders.includes('X-Auth-Subject'), true, route.operationId);
+    }
+    assert.equal(route.errorEnvelope, 'ErrorResponse');
+    assert.equal(route.internalRequestMode, 'validated_attestation');
+    assert.ok(route.maxRequestBodyBytes > 0);
+  }
+});
