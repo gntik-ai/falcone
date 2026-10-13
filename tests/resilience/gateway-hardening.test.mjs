@@ -13,12 +13,30 @@ const strategy = readTestingStrategy();
 const dataset = readReferenceDataset();
 
 test('gateway hardening contract covers QoS, uniform errors, idempotency, and correlation propagation', () => {
+  const eventSourcePaths = new Map([
+    ['streamCollectionChanges', '/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes'],
+    ['streamTableChanges', '/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes']
+  ]);
+  const eventSourceOperations = [];
+
   for (const route of routeCatalog.routes) {
     assert.equal(typeof route.gatewayQosProfile, 'string');
     assert.equal(typeof route.gatewayRequestValidationProfile, 'string');
     assert.equal(route.errorEnvelope, 'ErrorResponse');
-    assert.equal(route.correlationIdRequired, true);
-    assert.equal(route.correlationIdGeneratedWhenMissing, true);
+    // EventSource cannot supply custom headers; only these two GET streams may
+    // omit the client correlation header. The gateway must still generate it.
+    if (eventSourcePaths.has(route.operationId)) {
+      assert.equal(route.path, eventSourcePaths.get(route.operationId));
+      assert.equal(route.method, 'GET');
+      assert.equal(route.family, 'realtime');
+      assert.equal(route.gatewayAuthMode, 'query_api_key_sse');
+      assert.equal(route.correlationIdRequired, false, route.operationId);
+      eventSourceOperations.push(route.operationId);
+    } else {
+      assert.equal(route.correlationIdRequired, true, route.operationId);
+      assert.notEqual(route.gatewayAuthMode, 'query_api_key_sse', route.operationId);
+    }
+    assert.equal(route.correlationIdGeneratedWhenMissing, true, route.operationId);
     assert.equal(route.internalRequestMode, 'validated_attestation');
     assert.ok(route.maxRequestBodyBytes > 0);
 
@@ -28,6 +46,7 @@ test('gateway hardening contract covers QoS, uniform errors, idempotency, and co
     }
   }
 
+  assert.deepEqual(eventSourceOperations.sort(), [...eventSourcePaths.keys()].sort());
   assert.equal(values.gatewayPolicy.correlation.generateWhenMissing, true);
   assert.deepEqual(values.gatewayPolicy.errorEnvelope.requiredFields, [
     'status',
