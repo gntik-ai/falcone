@@ -95,6 +95,16 @@ export interface AssignmentRecord {
   assignmentMetadata?: Record<string, unknown>
 }
 
+export interface SelfPlanHistoryItem {
+  assignmentId: string
+  planId: string
+  planSlug: string
+  planDisplayName: string
+  planStatus: PlanStatus
+  effectiveFrom: string
+  supersededAt: string | null
+}
+
 export interface LimitProfileRow {
   dimensionKey: string
   displayLabel: string
@@ -291,6 +301,14 @@ export function assignPlan(tenantId: string, body: Record<string, unknown>) { re
 export function getTenantCurrentPlan(tenantId: string) { return request(`/v1/tenants/${tenantId}/plan`) }
 export function getTenantPlanHistory(tenantId: string, params: { page?: number; pageSize?: number } = {}) { return request<PaginationEnvelope<AssignmentRecord>>(withSearch(`/v1/tenants/${tenantId}/plan/history`, { page: params.page ?? 1, pageSize: params.pageSize ?? 20 })) }
 export function getMyPlan() { return request('/v1/tenant/plan') }
+export async function getMyPlanHistory(params: { page?: number; pageSize?: number } = {}): Promise<PaginationEnvelope<SelfPlanHistoryItem>> {
+  const { page = 1, pageSize = 20 } = params
+  const res = await request<Partial<PaginationEnvelope<SelfPlanHistoryItem>> & { assignments?: SelfPlanHistoryItem[] }>(
+    withSearch('/v1/tenant/plan/history', { page, pageSize })
+  )
+  const items = res.items ?? res.assignments ?? []
+  return { items, total: res.total ?? items.length, page: res.page ?? page, pageSize: res.pageSize ?? pageSize }
+}
 export function getMyPlanLimits() { return request<{ tenantId?: string; noAssignment?: boolean; profile: LimitProfileRow[] }>('/v1/tenant/plan/limits') }
 export function getEffectiveEntitlements(tenantId?: string, options: { includeConsumption?: boolean } = {}): Promise<CurrentEffectiveEntitlementSummary> {
   const baseUrl = tenantId ? `/v1/tenants/${tenantId}/plan/effective-entitlements` : '/v1/tenant/plan/effective-entitlements'

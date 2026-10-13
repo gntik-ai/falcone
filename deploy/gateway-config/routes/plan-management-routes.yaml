@@ -223,6 +223,22 @@ routes:
       nodes:
         provisioning-orchestrator: 1
 
+  - name: self-tenant-plan-history
+    uri: /v1/tenant/plan/history
+    methods:
+      - GET
+    plugins:
+      keycloak-openid-connect:
+        enabled: true
+      correlation-id:
+        header_name: X-Correlation-Id
+      prometheus:
+        prefer_name: true
+    upstream:
+      type: roundrobin
+      nodes:
+        provisioning-orchestrator: 1
+
   - name: tenant-plan-history-impact
     uri: /v1/tenants/:tenantId/plan/history-impact
     methods:
