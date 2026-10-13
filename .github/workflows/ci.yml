@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '4d6c9c380239f1c132be987ab57275c471abf593'
+  FALCONE_CHARTS_REF: 'ddc25f2c67d227c7530f272a2668ea96c03956aa'
 
 jobs:
   quality:
@@ -324,6 +324,64 @@ jobs:
 
       - name: Web console unit tests (vitest)
         run: pnpm --filter @in-falcone/web-console test
+
+  web-console-next:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck the next console
+        run: pnpm --filter @in-falcone/web-console-next typecheck
+
+      - name: Test the next console
+        run: pnpm --filter @in-falcone/web-console-next test
+
+      - name: Enforce semantic colour tokens
+        run: pnpm --filter @in-falcone/web-console-next lint:colours
+
+      - name: Validate exact public UI pins
+        run: node scripts/validate-gntik-ui-pin.mjs
+
+      - name: Test pin, colour and CI validation
+        run: |
+          node --test tests/unit/gntik-ui-pin.test.mjs
+          node --test tests/unit/web-console-next-colours.test.mjs
+          node --test tests/unit/web-console-next-ci.test.mjs
+
+      - name: Build the next console at both base paths
+        run: |
+          for base in / /next/; do
+            VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
+            BASE_PATH="$base" node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const html = readFileSync('apps/web-console-next/dist/index.html', 'utf8');
+          const assets = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map((match) => match[1]);
+          assert.ok(assets.length > 0, 'Expected built asset URLs');
+          assert.ok(assets.every((url) => url.startsWith(`${process.env.BASE_PATH}assets/`)));
+          NODE
+          done
+
+      - name: Build the legacy release SPA
+        run: pnpm --filter @in-falcone/web-console exec vite build
+
+      - name: Build the legacy console image without publishing
+        run: docker build -f apps/web-console/Dockerfile .
 
   security:
     runs-on: ubuntu-latest
