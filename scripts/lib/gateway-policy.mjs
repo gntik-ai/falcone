@@ -2,6 +2,7 @@ import { readDeploymentTopology, resolveValues } from './deployment-topology.mjs
 import { readDomainModel } from './domain-model.mjs';
 import { readGatewayRouting, readPublicRouteCatalog } from './public-api.mjs';
 import { readYaml } from './quality-gates.mjs';
+import { collectRealtimeSseRouteViolations, REALTIME_SSE_AUTH_MODE, REALTIME_SSE_PLUGINS, REALTIME_SSE_ROUTES, SPOOFED_CONTEXT_HEADERS } from './realtime-sse-policy.mjs';
 
 export const ROOT_VALUES_PATH = '../falcone-charts/charts/in-falcone/values.yaml';
 export const ENVIRONMENTS = ['dev', 'sandbox', 'staging', 'prod'];
@@ -11,7 +12,8 @@ export const REQUIRED_PRODUCT_PLUGINS = ['openid-connect', 'cors', 'limit-count'
 export const REQUIRED_MONGO_PRODUCT_PLUGINS = REQUIRED_PRODUCT_PLUGINS.map((plugin) =>
   plugin === 'openid-connect' ? 'issuer-jwks-auth' : plugin
 );
-export function requiredProductPlugins(familyId) {
+export function requiredProductPlugins(familyId, routeId, authMode) {
+  if (authMode === REALTIME_SSE_AUTH_MODE && Object.hasOwn(REALTIME_SSE_ROUTES, routeId)) return REALTIME_SSE_PLUGINS;
   return familyId === 'mongo' ? REQUIRED_MONGO_PRODUCT_PLUGINS : REQUIRED_PRODUCT_PLUGINS;
 }
 export const REQUIRED_PASSTHROUGH_PLUGINS = [
@@ -25,7 +27,7 @@ export const REQUIRED_PASSTHROUGH_PLUGINS = [
   'http-logger'
 ];
 export const REQUIRED_PERSONAS = ['workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_viewer', 'workspace_service_account', 'tenant_admin', 'tenant_developer', 'tenant_viewer', 'mixed_tenant_viewer_workspace_developer', 'mixed_tenant_developer_workspace_viewer', 'superadmin'];
-export const REQUIRED_SPOOFED_HEADERS = ['X-Auth-Subject', 'X-Actor-Username', 'X-Tenant-Id', 'X-Workspace-Id', 'X-Plan-Id', 'X-Auth-Scopes', 'X-Actor-Roles'];
+export const REQUIRED_SPOOFED_HEADERS = SPOOFED_CONTEXT_HEADERS;
 export const REQUIRED_INTERNAL_REQUEST_HEADERS = [
   'X-Gateway-Managed-Route',
   'X-Correlation-Id',
@@ -366,7 +368,8 @@ function collectRoutingAlignmentViolations(values, gatewayRouting, routeCatalog,
       );
     }
 
-    if (JSON.stringify((routing.propagatedHeaders ?? []).slice().sort()) !== JSON.stringify(propagatedHeaders)) {
+    const expectedHeaders = familyId === 'realtime' && routing.authMode === REALTIME_SSE_AUTH_MODE ? [] : propagatedHeaders;
+    if (JSON.stringify((routing.propagatedHeaders ?? []).slice().sort()) !== JSON.stringify(expectedHeaders)) {
       violations.push(`Gateway routing family ${familyId} must propagate the approved auth context headers.`);
     }
 
@@ -411,6 +414,14 @@ function collectApisixRouteViolations(values, gatewayRouting, violations) {
   }
 
   for (const family of routingFamilies) {
+    if (family.id === 'realtime') {
+      for (const id of Object.keys(REALTIME_SSE_ROUTES)) {
+        const route = enabledRoutes.find((entry) => entry.name === id);
+        if (!route) violations.push(`Enabled APISIX route inventory must include ${id}.`);
+        else violations.push(...collectRealtimeSseRouteViolations(route));
+      }
+      continue;
+    }
     const route = enabledRoutes.find((entry) => entry.name === `public-api-${family.id}`);
     if (!route) {
       violations.push(`Enabled APISIX route inventory must include public-api-${family.id}.`);
@@ -441,6 +452,11 @@ function collectApisixRouteViolations(values, gatewayRouting, violations) {
     if (family.id === 'websockets' && route.enableWebsocket !== true) {
       violations.push('APISIX route public-api-websockets must enable websocket upgrades.');
     }
+  }
+
+  // Reject the named bypass on every other route, regardless of its family label.
+  for (const route of enabledRoutes) {
+    if (!Object.hasOwn(REALTIME_SSE_ROUTES, route.name)) violations.push(...collectRealtimeSseRouteViolations(route));
   }
 
   const realtimeRoute = enabledRoutes.find((route) => route.name === 'realtime');

@@ -138,6 +138,10 @@
     {
       "name": "MCP",
       "description": "MCP server hosting and tool-call mediation APIs."
+    },
+    {
+      "name": "Realtime",
+      "description": "Workspace-scoped document collection and PostgreSQL table change streams over Server-Sent Events."
     }
   ],
   "paths": {
@@ -57647,6 +57651,422 @@
         "x-owning-service": "control_api",
         "description": "Independent database lifecycle (#967). Requires database.admin in the owning workspace. User tables require force=true for Postgres; scoped documents require force=true for Mongo. Mongo removes only documents matching both tenantId and workspaceId, and retains a database with remaining documents. A failed physical drop keeps the registry row for retry. Without engine, a matching Postgres registry entry takes precedence over Mongo."
       }
+    },
+    "/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes": {
+      "get": {
+        "operationId": "streamCollectionChanges",
+        "summary": "Stream document collection changes",
+        "description": "Authenticated Server-Sent Events. Credential precedence is header API key, then flc_-prefixed query apikey, then bearer JWT. A presented invalid header key fails closed even with a valid query key; a valid header key authenticates even with an invalid query key. The query key is accepted only for SSE routes; anon and service keys and verified bearer sessions are supported. With no valid alternate credential, absent, non-flc_ or unverifiable query keys return 401 UNAUTHENTICATED JSON before streaming. A key bound to a different workspace returns 403 FORBIDDEN JSON before streaming. Custom version and correlation headers are optional for EventSource. An unset executor returns 501 REALTIME_DISABLED JSON before streaming. Subscription initialization occurs after 200: a rejection sends exactly one error event with a code and message, then the stream ends. Examples: IDENTITY_MISSING, WORKSPACE_MISSING, WORKSPACE_DB_UNRESOLVED. Access logs must omit query strings and redact apikey. Deployed availability depends on the paired falcone-charts routes. DocumentDB WAL updates are emitted as replace, never update.",
+        "parameters": [
+          {
+            "name": "X-API-Version",
+            "in": "header",
+            "required": false,
+            "description": "Pinned additive contract version for the v1 public API release published with gateway QoS and hardening support.",
+            "schema": {
+              "type": "string",
+              "const": "2026-03-26",
+              "pattern": "^2026-03-26$"
+            }
+          },
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": false,
+            "description": "Stable request correlation identifier reused by downstream authorization, orchestration, audit flows, and backfilled by the gateway when recovery requires it.",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]{8,128}$"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "databaseName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "collectionName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "apikey",
+            "in": "query",
+            "required": false,
+            "description": "Optional flc_-prefixed API key for EventSource. Header API keys take precedence; invalid credentials are checked by the executor. Never log this value.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream opened. Named data events carry {type, documentId, document}; error events carry {code, message}.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "event: insert\ndata: {\"type\":\"insert\",\"documentId\":\"record1\",\"document\":{\"id\":\"record1\"}}\n\n"
+              }
+            },
+            "x-sse-data-schema": {
+              "$ref": "#/components/schemas/CollectionChangeEvent"
+            },
+            "x-sse-error-schema": {
+              "$ref": "#/components/schemas/RealtimeStreamError"
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no credential, or the selected credential cannot be verified. No stream starts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: credential workspace mismatch, or API-key dbRole lacks table SELECT (tables only). No stream or capture DDL starts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "REALTIME_DISABLED: executor is unset. No stream starts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway upstream timeout.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "headerApiKey": []
+          },
+          {
+            "queryApiKey": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "Realtime"
+        ],
+        "x-family": "realtime",
+        "x-scope": "workspace",
+        "x-resource-type": "change_stream",
+        "x-audiences": [
+          "developer_external",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-owning-service": "control_api",
+        "x-downstream-adapters": [
+          "mongodb"
+        ],
+        "x-rate-limit-class": "realtime",
+        "x-sse-event-types": [
+          "insert",
+          "replace",
+          "delete",
+          "error"
+        ],
+        "x-credential-schemes": {
+          "headerApiKey": {
+            "$ref": "#/components/securitySchemes/headerApiKey"
+          },
+          "queryApiKey": {
+            "$ref": "#/components/securitySchemes/queryApiKey"
+          },
+          "bearerAuth": {
+            "$ref": "#/components/securitySchemes/bearerAuth"
+          }
+        }
+      }
+    },
+    "/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes": {
+      "get": {
+        "operationId": "streamTableChanges",
+        "summary": "Stream PostgreSQL table changes",
+        "description": "Authenticated Server-Sent Events. Credential precedence is header API key, then flc_-prefixed query apikey, then bearer JWT. A presented invalid header key fails closed even with a valid query key; a valid header key authenticates even with an invalid query key. The query key is accepted only for SSE routes; anon and service keys and verified bearer sessions are supported. With no valid alternate credential, absent, non-flc_ or unverifiable query keys return 401 UNAUTHENTICATED JSON before streaming. A key bound to a different workspace returns 403 FORBIDDEN JSON before streaming. Custom version and correlation headers are optional for EventSource. An unset executor returns 501 REALTIME_DISABLED JSON before streaming. Subscription initialization occurs after 200: a rejection sends exactly one error event with a code and message, then the stream ends. Examples: IDENTITY_MISSING, WORKSPACE_MISSING, WORKSPACE_DB_UNRESOLVED. Access logs must omit query strings and redact apikey. Deployed availability depends on the paired falcone-charts routes. API-key identities must have table-level SELECT for their dbRole, checked on a non-admin connection before 200 or capture DDL. Payloads are filtered by tenant, not by row-level RLS policies: callers may receive rows that RLS would hide. RLS payload filtering requires a separate change.",
+        "parameters": [
+          {
+            "name": "X-API-Version",
+            "in": "header",
+            "required": false,
+            "description": "Pinned additive contract version for the v1 public API release published with gateway QoS and hardening support.",
+            "schema": {
+              "type": "string",
+              "const": "2026-03-26",
+              "pattern": "^2026-03-26$"
+            }
+          },
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": false,
+            "description": "Stable request correlation identifier reused by downstream authorization, orchestration, audit flows, and backfilled by the gateway when recovery requires it.",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]{8,128}$"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "databaseName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schemaName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$"
+            }
+          },
+          {
+            "name": "tableName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$"
+            }
+          },
+          {
+            "name": "apikey",
+            "in": "query",
+            "required": false,
+            "description": "Optional flc_-prefixed API key for EventSource. Header API keys take precedence; invalid credentials are checked by the executor. Never log this value.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream opened. Named data events carry {type, documentId, document}; error events carry {code, message}.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "event: insert\ndata: {\"type\":\"insert\",\"documentId\":\"record1\",\"document\":{\"id\":\"record1\"}}\n\n"
+              }
+            },
+            "x-sse-data-schema": {
+              "$ref": "#/components/schemas/TableChangeEvent"
+            },
+            "x-sse-error-schema": {
+              "$ref": "#/components/schemas/RealtimeStreamError"
+            }
+          },
+          "400": {
+            "description": "INVALID_IDENTIFIER: invalid PostgreSQL schema or table identifier (tables only).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no credential, or the selected credential cannot be verified. No stream starts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: credential workspace mismatch, or API-key dbRole lacks table SELECT (tables only). No stream or capture DDL starts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "CONTROL_PLANE_ERROR: database failure before streaming. No stream or capture DDL starts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "REALTIME_DISABLED: executor is unset. No stream starts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway upstream timeout.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "headerApiKey": []
+          },
+          {
+            "queryApiKey": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "Realtime"
+        ],
+        "x-family": "realtime",
+        "x-scope": "workspace",
+        "x-resource-type": "change_stream",
+        "x-audiences": [
+          "developer_external",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-owning-service": "control_api",
+        "x-downstream-adapters": [
+          "postgresql"
+        ],
+        "x-rate-limit-class": "realtime",
+        "x-sse-event-types": [
+          "insert",
+          "update",
+          "delete",
+          "error"
+        ],
+        "x-credential-schemes": {
+          "headerApiKey": {
+            "$ref": "#/components/securitySchemes/headerApiKey"
+          },
+          "queryApiKey": {
+            "$ref": "#/components/securitySchemes/queryApiKey"
+          },
+          "bearerAuth": {
+            "$ref": "#/components/securitySchemes/bearerAuth"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -57656,6 +58076,18 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "description": "Keycloak-issued access token carrying platform, tenant, and workspace authorization bindings."
+      },
+      "headerApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "apikey",
+        "description": "Executor-verified flc_ API key. Header key takes precedence over query key."
+      },
+      "queryApiKey": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "apikey",
+        "description": "Executor-verified flc_ API key. Header key takes precedence over query key."
       }
     },
     "parameters": {
@@ -91335,6 +91767,83 @@
             "format": "email",
             "maxLength": 255,
             "description": "Re-enter the recipient: the control plane does not persist the address. Legacy/rotated-key invitations are explicitly reissued under the current key."
+          }
+        }
+      },
+      "CollectionChangeEvent": {
+        "type": "object",
+        "required": [
+          "type",
+          "documentId",
+          "document"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "insert",
+              "replace",
+              "delete"
+            ]
+          },
+          "documentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "document": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          }
+        }
+      },
+      "TableChangeEvent": {
+        "type": "object",
+        "required": [
+          "type",
+          "documentId",
+          "document"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "insert",
+              "update",
+              "delete"
+            ]
+          },
+          "documentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "document": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          }
+        }
+      },
+      "RealtimeStreamError": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
           }
         }
       }

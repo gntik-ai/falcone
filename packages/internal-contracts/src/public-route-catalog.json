@@ -24600,6 +24600,162 @@
     {
       "adminChannel": null,
       "allowAnonymousOptions": true,
+      "allowedContentTypes": [],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": false,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "mongodb"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "eventTypes": [
+        "insert",
+        "replace",
+        "delete",
+        "error"
+      ],
+      "explicitConfirmationRequired": false,
+      "family": "realtime",
+      "familyTitle": "Realtime",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "query_api_key_sse",
+      "gatewayContextHeaders": [],
+      "gatewayQosProfile": "realtime_sse",
+      "gatewayRequestValidationProfile": "realtime_sse",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "realtime",
+      "gatewayTimeoutProfile": "realtime",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1024,
+      "method": "GET",
+      "operationId": "streamCollectionChanges",
+      "path": "/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 30,
+      "rateLimitClass": "realtime",
+      "requiredHeaders": [],
+      "requiredPlanFlags": [],
+      "resourceType": "change_stream",
+      "responseContentTypes": [
+        "text/event-stream"
+      ],
+      "scope": "workspace",
+      "summary": "Stream document collection changes",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Realtime"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
+      "allowedContentTypes": [],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "authRequired": true,
+      "consoleDelegationMode": null,
+      "consoleDiscoverySurface": false,
+      "consoleStatusOperationIds": [],
+      "consoleTier": null,
+      "consoleWorkflowId": null,
+      "correlationIdGeneratedWhenMissing": true,
+      "correlationIdRequired": false,
+      "deprecated": false,
+      "discoveryRoute": "/v1/platform/route-catalog",
+      "downstreamAdapters": [
+        "postgresql"
+      ],
+      "downstreamService": "control_api",
+      "errorEnvelope": "ErrorResponse",
+      "eventTypes": [
+        "insert",
+        "update",
+        "delete",
+        "error"
+      ],
+      "explicitConfirmationRequired": false,
+      "family": "realtime",
+      "familyTitle": "Realtime",
+      "gatewayAllowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-API-Version",
+        "X-Correlation-Id",
+        "X-Requested-With"
+      ],
+      "gatewayAuthMode": "query_api_key_sse",
+      "gatewayContextHeaders": [],
+      "gatewayQosProfile": "realtime_sse",
+      "gatewayRequestValidationProfile": "realtime_sse",
+      "gatewayRetryProfile": "mutations",
+      "gatewayRouteClass": "realtime",
+      "gatewayTimeoutProfile": "realtime",
+      "idempotencyReplayHeader": null,
+      "idempotencyTtlSeconds": null,
+      "internalRequestMode": "validated_attestation",
+      "maxRequestBodyBytes": 1024,
+      "method": "GET",
+      "operationId": "streamTableChanges",
+      "path": "/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes",
+      "planCapabilityAnyOf": [],
+      "qosBurst": 30,
+      "rateLimitClass": "realtime",
+      "requiredHeaders": [],
+      "requiredPlanFlags": [],
+      "resourceType": "change_stream",
+      "responseContentTypes": [
+        "text/event-stream"
+      ],
+      "scope": "workspace",
+      "summary": "Stream PostgreSQL table changes",
+      "supportsIdempotencyKey": false,
+      "tags": [
+        "Realtime"
+      ],
+      "tenantBinding": "required",
+      "visibility": "public",
+      "workspaceBinding": "required"
+    },
+    {
+      "adminChannel": null,
+      "allowAnonymousOptions": true,
       "allowedContentTypes": [
         "application/json"
       ],

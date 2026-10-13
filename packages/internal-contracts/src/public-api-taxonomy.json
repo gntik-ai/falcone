@@ -609,6 +609,35 @@
       ],
       "visibility": "public",
       "apisix_route_class": "control"
+    },
+    {
+      "id": "realtime",
+      "title": "Realtime",
+      "prefix": "/v1/realtime",
+      "summary": "Workspace-scoped document collection and PostgreSQL table change streams over Server-Sent Events.",
+      "owning_service": "control_api",
+      "downstream_contracts": [
+        "control_api_command",
+        "audit_record"
+      ],
+      "resource_scopes": [
+        "workspace"
+      ],
+      "audiences": [
+        "developer_external",
+        "workspace_owner",
+        "workspace_admin",
+        "workspace_developer",
+        "workspace_viewer",
+        "workspace_service_account",
+        "platform_team"
+      ],
+      "visibility": "public",
+      "apisix_route_class": "realtime",
+      "downstream_adapters": [
+        "postgresql",
+        "mongodb"
+      ]
     }
   ],
   "resource_taxonomy": [

@@ -62,22 +62,32 @@ test('api-key issuance route targets the executor with admin (JWT) auth, scoped 
   assert.ok(route.priority > workspaces.priority, 'issuance route must outrank public-api-workspaces');
 });
 
-test('realtime SSE route streams to the executor, anon-keyed, OIDC-free, long timeout', () => {
-  const route = byName('public-api-realtime-changes')
-  assert.ok(route, 'public-api-realtime-changes must be declared')
-  assert.equal(route.upstream?.requiresExecutor, true)
-  assert.equal(route.upstream?.dataPlane, true)
-  assert.equal(route.upstream?.sse, true) // template gives it a long upstream timeout
-  // matches any change-stream endpoint (Mongo collections + Postgres tables)
-  assert.deepEqual(route.vars, [['uri', '~~', '/changes$']])
-  // anon/read: no JWT at the gateway (EventSource sends ?apikey=, executor verifies)
-  assert.ok(!('openid-connect' in (route.plugins ?? {})), 'realtime route must not enable openid-connect')
-  // rate-limited per key whether the key is a header or ?apikey=
-  const limit = route.plugins?.['limit-count']
-  assert.ok(limit && limit.rejected_code === 429, 'realtime route must rate-limit')
-  assert.equal(limit.key_type, 'var_combination')
-  assert.ok(String(limit.key).includes('$arg_apikey'), 'realtime rate limit must consider the ?apikey= query arg')
-})
+for (const [name, pattern, path] of [
+  ['public-api-realtime-collection-changes', '^/v1/realtime/workspaces/[^/]+/data/[^/]+/collections/[^/]+/changes$', '/v1/realtime/workspaces/ws1/data/appdb/collections/notes/changes'],
+  ['public-api-realtime-table-changes', '^/v1/realtime/workspaces/[^/]+/data/[^/]+/schemas/[^/]+/tables/[^/]+/changes$', '/v1/realtime/workspaces/ws1/data/appdb/schemas/public/tables/notes/changes'],
+]) {
+  test(`${name} streams to the executor, anon-keyed, OIDC-free, long timeout`, () => {
+    const route = byName(name);
+    assert.ok(route, `${name} must be declared`);
+    assert.equal(route.upstream?.requiresExecutor, true);
+    assert.equal(route.upstream?.dataPlane, true);
+    assert.equal(route.upstream?.sse, true);
+    assert.deepEqual(route.methods, ['GET', 'OPTIONS']);
+    assert.deepEqual(route.vars, [['uri', '~~', pattern]]);
+    const guard = new RegExp(route.vars[0][2]);
+    assert.equal(guard.test(path), true);
+    for (const other of [`${path}/extra`, `/extra${path}`, '/v1/realtime/workspaces/ws1/mongo-captures', '/v1/workspaces/ws1/pg-captures']) {
+      assert.equal(guard.test(other), false, other);
+    }
+    // EventSource sends ?apikey=; the executor verifies credentials.
+    assert.ok(!('openid-connect' in (route.plugins ?? {})), `${name} must not enable openid-connect`);
+    assert.equal(route.plugins?.cors?.allow_methods, 'GET,OPTIONS');
+    const limit = route.plugins?.['limit-count'];
+    assert.ok(limit && limit.rejected_code === 429, `${name} must rate-limit`);
+    assert.equal(limit.key_type, 'var_combination');
+    assert.equal(limit.key, '$http_apikey$arg_apikey');
+  });
+}
 
 test('every requiresExecutor route is also a data-plane route (so the split sends it to the executor)', () => {
   for (const route of routes.filter((r) => r.upstream?.requiresExecutor)) {

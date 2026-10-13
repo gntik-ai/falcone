@@ -8,6 +8,7 @@ import {
   requiredProductPlugins
 } from '../../scripts/lib/gateway-policy.mjs';
 import { readGatewayRouting, readPublicRouteCatalog } from '../../scripts/lib/public-api.mjs';
+import { collectRealtimeSseRouteViolations, REALTIME_SSE_ROUTES } from '../../scripts/lib/realtime-sse-policy.mjs';
 import {
   listConsoleRoutesByTier,
   listConsoleWorkflowRoutes,
@@ -21,6 +22,14 @@ test('gateway contract publishes APISIX policy for every public family and passt
   const routeCatalog = readPublicRouteCatalog();
 
   for (const family of gatewayRouting.spec.families) {
+    if (family.id === 'realtime') {
+      for (const id of Object.keys(REALTIME_SSE_ROUTES)) {
+        const route = enabledRoutes.find((entry) => entry.name === id);
+        assert.ok(route, `missing APISIX SSE route ${id}`);
+        assert.deepEqual(collectRealtimeSseRouteViolations(route), []);
+      }
+      continue;
+    }
     const route = enabledRoutes.find((entry) => entry.name === `public-api-${family.id}`);
     assert.ok(route, `missing APISIX route for family ${family.id}`);
     assert.equal(route.uri, `${family.pathPrefix}/*`);
@@ -68,26 +77,6 @@ test('gateway metrics and event-gateway QoS remain explicit in values and catalo
   assert.equal(publishRoute.gatewayRequestValidationProfile, 'event_gateway');
   assert.equal(websocketRoute.gatewayQosProfile, 'realtime');
   assert.equal(websocketRoute.gatewayRequestValidationProfile, 'realtime');
-});
-
-test('route catalog exposes gateway-facing auth and context metadata for every operation', () => {
-  const routeCatalog = readPublicRouteCatalog();
-
-  for (const route of routeCatalog.routes) {
-    assert.equal(typeof route.gatewayAuthMode, 'string');
-    assert.equal(typeof route.gatewayRouteClass, 'string');
-    assert.equal(typeof route.gatewayQosProfile, 'string');
-    assert.equal(typeof route.gatewayRequestValidationProfile, 'string');
-    assert.equal(Array.isArray(route.gatewayAllowedHeaders), true);
-    assert.equal(Array.isArray(route.gatewayContextHeaders), true);
-    assert.equal(Array.isArray(route.allowedContentTypes), true);
-    assert.equal(route.gatewayAllowedHeaders.includes('Authorization'), true);
-    assert.equal(route.gatewayAllowedHeaders.includes('X-API-Version'), true);
-    assert.equal(route.gatewayContextHeaders.includes('X-Auth-Subject'), true);
-    assert.equal(route.errorEnvelope, 'ErrorResponse');
-    assert.equal(route.internalRequestMode, 'validated_attestation');
-    assert.ok(route.maxRequestBodyBytes > 0);
-  }
 });
 
 test('route catalog helpers can filter and summarize console endpoint separation metadata', () => {

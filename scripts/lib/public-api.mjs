@@ -10,6 +10,7 @@ import {
 } from './quality-gates.mjs';
 import { readAuthorizationModel } from './authorization-model.mjs';
 import { readDomainModel } from './domain-model.mjs';
+import { isRealtimeSseOperation } from './realtime-sse-policy.mjs';
 
 export const PUBLIC_API_TAXONOMY_PATH = 'packages/internal-contracts/src/public-api-taxonomy.json';
 export const PUBLIC_ROUTE_CATALOG_PATH = 'packages/internal-contracts/src/public-route-catalog.json';
@@ -248,7 +249,7 @@ export function buildRouteCatalog(
         gatewayRetryProfile: qosProfile.retryProfile ?? null,
         maxRequestBodyBytes: requestValidationProfile.maxBodyBytes ?? null,
         allowedContentTypes: requestValidationProfile.allowedContentTypes ?? [],
-        correlationIdRequired: gatewayRouting?.spec?.correlationHeader?.required !== false,
+        correlationIdRequired: isRealtimeSseOperation(path, operation) ? false : gatewayRouting?.spec?.correlationHeader?.required !== false,
         correlationIdGeneratedWhenMissing: gatewayRouting?.spec?.correlationHeader?.generateWhenMissing === true,
         tenantBinding: operation['x-tenant-binding'] ?? routing.tenantBinding ?? null,
         workspaceBinding: operation['x-workspace-binding'] ?? routing.workspaceBinding ?? null,
@@ -278,6 +279,10 @@ export function buildRouteCatalog(
         downstreamService: operation['x-owning-service'] ?? family?.owning_service ?? null,
         downstreamAdapters: operation['x-downstream-adapters'] ?? family?.downstream_adapters ?? [],
         rateLimitClass: operation['x-rate-limit-class'] ?? 'default',
+        ...(operation['x-sse-event-types'] ? {
+          responseContentTypes: ['text/event-stream'],
+          eventTypes: operation['x-sse-event-types'],
+        } : {}),
         qosBurst: qosProfile.burst ?? 0,
         internalRequestMode: gatewayRouting?.spec?.internalRequestMode?.mode ?? null,
         errorEnvelope: gatewayRouting?.spec?.errorEnvelope?.schema ?? null,
@@ -448,11 +453,11 @@ function collectOperationViolations(document, taxonomy, violations) {
       violations.push(`${method.toUpperCase()} ${path} must use one of the allowed prefixes (${allowedPrefixes.join(', ')}) for family ${familyId}.`);
     }
 
-    if (!headers.includes(taxonomy.shared_http.headers.api_version.name)) {
+    if (!headers.includes(taxonomy.shared_http.headers.api_version.name) && !(method === 'get' && isRealtimeSseOperation(path, operation))) {
       violations.push(`${method.toUpperCase()} ${path} must require ${taxonomy.shared_http.headers.api_version.name}.`);
     }
 
-    if (!headers.includes(taxonomy.shared_http.headers.correlation_id.name)) {
+    if (!headers.includes(taxonomy.shared_http.headers.correlation_id.name) && !(method === 'get' && isRealtimeSseOperation(path, operation))) {
       violations.push(`${method.toUpperCase()} ${path} must require ${taxonomy.shared_http.headers.correlation_id.name}.`);
     }
 

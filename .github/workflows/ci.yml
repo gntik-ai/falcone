@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '78f884367ab7fe7c69bc912ac0552cc033edac2a'
+  FALCONE_CHARTS_REF: '4d6c9c380239f1c132be987ab57275c471abf593'
 
 jobs:
   quality:
@@ -415,6 +415,9 @@ jobs:
 
       - name: Executor real-stack tests (Postgres + pgvector)
         run: bash tests/env/executor/run.sh
+
+      - name: Executor realtime SSE tests (DocumentDB + FerretDB)
+        run: bash tests/env/executor/run-realtime.sh
 
       - name: Flow audit outbox real-stack tests (Postgres + Redpanda)
         run: bash tests/env/flow-audit-outbox/run.sh

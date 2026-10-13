@@ -18,6 +18,35 @@ test('testing strategy package remains internally consistent', () => {
   assert.deepEqual(violations, []);
 });
 
+test('EventSource header exemption is bounded by path, operation id and GET method', () => {
+  const path = '/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes';
+  for (const change of ['path', 'operationId', 'method']) {
+    const document = readJson(OPENAPI_PATH);
+    const operation = document.paths[path].get;
+    if (change === 'path') {
+      delete document.paths[path];
+      document.paths[`${path}/extra`] = { get: operation };
+    } else if (change === 'operationId') {
+      operation.operationId = 'streamOtherChanges';
+    } else {
+      document.paths[path] = { post: operation };
+    }
+    const violations = collectTestingStrategyViolations(readTestingStrategy(), readReferenceDataset(), document);
+    assert.ok(violations.some((violation) => violation.includes('must require X-API-Version')), change);
+  }
+});
+
+test('EventSource exemption retains error contract requirements', () => {
+  const document = readJson(OPENAPI_PATH);
+  document.paths['/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes'].get.responses = {
+    '200': { description: 'stream' }
+  };
+  const violations = collectTestingStrategyViolations(readTestingStrategy(), readReferenceDataset(), document);
+  assert.deepEqual(violations, [
+    'GET /v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes in OpenAPI must declare an error contract to match strategy expectations.'
+  ]);
+});
+
 test('collectTestingStrategyViolations flags missing layers, fixtures, and console states', () => {
   const strategy = {
     pyramid: [{ level: 'unit', purpose: '', why_now: '' }],
