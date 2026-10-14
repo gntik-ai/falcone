@@ -244,11 +244,11 @@ importers:
         specifier: 0.400.0
         version: 0.400.0(react@19.3.0)
       monaco-editor:
-        specifier: 0.55.1
-        version: 0.55.1
+        specifier: 0.54.0
+        version: 0.54.0
       monaco-yaml:
         specifier: 5.5.1
-        version: 5.5.1(monaco-editor@0.55.1)
+        version: 5.5.1(monaco-editor@0.54.0)
       react:
         specifier: ^19.2.0
         version: 19.3.0
@@ -3794,6 +3794,9 @@ packages:
 
   mitt@3.0.1:
     resolution: {integrity: sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw==}
+
+  monaco-editor@0.54.0:
+    resolution: {integrity: sha512-hx45SEUoLatgWxHKCmlLJH81xBo0uXP4sRkESUpmDQevfi+e7K1VuiSprK6UpQ8u4zOcKNiH0pMvHvlMWA/4cw==}
 
   monaco-editor@0.55.1:
     resolution: {integrity: sha512-jz4x+TJNFHwHtwuV9vA9rMujcZRb0CEilTEwG2rRSpe/A7Jdkuj8xPKttCgOh+v/lkHy7HsZ64oj+q3xoAFl9A==}
@@ -9010,6 +9013,11 @@ snapshots:
 
   mitt@3.0.1: {}
 
+  monaco-editor@0.54.0:
+    dependencies:
+      dompurify: 3.4.11
+      marked: 14.0.0
+
   monaco-editor@0.55.1:
     dependencies:
       dompurify: 3.4.11
@@ -9032,9 +9040,30 @@ snapshots:
 
   monaco-types@0.1.2: {}
 
+  monaco-worker-manager@2.0.1(monaco-editor@0.54.0):
+    dependencies:
+      monaco-editor: 0.54.0
+
   monaco-worker-manager@2.0.1(monaco-editor@0.55.1):
     dependencies:
       monaco-editor: 0.55.1
+
+  monaco-yaml@5.5.1(monaco-editor@0.54.0):
+    dependencies:
+      '@vscode/l10n': 0.0.18
+      jsonc-parser: 3.3.1
+      monaco-editor: 0.54.0
+      monaco-languageserver-types: 0.4.1
+      monaco-marker-data-provider: 1.2.5
+      monaco-types: 0.1.2
+      monaco-worker-manager: 2.0.1(monaco-editor@0.54.0)
+      path-browserify: 1.0.1
+      prettier: 3.8.4
+      proxy-disposable: 1.0.0
+      vscode-languageserver-textdocument: 1.0.12
+      vscode-languageserver-types: 3.18.0
+      vscode-uri: 3.1.0
+      yaml: 2.8.3
 
   monaco-yaml@5.5.1(monaco-editor@0.55.1):
     dependencies:
