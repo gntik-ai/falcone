@@ -155,6 +155,7 @@ export const routes = [
   // ---- domain B: workspace data plane (DB provisioning + function registry) --
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/database', localHandler: 'provisionDatabase', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces/{workspaceId}/database', localHandler: 'getDatabase', auth: 'authenticated' },
+  { method: 'GET',  path: '/v1/workspaces/{workspaceId}/database/history', localHandler: 'getDatabaseHistory', auth: 'authenticated' },
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/database/credential-rotations', localHandler: 'rotateDatabaseCredential', auth: 'authenticated' },
   { method: 'POST', path: '/v1/workspaces/{workspaceId}/functions', localHandler: 'registerFunction', auth: 'authenticated' },
   { method: 'GET',  path: '/v1/workspaces/{workspaceId}/functions', localHandler: 'listFunctions', auth: 'authenticated' },
