@@ -10,8 +10,9 @@ const fnDockerfilePath = path.join(repoRoot, 'apps/fn-runtime/Dockerfile');
 const webDockerfilePath = path.join(repoRoot, 'apps/web-console/Dockerfile');
 const fnDockerfile = fs.readFileSync(fnDockerfilePath, 'utf8');
 const webDockerfile = fs.readFileSync(webDockerfilePath, 'utf8');
-const filteredInstall = 'corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console...';
-const boundedBuild = 'NODE_OPTIONS=--max-old-space-size=1536 pnpm --filter @in-falcone/web-console exec vite build';
+const filteredInstall = 'corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console... --filter @in-falcone/web-console-next...';
+const boundedBuild = 'NODE_OPTIONS=--max-old-space-size=1536 VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console exec vite build';
+const nextBuild = 'NODE_OPTIONS=--max-old-space-size=1536 CSP_TEST_HARNESS= VITE_BASE_PATH=/next/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build';
 // The web-console FROM stages are parameterized by a base-image build arg (issue #929); the ARG
 // default preserves the current base. These literal strings are single-quoted so `${...}` stays
 // literal (no JS interpolation).
@@ -99,11 +100,11 @@ function validateWebBuilder(source) {
   const contextCopy = oneInstruction(builder, 'COPY');
   assert.equal(contextCopy.args, '. .', 'builder must receive the root checkout, including its workspace lockfile');
   const runs = builder.filter((entry) => entry.instruction === 'RUN');
-  assert.equal(runs.length, 2, 'dependency installation and Vite build must be separate Docker layers');
-  assert.deepEqual(runs.map((entry) => entry.args), [filteredInstall, boundedBuild]);
+  assert.equal(runs.length, 3, 'dependency installation and each Vite build must be separate Docker layers');
+  assert.deepEqual(runs.map((entry) => entry.args), [filteredInstall, boundedBuild, nextBuild]);
   assert.ok(builder.indexOf(contextCopy) < builder.indexOf(runs[0]));
   assert.ok(builder.indexOf(runs[0]) < builder.indexOf(runs[1]));
-  assert.match(runs[0].args, /pnpm install --frozen-lockfile --filter @in-falcone\/web-console\.\.\.$/);
+  assert.match(runs[0].args, /pnpm install --frozen-lockfile --filter @in-falcone\/web-console\.\.\. --filter @in-falcone\/web-console-next\.\.\.$/);
   assert.match(runs[1].args, /^NODE_OPTIONS=--max-old-space-size=1536\s/);
 
   const rootPackage = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
@@ -111,9 +112,15 @@ function validateWebBuilder(source) {
   const lockfile = fs.readFileSync(path.join(repoRoot, 'pnpm-lock.yaml'), 'utf8');
   assert.match(lockfile, /^lockfileVersion:\s*['"]?9\.0['"]?/m);
   assert.match(lockfile, /^\s{2}apps\/web-console:\s*$/m, 'root lockfile must contain the web-console workspace importer');
+  assert.match(lockfile, /^\s{2}apps\/web-console-next:\s*$/m);
 
-  const artifactCopy = oneInstruction(runtime, 'COPY', (entry) => entry.args.includes('/dist'));
+  const artifactCopy = oneInstruction(runtime, 'COPY', (entry) => entry.args.endsWith(' ./dist'));
   assert.equal(artifactCopy.args, '--from=builder /src/apps/web-console/dist ./dist');
+  assert.equal(oneInstruction(runtime, 'COPY', (entry) => entry.args.endsWith(' ./dist-next')).args,
+    '--from=builder /src/apps/web-console-next/dist ./dist-next');
+  assert.doesNotMatch(source, /(?:token|password|\.npmrc|--mount=type=secret)/i);
+  assert.deepEqual(instructions.filter((entry) => entry.instruction === 'ARG').map((entry) => entry.args),
+    ['NODE_BASE_IMAGE=node:22-alpine', 'APP_VERSION=dev', 'APP_COMMIT_SHA=']);
   assert.equal(
     instructions.some((entry) => entry.instruction === 'COPY'
       && !entry.args.startsWith('--from=')
@@ -165,7 +172,7 @@ test('contract validators are sensitive to both pre-fix Dockerfile regressions',
   assert.throws(() => validateFnRootContext(oldFnDockerfile), /apps\/fn-runtime\/server\.mjs/);
 
   const oldWebDockerfile = webDockerfile
-    .replace(`FROM ${webBuilderFrom}\nWORKDIR /src\nCOPY . .\nRUN ${filteredInstall}\nRUN ${boundedBuild}\n\n`, '')
+    .replace(/^FROM [\s\S]*?\n(?=FROM )/m, '')
     .replace('COPY --from=builder /src/apps/web-console/dist ./dist', 'COPY apps/web-console/dist ./dist');
   assert.notEqual(oldWebDockerfile, webDockerfile);
   assert.throws(() => validateWebBuilder(oldWebDockerfile), /Dockerfile stage 1 is missing/);

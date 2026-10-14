@@ -13,6 +13,7 @@ import { promisify } from 'node:util';
 import { brotliCompress, gzip } from 'node:zlib';
 
 const ROOT = process.env.WEB_CONSOLE_STATIC_ROOT || '/app/dist';
+const NEXT_ROOT = process.env.WEB_CONSOLE_NEXT_STATIC_ROOT || '/app/dist-next';
 const configuredPort = Number.parseInt(process.env.PORT ?? '3000', 10);
 const PORT = Number.isFinite(configuredPort) ? configuredPort : 3000;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.svg':'image/svg+xml', '.png':'image/png', '.ico':'image/x-icon', '.woff2':'font/woff2', '.map':'application/json' };
@@ -105,14 +106,35 @@ const server = http.createServer(async (req, res) => {
     req.pipe(upstream);
     return;
   }
-  let p = normalize(decodeURIComponent((req.url ?? '/').split('?')[0])).replace(/^(\.\.[/\\])+/, '');
+  let pathname;
+  try {
+    pathname = decodeURIComponent((req.url ?? '/').split('?')[0]);
+    // Validate before normalization so /next/../ cannot be reclassified as legacy.
+    if (pathname.includes('\0') || pathname.split(/[/\\]/).includes('..')) throw new Error('Invalid path');
+  } catch {
+    res.writeHead(400, { ...SECURITY_HEADERS, 'content-type': 'text/plain' });
+    return res.end('Bad request');
+  }
+  const isNext = pathname === '/next' || pathname.startsWith('/next/');
+  const root = isNext ? NEXT_ROOT : ROOT;
+  let p = normalize(isNext ? (pathname.slice('/next'.length) || '/') : pathname).replace(/^(\.\.[/\\])+/, '');
   if (p === '/' || p === '\\') p = '/index.html';
   try {
-    const body = await readFile(join(ROOT, p));
+    const body = await readFile(join(root, p));
     await sendStatic(req, res, p, body, MIME[extname(p)] ?? 'application/octet-stream');
   } catch {
-    const body = await readFile(join(ROOT, 'index.html'));
-    await sendStatic(req, res, '/index.html', body, 'text/html');
+    if (isNext && p.startsWith('/assets/')) {
+      res.writeHead(404, { ...SECURITY_HEADERS, 'content-type': 'text/plain' });
+      return res.end('Not found');
+    }
+    try {
+      const body = await readFile(join(root, 'index.html'));
+      await sendStatic(req, res, '/index.html', body, 'text/html');
+    } catch (error) {
+      if (!isNext) throw error;
+      res.writeHead(404, { ...SECURITY_HEADERS, 'content-type': 'text/plain' });
+      res.end('Not found');
+    }
   }
 });
 

@@ -26,6 +26,30 @@ const staticServers = [
   }
 ];
 
+test('next shell routes serve the separate index with the exact legacy security headers', async (t) => {
+  const { root, files } = await createDistRoot(t);
+  const nextRoot = await mkdtemp(join(tmpdir(), 'falcone-next-'));
+  t.after(() => rm(nextRoot, { recursive: true, force: true }));
+  const nextIndex = '<!doctype html><main>Next console</main>';
+  await writeFile(join(nextRoot, 'index.html'), nextIndex);
+  const { port } = await startStaticServer(t, 'apps/web-console/static-server.mjs', root, {
+    WEB_CONSOLE_NEXT_STATIC_ROOT: nextRoot
+  });
+  const legacy = await request(port, '/');
+  assert.equal(legacy.body.toString(), files['/index.html']);
+  for (const path of ['/next', '/next/', '/next/console/tenants', '/next/index.html?test=1']) {
+    const response = await request(port, path);
+    assert.equal(response.statusCode, 200, path);
+    assert.equal(response.body.toString(), nextIndex, path);
+    assert.equal(response.headers['content-type'], 'text/html');
+    assert.equal(response.headers['cache-control'], 'no-store');
+    assertSecurityHeaders(response.headers, path);
+    for (const name of ['content-security-policy', 'x-frame-options', 'x-content-type-options', 'referrer-policy', 'permissions-policy']) {
+      assert.equal(response.headers[name], legacy.headers[name], name);
+    }
+  }
+});
+
 async function createDistRoot(t) {
   const root = await mkdtemp(join(tmpdir(), 'falcone-web-console-static-'));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -196,6 +220,26 @@ function extractNginxLocation(source, pattern, name, scope) {
   assert.ok(match, `${name} declares ${scope}`);
   return match[1];
 }
+
+test('nginx mirror serves the next index and assets with the legacy CSP and cache policies', async () => {
+  const source = await readFile(join(repoRoot, 'apps/web-console/nginx.conf'), 'utf8');
+  const legacy = extractNginxLocation(source, /location = \/index\.html \{([\s\S]*?)\n  \}/, 'nginx', 'legacy index');
+  for (const [scope, pattern, cache] of [
+    ['next index', /location = \/next\/index\.html \{([\s\S]*?)\n  \}/, 'no-store'],
+    ['next assets', /location \^~ \/next\/assets\/ \{([\s\S]*?)\n  \}/, IMMUTABLE],
+    ['next fallback', /location \/next\/ \{([\s\S]*?)\n  \}/, null]
+  ]) {
+    const location = extractNginxLocation(source, pattern, 'nginx', scope);
+    assertNginxSecurityHeaderSource(location, 'nginx', scope);
+    assert.equal(location.match(/add_header Content-Security-Policy[^\n]+/)[0], legacy.match(/add_header Content-Security-Policy[^\n]+/)[0]);
+    assert.match(location, /alias \/app\/dist-next\//);
+    if (cache) assert.ok(location.includes(`add_header Cache-Control '${cache}'`));
+    if (scope === 'next assets') assert.match(location, /try_files \$uri =404;/);
+    if (scope === 'next fallback') assert.match(location, /try_files \$uri \$uri\/ \/next\/index\.html;/);
+    assert.doesNotMatch(location, /proxy_pass/);
+  }
+  assert.match(source, /location = \/next \{[\s\S]*?return 301 \/next\//);
+});
 
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

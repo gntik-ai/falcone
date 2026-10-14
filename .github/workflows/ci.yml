@@ -393,6 +393,12 @@ jobs:
       - name: Build the legacy release SPA
         run: pnpm --filter @in-falcone/web-console exec vite build
 
+      - name: Build the next release SPA
+        env:
+          VITE_BASE_PATH: /next/
+          CSP_TEST_HARNESS: ''
+        run: pnpm --filter @in-falcone/web-console-next exec vite build
+
       - name: Build the legacy console image without publishing
         run: docker build -f apps/web-console/Dockerfile .
 
