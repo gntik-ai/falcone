@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: 'c074ce44854c3d9578cc129ef7dac18d1b5e0fef'
+  FALCONE_CHARTS_REF: 'c46b9f07c806d379b46f7b92d377f117542f09b0'
 
 jobs:
   quality:
@@ -90,6 +90,7 @@ jobs:
       - name: Storage workspace authorization and regression tests
         run: |
           node --test tests/blackbox/storage-workspace-authz.test.mjs \
+            tests/blackbox/storage-workspace-bucket-list.test.mjs \
             tests/blackbox/structural-write-role-gates-kind.test.mjs \
             tests/blackbox/data-export-import-clone.test.mjs \
             tests/blackbox/storage-bucket-ownership-idor.test.mjs \
@@ -298,6 +299,12 @@ jobs:
 
       - name: Real Postgres reservation, expiry and tenant purge
         run: node --test tests/integration/http-idempotency-postgres.test.mjs
+
+      - name: Real Postgres workspace bucket pagination
+        env:
+          STORAGE_BUCKET_LIST_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+          STORAGE_BUCKET_LIST_TEST_REQUIRED: '1'
+        run: node --test tests/integration/storage-workspace-bucket-page.test.mjs
 
       - name: HTTP flow creation and Kafka publish reproductions
         run: node --test tests/unit/http-idempotency-server.test.mjs

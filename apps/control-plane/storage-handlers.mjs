@@ -369,18 +369,31 @@ function isSuperOrInternal(identity) {
 
 // #973: bucket reads require model authority or a tenant role with a verified workspace binding.
 // Return the existing 404 shape before S3; request fields never grant workspace authority.
-function denyUnlessWorkspaceBucketReader(ctx, bucket, rec) {
-  if (isSuperOrInternal(ctx.identity)) return null;
+function canReadWorkspaceBuckets(identity, rec) {
+  if (isSuperOrInternal(identity)) return true;
   if (rec) {
     const scope = { tenantId: rec.tenant_id, workspaceId: rec.workspace_id };
-    if (['bucket.read', 'bucket.write', 'bucket.admin'].some((action) => can(ctx.identity, action, scope))) return null;
-    const identity = ctx.identity;
+    if (['bucket.read', 'bucket.write', 'bucket.admin'].some((action) => can(identity, action, scope))) return true;
     if (rec.tenant_id && identity.tenantId === rec.tenant_id && rec.workspace_id
       && Array.isArray(identity.roles)
       && identity.roles.some((role) => TENANT_ROLES.has(role))
-      && Array.isArray(identity.workspaceIds) && identity.workspaceIds.includes(rec.workspace_id)) return null;
+      && Array.isArray(identity.workspaceIds) && identity.workspaceIds.includes(rec.workspace_id)) return true;
   }
+  return false;
+}
+function denyUnlessWorkspaceBucketReader(ctx, bucket, rec) {
+  if (canReadWorkspaceBuckets(ctx.identity, rec)) return null;
   return err(404, 'BUCKET_NOT_FOUND', `bucket ${bucket} not found`);
+}
+
+// Resolve ownership before authority checks, hiding both missing and foreign workspaces.
+async function requireOwnedWorkspace(ctx) {
+  const workspaceId = ctx.params.workspaceId;
+  const ws = await store.getWorkspace(ctx.pool, workspaceId);
+  if (!ws || (!isSuperOrInternal(ctx.identity) && ws.tenant_id !== ctx.identity.tenantId)) {
+    return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`) };
+  }
+  return { ws };
 }
 
 // Shared registry lookup for object I/O; platform bypass remains unchanged (#973).
@@ -611,6 +624,14 @@ async function storageDeleteObject(ctx) {
     return ok(200, { objectKey: key, bucketName: bucket, deleted: true });
   } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_DELETE_FAILED', String(e.message ?? e)); }
 }
+function storageBucketListItem(bucketName, mapping, region, lastModifiedAt) {
+  return {
+    resourceId: bucketName, bucketName,
+    tenantId: mapping?.tenant_id ?? null, workspaceId: mapping?.workspace_id ?? null,
+    region, status: 'active',
+    timestamps: { createdAt: mapping?.created_at ?? lastModifiedAt, lastModifiedAt },
+  };
+}
 async function storageListBuckets(ctx) {
   const map = await store.bucketWorkspaceMap(ctx.pool);
   const isSuperadmin = isSuperOrInternal(ctx.identity);
@@ -620,16 +641,20 @@ async function storageListBuckets(ctx) {
   const all = await listBuckets();
   const items = all
     .filter((b) => isSuperadmin || readable.has(b.name))
-    .map((b) => {
-      const m = map[b.name];
-      return {
-        resourceId: b.name, bucketName: b.name,
-        tenantId: m?.tenant_id ?? null, workspaceId: m?.workspace_id ?? null,
-        region: REGION, status: 'active',
-        timestamps: { createdAt: m?.created_at ?? b.creationDate, lastModifiedAt: b.creationDate }
-      };
-    });
+    .map((b) => storageBucketListItem(b.name, map[b.name], REGION, b.creationDate));
   return ok(200, { items, page: { size: items.length } });
+}
+async function storageListWorkspaceBuckets(ctx) {
+  const { ws, error } = await requireOwnedWorkspace(ctx);
+  if (error) return error;
+  if (!canReadWorkspaceBuckets(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id })) {
+    return err(403, 'FORBIDDEN', 'caller may not read buckets in this workspace');
+  }
+  const size = Math.min(Math.max(Math.floor(Number(ctx.query?.['page[size]'] ?? 50) || 50), 1), 200);
+  const after = ctx.query?.['page[after]'] || null;
+  const { items: rows, nextCursor } = await store.listWorkspaceBucketsPage(ctx.pool, ws.id, ws.tenant_id, { size, after });
+  const items = rows.map((row) => storageBucketListItem(row.bucket_name, row, row.region, row.created_at));
+  return ok(200, { items, page: { size: items.length, ...(nextCursor === undefined ? {} : { nextCursor }) } });
 }
 async function storageListObjects(ctx) {
   const bucket = ctx.params.bucketId;
@@ -664,10 +689,8 @@ async function storageObjectMetadata(ctx) {
 }
 async function storageWorkspaceUsage(ctx) {
   const workspaceId = ctx.params.workspaceId;
-  const ws = await store.getWorkspace(ctx.pool, workspaceId);
-  if (!ws || (!isSuperOrInternal(ctx.identity) && ws.tenant_id !== ctx.identity.tenantId)) {
-    return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
-  }
+  const { ws, error } = await requireOwnedWorkspace(ctx);
+  if (error) return error;
   const mapped = await store.listBucketsForWorkspace(ctx.pool, workspaceId);
   let totalBytes = 0, objectCount = 0; const bucketEntries = [];
   for (const row of mapped) {
@@ -703,13 +726,8 @@ async function storageWorkspaceUsage(ctx) {
 }
 // POST /v1/storage/workspaces/{workspaceId}/buckets — provision a real bucket + map it.
 async function storageProvisionBucket(ctx) {
-  const workspaceId = ctx.params.workspaceId;
-  const ws = await store.getWorkspace(ctx.pool, workspaceId);
-  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
-  // Ownership check: only superadmin/internal or the workspace-owning tenant may provision.
-  if (!isSuperOrInternal(ctx.identity) && ws.tenant_id !== ctx.identity.tenantId) {
-    return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
-  }
+  const { ws, error } = await requireOwnedWorkspace(ctx);
+  if (error) return error;
   if (!can(ctx.identity, 'bucket.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
     return err(403, 'FORBIDDEN', 'caller may not administer buckets in this workspace');
   }
@@ -1241,7 +1259,7 @@ async function storageBucketImport(ctx) {
 }
 
 export const STORAGE_HANDLERS = {
-  storageListBuckets, storageListObjects, storageObjectMetadata, storageWorkspaceUsage, storageProvisionBucket,
+  storageListBuckets, storageListWorkspaceBuckets, storageListObjects, storageObjectMetadata, storageWorkspaceUsage, storageProvisionBucket,
   storagePutObject, storageGetObject, storageDeleteObject, storageDeleteBucket,
   storagePresignObject,
   storageMultipartInitiate, storageMultipartUploadPart, storageMultipartComplete, storageMultipartAbort,
