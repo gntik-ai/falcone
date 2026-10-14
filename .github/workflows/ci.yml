@@ -114,6 +114,9 @@ jobs:
       - name: Authorization denial audit harness
         run: node --test tests/blackbox/authorization-denial-audit.test.mjs
 
+      - name: Self-tenant plan history authorization and projection
+        run: node --test tests/blackbox/self-tenant-plan-history.test.mjs
+
       - name: Workspace delete cascade
         run: node --test tests/blackbox/workspace-delete-cascade.test.mjs
 

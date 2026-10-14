@@ -7,14 +7,15 @@ import { startDenialServer, TEN_A } from './helpers/authorization-denial-server.
 
 const path = '/v1/tenant/plan/history';
 
-async function historyServer() {
+async function historyServer(fixture = []) {
   const server = await startDenialServer();
   const historyQueries = [];
   server.pool.query = async (sql, values = []) => {
     if (sql.includes('tenant_plan_assignments')) {
       historyQueries.push({ sql, values });
       assert.equal(values[0], TEN_A);
-      return { rows: sql.includes('COUNT(*)') ? [{ total: 0 }] : [] };
+      return { rows: sql.includes('COUNT(*)') ? [{ total: fixture.length }]
+        : fixture.slice(values[2], values[2] + values[1]) };
     }
     // The real HTTP listener also writes audit records at the DB boundary.
     return { rows: [] };
@@ -49,6 +50,31 @@ test('verified tenant-owner and tenant-admin tokens can read their own history o
     assert.equal(response.status, 200);
     assert.deepEqual(JSON.parse(response.body), { tenantId: TEN_A, assignments: [], total: 0, page: 1, pageSize: 20 });
   }
+});
+
+test('HTTP returns projected history and paginates only the verified issuer tenant', async () => {
+  // The database boundary returns rows in its effective_from DESC query order.
+  const fixture = [
+    { id: 'current', effective_from: '2026-03-01T00:00:00Z', superseded_at: null },
+    { id: 'middle', effective_from: '2026-02-01T00:00:00Z', superseded_at: '2026-03-01T00:00:00Z' },
+    { id: 'oldest', effective_from: '2026-01-01T00:00:00Z', superseded_at: '2026-02-01T00:00:00Z' }
+  ].map(row => ({ ...row, tenant_id: TEN_A, plan_id: 'plan-starter', plan_slug: 'starter',
+    plan_display_name: 'Starter', plan_status: 'active', assigned_by: 'private-operator',
+    assignment_metadata: { note: 'private' }, plan_description: 'private description',
+    capabilities: { storage: true }, quota_dimensions: { storage: 10 } }));
+  const server = await historyServer(fixture);
+  const bearer = server.token({ tenant_id: 'tenant-other', realm_access: { roles: ['tenant_owner'] } });
+  const response = await server.request(path, { bearer });
+  assert.equal(response.status, 200);
+  const expected = [
+    { assignmentId: 'current', planId: 'plan-starter', planSlug: 'starter', planDisplayName: 'Starter', planStatus: 'active', effectiveFrom: '2026-03-01T00:00:00Z', supersededAt: null },
+    { assignmentId: 'middle', planId: 'plan-starter', planSlug: 'starter', planDisplayName: 'Starter', planStatus: 'active', effectiveFrom: '2026-02-01T00:00:00Z', supersededAt: '2026-03-01T00:00:00Z' },
+    { assignmentId: 'oldest', planId: 'plan-starter', planSlug: 'starter', planDisplayName: 'Starter', planStatus: 'active', effectiveFrom: '2026-01-01T00:00:00Z', supersededAt: '2026-02-01T00:00:00Z' }
+  ];
+  assert.deepEqual(JSON.parse(response.body), { tenantId: TEN_A, assignments: expected, total: 3, page: 1, pageSize: 20 });
+  const secondPage = await server.request(`${path}?page=2&pageSize=2`, { bearer });
+  assert.equal(secondPage.status, 200);
+  assert.deepEqual(JSON.parse(secondPage.body), { tenantId: TEN_A, assignments: [expected[2]], total: 3, page: 2, pageSize: 2 });
 });
 
 test('tenant-owner and tenant actor types require a qualifying realm role at the HTTP gate', async () => {
