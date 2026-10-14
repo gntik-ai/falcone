@@ -11,6 +11,22 @@ import {
   readPublicRouteCatalog
 } from '../../scripts/lib/public-api.mjs';
 
+test('#1090: both catalogs publish the same workspace bucket list bindings, capability and audiences', () => {
+  const path = '/v1/storage/workspaces/{workspaceId}/buckets';
+  const catalog = readPublicRouteCatalog();
+  const entry = catalog.routes.find((r) => r.path === path && r.method === 'GET');
+  assert.ok(entry);
+  assert.equal(entry.operationId, 'listWorkspaceStorageBuckets');
+  assert.equal(entry.tenantBinding, 'required');
+  assert.equal(entry.workspaceBinding, 'required');
+  assert.deepEqual(entry.planCapabilityAnyOf, ['data.storage.bucket']);
+  assert.equal(entry.rateLimitClass, 'data-read');
+  assert.deepEqual(entry.audiences, ['developer_external', 'workspace_owner', 'workspace_admin',
+    'workspace_developer', 'workspace_viewer', 'workspace_service_account', 'platform_team']);
+  const gatewayEntry = readJson('deploy/gateway-config/public-route-catalog.json').find((r) => r.path === path && r.method === 'GET');
+  assert.deepEqual(gatewayEntry, entry);
+});
+
 test('public API taxonomy, gateway routing, and generated route catalog remain aligned', () => {
   const document = readJson(OPENAPI_PATH);
   const taxonomy = readPublicApiTaxonomy();

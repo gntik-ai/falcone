@@ -58252,6 +58252,155 @@
           "tenant_operator"
         ]
       }
+    },
+    "/v1/storage/workspaces/{workspaceId}/buckets": {
+      "get": {
+        "operationId": "listWorkspaceStorageBuckets",
+        "summary": "List registry buckets for one authorized workspace in bucketName order",
+        "tags": [
+          "Storage"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "page[size]",
+            "in": "query",
+            "required": false,
+            "description": "Maximum page size; defaults to 50. Invalid or zero values use the default; numeric values are clamped to 1..200 and rounded down.",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "page[after]",
+            "in": "query",
+            "required": false,
+            "description": "The last bucketName from the previous page; only strictly greater bucket names are returned.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resource returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageBucketCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed or contextually inconsistent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated but not authorized for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "storage",
+        "x-scope": "workspace",
+        "x-resource-type": "bucket",
+        "x-audiences": [
+          "developer_external",
+          "workspace_owner",
+          "workspace_admin",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "platform_team"
+        ],
+        "x-visibility": "public",
+        "x-rate-limit-class": "data-read",
+        "x-owning-service": "control_api",
+        "x-downstream-adapters": [
+          "storage"
+        ],
+        "description": "Registry-only listing with no S3 access. Missing or foreign workspaces return 404 WORKSPACE_NOT_FOUND before authorization; owning-tenant callers without verified bucket-read authority return 403 FORBIDDEN. Superadmin and internal actors may read any workspace. Follow page.nextCursor using page[after]; the last page omits nextCursor.",
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required"
+      }
     }
   },
   "components": {

@@ -90,6 +90,7 @@ jobs:
       - name: Storage workspace authorization and regression tests
         run: |
           node --test tests/blackbox/storage-workspace-authz.test.mjs \
+            tests/blackbox/storage-workspace-bucket-list.test.mjs \
             tests/blackbox/structural-write-role-gates-kind.test.mjs \
             tests/blackbox/data-export-import-clone.test.mjs \
             tests/blackbox/storage-bucket-ownership-idor.test.mjs \

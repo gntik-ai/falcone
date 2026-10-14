@@ -1834,6 +1834,20 @@
     "consoleUsed": true
   },
   {
+    "operationId": "listWorkspaceStorageBuckets",
+    "method": "GET",
+    "path": "/v1/storage/workspaces/{workspaceId}/buckets",
+    "family": "storage",
+    "module": "apps/control-plane/storage-handlers.mjs",
+    "export": "STORAGE_HANDLERS.storageListWorkspaceBuckets",
+    "invoke": "localHandler",
+    "deps": ["pg"],
+    "auth": "authenticated; workspace ownership and model bucket-read authority",
+    "subroutes": "no",
+    "notes": "Registry-only workspace bucket list, sorted by bucket name with bounded keyset pagination. No S3 access.",
+    "consoleUsed": false
+  },
+  {
     "operationId": "getFunctionInventory",
     "method": "GET",
     "path": "/v1/functions/workspaces/{workspaceId}/inventory",

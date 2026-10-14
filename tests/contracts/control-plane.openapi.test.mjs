@@ -2,7 +2,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { OPENAPI_PATH, collectContractViolations, resolveParameters } from '../../scripts/lib/quality-gates.mjs';
+import { OPENAPI_PATH, collectContractViolations, resolveParameters, readJson } from '../../scripts/lib/quality-gates.mjs';
+import { routes } from '../../apps/control-plane/routes.mjs';
+
+test('#1090: workspace bucket listing is registered with its cursor and safe error contracts', () => {
+  const path = '/v1/storage/workspaces/{workspaceId}/buckets';
+  const document = readJson(OPENAPI_PATH);
+  const operation = document.paths[path]?.get;
+  assert.ok(operation, 'workspace list is advertised');
+  assert.equal(operation.operationId, 'listWorkspaceStorageBuckets');
+  assert.deepEqual(readJson('apps/control-plane-executor/openapi/families/storage.openapi.json').paths[path].get, operation);
+  assert.deepEqual(operation.security, [{ bearerAuth: [] }]);
+  assert.equal(operation['x-scope'], 'workspace');
+  const parameters = resolveParameters(document, operation);
+  assert.ok(parameters.some((p) => p.name === 'workspaceId' && p.in === 'path' && p.required));
+  assert.deepEqual(parameters.find((p) => p.name === 'page[size]').schema, { type: 'integer', default: 50, minimum: 1, maximum: 200 });
+  assert.ok(parameters.find((p) => p.name === 'page[after]').description.includes('bucketName'));
+  assert.equal(operation.responses['200'].content['application/json'].schema.$ref, '#/components/schemas/StorageBucketCollection');
+  for (const status of ['403', '404']) assertUsesErrorResponse(document, operation.responses[status], `list error ${status}`);
+  const route = routes.find((r) => r.method === 'GET' && r.path === path);
+  assert.equal(route?.localHandler, 'storageListWorkspaceBuckets');
+  assert.equal(route.auth, 'authenticated');
+  const mapping = readJson('apps/control-plane/route-map.json').find((r) => r.operationId === operation.operationId);
+  assert.equal(mapping?.path, path);
+  assert.equal(mapping.method, 'GET');
+  assert.equal(mapping.export, 'STORAGE_HANDLERS.storageListWorkspaceBuckets');
+});
 
 function assertUsesErrorResponse(document, response, message) {
   const schema = response?.content?.['application/json']?.schema;

@@ -483,6 +483,7 @@ Workspace-scoped object storage discovery, bucket control, and presign-safe surf
 | GET | `/v1/storage/tenants/{tenantId}/usage` | tenant | storage_usage_snapshot | Fetch one tenant-scoped storage usage snapshot aggregated across workspaces |
 | GET | `/v1/storage/usage/tenants` | platform | storage_usage_snapshot | List the top tenant storage usage snapshots across the platform |
 | GET | `/v1/storage/workspaces/{workspaceId}/audit` | workspace | storage_audit_event | List workspace-scoped storage audit records |
+| GET | `/v1/storage/workspaces/{workspaceId}/buckets` | workspace | bucket | List registry buckets for one authorized workspace in bucketName order |
 | POST | `/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports` | workspace | storage_export_manifest | Preview a bounded storage bucket export manifest |
 | GET | `/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports/{manifestId}` | workspace | storage_export_manifest | Fetch one bounded storage export manifest |
 | POST | `/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/imports` | workspace | storage_import_result | Preview a bounded storage bucket import result |

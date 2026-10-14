@@ -814,6 +814,16 @@ export async function listBucketsForWorkspace(pool, workspaceId) {
        FROM workspace_buckets WHERE workspace_id=$1 ORDER BY created_at`, [workspaceId]);
   return rows;
 }
+// Additive registry-only listing; keep the legacy usage/provision ordering above.
+export async function listWorkspaceBucketsPage(pool, workspaceId, tenantId, { size = 50, after = null } = {}) {
+  const { rows } = await pool.query(
+    `SELECT id, workspace_id, tenant_id, bucket_name, region, created_at
+       FROM workspace_buckets WHERE workspace_id=$1 AND tenant_id=$2
+         AND ($3::text IS NULL OR bucket_name > $3)
+       ORDER BY bucket_name LIMIT $4`, [workspaceId, tenantId, after, size + 1]);
+  const items = rows.slice(0, size);
+  return { items, ...(rows.length > size ? { nextCursor: items.at(-1).bucket_name } : {}) };
+}
 export async function bucketWorkspaceMap(pool) {
   const { rows } = await pool.query('SELECT bucket_name, workspace_id, tenant_id, region, created_at FROM workspace_buckets');
   const map = {};
