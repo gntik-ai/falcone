@@ -624,6 +624,14 @@ async function storageDeleteObject(ctx) {
     return ok(200, { objectKey: key, bucketName: bucket, deleted: true });
   } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_DELETE_FAILED', String(e.message ?? e)); }
 }
+function storageBucketListItem(bucketName, mapping, region, lastModifiedAt) {
+  return {
+    resourceId: bucketName, bucketName,
+    tenantId: mapping?.tenant_id ?? null, workspaceId: mapping?.workspace_id ?? null,
+    region, status: 'active',
+    timestamps: { createdAt: mapping?.created_at ?? lastModifiedAt, lastModifiedAt },
+  };
+}
 async function storageListBuckets(ctx) {
   const map = await store.bucketWorkspaceMap(ctx.pool);
   const isSuperadmin = isSuperOrInternal(ctx.identity);
@@ -633,15 +641,7 @@ async function storageListBuckets(ctx) {
   const all = await listBuckets();
   const items = all
     .filter((b) => isSuperadmin || readable.has(b.name))
-    .map((b) => {
-      const m = map[b.name];
-      return {
-        resourceId: b.name, bucketName: b.name,
-        tenantId: m?.tenant_id ?? null, workspaceId: m?.workspace_id ?? null,
-        region: REGION, status: 'active',
-        timestamps: { createdAt: m?.created_at ?? b.creationDate, lastModifiedAt: b.creationDate }
-      };
-    });
+    .map((b) => storageBucketListItem(b.name, map[b.name], REGION, b.creationDate));
   return ok(200, { items, page: { size: items.length } });
 }
 async function storageListWorkspaceBuckets(ctx) {
@@ -653,12 +653,7 @@ async function storageListWorkspaceBuckets(ctx) {
   const size = Math.min(Math.max(Math.floor(Number(ctx.query?.['page[size]'] ?? 50) || 50), 1), 200);
   const after = ctx.query?.['page[after]'] || null;
   const { items: rows, nextCursor } = await store.listWorkspaceBucketsPage(ctx.pool, ws.id, ws.tenant_id, { size, after });
-  const items = rows.map((row) => ({
-    resourceId: row.bucket_name, bucketName: row.bucket_name,
-    tenantId: row.tenant_id, workspaceId: row.workspace_id,
-    region: row.region, status: 'active',
-    timestamps: { createdAt: row.created_at, lastModifiedAt: row.created_at },
-  }));
+  const items = rows.map((row) => storageBucketListItem(row.bucket_name, row, row.region, row.created_at));
   return ok(200, { items, page: { size: items.length, ...(nextCursor === undefined ? {} : { nextCursor }) } });
 }
 async function storageListObjects(ctx) {

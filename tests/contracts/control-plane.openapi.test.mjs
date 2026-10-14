@@ -26,7 +26,8 @@ test('#1090: workspace bucket listing is registered with its cursor and safe err
   const mapping = readJson('apps/control-plane/route-map.json').find((r) => r.operationId === operation.operationId);
   assert.equal(mapping?.path, path);
   assert.equal(mapping.method, 'GET');
-  assert.equal(mapping.export, 'STORAGE_HANDLERS.storageListWorkspaceBuckets');
+  assert.equal(mapping.module, 'apps/control-plane/b-handlers.mjs');
+  assert.equal(mapping.export, 'LOCAL_HANDLERS.storageListWorkspaceBuckets');
 });
 
 function assertUsesErrorResponse(document, response, message) {

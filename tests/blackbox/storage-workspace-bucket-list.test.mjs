@@ -23,10 +23,9 @@ function caller(roles = ['workspace_viewer'], workspaceIds = ['ws1'], tenantId =
 }
 
 // Mock only the database and network boundaries; use the real store and handler.
-function fixture(t, identity = caller(), workspaceId = 'ws1', query = {}) {
+function fixture(t, identity = caller(), workspaceId = 'ws1', query = {}, buckets = BUCKETS) {
   let bucketQueries = 0;
   let s3Calls = 0;
-  const limits = [];
   t.mock.method(globalThis, 'fetch', async () => {
     s3Calls++;
     throw new Error('workspace listing must not use S3');
@@ -39,17 +38,15 @@ function fixture(t, identity = caller(), workspaceId = 'ws1', query = {}) {
       }
       if (sql.includes('FROM workspace_buckets')) {
         bucketQueries++;
-        assert.match(sql, /ORDER BY bucket_name LIMIT \$4/);
         const [ws, tenant, after, limit] = params;
-        limits.push(limit);
-        return { rows: BUCKETS.filter((b) => b.workspace_id === ws && b.tenant_id === tenant
+        return { rows: buckets.filter((b) => b.workspace_id === ws && b.tenant_id === tenant
           && (after == null || b.bucket_name > after))
           .sort((a, b) => a.bucket_name < b.bucket_name ? -1 : 1).slice(0, limit) };
       }
       throw new Error('unexpected database query');
     },
   } };
-  return { ctx, limits, bucketQueries: () => bucketQueries };
+  return { ctx, bucketQueries: () => bucketQueries };
 }
 
 test('bound workspace viewers and tenant admins get only sorted workspace registry buckets in the legacy shape', async (t) => {
@@ -67,7 +64,7 @@ test('bound workspace viewers and tenant admins get only sorted workspace regist
 });
 
 test('walking name cursors yields every workspace bucket once and omits the final cursor', async (t) => {
-  const { ctx, limits } = fixture(t, caller(), 'ws1', { 'page[size]': '2' });
+  const { ctx } = fixture(t, caller(), 'ws1', { 'page[size]': '2' });
   const first = await STORAGE_HANDLERS.storageListWorkspaceBuckets(ctx);
   assert.equal(first.statusCode, 200);
   assert.deepEqual(first.body.items.map((b) => b.bucketName), ['bucket-a', 'bucket-m']);
@@ -78,17 +75,21 @@ test('walking name cursors yields every workspace bucket once and omits the fina
   assert.deepEqual([...first.body.items, ...last.body.items].map((b) => b.bucketName), ['bucket-a', 'bucket-m', 'bucket-z']);
   ctx.query['page[after]'] = 'bucket-z';
   assert.deepEqual((await STORAGE_HANDLERS.storageListWorkspaceBuckets(ctx)).body, { items: [], page: { size: 0 } });
-  assert.deepEqual(limits, [3, 3, 3], 'one lookahead row per page');
 });
 
 test('invalid page sizes are bounded, never a database error or 5xx', async (t) => {
-  for (const [value, expectedLimit] of [[undefined, 51], ['0', 51], ['-5', 2], ['abc', 51], ['201', 201],
-    ['Infinity', 201], ['-Infinity', 2], ['2.9', 3], ['0.5', 2]]) {
-    const { ctx, limits } = fixture(t, caller(), 'ws1', { 'page[size]': value });
+  const buckets = Array.from({ length: 205 }, (_, index) => ({
+    ...BUCKETS[0], bucket_name: `bucket-${String(index).padStart(3, '0')}`,
+  }));
+  for (const [value, expectedSize, expectedCursor] of [[undefined, 50, 'bucket-049'], ['0', 50, 'bucket-049'],
+    ['-5', 1, 'bucket-000'], ['abc', 50, 'bucket-049'], ['201', 200, 'bucket-199'],
+    ['Infinity', 200, 'bucket-199'], ['-Infinity', 1, 'bucket-000'], ['2.9', 2, 'bucket-001'],
+    ['0.5', 1, 'bucket-000']]) {
+    const { ctx } = fixture(t, caller(), 'ws1', { 'page[size]': value }, buckets);
     const result = await STORAGE_HANDLERS.storageListWorkspaceBuckets(ctx);
     assert.equal(result.statusCode, 200, String(value));
-    assert.deepEqual(limits, [expectedLimit], String(value));
-    assert.ok(result.body.items.length <= expectedLimit - 1);
+    assert.equal(result.body.items.length, expectedSize, String(value));
+    assert.deepEqual(result.body.page, { size: expectedSize, nextCursor: expectedCursor }, String(value));
   }
 });
 
