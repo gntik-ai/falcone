@@ -1,8 +1,53 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { invokeRoute } from '../../apps/control-plane/route-invoke.mjs';
+import { secretInventory } from '../../packages/provisioning-orchestrator/src/actions/secret-inventory.mjs';
 import { main as consumerStatus } from '../../packages/provisioning-orchestrator/src/actions/secret-rotation-consumer-status.mjs';
 const identity = { sub: 'actor-a', tenantId: 'tenant-a', workspaceId: 'workspace-a', workspaceIds: ['workspace-a'], actorType: 'tenant_owner', roles: ['tenant-owner'], scopes: [] };
+
+test('inventory invoke rejects missing identity without invoking the handler', async () => {
+  assert.deepEqual(await invokeRoute({ invoke: 'params-auth-query' }, () => { throw new Error('must not invoke'); },
+    { domain: 'platform' }, null, null, {}), { statusCode: 401, body: { code: 'UNAUTHENTICATED' } });
+});
+
+test('inventory invoke preserves platform tenant filter and binds query to its database', async () => {
+  const db = { marker: 'db', async query(_sql, values) {
+    assert.equal(this.marker, 'db');
+    assert.deepEqual(values, ['tenant', 'tenant-b', 0, 50]);
+    return { rows: [{ name: 'key', tenantId: 'tenant-b' }] };
+  } };
+  const result = await invokeRoute({ invoke: 'params-auth-query' }, secretInventory,
+    { domain: 'tenant', tenantId: 'tenant-b', auth: { roles: [] }, query: () => { throw new Error('spoofed query'); } }, null,
+    { ...identity, trustKind: 'platform', roles: ['platform_operator'] }, db);
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.secrets[0].tenantId, 'tenant-b');
+});
+
+test('inventory invoke aliases tenant operators and rejects untrusted platform grants before querying', async () => {
+  for (const [roles, trustKind, tenantId, domain, status] of [
+    [['tenant_operator'], 'tenant', 'tenant-a', 'tenant', 200],
+    [['tenant_operator'], 'tenant', undefined, 'tenant', 403],
+    [['tenant_operator'], 'tenant', 'tenant-a', 'platform', 403],
+    [['tenant_owner'], 'tenant', 'tenant-a', 'tenant', 403],
+    [[], 'platform', 'tenant-a', 'platform', 403],
+    [['platform_operator'], 'tenant', 'tenant-a', 'platform', 403],
+    [['platform-operator'], 'tenant', 'tenant-a', 'platform', 403],
+    [['superadmin'], 'tenant', 'tenant-a', 'platform', 403],
+    [['superadmin'], 'platform', undefined, 'platform', 200]
+  ]) {
+    let calls = 0;
+    const result = await invokeRoute({ invoke: 'params-auth-query' }, secretInventory,
+      { domain, auth: { roles: ['superadmin'], tenantId: 'spoofed' } }, null,
+      { ...identity, roles, trustKind, tenantId }, { async query(_sql, values) {
+        calls++;
+        if (domain === 'tenant') assert.equal(values[1], 'tenant-a');
+        return { rows: [] };
+      } });
+    assert.equal(result.statusCode, status, `${roles} ${trustKind} ${domain}`);
+    if (status === 403) assert.deepEqual(result.body, { error: 'forbidden' });
+    assert.equal(calls, status === 200 ? 1 : 0);
+  }
+});
 
 test('params-auth-db passes trusted auth and db and maps forbidden results to HTTP 403', async () => {
   const db = { async query(sql) { return { rows: sql.includes('secret_version_states') ? [{ tenant_id: 'tenant-b' }] : [] }; } };

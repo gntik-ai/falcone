@@ -2025,6 +2025,122 @@
         ],
         "type": "object"
       },
+      "SecretInventoryError": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "enum": [
+              "domain is required",
+              "invalid domain",
+              "invalid pagination",
+              "forbidden"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "SecretInventoryUnauthenticated": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "UNAUTHENTICATED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "SecretMetadataItem": {
+        "additionalProperties": false,
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "value"
+              ]
+            },
+            {
+              "required": [
+                "data"
+              ]
+            }
+          ]
+        },
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currentVersion": {
+            "additionalProperties": false,
+            "properties": {
+              "activatedAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "active",
+                  "grace"
+                ],
+                "type": "string"
+              },
+              "vaultVersion": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "vaultVersion",
+              "state",
+              "activatedAt"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "domain": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "requiresForce": {
+            "description": "True only when the current version is the sole active or grace version",
+            "type": "boolean"
+          },
+          "secretType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "StorageCapabilityBaseline": {
         "additionalProperties": false,
         "properties": {
@@ -4488,6 +4604,191 @@
         "x-resource-type": "platform_user",
         "x-scope": "platform",
         "x-visibility": "public"
+      }
+    },
+    "/v1/secrets/inventory": {
+      "get": {
+        "operationId": "listSecretInventory",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "in": "query",
+            "name": "domain",
+            "required": true,
+            "schema": {
+              "enum": [
+                "platform",
+                "tenant",
+                "functions",
+                "gateway",
+                "iam"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tenantId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "limit": {
+                      "maximum": 200,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "secrets": {
+                      "items": {
+                        "$ref": "#/components/schemas/SecretMetadataItem"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "secrets",
+                    "offset",
+                    "limit"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Secret inventory metadata response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretInventoryError"
+                }
+              }
+            },
+            "description": "Missing or invalid domain or invalid pagination"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretInventoryUnauthenticated"
+                }
+              }
+            },
+            "description": "No authenticated identity"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretInventoryError"
+                }
+              }
+            },
+            "description": "Forbidden role, domain or tenant scope"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected gateway discovery error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List authorized secret metadata and current version state without secret material",
+        "tags": [
+          "Platform"
+        ],
+        "x-audiences": [
+          "superadmin",
+          "platform_operator",
+          "tenant_operator"
+        ],
+        "x-authorized-role-claims": [
+          "superadmin",
+          "platform-operator",
+          "platform_operator",
+          "tenant-operator",
+          "tenant_operator"
+        ],
+        "x-family": "platform",
+        "x-owning-service": "control_api",
+        "x-resource-type": "secret_metadata",
+        "x-scope": "platform",
+        "x-tenant-binding": "trusted_identity_or_platform_filter"
       }
     }
   },

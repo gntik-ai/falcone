@@ -8,6 +8,25 @@ import type {
 } from './auth'
 import type { Tenant, TenantCollectionResponse, Workspace, WorkspaceCollectionResponse } from './types'
 
+export interface PlatformSecretInventoryRow {
+  secretPath: string
+  name: string
+  domain: string
+  tenant: string
+  state: 'active' | 'grace'
+  lastRotated: string
+  vaultVersion: number
+  requiresForce: boolean
+}
+
+// Static metadata source for the interim platform secrets inventory. No secret material.
+export function buildPlatformSecretInventoryFixture(): PlatformSecretInventoryRow[] {
+  return [
+    { secretPath: 'platform/postgresql/app-password', name: 'app-password', domain: 'platform', tenant: '—', state: 'active', lastRotated: '2026-03-31T00:00:00Z', vaultVersion: 2, requiresForce: false },
+    { secretPath: 'tenant/tenant-a/db-password', name: 'db-password', domain: 'organización', tenant: 'org-a', state: 'grace', lastRotated: '2026-03-30T12:00:00Z', vaultVersion: 1, requiresForce: true }
+  ]
+}
+
 // Every invocation returns a fresh object. All identities and credentials are synthetic.
 export function buildConsoleSignupPolicyFixture(): ConsoleSignupPolicy {
   return {

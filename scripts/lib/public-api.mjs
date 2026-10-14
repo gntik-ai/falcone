@@ -449,7 +449,11 @@ function collectOperationViolations(document, taxonomy, violations) {
     }
 
     const allowedPrefixes = allowedPrefixesForOperation(familyId, operation);
-    if (!allowedPrefixes.some((prefix) => path.startsWith(prefix))) {
+    // The existing secret inventory contract is published outside the platform
+    // prefix. Keep this exception confined to its exact GET operation and path.
+    const isSecretInventory = familyId === 'platform' && method === 'get'
+      && operation.operationId === 'listSecretInventory' && path === '/v1/secrets/inventory';
+    if (!isSecretInventory && !allowedPrefixes.some((prefix) => path.startsWith(prefix))) {
       violations.push(`${method.toUpperCase()} ${path} must use one of the allowed prefixes (${allowedPrefixes.join(', ')}) for family ${familyId}.`);
     }
 

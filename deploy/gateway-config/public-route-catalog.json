@@ -1,5 +1,10 @@
 [
   {
+    "method": "GET",
+    "path": "/v1/secrets/inventory",
+    "privilege_domain": "structural_admin"
+  },
+  {
     "method": "POST",
     "path": "/v1/tenants",
     "privilege_domain": "structural_admin"

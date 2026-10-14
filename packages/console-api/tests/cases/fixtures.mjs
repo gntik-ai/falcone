@@ -3,20 +3,29 @@ import { assertSyntheticFixture } from '../fixture-validator.mjs'
 import { snapshot } from './support.mjs'
 
 export const fixtureCases = [
-  ['each exported fixture builder returns synthetic data, including the base snapshot', async () => {
+  ['exported fixtures contain only synthetic credentials or the legacy inventory metadata', async () => {
     const fixtures = await import('@in-falcone/console-api/fixtures')
     const expected = [
       'buildConsoleAccountStatusViewFixture', 'buildConsoleLoginSessionFixture',
       'buildConsolePasswordRecoveryFixture', 'buildConsoleRefreshSessionFixture',
       'buildConsoleSessionTerminationFixture', 'buildConsoleSignupFixture',
       'buildConsoleSignupPolicyFixture', 'buildTenantCollectionFixture', 'buildTenantFixture',
-      'buildWorkspaceCollectionFixture', 'buildWorkspaceFixture'
+      'buildWorkspaceCollectionFixture', 'buildWorkspaceFixture', 'buildPlatformSecretInventoryFixture'
     ]
     assert.deepEqual(Object.keys(fixtures).sort(), expected.sort())
-    for (const builder of Object.values(fixtures)) {
+    for (const [name, builder] of Object.entries(fixtures)) {
       const fixture = builder()
       assert.ok(fixture && typeof fixture === 'object')
-      assertSyntheticFixture(fixture)
+      if (name === 'buildPlatformSecretInventoryFixture') {
+        // Paths are metadata, not credentials. Exact legacy paths and rows are
+        // checked in platform-secret-inventory.test.ts; check all other fields here.
+        for (const { secretPath, ...metadata } of fixture) {
+          assert.equal(typeof secretPath, 'string')
+          assertSyntheticFixture(metadata)
+        }
+      } else {
+        assertSyntheticFixture(fixture)
+      }
     }
     assertSyntheticFixture(snapshot)
     assert.equal(fixtures.buildConsoleLoginSessionFixture().tokenSet.accessToken, 'synthetic-access-token')

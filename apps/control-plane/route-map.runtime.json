@@ -1,5 +1,15 @@
 [
   {
+    "method": "GET",
+    "path": "/v1/secrets/inventory",
+    "module": "/repo/packages/provisioning-orchestrator/src/actions/secret-inventory.mjs",
+    "export": "secretInventory",
+    "invoke": "params-auth-query",
+    "deps": ["pg"],
+    "auth": "authenticated",
+    "mergeQueryIntoParams": true
+  },
+  {
     "method": "POST",
     "path": "/v1/workspaces/{workspaceId}/iam/clients",
     "localHandler": "createWorkspaceIamClient",

@@ -334,6 +334,7 @@ Cross-tenant platform governance, catalog, and operator discovery surfaces.
 | GET | `/v1/platform/topology/regions` | platform | topology_region | List the supported data residency regions for tenant provisioning |
 | POST | `/v1/platform/users` | platform | platform_user | Submit a canonical platform user write request under the platform family |
 | GET | `/v1/platform/users/{userId}` | platform | platform_user | Fetch one canonical platform user entity under the platform family |
+| GET | `/v1/secrets/inventory` | platform | secret_metadata | List authorized secret metadata and current version state without secret material |
 
 ## Postgres
 
