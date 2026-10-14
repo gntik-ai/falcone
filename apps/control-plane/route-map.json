@@ -1493,6 +1493,21 @@
     "consoleUsed": false
   },
   {
+    "operationId": "listSecretInventory",
+    "method": "GET",
+    "path": "/v1/secrets/inventory",
+    "family": "platform",
+    "module": "packages/provisioning-orchestrator/src/actions/secret-inventory.mjs",
+    "export": "secretInventory",
+    "invoke": "params-auth-query",
+    "deps": ["pg"],
+    "auth": "authenticated",
+    "mergeQueryIntoParams": true,
+    "subroutes": "no",
+    "notes": "Metadata-only inventory; validates pagination and binds tenant operators to their trusted tenant before querying.",
+    "consoleUsed": false
+  },
+  {
     "operationId": "rotateSecret",
     "method": "POST",
     "path": "/v1/platform/secrets/{domain}/{secretName}/rotate",

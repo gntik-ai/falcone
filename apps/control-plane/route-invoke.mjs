@@ -1,4 +1,4 @@
-export const SUPPORTED_INVOKES = new Set(['params-pg', 'params-only', 'params-overrides', 'callercontext-overrides', 'owhttp-overrides', 'params-auth', 'params-auth-overrides', 'owhttp', 'params-auth-db', 'identity-overrides', 'workflow-status']);
+export const SUPPORTED_INVOKES = new Set(['params-pg', 'params-only', 'params-overrides', 'callercontext-overrides', 'owhttp-overrides', 'params-auth', 'params-auth-overrides', 'owhttp', 'params-auth-db', 'params-auth-query', 'identity-overrides', 'workflow-status']);
 
 const PLATFORM_ROLES = new Set(['superadmin', 'platform_admin', 'platform_operator', 'platform_auditor',
   'platform-admin', 'platform-operator', 'platform-auditor']);
@@ -27,6 +27,13 @@ export function authFrom(identity) {
 }
 export async function invokeRoute(route, handler, params, callerContext, identity, db, ensureSetClient = async () => {}) {
   switch (route.invoke ?? 'callercontext-overrides') {
+    case 'params-auth-query': {
+      if (!identity) return { statusCode: 401, body: { code: 'UNAUTHENTICATED' } };
+      const roleAliases = { tenant_owner: 'tenant-owner', tenant_operator: 'tenant-operator', platform_operator: 'platform-operator' };
+      const auth = authFrom(identity);
+      auth.roles = auth.roles.flatMap(role => roleAliases[role] ? [role, roleAliases[role]] : [role]);
+      return handler({ ...params, auth }, { query: db.query.bind(db) });
+    }
     case 'workflow-status': {
       if (!identity?.tenantId) return { statusCode: 401, body: { code: 'UNAUTHENTICATED' } };
       if ((params.tenantId && params.tenantId !== identity.tenantId)
