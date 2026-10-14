@@ -27,7 +27,10 @@ test('inventory joins live versions after pagination and isolates tenants in rea
     const schema = `inventory_${randomUUID().replaceAll('-', '')}`;
     await db.query(`CREATE SCHEMA ${schema}`);
     await db.query(`SET LOCAL search_path TO ${schema}, public`);
-    for (const file of ['022-secret-metadata.sql', '092-secret-rotation.sql']) {
+    for (const file of [
+      '022-secret-metadata.sql',
+      '092-secret-rotation.sql'
+    ]) {
       await db.query(await readFile(new URL(`../../../packages/provisioning-orchestrator/src/migrations/${file}`, import.meta.url), 'utf8'));
     }
     const a = '11111111-1111-1111-1111-111111111111';
