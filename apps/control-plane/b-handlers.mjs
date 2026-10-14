@@ -1379,6 +1379,51 @@ async function getDatabase(ctx) {
   if (!db) return err(404, 'DB_NOT_PROVISIONED', 'workspace has no database');
   return ok(200, { database: db });
 }
+// GET /v1/workspaces/{workspaceId}/database/history — best-effort timeline, no secrets.
+export async function getDatabaseHistory(ctx) {
+  const r = await resolveWorkspaceForManage(ctx); if (r.error) return r.error;
+  const { ws } = r;
+  const scope = [ws.tenant_id, ws.id];
+  const db = await ctx.pool.query(
+    'SELECT id FROM workspace_databases WHERE tenant_id=$1 AND workspace_id=$2 LIMIT 1', scope);
+  if (!db.rows.length) return err(404, 'DB_NOT_PROVISIONED', 'workspace has no database');
+  const operations = await ctx.pool.query(
+    `SELECT t.transition_id, t.previous_status, t.new_status, t.transitioned_at, t.actor_id, o.correlation_id
+       FROM async_operation_transitions t JOIN async_operations o ON o.operation_id=t.operation_id
+      WHERE o.tenant_id=$1 AND t.tenant_id=$1 AND o.workspace_id=$2
+        AND o.operation_type='workspace.database.provision'
+        AND ((t.previous_status='pending' AND t.new_status='running')
+          OR (t.previous_status='running' AND t.new_status IN ('completed', 'failed')))
+      ORDER BY t.transitioned_at DESC, t.transition_id DESC LIMIT 201`, scope)
+    .catch(() => ({ rows: [] })); // Operation mirrors are best-effort and may be unavailable.
+  const items = operations.rows.map(row => ({
+    eventId: row.transition_id,
+    type: row.new_status === 'running' ? 'database.provision_started'
+      : row.new_status === 'completed' ? 'database.provisioned' : 'database.provision_failed',
+    occurredAt: new Date(row.transitioned_at).toISOString(),
+    outcome: row.new_status === 'failed' ? 'failed' : 'succeeded',
+    actorId: row.actor_id, correlationId: row.correlation_id, source: 'operation',
+  }));
+  const audits = await ctx.pool.query(
+    `SELECT id, created_at, outcome, actor_id, correlation_id
+       FROM plan_audit_events
+      WHERE tenant_id=$1 AND action_type='workspace.database.credential.rotate'
+        AND new_state->>'workspaceId'=$2 AND outcome IN ('succeeded', 'failed', 'error')
+        AND (new_state->>'status') IS DISTINCT FROM '404'
+      ORDER BY created_at DESC, id DESC LIMIT 201`, scope);
+  items.push(...audits.rows.map(row => ({
+    eventId: row.id,
+    type: row.outcome === 'succeeded' ? 'database.credential_rotated' : 'database.credential_rotation_failed',
+    occurredAt: new Date(row.created_at).toISOString(), outcome: row.outcome,
+    actorId: row.actor_id, correlationId: row.correlation_id ?? null, source: 'audit',
+  })));
+  const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  items.sort((a, b) => compare(a.occurredAt, b.occurredAt)
+    || compare(a.source === 'operation' ? 0 : 1, b.source === 'operation' ? 0 : 1)
+    || compare(a.eventId, b.eventId));
+  const recent = items.slice(-200);
+  return ok(200, { items: recent, page: { size: recent.length, hasMore: items.length > 200 }, completeness: 'best_effort' });
+}
 // POST /v1/workspaces/{workspaceId}/database/credential-rotations — rotate creds.
 // A workspace provisioned in `dedicated_role` mode has its own login role; rotation ALTERs that
 // role's password (old credential rejected by Postgres, new one accepted) and returns the new DSN
@@ -1632,7 +1677,7 @@ export const LOCAL_HANDLERS = {
   createWorkspaceIamClient,
   createServiceAccount, getServiceAccount, listServiceAccounts: listServiceAccountsHandler,
   issueCredential, rotateCredential, revokeCredential, deleteServiceAccount,
-  provisionDatabase, provisionDatabaseGeneric, deleteDatabase, getDatabase, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,
+  provisionDatabase, provisionDatabaseGeneric, deleteDatabase, getDatabase, getDatabaseHistory, rotateDatabaseCredential, registerFunction, listFunctions: listFunctionsHandler,
   iamListUsers, iamGetUser, iamCreateUser, iamDeleteUser, iamSetUserStatus, iamListRoles, iamListScopes, iamGetRole, iamDeleteRole, iamCreateRole, iamListGroups, iamCreateGroup, iamListClients,
   iamListRealms, iamGetRealm, iamUpdateRealm,
   iamListUserRoles, iamAssignUserRoles, iamRemoveUserRoles,
