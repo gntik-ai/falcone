@@ -117,8 +117,9 @@ test('storage OpenAPI contract exposes additive provider, bucket, and object rou
   const objectOrganizationSchema = document.components.schemas.StorageObjectOrganization;
   const objectWriteSchema = document.components.schemas.StorageObjectWriteRequest;
   const objectMetadataSchema = document.components.schemas.StorageObjectMetadata;
-  const objectPayloadSchema = document.components.schemas.StorageObjectPayload;
-  const objectDownloadSchema = document.components.schemas.StorageObjectDownload;
+  const objectReadSchema = document.components.schemas.StorageObjectReadResult;
+  const objectRangeReadSchema = document.components.schemas.StorageObjectRangeReadResult;
+  const objectWriteResultSchema = document.components.schemas.StorageObjectWriteResult;
   const objectCollectionSchema = document.components.schemas.StorageObjectCollection;
   const objectKeyParam = document.components.parameters.ObjectKey;
   const storageCredentialScopeSchema = document.components.schemas.StorageProgrammaticCredentialScope;
@@ -185,8 +186,9 @@ test('storage OpenAPI contract exposes additive provider, bucket, and object rou
   assert.ok(objectOrganizationSchema);
   assert.ok(objectWriteSchema);
   assert.ok(objectMetadataSchema);
-  assert.ok(objectPayloadSchema);
-  assert.ok(objectDownloadSchema);
+  assert.ok(objectReadSchema);
+  assert.ok(objectRangeReadSchema);
+  assert.ok(objectWriteResultSchema);
   assert.ok(objectCollectionSchema);
   assert.ok(objectKeyParam);
   assert.ok(storageCredentialScopeSchema);
@@ -229,7 +231,9 @@ test('storage OpenAPI contract exposes additive provider, bucket, and object rou
     'auditResourceKey'
   ]);
   assert.deepEqual(objectCollectionSchema.required, ['items', 'page']);
-  assert.deepEqual(objectDownloadSchema.required, ['metadata', 'payload']);
+  assert.deepEqual(objectReadSchema.required, ['objectKey', 'bucketName', 'contentBase64', 'encoding', 'contentType', 'sizeBytes']);
+  assert.deepEqual(objectRangeReadSchema.required, [...objectReadSchema.required, 'contentRange', 'partial']);
+  assert.deepEqual(objectWriteResultSchema.required, ['objectKey', 'bucketName', 'sizeBytes', 'contentType']);
   assert.deepEqual(storageCredentialScopeSchema.required, ['workspaceId', 'allowedActions']);
   assert.deepEqual(storageCredentialPrincipalSchema.required, ['principalType', 'principalId']);
   assert.deepEqual(storageCredentialCreateRequestSchema.required, ['displayName', 'principal', 'scopes']);

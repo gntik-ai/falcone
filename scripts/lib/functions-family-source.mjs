@@ -16,14 +16,14 @@ function reachableComponents(document) {
   return refs;
 }
 
-// Functions is maintained as a family source; other families retain the unified
-// source. Preserve every served operation and every unrelated component verbatim.
-export function mergeFunctionsFamilySource(document, family, version) {
+// Merge a maintained family source while preserving unrelated operations and
+// components. Other families continue to use the unified source.
+export function mergePublicApiFamilySource(document, family, version, familyId) {
   const result = structuredClone(document);
   const before = reachableComponents(document);
   for (const [path, methods] of Object.entries(result.paths)) {
     for (const [method, operation] of Object.entries(methods)) {
-      if (operation['x-family'] === 'functions' && !family.paths[path]?.[method]) delete methods[method];
+      if (operation['x-family'] === familyId && !family.paths[path]?.[method]) delete methods[method];
     }
     if (Object.keys(methods).length === 0) delete result.paths[path];
   }
@@ -53,4 +53,8 @@ export function mergeFunctionsFamilySource(document, family, version) {
   }
   result.info.version = version;
   return result;
+}
+
+export function mergeFunctionsFamilySource(document, family, version) {
+  return mergePublicApiFamilySource(document, family, version, 'functions');
 }

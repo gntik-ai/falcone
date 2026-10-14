@@ -48022,15 +48022,6 @@
     "/v1/storage/buckets/{resourceId}/objects/{objectKey}": {
       "put": {
         "operationId": "uploadStorageObject",
-        "summary": "Upload or replace one object inside a workspace-scoped storage bucket",
-        "tags": [
-          "Storage"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "$ref": "#/components/parameters/XApiVersion"
@@ -48049,120 +48040,126 @@
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/StorageObjectWriteRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
-          "202": {
-            "description": "Storage object upload request accepted.",
+          "201": {
+            "description": "Object stored.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GatewayMutationAccepted"
+                  "$ref": "#/components/schemas/StorageObjectWriteResult"
                 }
               }
             }
           },
           "400": {
-            "description": "The request is malformed or contextually inconsistent.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The request is malformed or contextually inconsistent."
           },
           "403": {
-            "description": "The caller is authenticated but not authorized for this scope.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
           },
           "404": {
-            "description": "The requested resource was not found.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The requested resource was not found."
           },
           "409": {
-            "description": "The upload would exceed the workspace storage byte quota; the request is rejected with error code STORAGE_QUOTA_EXCEEDED.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The upload would exceed the workspace storage byte quota; the request is rejected with error code STORAGE_QUOTA_EXCEEDED."
           },
           "413": {
-            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family."
           },
           "429": {
-            "description": "Gateway QoS policy rejected the request rate for this route family.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
           },
           "431": {
-            "description": "Gateway rejected one or more invalid or oversized request headers.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
           },
           "504": {
-            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
           },
           "default": {
-            "description": "Unexpected gateway error.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unexpected gateway error."
           }
         },
-        "x-family": "storage",
-        "x-scope": "workspace",
-        "x-resource-type": "bucket_object",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Upload or replace one object inside a workspace-scoped storage bucket",
+        "tags": [
+          "Storage"
+        ],
         "x-audiences": [
           "developer_external",
           "workspace_owner",
@@ -48171,24 +48168,18 @@
           "workspace_service_account",
           "platform_team"
         ],
-        "x-visibility": "public",
-        "x-rate-limit-class": "data-control",
-        "x-owning-service": "control_api",
         "x-downstream-adapters": [
           "storage"
-        ]
+        ],
+        "x-family": "storage",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-control",
+        "x-resource-type": "bucket_object",
+        "x-scope": "workspace",
+        "x-visibility": "public"
       },
       "get": {
         "operationId": "downloadStorageObject",
-        "summary": "Download one object from a workspace-scoped storage bucket",
-        "tags": [
-          "Storage"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "$ref": "#/components/parameters/XApiVersion"
@@ -48203,10 +48194,10 @@
             "$ref": "#/components/parameters/ObjectKey"
           },
           {
-            "name": "Range",
-            "in": "header",
-            "required": false,
             "description": "Optional HTTP byte range (e.g. 'bytes=0-3'). When present and satisfiable, the response is 206 Partial Content with only the requested bytes and a Content-Range header.",
+            "in": "header",
+            "name": "Range",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -48214,123 +48205,137 @@
         ],
         "responses": {
           "200": {
-            "description": "Resource returned.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StorageObjectDownload"
+                  "$ref": "#/components/schemas/StorageObjectReadResult"
                 }
               }
-            }
-          },
-          "206": {
-            "description": "Partial content: the requested byte range. Includes Content-Range and Accept-Ranges headers.",
+            },
+            "description": "Resource returned.",
             "headers": {
-              "Content-Range": {
-                "description": "Byte range and total size of the object (e.g. 'bytes 0-3/20').",
-                "schema": {
-                  "type": "string"
-                }
-              },
               "Accept-Ranges": {
                 "description": "Always 'bytes' for range-capable objects.",
                 "schema": {
                   "type": "string"
                 }
               }
-            },
+            }
+          },
+          "206": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StorageObjectDownload"
+                  "$ref": "#/components/schemas/StorageObjectRangeReadResult"
+                }
+              }
+            },
+            "description": "Partial content: the requested byte range. Includes Content-Range and Accept-Ranges headers.",
+            "headers": {
+              "Accept-Ranges": {
+                "description": "Always 'bytes' for range-capable objects.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Content-Range": {
+                "description": "Byte range and total size of the object (e.g. 'bytes 0-3/20').",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
           },
           "400": {
-            "description": "The request is malformed or contextually inconsistent.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The request is malformed or contextually inconsistent."
           },
           "403": {
-            "description": "The caller is authenticated but not authorized for this scope.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
           },
           "404": {
-            "description": "The requested resource was not found.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The requested resource was not found."
           },
           "416": {
-            "description": "The requested byte range is not satisfiable for this object.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The requested byte range is not satisfiable for this object."
           },
           "429": {
-            "description": "Gateway QoS policy rejected the request rate for this route family.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
           },
           "431": {
-            "description": "Gateway rejected one or more invalid or oversized request headers.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
           },
           "504": {
-            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
           },
           "default": {
-            "description": "Unexpected gateway error.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unexpected gateway error."
           }
         },
-        "x-family": "storage",
-        "x-scope": "workspace",
-        "x-resource-type": "bucket_object",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Download one object from a workspace-scoped storage bucket",
+        "tags": [
+          "Storage"
+        ],
         "x-audiences": [
           "developer_external",
           "workspace_owner",
@@ -48340,12 +48345,15 @@
           "workspace_service_account",
           "platform_team"
         ],
-        "x-visibility": "public",
-        "x-rate-limit-class": "data-read",
-        "x-owning-service": "control_api",
         "x-downstream-adapters": [
           "storage"
-        ]
+        ],
+        "x-family": "storage",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-resource-type": "bucket_object",
+        "x-scope": "workspace",
+        "x-visibility": "public"
       },
       "delete": {
         "operationId": "deleteStorageObject",
@@ -87302,54 +87310,44 @@
         }
       },
       "StorageObjectWriteRequest": {
-        "type": "object",
         "additionalProperties": false,
+        "properties": {
+          "applicationId": {
+            "pattern": "^app_[0-9a-z]+$",
+            "type": "string"
+          },
+          "applicationSlug": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "checksumSha256": {
+            "maxLength": 128,
+            "minLength": 16,
+            "type": "string"
+          },
+          "contentBase64": {
+            "format": "byte",
+            "type": "string"
+          },
+          "contentType": {
+            "maxLength": 255,
+            "minLength": 3,
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "maxLength": 255,
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
         "required": [
-          "tenantId",
-          "workspaceId",
           "contentType",
           "contentBase64"
         ],
-        "properties": {
-          "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
-          },
-          "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
-          },
-          "contentType": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 255
-          },
-          "contentBase64": {
-            "type": "string",
-            "format": "byte"
-          },
-          "checksumSha256": {
-            "type": "string",
-            "minLength": 16,
-            "maxLength": 128
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string",
-              "maxLength": 255
-            }
-          },
-          "applicationId": {
-            "type": "string",
-            "pattern": "^app_[0-9a-z]+$"
-          },
-          "applicationSlug": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120
-          }
-        }
+        "type": "object"
       },
       "StorageObjectMetadata": {
         "type": "object",
@@ -87470,61 +87468,6 @@
           },
           "organization": {
             "$ref": "#/components/schemas/StorageObjectOrganization"
-          }
-        }
-      },
-      "StorageObjectPayload": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "contentBase64",
-          "encoding",
-          "disposition",
-          "contentType",
-          "sizeBytes"
-        ],
-        "properties": {
-          "contentBase64": {
-            "type": "string",
-            "format": "byte"
-          },
-          "encoding": {
-            "type": "string",
-            "enum": [
-              "base64"
-            ]
-          },
-          "disposition": {
-            "type": "string",
-            "enum": [
-              "attachment",
-              "inline"
-            ]
-          },
-          "contentType": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 255
-          },
-          "sizeBytes": {
-            "type": "integer",
-            "minimum": 0
-          }
-        }
-      },
-      "StorageObjectDownload": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "metadata",
-          "payload"
-        ],
-        "properties": {
-          "metadata": {
-            "$ref": "#/components/schemas/StorageObjectMetadata"
-          },
-          "payload": {
-            "$ref": "#/components/schemas/StorageObjectPayload"
           }
         }
       },
@@ -92296,6 +92239,113 @@
             }
           ]
         }
+      },
+      "StorageObjectWriteResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "objectKey": {
+            "type": "string"
+          },
+          "bucketName": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contentType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "objectKey",
+          "bucketName",
+          "sizeBytes",
+          "contentType"
+        ]
+      },
+      "StorageObjectReadResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "objectKey": {
+            "type": "string"
+          },
+          "bucketName": {
+            "type": "string"
+          },
+          "contentBase64": {
+            "type": "string",
+            "format": "byte"
+          },
+          "encoding": {
+            "type": "string",
+            "enum": [
+              "base64"
+            ]
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "objectKey",
+          "bucketName",
+          "contentBase64",
+          "encoding",
+          "contentType",
+          "sizeBytes"
+        ]
+      },
+      "StorageObjectRangeReadResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "objectKey": {
+            "type": "string"
+          },
+          "bucketName": {
+            "type": "string"
+          },
+          "contentBase64": {
+            "type": "string",
+            "format": "byte"
+          },
+          "encoding": {
+            "type": "string",
+            "enum": [
+              "base64"
+            ]
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contentRange": {
+            "type": "string"
+          },
+          "partial": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "objectKey",
+          "bucketName",
+          "contentBase64",
+          "encoding",
+          "contentType",
+          "sizeBytes",
+          "contentRange",
+          "partial"
+        ]
       }
     }
   }

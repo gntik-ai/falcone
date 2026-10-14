@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { OPENAPI_PATH, readJson } from './lib/quality-gates.mjs';
-import { mergeFunctionsFamilySource } from './lib/functions-family-source.mjs';
+import { mergeFunctionsFamilySource, mergePublicApiFamilySource } from './lib/functions-family-source.mjs';
 import {
   PUBLIC_API_FAMILY_DIR,
   readPublicApiTaxonomy,
@@ -9,10 +9,16 @@ import {
   writeGeneratedRouteCatalog
 } from './lib/public-api.mjs';
 
-const document = mergeFunctionsFamilySource(
+const functionsDocument = mergeFunctionsFamilySource(
   readJson(OPENAPI_PATH),
   readJson(`${PUBLIC_API_FAMILY_DIR}/functions.openapi.json`),
   readPublicApiTaxonomy().release.openapi_semver,
+);
+const document = mergePublicApiFamilySource(
+  functionsDocument,
+  readJson(`${PUBLIC_API_FAMILY_DIR}/storage.openapi.json`),
+  readPublicApiTaxonomy().release.openapi_semver,
+  'storage',
 );
 writeFileSync(OPENAPI_PATH, `${JSON.stringify(document, null, 2)}\n`);
 writeGeneratedFamilyDocuments(document);

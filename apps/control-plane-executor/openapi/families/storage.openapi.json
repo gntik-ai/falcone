@@ -1568,22 +1568,6 @@
         ],
         "type": "object"
       },
-      "StorageObjectDownload": {
-        "additionalProperties": false,
-        "properties": {
-          "metadata": {
-            "$ref": "#/components/schemas/StorageObjectMetadata"
-          },
-          "payload": {
-            "$ref": "#/components/schemas/StorageObjectPayload"
-          }
-        },
-        "required": [
-          "metadata",
-          "payload"
-        ],
-        "type": "object"
-      },
       "StorageObjectMetadata": {
         "additionalProperties": false,
         "properties": {
@@ -1791,23 +1775,20 @@
         ],
         "type": "object"
       },
-      "StorageObjectPayload": {
+      "StorageObjectRangeReadResult": {
         "additionalProperties": false,
         "properties": {
+          "bucketName": {
+            "type": "string"
+          },
           "contentBase64": {
             "format": "byte",
             "type": "string"
           },
-          "contentType": {
-            "maxLength": 255,
-            "minLength": 3,
+          "contentRange": {
             "type": "string"
           },
-          "disposition": {
-            "enum": [
-              "attachment",
-              "inline"
-            ],
+          "contentType": {
             "type": "string"
           },
           "encoding": {
@@ -1816,15 +1797,61 @@
             ],
             "type": "string"
           },
+          "objectKey": {
+            "type": "string"
+          },
+          "partial": {
+            "type": "boolean"
+          },
           "sizeBytes": {
             "minimum": 0,
             "type": "integer"
           }
         },
         "required": [
+          "objectKey",
+          "bucketName",
           "contentBase64",
           "encoding",
-          "disposition",
+          "contentType",
+          "sizeBytes",
+          "contentRange",
+          "partial"
+        ],
+        "type": "object"
+      },
+      "StorageObjectReadResult": {
+        "additionalProperties": false,
+        "properties": {
+          "bucketName": {
+            "type": "string"
+          },
+          "contentBase64": {
+            "format": "byte",
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "encoding": {
+            "enum": [
+              "base64"
+            ],
+            "type": "string"
+          },
+          "objectKey": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "objectKey",
+          "bucketName",
+          "contentBase64",
+          "encoding",
           "contentType",
           "sizeBytes"
         ],
@@ -1862,21 +1889,36 @@
               "type": "string"
             },
             "type": "object"
-          },
-          "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
-            "type": "string"
-          },
-          "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
-            "type": "string"
           }
         },
         "required": [
-          "tenantId",
-          "workspaceId",
           "contentType",
           "contentBase64"
+        ],
+        "type": "object"
+      },
+      "StorageObjectWriteResult": {
+        "additionalProperties": false,
+        "properties": {
+          "bucketName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "objectKey": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "objectKey",
+          "bucketName",
+          "sizeBytes",
+          "contentType"
         ],
         "type": "object"
       },
@@ -3449,17 +3491,25 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StorageObjectDownload"
+                  "$ref": "#/components/schemas/StorageObjectReadResult"
                 }
               }
             },
-            "description": "Resource returned."
+            "description": "Resource returned.",
+            "headers": {
+              "Accept-Ranges": {
+                "description": "Always 'bytes' for range-capable objects.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "206": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StorageObjectDownload"
+                  "$ref": "#/components/schemas/StorageObjectRangeReadResult"
                 }
               }
             },
@@ -3618,15 +3668,15 @@
           "required": true
         },
         "responses": {
-          "202": {
+          "201": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GatewayMutationAccepted"
+                  "$ref": "#/components/schemas/StorageObjectWriteResult"
                 }
               }
             },
-            "description": "Storage object upload request accepted."
+            "description": "Object stored."
           },
           "400": {
             "content": {
