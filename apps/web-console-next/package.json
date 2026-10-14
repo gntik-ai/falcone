@@ -9,7 +9,10 @@
     "test": "vitest run",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "lint:colours": "node scripts/lint-colours.mjs"
+    "lint:colours": "node scripts/lint-colours.mjs",
+    "validate:dist": "node scripts/validate-dist.mjs",
+    "test:csp": "playwright test --config tests/csp/playwright.config.mjs",
+    "test:dist": "node --test tests/validate-dist.test.mjs"
   },
   "dependencies": {
     "@fontsource/geist-mono": "5.2.5",

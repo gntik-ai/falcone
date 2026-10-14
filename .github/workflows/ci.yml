@@ -380,6 +380,16 @@ jobs:
           NODE
           done
 
+      - name: Validate next-console CSP and self-hosted assets
+        run: |
+          pnpm --filter @in-falcone/web-console-next exec playwright install --with-deps chromium
+          node --test apps/web-console-next/tests/validate-dist.test.mjs
+          for base in / /next/; do
+            CSP_TEST_HARNESS=true VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
+            pnpm --filter @in-falcone/web-console-next validate:dist
+            VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next test:csp
+          done
+
       - name: Build the legacy release SPA
         run: pnpm --filter @in-falcone/web-console exec vite build
 

@@ -1,2 +1,17 @@
 @import "tailwindcss";
 @import "@gntik-ai/templates/styles.css";
+
+@theme inline {
+  --font-sans: "Geist Sans", sans-serif;
+  --font-mono: "Geist Mono", monospace;
+}
+
+/* The kit's unlayered brand font token must point at the installed family. */
+:root {
+  --font-sans: "Geist Sans", sans-serif;
+  --font-mono: "Geist Mono", monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+}
