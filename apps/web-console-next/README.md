@@ -63,3 +63,11 @@ The separate `tests/csp/index.html` entry derives concrete paths from `appRoutes
 mounts Monaco (editor and YAML workers) and xyflow, and includes an inline-script
 negative control served from a temporary dist copy. It is included only when
 `CSP_TEST_HARNESS=true`; ordinary builds do not ship this page or its editor bundles.
+
+Use `configureLocalMonacoYaml` from `src/lib/monaco-environment.ts` for YAML
+surfaces. `monaco-worker-manager` 2.x passes the older `moduleId`/`createData`
+options; Monaco 0.54 requires an explicit `worker`. The adapter constructs the
+bundled YAML worker, sends its bootstrap and language settings before Monaco's
+RPC messages, and leaves the shared Monaco API unchanged. The CSP harness checks
+actual YAML diagnostics and diff results, and rejects worker fallback warnings
+and uncaught page errors.

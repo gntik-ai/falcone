@@ -6,9 +6,11 @@ test.beforeAll(async () => { server = await startServer(); });
 test.afterAll(async () => { await server?.close(); });
 
 async function observe(page) {
-  const consoleCspErrors = [], externalRequests = [], fonts = [], workers = [];
+  const consoleCspErrors = [], externalRequests = [], fonts = [], workers = [], workerErrors = [];
+  page.on('pageerror', (error) => workerErrors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error' && /content security policy|\bcsp\b/i.test(message.text())) consoleCspErrors.push(message.text());
+    if (/could not create web worker|falling back to loading web worker/i.test(message.text())) workerErrors.push(message.text());
   });
   page.context().on('request', (request) => {
     if (!['blob:', 'data:'].includes(new URL(request.url()).protocol) && new URL(request.url()).origin !== server.origin) externalRequests.push(request.url());
@@ -21,13 +23,14 @@ async function observe(page) {
     window.cspViolations = [];
     document.addEventListener('securitypolicyviolation', (event) => window.cspViolations.push({ directive: event.violatedDirective, blockedURI: event.blockedURI }));
   });
-  return { consoleCspErrors, externalRequests, fonts, workers };
+  return { consoleCspErrors, externalRequests, fonts, workers, workerErrors };
 }
 
 async function expectClean(page, observed) {
   expect(await page.evaluate(() => window.cspViolations)).toEqual([]);
   expect(observed.consoleCspErrors).toEqual([]);
   expect(observed.externalRequests).toEqual([]);
+  expect(observed.workerErrors).toEqual([]);
 }
 
 async function expectFonts(page, observed, mono = false) {

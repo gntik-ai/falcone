@@ -5,9 +5,8 @@ import type { RouteObject } from 'react-router-dom'
 import { ReactFlow } from '@xyflow/react'
 import { LayoutDashboard } from 'lucide-react'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
-import { configureMonacoYaml } from 'monaco-yaml'
 import { appRoutes } from '../../src/router'
-import { installMonacoEnvironment } from '../../src/lib/monaco-environment'
+import { configureLocalMonacoYaml, installMonacoEnvironment } from '../../src/lib/monaco-environment'
 import '@fontsource/geist-sans/latin-400.css'
 import '@fontsource/geist-mono/latin-400.css'
 import '@xyflow/react/dist/style.css'
@@ -34,7 +33,7 @@ function Harness() {
   const [yamlReady, setYamlReady] = useState(false)
   const [editorReady, setEditorReady] = useState(false)
   useEffect(() => {
-    const yaml = configureMonacoYaml(monaco, { validate: true, enableSchemaRequest: false, schemas: [] })
+    const yaml = configureLocalMonacoYaml(monaco, { validate: true, enableSchemaRequest: false, schemas: [] })
     const model = monaco.editor.createModel('greeting: [', 'yaml', monaco.Uri.parse('inmemory://csp/example.yaml'))
     const markers = monaco.editor.onDidChangeMarkers(() => {
       if (monaco.editor.getModelMarkers({ resource: model.uri }).some((marker) => marker.severity === monaco.MarkerSeverity.Error)) setYamlReady(true)
