@@ -410,6 +410,20 @@
     "consoleUsed": true
   },
   {
+    "operationId": "getMyPlanHistory",
+    "method": "GET",
+    "path": "/v1/tenant/plan/history",
+    "family": "plans",
+    "module": "packages/provisioning-orchestrator/src/actions/plan-assignment-history-self.mjs",
+    "export": "main",
+    "invoke": "callercontext-overrides",
+    "deps": ["pg"],
+    "auth": "tenant_owner (token tenant only; action accepts tenant_owner, tenant-owner, tenant)",
+    "subroutes": "no",
+    "notes": "planManagementApi.ts::getMyPlanHistory. Seed route merges page/pageSize query; tenantId may only match the token tenant. Projected assignments omit operator identities and internal metadata. Explicit tenant-owner/tenant actor types need a qualifying realm role at the HTTP gate.",
+    "consoleUsed": true
+  },
+  {
     "operationId": "getTenantPlanHistoryImpact",
     "method": "GET",
     "path": "/v1/tenants/{tenantId}/plan/history-impact",

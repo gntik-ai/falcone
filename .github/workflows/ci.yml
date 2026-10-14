@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '228ab77e9cc6c085cc931b9081a706f08af29a19'
+  FALCONE_CHARTS_REF: '662314dc03cc9a7c3f4a133bb03883366c6ab965'
 
 jobs:
   quality:
@@ -113,6 +113,9 @@ jobs:
 
       - name: Authorization denial audit harness
         run: node --test tests/blackbox/authorization-denial-audit.test.mjs
+
+      - name: Self-tenant plan history authorization and projection
+        run: node --test tests/blackbox/self-tenant-plan-history.test.mjs
 
       - name: Workspace delete cascade
         run: node --test tests/blackbox/workspace-delete-cascade.test.mjs

@@ -34,6 +34,8 @@ export const routes = [
     invoke: 'callercontext-overrides', deps: ['db'], auth: 'tenant_owner', mergeQueryIntoParams: true },
 
   // own-tenant plan API (tenant-scoped; operators read their OWN plan — no superadmin collection needed)
+  { method: 'GET',  path: '/v1/tenant/plan/history', module: `${PO}/plan-assignment-history-self.mjs`, export: 'main',
+    invoke: 'callercontext-overrides', deps: ['db'], auth: 'tenant_owner', mergeQueryIntoParams: true },
   // /v1/tenant/plan/effective-entitlements — full entitlement + consumption profile for the operator's tenant
   { method: 'GET',  path: '/v1/tenant/plan/effective-entitlements', module: `${PO}/tenant-effective-entitlements-get.mjs`, export: 'main',
     invoke: 'callercontext-overrides', deps: ['db'], auth: 'tenant_owner', mergeQueryIntoParams: true },

@@ -17,3 +17,28 @@ shows `No personal tenant plan` and does not call
 does not call `GET /v1/tenant/plan/allocation-summary` for tenant-less platform principals. The
 tenant-specific plan page `/console/tenants/{tenantId}/plan` is a superadmin-only route; non-superadmin
 platform roles see the no-personal-plan state without a tenant-plan action.
+
+`GET /v1/tenant/plan/history` reads plan assignment history for the token tenant only. The action
+accepts actors with an id, a token tenant (`actor.tenantId` or `actor.tenant.id`), and type
+`tenant_owner`, `tenant-owner`, or `tenant`. At the HTTP `tenant_owner` gate, `tenant_owner` works
+directly; the realm role `tenant_admin` also maps to this type. Explicit `tenant-owner` and `tenant`
+types must additionally carry realm role `tenant_owner` or `tenant_admin` to pass that gate.
+
+The action returns `403 FORBIDDEN` for `superadmin`, `internal`, `tenant_member`, `workspace_admin`,
+other actor types, missing actor ids, and missing token tenants, even when a query `tenantId` is
+supplied. Query `tenantId` may only equal the token tenant; a mismatch is rejected before database
+access. Request parameters never select the tenant. Missing bearer tokens are rejected, and the
+gateway route `self-tenant-plan-history` enables `keycloak-openid-connect`.
+
+The response is `{tenantId, assignments, total, page, pageSize}`. Assignments are ordered by
+`effectiveFrom` descending and contain exactly `assignmentId`, `planId`, `planSlug`,
+`planDisplayName`, `planStatus`, `effectiveFrom`, and `supersededAt` (null for the current assignment).
+Operator identities, metadata, descriptions, capabilities, quotas, and per-item tenant ids are
+omitted. Empty histories return `assignments: []` and `total: 0`. Pagination defaults to page 1 and
+page size 20; values must be positive integers (query strings match `^[1-9][0-9]*$`), with page size
+at most 100. Invalid pagination returns `400 VALIDATION_ERROR`.
+
+The console service `getMyPlanHistory({page, pageSize})` normalizes `assignments` to `items`. The
+tenant-id scoped `GET /v1/tenants/{tenantId}/plan/history` remains superadmin-only. The Mi plan UI
+continues to show its current empty-history state until the dependent timeline task consumes the
+self-history service.
