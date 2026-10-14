@@ -27,15 +27,17 @@ ARG APP_VERSION=dev
 ARG APP_COMMIT_SHA=
 WORKDIR /src
 COPY . .
-RUN corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console...
+RUN corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console... --filter @in-falcone/web-console-next...
 RUN NODE_OPTIONS=--max-old-space-size=1536 VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console exec vite build
+RUN NODE_OPTIONS=--max-old-space-size=1536 CSP_TEST_HARNESS= VITE_BASE_PATH=/next/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build
 
 FROM ${NODE_BASE_IMAGE}
 WORKDIR /app
 
-# Zero-dependency static server + the freshly built SPA bundle.
+# Zero-dependency static server + both freshly built SPA bundles.
 COPY apps/web-console/static-server.mjs ./static-server.mjs
 COPY --from=builder /src/apps/web-console/dist ./dist
+COPY --from=builder /src/apps/web-console-next/dist ./dist-next
 
 ENV NODE_ENV=production
 # Numeric non-root user -> passes runAsNonRoot verification under the restricted profile.

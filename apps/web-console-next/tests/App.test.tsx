@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import { App } from '../src/App'
 
@@ -20,4 +20,19 @@ test('the console header renders a bundled inline SVG icon', () => {
   const icon = screen.getByRole('img', { name: 'Consola' })
   expect(icon.tagName.toLowerCase()).toBe('svg')
   expect(icon).toBeVisible()
+})
+
+test('the shell About entry shows the release version and seven-character image SHA', () => {
+  vi.stubGlobal('__APP_VERSION__', '1.2.3')
+  vi.stubGlobal('__APP_COMMIT_SHA__', '0123456789abcdef0123456789abcdef01234567')
+  render(<MemoryRouter><App /></MemoryRouter>)
+  fireEvent.click(screen.getByText('Acerca de'))
+  expect(screen.getByText('1.2.3 · 0123456')).toBeVisible()
+})
+
+test('the shell About entry shows dev without a SHA for local builds', () => {
+  render(<MemoryRouter><App /></MemoryRouter>)
+  fireEvent.click(screen.getByText('Acerca de'))
+  expect(screen.getByText('dev')).toBeVisible()
+  expect(screen.queryByText(/ · /)).not.toBeInTheDocument()
 })

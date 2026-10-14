@@ -4,11 +4,30 @@ import { loadEnv } from 'vite'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
+const version = /^(?:[0-9]+\.[0-9]+\.[0-9]+|dev)$/.test(process.env.VITE_APP_VERSION ?? '')
+  ? process.env.VITE_APP_VERSION!
+  : 'dev'
+const commitSha = /^(?:[0-9a-f]{40}|[0-9a-f]{7})$/.test(process.env.VITE_APP_COMMIT_SHA ?? '')
+  ? process.env.VITE_APP_COMMIT_SHA!
+  : ''
+const escapedVersion = version.replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[character]!)
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
   return {
     base: env.VITE_BASE_PATH || '/',
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), {
+      name: 'console-build-version',
+      transformIndexHtml(html) {
+        return html.replace(/<meta name="version" content="[^"]*"\s*\/>/, `<meta name="version" content="${escapedVersion}" />`)
+      }
+    }],
+    define: {
+      __APP_VERSION__: mode === 'test' ? 'globalThis.__APP_VERSION__' : JSON.stringify(version),
+      __APP_COMMIT_SHA__: mode === 'test' ? 'globalThis.__APP_COMMIT_SHA__' : JSON.stringify(commitSha)
+    },
     worker: { format: 'es' },
     build: {
       rollupOptions: {
