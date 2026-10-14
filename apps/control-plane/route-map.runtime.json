@@ -137,7 +137,7 @@
     "invoke": "callercontext-overrides",
     "deps": ["db"],
     "auth": "authenticated",
-    "notes": "reads params.tenantId (path) or actor.tenantId. Action self-checks: superadmin any, actor.type 'tenant-owner' (hyphen) own only (server emits tenant_owner underscore, so tenant owner self-access 403s in the action)."
+    "notes": "reads params.tenantId (path), callerContext.tenantId or actor.tenantId. Action self-checks: actor.type tenant_owner/tenant-owner own tenant only; superadmin any tenant. Realm role tenant_admin maps to tenant_owner."
   },
   {
     "method": "GET",
@@ -147,7 +147,7 @@
     "invoke": "callercontext-overrides",
     "deps": ["db"],
     "auth": "authenticated",
-    "notes": "self variant; no tenantId path, resolves actor.tenantId. Same hyphen-vs-underscore actor.type caveat as the admin variant."
+    "notes": "self variant; no tenantId path, resolves callerContext.tenantId or actor.tenantId. Action self-checks: actor.type tenant_owner/tenant-owner own tenant only; superadmin any tenant. Realm role tenant_admin maps to tenant_owner."
   },
   {
     "method": "GET",

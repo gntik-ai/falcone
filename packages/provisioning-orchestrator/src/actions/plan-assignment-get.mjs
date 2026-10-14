@@ -7,8 +7,9 @@ function authorize(params) {
   if (!actor?.id) throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
   const scopedTenantId = params.tenantId ?? params.callerContext?.tenantId ?? actor.tenantId;
   if (!scopedTenantId) throw Object.assign(new Error('tenantId is required'), { code: 'VALIDATION_ERROR' });
-  if (actor.type === 'tenant-owner' && scopedTenantId !== (params.callerContext?.tenantId ?? actor.tenantId)) throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
-  if (actor.type !== 'tenant-owner' && actor.type !== 'superadmin') throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
+  const ownerTypes = new Set(['tenant_owner', 'tenant-owner']);
+  if (ownerTypes.has(actor.type) && scopedTenantId !== (params.callerContext?.tenantId ?? actor.tenantId)) throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
+  if (!ownerTypes.has(actor.type) && actor.type !== 'superadmin') throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
   return scopedTenantId;
 }
 
