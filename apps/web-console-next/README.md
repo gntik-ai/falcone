@@ -45,3 +45,29 @@ tokens and imports no page components from those transitive packages.
 | @gntik-ai/templates | 0.5.0 | sha512-/XvpKKOv4MYr6GVp2Ya8J8HKjAY3nFWQrM+J+QM99s6fkYngVtBXIz/mpljZ3RVLvhYLshFktdkJo6abtKFdcw== |
 | @gntik-ai/tokens | 0.2.1 | sha512-Ys7tPnkMylielio3HIxQMTPp1tnmxnEqbp7JGnIaXdcdiAdZieudaLm2xnDCTZ+SWfq5AFTxmH0JQxIB+6CRSA== |
 | @gntik-ai/ui | 0.5.0 | sha512-QAw3Yklf3txCdXSdPrPR/PJxoQlZZ9hoQ5R38DRIWD4Dmd62HVeRaMiG/tqwLysoONJ5Ku1KM3Ijje4wMTB06w== |
+
+CSP asset checks use the unchanged headers parsed from `../web-console/static-server.mjs`.
+The body font is Geist Sans; the test page's `code[data-testid="mono"]` uses Geist Mono.
+Run `pnpm test:dist` for the validator fixtures. To exercise Chromium locally:
+
+```sh
+pnpm exec playwright install --with-deps chromium
+for base in / /next/; do
+  CSP_TEST_HARNESS=true VITE_BASE_PATH="$base" pnpm build
+  pnpm validate:dist
+  VITE_BASE_PATH="$base" pnpm test:csp
+done
+```
+
+The separate `tests/csp/index.html` entry derives concrete paths from `appRoutes`,
+mounts Monaco (editor and YAML workers) and xyflow, and includes an inline-script
+negative control served from a temporary dist copy. It is included only when
+`CSP_TEST_HARNESS=true`; ordinary builds do not ship this page or its editor bundles.
+
+Use `configureLocalMonacoYaml` from `src/lib/monaco-environment.ts` for YAML
+surfaces. `monaco-worker-manager` 2.x passes the older `moduleId`/`createData`
+options; Monaco 0.54 requires an explicit `worker`. The adapter constructs the
+bundled YAML worker, sends its bootstrap and language settings before Monaco's
+RPC messages, and leaves the shared Monaco API unchanged. The CSP harness checks
+actual YAML diagnostics and diff results, and rejects worker fallback warnings
+and uncaught page errors.

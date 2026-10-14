@@ -14,3 +14,10 @@ test('the root displays the Falcone brand, activates dark mode and provides live
   expect(container.querySelector('[aria-live="polite"]')).toBeInTheDocument()
   expect(container.querySelector('[aria-live="assertive"]')).toBeInTheDocument()
 })
+
+test('the console header renders a bundled inline SVG icon', () => {
+  render(<MemoryRouter><App /></MemoryRouter>)
+  const icon = screen.getByRole('img', { name: 'Consola' })
+  expect(icon.tagName.toLowerCase()).toBe('svg')
+  expect(icon).toBeVisible()
+})

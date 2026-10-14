@@ -30,3 +30,19 @@ test('the next-console CI job checks the scaffold and legacy release commands wi
   assert.doesNotMatch(serialized, /secrets\.|docker push|push:|login-action|registry-url/);
   assert.equal(ci.on.pull_request?.paths, undefined);
 });
+
+test('the next-console CSP step builds both bases and enforces the dist and Chromium checks', () => {
+  const job = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs['web-console-next'];
+  const step = job.steps.find((step) => step.name === 'Validate next-console CSP and self-hosted assets');
+  assert.ok(step, 'CSP validation must be an enforced CI step');
+  assert.equal(step.if, undefined);
+  assert.equal(step.continueOnError, undefined);
+  assert.equal(step['continue-on-error'], undefined);
+  assert.equal(step.env, undefined);
+  assert.match(step.run, /web-console-next exec playwright install --with-deps chromium/);
+  assert.match(step.run, /node --test apps\/web-console-next\/tests\/validate-dist.test.mjs/);
+  assert.match(step.run, /for base in \/ \/next\//);
+  assert.match(step.run, /CSP_TEST_HARNESS=true.*web-console-next build/);
+  assert.match(step.run, /web-console-next validate:dist/);
+  assert.match(step.run, /VITE_BASE_PATH="\$base".*web-console-next test:csp/);
+});

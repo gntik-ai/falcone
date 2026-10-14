@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Falcone">
+  <rect width="64" height="64" rx="14" fill="#1b2d5b"/>
+  <path fill="#f8fafc" d="M18 16h30v9H28v8h16v9H28v14H18z"/>
+  <path fill="#37c8a5" d="M30 16h18v9H38z"/>
+  <path fill="#f2b84b" d="M28 33h16v9H28z"/>
+</svg>
