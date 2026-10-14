@@ -8,7 +8,7 @@ test('Postgres: workspace bucket pages isolate tenant/workspace and walk strict 
     assert.notEqual(process.env.STORAGE_BUCKET_LIST_TEST_REQUIRED, '1', 'CI requires a dedicated real Postgres');
     return t.skip('STORAGE_BUCKET_LIST_TEST_DATABASE_URL is absent; a dedicated real Postgres is required');
   }
-  const { Client } = await import('pg');
+  const { Client } = (await import('pg')).default;
   const client = new Client({ connectionString: dsn });
   try {
     await client.connect();
