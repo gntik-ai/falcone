@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { OPENAPI_PATH, readJson } from './lib/quality-gates.mjs';
-import { mergeFunctionsFamilySource, mergePublicApiFamilySource } from './lib/functions-family-source.mjs';
+import { mergeFunctionsFamilySource } from './lib/functions-family-source.mjs';
+import { mergePublicApiFamilySource } from './lib/public-api-family-source.mjs';
 import {
   PUBLIC_API_FAMILY_DIR,
   readPublicApiTaxonomy,

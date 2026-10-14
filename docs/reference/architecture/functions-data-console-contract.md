@@ -130,9 +130,18 @@ require a separate implementation enhancement. Optional trigger fields in served
 and the console remain for compatibility; their presence does not enable automation.
 
 Edit `apps/control-plane-executor/openapi/families/functions.openapi.json` for functions changes,
-then run `npm run generate:public-api`. The generator merges that family source into the unified
-contract, removes schemas made unreachable by withdrawal, and refreshes family contracts, the
-route catalog, and public API docs. Other families still use the unified contract as their source.
+or `apps/control-plane-executor/openapi/families/storage.openapi.json` for storage changes, then
+run `npm run generate:public-api`. The generator merges these maintained family sources into the
+unified contract, removes schemas made unreachable by withdrawal, and refreshes family contracts,
+the route catalog, and public API docs. Other families use the unified contract as their source.
+
+Components reached only by one family follow that family's source. Components shared across
+families must agree with the unified contract and both maintained family sources wherever present.
+Synchronize shared edits across these sources before generation; a mismatch stops the generator
+with the family and component reference, before any files are written. This prevents a stale
+family copy from silently reverting another source's edit. The shared `IdempotencyKey` parameter
+remains maintained in the unified contract and overrides stale family copies during generation.
+
 The functions parity contract test reads both the shipped runtime map and seed routes without
 network, cluster access, or credentials.
 
