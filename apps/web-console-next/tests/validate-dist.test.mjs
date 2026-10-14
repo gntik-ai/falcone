@@ -77,10 +77,12 @@ test('a build without either font family is rejected', async () => {
 
 test('HTML comments inside an external script still count as an inline body', async () => {
   const result = await validate('comment-script');
+  assert.notEqual(result.status, 0);
   assert.match(result.stderr, /index\.html.*inline script body/);
 });
 
 test('a quoted CSS import without whitespace is still a remote target', async () => {
   const result = await validate('compact-import');
+  assert.notEqual(result.status, 0);
   assert.match(result.stderr, /font\.css.*https:\/\/fonts\.example\/compact\.css/);
 });
