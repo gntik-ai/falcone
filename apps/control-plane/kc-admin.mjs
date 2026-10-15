@@ -426,8 +426,11 @@ export const kcAdmin = {
     for (const name of roleNames) reps.push(await this.getRealmRole(realm, name));
     await kc('POST', `/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}/role-mappings/realm`, reps);
   },
-  async listUsers(realm, { max = 100 } = {}) {
-    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/users?max=${max}`)).json ?? [];
+  async listUsers(realm, { first = 0, max = 100 } = {}) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/users?first=${first}&max=${max}`)).json ?? [];
+  },
+  async countUsers(realm) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/users/count`)).json;
   },
   async findUsersByEmail(realm, email) {
     return (await kc('GET', `/realms/${encodeURIComponent(realm)}/users?email=${encodeURIComponent(email)}&exact=true`)).json ?? [];

@@ -1888,6 +1888,57 @@
         ],
         "type": "object"
       },
+      "IamUserListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "compatibility": {
+            "$ref": "#/components/schemas/IamProviderCompatibility"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IamUser"
+            },
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/IamUserPageInfo"
+          },
+          "total": {
+            "description": "Realm user count at the time of the request.",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "items",
+          "compatibility",
+          "total"
+        ],
+        "type": "object"
+      },
+      "IamUserPageInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "maxLength": 256,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "size": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "size",
+          "after"
+        ],
+        "type": "object"
+      },
       "IamUserUpdateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5791,6 +5842,7 @@
     },
     "/v1/iam/realms/{realmId}/users": {
       "get": {
+        "description": "Returns offset-based windows over Keycloak's user order. On a stable realm, following page.after until null returns every user exactly once. If users are created or deleted between requests, traversal may skip or repeat users; clients must deduplicate by id. total is the realm user count at the time of each request.",
         "operationId": "listIamUsers",
         "parameters": [
           {
@@ -5820,7 +5872,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IamUserCollectionResponse"
+                  "$ref": "#/components/schemas/IamUserListResponse"
                 }
               }
             },

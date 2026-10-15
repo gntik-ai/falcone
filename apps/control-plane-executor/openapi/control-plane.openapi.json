@@ -5728,7 +5728,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IamUserCollectionResponse"
+                  "$ref": "#/components/schemas/IamUserListResponse"
                 }
               }
             }
@@ -5804,7 +5804,8 @@
         ],
         "x-visibility": "public",
         "x-rate-limit-class": "catalog",
-        "x-owning-service": "control_api"
+        "x-owning-service": "control_api",
+        "description": "Returns offset-based windows over Keycloak's user order. On a stable realm, following page.after until null returns every user exactly once. If users are created or deleted between requests, traversal may skip or repeat users; clients must deduplicate by id. total is the realm user count at the time of each request."
       },
       "post": {
         "operationId": "createIamUser",
@@ -98718,6 +98719,57 @@
           "items",
           "status"
         ]
+      },
+      "IamUserListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "page",
+          "items",
+          "compatibility",
+          "total"
+        ],
+        "properties": {
+          "page": {
+            "$ref": "#/components/schemas/IamUserPageInfo"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IamUser"
+            }
+          },
+          "compatibility": {
+            "$ref": "#/components/schemas/IamProviderCompatibility"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Realm user count at the time of the request."
+          }
+        }
+      },
+      "IamUserPageInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "size",
+          "after"
+        ],
+        "properties": {
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "after": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 256
+          }
+        }
       }
     }
   }

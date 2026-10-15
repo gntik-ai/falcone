@@ -918,15 +918,41 @@ async function iamListUsers(ctx) {
   // Previously superadmin-only (route gate), so an owner got 403 on its own end-users
   // (P1 BUG-ENDUSER-OWNER-403). authorizeRealmManage denies cross-tenant (the owner of
   // another tenant's realm → 403) by resolving realm→tenant + canManageTenant.
+  // Offset windows follow Keycloak's user order: realm changes can skip or repeat
+  // users, so clients dedupe by id. total is the count for each request.
   const az = await authorizeRealmManage(ctx);
   if (az.error) return az.error;
   const kc = ctx.kcAdmin ?? kcAdmin;
   const realm = ctx.params.realmId;
-  const max = Number(ctx.query['page[size]'] ?? ctx.query.max ?? 200) || 200;
-  let users;
-  try { users = await kc.listUsers(realm, { max }); }
+  const size = ctx.query['page[size]'] ?? ctx.query.max ?? '25';
+  const max = Number(size);
+  if (typeof size !== 'string' || !/^[0-9]+$/.test(size) || max < 1 || max > 200) {
+    return err(400, 'VALIDATION_ERROR', 'page[size] or max must be an integer from 1 to 200');
+  }
+  const after = ctx.query['page[after]'];
+  let first = 0;
+  if (after !== undefined) {
+    if (typeof after !== 'string' || after.length > 256 || !/^[A-Za-z0-9_-]+$/.test(after)) {
+      return err(400, 'VALIDATION_ERROR', 'invalid page[after]');
+    }
+    try {
+      const decoded = Buffer.from(after, 'base64url');
+      const cursor = JSON.parse(decoded.toString('utf8'));
+      if (decoded.toString('base64url') !== after || cursor?.v !== 1 || cursor.realm !== realm
+        || !Number.isSafeInteger(cursor.first) || cursor.first < 0) {
+        return err(400, 'VALIDATION_ERROR', 'invalid page[after]');
+      }
+      first = cursor.first;
+    }
+    catch { return err(400, 'VALIDATION_ERROR', 'invalid page[after]'); }
+  }
+  let users, total;
+  try {
+    users = await kc.listUsers(realm, { first, max: max + 1 });
+    total = await kc.countUsers(realm);
+  }
   catch (e) { return kcBackedErr(e, 'IAM_LIST_USERS_FAILED'); }
-  const items = await Promise.all(users.map(async (u) => {
+  const items = await Promise.all(users.slice(0, max).map(async (u) => {
     let realmRoles = [];
     try {
       realmRoles = (await kc.listUserRealmRoles(realm, u.id))
@@ -939,7 +965,9 @@ async function iamListUsers(ctx) {
       realmRoles, requiredActions: u.requiredActions ?? [], attributes: u.attributes ?? {}
     };
   }));
-  return ok(200, { items, total: items.length, page: { after: null, size: items.length } });
+  const next = users.length > max
+    ? Buffer.from(JSON.stringify({ v: 1, realm, first: first + max })).toString('base64url') : null;
+  return ok(200, { items, total, page: { after: next, size: max } });
 }
 // Extract the password to set on a created user from the documented
 // `bootstrapCredentials.temporaryPassword` field or legacy payload shapes kept for
