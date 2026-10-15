@@ -53,6 +53,11 @@ Native operator passthrough routes under `/_native/*` are documented separately 
 | websockets | realtime | realtime | 131072 | realtime | mutations |
 | workspaces | workspace_control | workspace_control | 262144 | control_plane | mutations |
 | realtime | realtime_sse | realtime_sse | 1024 | realtime | mutations |
+| plans | platform_control | platform_control | 262144 | control_plane | mutations |
+| quota-dimensions | platform_control | platform_control | 262144 | control_plane | mutations |
+| tenant-plan | tenant_control | tenant_control | 262144 | control_plane | mutations |
+| console | platform_control | platform_control | 262144 | control_plane | mutations |
+| async-operation-query | tenant_control | tenant_control | 262144 | control_plane | mutations |
 
 ## Families
 
@@ -90,6 +95,10 @@ Workspace-scoped event topics with controlled HTTP publish, SSE delivery, replay
 | POST | `/v1/events/workspaces/{workspaceId}/bridges` | workspace | event_bridge | Register a workspace-scoped managed event bridge from PostgreSQL, MongoDB, storage, OpenWhisk, or IAM into Kafka |
 | GET | `/v1/events/workspaces/{workspaceId}/bridges/{bridgeId}` | workspace | event_bridge | Fetch the normalized state for one managed event bridge |
 | GET | `/v1/events/workspaces/{workspaceId}/inventory` | workspace | event_inventory | Fetch one workspace Kafka topic inventory with naming, ACL, quota, and KRaft governance visibility |
+| GET | `/v1/events/workspaces/{workspaceId}/topics` | workspace | events | List topics in a workspace |
+| POST | `/v1/events/workspaces/{workspaceId}/topics` | workspace | events | Create a workspace topic |
+| GET | `/v1/events/workspaces/{workspaceId}/topics/{topic}/messages` | workspace | events | Read a bounded page of workspace topic messages |
+| POST | `/v1/events/workspaces/{workspaceId}/topics/{topic}/publish` | workspace | events | Publish a message to a workspace topic |
 
 ## Flows
 
@@ -210,6 +219,7 @@ Workspace-scoped usage, quota, gateway-stream, and observability series exposed 
 | GET | `/v1/metrics/tenants/{tenantId}/audit-records` | tenant | tenant_audit_record | Query tenant-scoped audit records through the unified observability surface |
 | GET | `/v1/metrics/tenants/{tenantId}/overview` | tenant | tenant_quota_usage_view | Fetch one tenant-scoped quota usage overview with provisioning-state detail through the unified observability surface |
 | GET | `/v1/metrics/tenants/{tenantId}/quotas` | tenant | tenant_quota_posture | Fetch one tenant-scoped quota posture through the unified observability surface |
+| GET | `/v1/metrics/tenants/{tenantId}/series` | tenant | metrics | Read a tenant metric series |
 | GET | `/v1/metrics/tenants/{tenantId}/usage` | tenant | tenant_usage_snapshot | Fetch one tenant-scoped usage consumption snapshot through the unified observability surface |
 | GET | `/v1/metrics/workspaces/{workspaceId}/audit-correlations/{correlationId}` | workspace | workspace_audit_correlation | Retrieve one workspace-scoped end-to-end audit correlation trace |
 | POST | `/v1/metrics/workspaces/{workspaceId}/audit-exports` | workspace | workspace_audit_export | Preview a bounded workspace-scoped audit export with masking metadata |
@@ -484,6 +494,7 @@ Workspace-scoped object storage discovery, bucket control, and presign-safe surf
 | GET | `/v1/storage/usage/tenants` | platform | storage_usage_snapshot | List the top tenant storage usage snapshots across the platform |
 | GET | `/v1/storage/workspaces/{workspaceId}/audit` | workspace | storage_audit_event | List workspace-scoped storage audit records |
 | GET | `/v1/storage/workspaces/{workspaceId}/buckets` | workspace | bucket | List registry buckets for one authorized workspace in bucketName order |
+| POST | `/v1/storage/workspaces/{workspaceId}/buckets` | workspace | storage | Create a workspace storage bucket |
 | POST | `/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports` | workspace | storage_export_manifest | Preview a bounded storage bucket export manifest |
 | GET | `/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports/{manifestId}` | workspace | storage_export_manifest | Fetch one bounded storage export manifest |
 | POST | `/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/imports` | workspace | storage_import_result | Preview a bounded storage bucket import result |
@@ -506,6 +517,10 @@ Tenant lifecycle, membership, invitation, quota, and tenant-level capability sur
 | DELETE | `/v1/tenants/{tenantId}` | tenant | tenant | Logically delete one tenant while preserving retention, auditability, and purge preconditions |
 | GET | `/v1/tenants/{tenantId}` | tenant | tenant | Fetch one canonical tenant with governance labels, quotas, retention posture, and export metadata |
 | PUT | `/v1/tenants/{tenantId}` | tenant | tenant | Update one canonical tenant including lifecycle, quota, label, and retention governance settings |
+| GET | `/v1/tenants/{tenantId}/auth-config` | tenant | tenants | Read tenant login options and social providers |
+| PUT | `/v1/tenants/{tenantId}/auth-config` | tenant | tenants | Update tenant login options |
+| DELETE | `/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}` | tenant | tenants | Delete a tenant social identity provider |
+| PUT | `/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}` | tenant | tenants | Create or update a tenant social identity provider |
 | GET | `/v1/tenants/{tenantId}/dashboard` | tenant | tenant_dashboard | Fetch tenant governance dashboard data including quotas, labels, provisioning state, and allowed actions |
 | GET | `/v1/tenants/{tenantId}/effective-capabilities` | tenant | tenant_capabilities | Resolve effective capabilities for one tenant |
 | POST | `/v1/tenants/{tenantId}/exports` | tenant | tenant_export | Create a recovery-oriented functional configuration export for one tenant |
@@ -523,11 +538,16 @@ Tenant lifecycle, membership, invitation, quota, and tenant-level capability sur
 | GET | `/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}` | tenant | tenant | Fetch one tenant ownership transfer record. |
 | POST | `/v1/tenants/{tenantId}/ownership-transfers/{ownershipTransferId}/acceptance` | tenant | tenant | Accept a pending tenant ownership transfer before it expires. |
 | GET | `/v1/tenants/{tenantId}/permission-recalculations/{permissionRecalculationId}` | tenant | tenant | Fetch one tenant-scoped effective-permission recalculation record. |
+| GET | `/v1/tenants/{tenantId}/plan` | tenant | tenants | Read a tenant current plan |
+| POST | `/v1/tenants/{tenantId}/plan` | tenant | tenants | Assign an active plan to a tenant |
 | POST | `/v1/tenants/{tenantId}/purge` | tenant | tenant_purge | Definitively purge one logically deleted tenant after retention and elevated confirmation checks |
 | POST | `/v1/tenants/{tenantId}/reactivation` | tenant | tenant | Reactivate one suspended tenant and restore descendant access controls under audit |
 | GET | `/v1/tenants/{tenantId}/storage-context` | tenant | tenant_storage_context | Fetch the tenant-scoped logical storage context used for workspace bucket bootstrap. |
 | POST | `/v1/tenants/{tenantId}/storage-context/credential-rotations` | tenant | tenant_storage_context | Rotate the active tenant-scoped storage credential reference without recreating the namespace. |
+| POST | `/v1/tenants/{tenantId}/users` | tenant | tenants | Create a user in a tenant realm |
 | GET | `/v1/tenants/{tenantId}/workflow-jobs/{jobRef}` | tenant | workflow_job | Get one tenant-scoped workflow job status. |
+| GET | `/v1/tenants/{tenantId}/workspaces` | tenant | tenants | List workspaces in a tenant |
+| POST | `/v1/tenants/{tenantId}/workspaces` | tenant | tenants | Create a workspace in a tenant |
 
 ## WebSockets
 
@@ -560,17 +580,24 @@ Workspace lifecycle, application inventory, workload identities, and managed-res
 | PUT | `/v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers/{providerId}` | workspace | application | Update one federated identity provider including metadata, certificates, and mapper bindings |
 | GET | `/v1/workspaces/{workspaceId}/applications/templates` | workspace | application | List starter templates for SPA, confidential backend, and B2B SAML external applications |
 | POST | `/v1/workspaces/{workspaceId}/clone` | workspace | workspace | Clone one workspace baseline into a new environment with optional application and credential reset policies |
+| GET | `/v1/workspaces/{workspaceId}/database` | workspace | workspaces | Read workspace database metadata |
+| POST | `/v1/workspaces/{workspaceId}/database` | workspace | workspaces | Provision a workspace PostgreSQL database |
+| POST | `/v1/workspaces/{workspaceId}/database/credential-rotations` | workspace | workspaces | Rotate a dedicated workspace database credential |
+| POST | `/v1/workspaces/{workspaceId}/databases` | workspace | workspaces | Provision a workspace database by engine |
 | DELETE | `/v1/workspaces/{workspaceId}/databases/{databaseName}` | workspace | workspace_database | Delete one provisioned workspace database |
 | GET | `/v1/workspaces/{workspaceId}/docs` | workspace | workspace_docs | Fetch authenticated workspace documentation, service snippets, auth instructions, and custom notes |
 | POST | `/v1/workspaces/{workspaceId}/docs/notes` | workspace | workspace_doc_note | Create a custom workspace documentation note |
 | DELETE | `/v1/workspaces/{workspaceId}/docs/notes/{noteId}` | workspace | workspace_doc_note | Delete a custom workspace documentation note |
 | PUT | `/v1/workspaces/{workspaceId}/docs/notes/{noteId}` | workspace | workspace_doc_note | Update a custom workspace documentation note |
 | GET | `/v1/workspaces/{workspaceId}/effective-capabilities` | workspace | workspace_capabilities | Resolve effective capabilities for one workspace |
+| GET | `/v1/workspaces/{workspaceId}/functions` | workspace | workspaces | List workspace function definitions |
+| POST | `/v1/workspaces/{workspaceId}/functions` | workspace | workspaces | Register a workspace function definition |
 | POST | `/v1/workspaces/{workspaceId}/managed-resources` | workspace | managed_resource | Submit a canonical managed resource write request |
 | GET | `/v1/workspaces/{workspaceId}/managed-resources/{resourceId}` | workspace | managed_resource | Fetch one canonical managed resource entity |
 | POST | `/v1/workspaces/{workspaceId}/memberships` | workspace | workspace_membership | Submit a workspace membership write request |
 | GET | `/v1/workspaces/{workspaceId}/memberships/{workspaceMembershipId}` | workspace | workspace_membership | Fetch one workspace membership record |
 | GET | `/v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}` | workspace | workspace | Fetch one workspace-scoped effective-permission recalculation record. |
+| GET | `/v1/workspaces/{workspaceId}/realtime` | workspace | workspaces | Read workspace realtime configuration |
 | GET | `/v1/workspaces/{workspaceId}/service-accounts` | workspace | service_account | List service accounts for one workspace |
 | POST | `/v1/workspaces/{workspaceId}/service-accounts` | workspace | service_account | Submit a canonical service account write request |
 | DELETE | `/v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}` | workspace | service_account | Delete a service account and its Keycloak client |
@@ -588,3 +615,47 @@ Workspace-scoped document collection and PostgreSQL table change streams over Se
 | --- | --- | --- | --- | --- |
 | GET | `/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/collections/{collectionName}/changes` | workspace | change_stream | Stream document collection changes |
 | GET | `/v1/realtime/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/changes` | workspace | change_stream | Stream PostgreSQL table changes |
+
+## Plans
+
+Plans console control-plane operations.
+
+| Method | Path | Scope | Resource | Summary |
+| --- | --- | --- | --- | --- |
+| GET | `/v1/plans` | platform | plans | List the plan catalogue |
+| POST | `/v1/plans` | platform | plans | Create a draft plan |
+| DELETE | `/v1/plans/{planId}` | platform | plans | Delete a never-assigned inactive plan |
+| PUT | `/v1/plans/{planId}` | platform | plans | Update plan details and entitlements |
+| POST | `/v1/plans/{planId}/lifecycle` | platform | plans | Transition plan lifecycle status |
+
+## Quota dimensions
+
+Quota dimensions console control-plane operations.
+
+| Method | Path | Scope | Resource | Summary |
+| --- | --- | --- | --- | --- |
+| GET | `/v1/quota-dimensions` | platform | quota_dimensions | List quota dimension definitions |
+
+## Tenant plan
+
+Tenant plan console control-plane operations.
+
+| Method | Path | Scope | Resource | Summary |
+| --- | --- | --- | --- | --- |
+| GET | `/v1/tenant/plan` | tenant | tenant_plan | Read the caller tenant current plan |
+
+## Console
+
+Console control-plane discovery.
+
+| Method | Path | Scope | Resource | Summary |
+| --- | --- | --- | --- | --- |
+| GET | `/v1/console/session` | platform | console | Read the verified console session |
+
+## Async operation query
+
+Async operation query control-plane discovery.
+
+| Method | Path | Scope | Resource | Summary |
+| --- | --- | --- | --- | --- |
+| POST | `/v1/async-operation-query` | tenant | async_operation_query | Query asynchronous operations, logs or results |

@@ -1,0 +1,272 @@
+{
+  "issue": 1095,
+  "inventory_note": "Only explicit issue mappings are attributed. Candidate indices 30, 31, 143, 144, 119, 193, 194, 121 and 196 remain unassigned; their routes carry null plus source evidence. The inventory itself was not supplied.",
+  "entries": [
+    {
+      "id": "M1",
+      "inventory_index": 76,
+      "method": "GET",
+      "path": "/v1/plans",
+      "source": "apps/control-plane/routes.mjs:17",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "M2",
+      "inventory_index": 169,
+      "method": "POST",
+      "path": "/v1/plans",
+      "source": "apps/control-plane/routes.mjs:19",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "M3",
+      "inventory_index": 170,
+      "method": "POST",
+      "path": "/v1/plans/{planId}/lifecycle",
+      "source": "apps/control-plane/routes.mjs:21",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "M4",
+      "inventory_index": 205,
+      "method": "PUT",
+      "path": "/v1/plans/{planId}",
+      "source": "apps/control-plane/route-map.runtime.json:60",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "M5",
+      "inventory_index": 4,
+      "method": "DELETE",
+      "path": "/v1/plans/{planId}",
+      "source": "apps/control-plane/routes.mjs:23",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "M6",
+      "inventory_index": 92,
+      "method": "GET",
+      "path": "/v1/quota-dimensions",
+      "source": "apps/control-plane/routes.mjs:29",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "M7",
+      "inventory_index": 99,
+      "method": "GET",
+      "path": "/v1/tenant/plan",
+      "source": "apps/control-plane/route-map.runtime.json:144",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "M8",
+      "inventory_index": 108,
+      "method": "GET",
+      "path": "/v1/tenants/{tenantId}/plan",
+      "source": "apps/control-plane/route-map.runtime.json:134",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "M9",
+      "inventory_index": 186,
+      "method": "POST",
+      "path": "/v1/tenants/{tenantId}/plan",
+      "source": "apps/control-plane/route-map.runtime.json:123",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-10",
+      "inventory_index": 105,
+      "method": "GET",
+      "path": "/v1/tenants/{tenantId}/auth-config",
+      "source": "apps/control-plane/routes.mjs:81",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-11",
+      "inventory_index": 211,
+      "method": "PUT",
+      "path": "/v1/tenants/{tenantId}/auth-config",
+      "source": "apps/control-plane/routes.mjs:82",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-12",
+      "inventory_index": null,
+      "method": "PUT",
+      "path": "/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}",
+      "source": "apps/control-plane/routes.mjs:83",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-13",
+      "inventory_index": null,
+      "method": "DELETE",
+      "path": "/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}",
+      "source": "apps/control-plane/routes.mjs:84",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-14",
+      "inventory_index": null,
+      "method": "GET",
+      "path": "/v1/events/workspaces/{workspaceId}/topics",
+      "source": "apps/control-plane/routes.mjs:335",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-15",
+      "inventory_index": null,
+      "method": "POST",
+      "path": "/v1/events/workspaces/{workspaceId}/topics",
+      "source": "apps/control-plane/routes.mjs:336",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-16",
+      "inventory_index": null,
+      "method": "POST",
+      "path": "/v1/events/workspaces/{workspaceId}/topics/{topic}/publish",
+      "source": "apps/control-plane/routes.mjs:337",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-17",
+      "inventory_index": null,
+      "method": "GET",
+      "path": "/v1/events/workspaces/{workspaceId}/topics/{topic}/messages",
+      "source": "apps/control-plane/routes.mjs:338",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-18",
+      "inventory_index": null,
+      "method": "POST",
+      "path": "/v1/workspaces/{workspaceId}/database",
+      "source": "apps/control-plane/routes.mjs:156",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-19",
+      "inventory_index": null,
+      "method": "GET",
+      "path": "/v1/workspaces/{workspaceId}/database",
+      "source": "apps/control-plane/routes.mjs:157",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-20",
+      "inventory_index": null,
+      "method": "POST",
+      "path": "/v1/workspaces/{workspaceId}/database/credential-rotations",
+      "source": "apps/control-plane/routes.mjs:159",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-21",
+      "inventory_index": null,
+      "method": "POST",
+      "path": "/v1/workspaces/{workspaceId}/functions",
+      "source": "apps/control-plane/routes.mjs:160",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-22",
+      "inventory_index": null,
+      "method": "GET",
+      "path": "/v1/workspaces/{workspaceId}/functions",
+      "source": "apps/control-plane/routes.mjs:161",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-23",
+      "inventory_index": 23,
+      "method": "GET",
+      "path": "/v1/console/session",
+      "source": "apps/control-plane/routes.mjs:55",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-24",
+      "inventory_index": 187,
+      "method": "POST",
+      "path": "/v1/tenants/{tenantId}/users",
+      "source": "apps/control-plane/routes.mjs:67",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-25",
+      "inventory_index": 123,
+      "method": "GET",
+      "path": "/v1/workspaces/{workspaceId}/realtime",
+      "source": "apps/control-plane/routes.mjs:96",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-26",
+      "inventory_index": 62,
+      "method": "GET",
+      "path": "/v1/metrics/tenants/{tenantId}/series",
+      "source": "apps/control-plane/routes.mjs:209",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-27",
+      "inventory_index": 182,
+      "method": "POST",
+      "path": "/v1/storage/workspaces/{workspaceId}/buckets",
+      "source": "apps/control-plane/routes.mjs:258",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-28",
+      "inventory_index": 136,
+      "method": "POST",
+      "path": "/v1/async-operation-query",
+      "source": "apps/control-plane/route-map.runtime.json:684",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-29",
+      "inventory_index": null,
+      "method": "POST",
+      "path": "/v1/tenants/{tenantId}/workspaces",
+      "source": "apps/control-plane/routes.mjs:87",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-30",
+      "inventory_index": null,
+      "method": "GET",
+      "path": "/v1/tenants/{tenantId}/workspaces",
+      "source": "apps/control-plane/routes.mjs:88",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-31",
+      "inventory_index": null,
+      "method": "POST",
+      "path": "/v1/workspaces/{workspaceId}/databases",
+      "source": "apps/control-plane/routes.mjs:251",
+      "disposition": "PUBLISH"
+    },
+    {
+      "id": "endpoint-32",
+      "inventory_index": 229,
+      "method": "UNKNOWN",
+      "path": null,
+      "source": null,
+      "disposition": "EXCLUDE",
+      "reason": "Inventory reports UNKNOWN method and provides no identifiable path or handler; no schema or route identity can be inferred."
+    },
+    {
+      "id": "endpoint-33",
+      "inventory_index": 230,
+      "method": "UNKNOWN",
+      "path": null,
+      "source": null,
+      "disposition": "EXCLUDE",
+      "reason": "Inventory reports UNKNOWN method and provides no identifiable path or handler; no schema or route identity can be inferred."
+    }
+  ]
+}

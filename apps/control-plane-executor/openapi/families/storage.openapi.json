@@ -315,6 +315,68 @@
         ],
         "type": "object"
       },
+      "ConsoleStorageBucketCreated": {
+        "properties": {
+          "bucket": {
+            "properties": {
+              "bucketName": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              },
+              "resourceId": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "tenantId": {
+                "type": "string"
+              },
+              "workspaceId": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "record": {
+            "type": "object"
+          },
+          "storageCredential": {
+            "properties": {
+              "accessKey": {
+                "type": "string"
+              },
+              "actions": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "bucket": {
+                "type": "string"
+              },
+              "identityName": {
+                "type": "string"
+              },
+              "secretKey": {
+                "type": "string"
+              }
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "bucket",
+          "record",
+          "storageCredential"
+        ],
+        "type": "object"
+      },
       "DeploymentAuditEntry": {
         "allOf": [
           {
@@ -5421,6 +5483,165 @@
         "x-tenant-binding": "required",
         "x-visibility": "public",
         "x-workspace-binding": "required"
+      },
+      "post": {
+        "description": "Requires verified bucket.admin authority for an owned workspace. Bucket count admission precedes backend creation. A one-time credential scoped to this bucket may be returned.",
+        "operationId": "createWorkspaceStorageBucket",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleStorageBucketCreated"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected oversized request body."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a workspace storage bucket",
+        "tags": [
+          "Storage"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin",
+            "internal",
+            "tenant_owner",
+            "tenant_admin",
+            "workspace_owner",
+            "workspace_admin"
+          ]
+        },
+        "x-audiences": [
+          "superadmin",
+          "internal",
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin"
+        ],
+        "x-contract-source": "unified",
+        "x-family": "storage",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "storage",
+        "x-scope": "workspace",
+        "x-visibility": "public"
       }
     },
     "/v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports": {

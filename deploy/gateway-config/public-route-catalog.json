@@ -495,5 +495,160 @@
     "tenantBinding": "required",
     "visibility": "public",
     "workspaceBinding": "required"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/plans",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/plans",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/plans/{planId}/lifecycle",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/plans/{planId}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/plans/{planId}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/quota-dimensions",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/tenant/plan",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/tenants/{tenantId}/plan",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/tenants/{tenantId}/plan",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/tenants/{tenantId}/auth-config",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/tenants/{tenantId}/auth-config",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/events/workspaces/{workspaceId}/topics",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/events/workspaces/{workspaceId}/topics",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/events/workspaces/{workspaceId}/topics/{topic}/publish",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/events/workspaces/{workspaceId}/topics/{topic}/messages",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/workspaces/{workspaceId}/database",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/database",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/workspaces/{workspaceId}/database/credential-rotations",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/workspaces/{workspaceId}/functions",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/functions",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/console/session",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/tenants/{tenantId}/users",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{workspaceId}/realtime",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/metrics/tenants/{tenantId}/series",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/storage/workspaces/{workspaceId}/buckets",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/async-operation-query",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/tenants/{tenantId}/workspaces",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/tenants/{tenantId}/workspaces",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/workspaces/{workspaceId}/databases",
+    "privilege_domain": "structural_admin"
   }
 ]

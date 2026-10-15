@@ -260,6 +260,71 @@ spec:
         - X-Actor-Roles
       qosProfile: platform_control
       requestValidationProfile: platform_control
+    - id: plans
+      pathPrefix: /v1/plans
+      upstreamService: control_api
+      routeClass: control
+      authMode: bearer_oidc
+      discoveryEnabled: false
+      corsProfile: product_api
+      allowAnonymousOptions: true
+      tenantBinding: none
+      workspaceBinding: none
+      propagatedHeaders: *a1
+      qosProfile: platform_control
+      requestValidationProfile: platform_control
+    - id: quota-dimensions
+      pathPrefix: /v1/quota-dimensions
+      upstreamService: control_api
+      routeClass: control
+      authMode: bearer_oidc
+      discoveryEnabled: false
+      corsProfile: product_api
+      allowAnonymousOptions: true
+      tenantBinding: none
+      workspaceBinding: none
+      propagatedHeaders: *a1
+      qosProfile: platform_control
+      requestValidationProfile: platform_control
+    - id: tenant-plan
+      pathPrefix: /v1/tenant
+      upstreamService: control_api
+      routeClass: control
+      authMode: bearer_oidc
+      discoveryEnabled: false
+      corsProfile: product_api
+      allowAnonymousOptions: true
+      tenantBinding: required
+      workspaceBinding: none
+      propagatedHeaders: *a1
+      qosProfile: tenant_control
+      requestValidationProfile: tenant_control
+    - id: console
+      pathPrefix: /v1/console
+      upstreamService: control_api
+      routeClass: control
+      authMode: bearer_oidc
+      discoveryEnabled: false
+      corsProfile: product_api
+      allowAnonymousOptions: true
+      tenantBinding: none
+      workspaceBinding: none
+      propagatedHeaders: *a1
+      qosProfile: platform_control
+      requestValidationProfile: platform_control
+    - id: async-operation-query
+      pathPrefix: /v1/async-operation-query
+      upstreamService: control_api
+      routeClass: control
+      authMode: bearer_oidc
+      discoveryEnabled: false
+      corsProfile: product_api
+      allowAnonymousOptions: true
+      tenantBinding: required
+      workspaceBinding: none
+      propagatedHeaders: *a1
+      qosProfile: tenant_control
+      requestValidationProfile: tenant_control
     - id: tenants
       pathPrefix: /v1/tenants
       upstreamService: control_api

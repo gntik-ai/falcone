@@ -18,9 +18,18 @@ function reachableComponents(document) {
 
 // Family-specific components follow the maintained family source. Shared
 // components must agree with the unified source to avoid merge-order data loss.
+// Additions explicitly maintained in the unified contract survive composition
+// with an older generated family document, which must not overwrite them.
 export function mergePublicApiFamilySource(document, family, version, familyId) {
   const result = structuredClone(document);
   const before = reachableComponents(document);
+  const unified = reachableComponents({
+    ...document,
+    paths: Object.fromEntries(Object.entries(document.paths).map(([path, methods]) => [
+      path,
+      Object.fromEntries(Object.entries(methods).filter(([, operation]) => operation?.['x-contract-source'] === 'unified')),
+    ])),
+  });
   const shared = reachableComponents({
     ...document,
     paths: Object.fromEntries(Object.entries(document.paths).map(([path, methods]) => [
@@ -30,13 +39,14 @@ export function mergePublicApiFamilySource(document, family, version, familyId) 
   });
   for (const [path, methods] of Object.entries(result.paths)) {
     for (const [method, operation] of Object.entries(methods)) {
-      if (operation['x-family'] === familyId && !family.paths[path]?.[method]) delete methods[method];
+      if (operation['x-family'] === familyId && operation['x-contract-source'] !== 'unified' && !family.paths[path]?.[method]) delete methods[method];
     }
     if (Object.keys(methods).length === 0) delete result.paths[path];
   }
   for (const [path, methods] of Object.entries(family.paths)) {
     result.paths[path] ??= {};
     for (const [method, operation] of Object.entries(methods)) {
+      if (result.paths[path][method]?.['x-contract-source'] === 'unified') continue;
       if (!isDeepStrictEqual(result.paths[path][method], operation)) {
         result.paths[path][method] = structuredClone(operation);
       }
@@ -50,6 +60,7 @@ export function mergePublicApiFamilySource(document, family, version, familyId) 
       if (section === 'parameters' && name === 'IdempotencyKey' && document.components?.parameters?.IdempotencyKey) continue;
       if (!isDeepStrictEqual(result.components[section][name], component)) {
         const ref = `#/components/${section}/${name}`;
+        if (unified.has(ref) && !shared.has(ref)) continue;
         if (shared.has(ref)) {
           throw new Error(`Shared component conflict in ${familyId}: ${ref}. Synchronize the unified contract and maintained family sources before generation.`);
         }
