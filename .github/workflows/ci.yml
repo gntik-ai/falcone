@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: 'd3955af8dcaa6dcfdc51917fe48345a3be0772b0'
+  FALCONE_CHARTS_REF: 'd863a0e0af49d7789c12a3df9ca4ef342079076d'
 
 jobs:
   quality:
