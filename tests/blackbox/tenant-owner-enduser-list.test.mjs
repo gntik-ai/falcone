@@ -36,6 +36,7 @@ function fakeKc() {
   return {
     calls,
     listUsers: async (realm, opts) => { calls.push(['listUsers', realm, opts?.max]); return [{ id: 'eu-1', username: 'alice', email: 'a@x.io', enabled: true }]; },
+    countUsers: async (realm) => { calls.push(['countUsers', realm]); return 1; },
     listUserRealmRoles: async () => [{ name: 'app_user' }],
   };
 }
