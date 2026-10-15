@@ -240,6 +240,15 @@ importers:
       '@xyflow/react':
         specifier: 12.11.0
         version: 12.11.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      i18next:
+        specifier: 25.0.1
+        version: 25.0.1(typescript@5.9.3)
+      i18next-icu:
+        specifier: 2.3.0
+        version: 2.3.0(intl-messageformat@10.7.16)
+      intl-messageformat:
+        specifier: 10.7.16
+        version: 10.7.16
       lucide-react:
         specifier: 0.400.0
         version: 0.400.0(react@19.3.0)
@@ -255,6 +264,9 @@ importers:
       react-dom:
         specifier: ^19.2.0
         version: 19.3.0(react@19.3.0)
+      react-i18next:
+        specifier: 15.5.1
+        version: 15.5.1(i18next@25.0.1(typescript@5.9.3))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)
       react-router-dom:
         specifier: ^6.30.1
         version: 6.30.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -1217,6 +1229,21 @@ packages:
 
   '@fontsource/geist-sans@5.2.5':
     resolution: {integrity: sha512-anllOHyJbElRs9fV15TeDRqAeb1IKm4bSknPl6ZMoyPTx1BBy7logudcUwpNjmQLkzn4Q0JGQLRCUKJYoyST6A==}
+
+  '@formatjs/ecma402-abstract@2.3.4':
+    resolution: {integrity: sha512-qrycXDeaORzIqNhBOx0btnhpD1c+/qFIHAN9znofuMJX6QBwtbrmlpWfD4oiUUD2vJUOIYFA/gYtg2KAMGG7sA==}
+
+  '@formatjs/fast-memoize@2.2.7':
+    resolution: {integrity: sha512-Yabmi9nSvyOMrlSeGGWDiH7rf3a7sIwplbvo/dlz9WCIjzIQAfy1RMf4S0X3yG724n5Ghu2GmEl5NJIV6O9sZQ==}
+
+  '@formatjs/icu-messageformat-parser@2.11.2':
+    resolution: {integrity: sha512-AfiMi5NOSo2TQImsYAg8UYddsNJ/vUEv/HaNqiFjnI3ZFfWihUtD5QtuX6kHl8+H+d3qvnE/3HZrfzgdWpsLNA==}
+
+  '@formatjs/icu-skeleton-parser@1.8.14':
+    resolution: {integrity: sha512-i4q4V4qslThK4Ig8SxyD76cp3+QJ3sAqr7f6q9VVfeGtxG9OhiAk3y9XF6Q41OymsKzsGQ6OQQoJNY4/lI8TcQ==}
+
+  '@formatjs/intl-localematcher@0.6.1':
+    resolution: {integrity: sha512-ePEgLgVCqi2BBFnTMWPfIghu6FkbZnnBVhO2sSxvLfrdFw7wCHAHiDoM2h4NRgjbaY7+B7HgOLZGkK187pZTZg==}
 
   '@gntik-ai/blocks@0.5.0':
     resolution: {integrity: sha512-U82KxZ/pch7DPEjHdCnJijTJaTcCt7Qmob47xskked00tT2dI63A3EjQHdfMCXpQIfPGqDY/NaU/pRf51nlK2Q==}
@@ -3230,6 +3257,9 @@ packages:
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
 
+  html-parse-stringify@3.1.0:
+    resolution: {integrity: sha512-E0oAXcELOtsXe+BmpJ2EZyedbldPpriV5vICzEuo6xjC/D1lDukOI7KrpfQGF2Qc4wWEy0nk3bFORS2K5ZAhFQ==}
+
   html-url-attributes@3.0.1:
     resolution: {integrity: sha512-ol6UPyBWqsrO6EJySPz2O7ZSr856WDrEzM5zMqp+FJJLGMW35cLYmmZnl0vztAZxRUoNZJFTCohfjuIJ8I4QBQ==}
 
@@ -3252,6 +3282,19 @@ packages:
     resolution: {integrity: sha512-Y93lCzHYgGWdrJ66yIktxiaGULYc6oGiABxhcO5AufBeOyoIdZF7bIfLaOrbM0iGIOXQQgxxRrFEnb+Y6w1n4A==}
     engines: {node: '>=10.18'}
 
+  i18next-icu@2.3.0:
+    resolution: {integrity: sha512-x+j7kd5nDJCfbU53uwsMfXD7ALPu5uv0bqjAMQ5nVvXRoj1L7gkmswKtM3XDWYo4YUHf1jznlhSdPyy0xEwU+Q==}
+    peerDependencies:
+      intl-messageformat: ^10.3.3
+
+  i18next@25.0.1:
+    resolution: {integrity: sha512-8S8PyZbrymJZn3DaN70/34JYWNhsqrU6yA4MuzcygJBv+41dgNMocEA8h+kV1P7MCc1ll03lOTOIXE7mpNCicw==}
+    peerDependencies:
+      typescript: ^5
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
     engines: {node: '>=0.10.0'}
@@ -3273,6 +3316,9 @@ packages:
   internmap@2.0.3:
     resolution: {integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==}
     engines: {node: '>=12'}
+
+  intl-messageformat@10.7.16:
+    resolution: {integrity: sha512-UmdmHUmp5CIKKjSoE10la5yfU+AYJAaiYLsodbjL4lji83JNvgOQUjGaGhGrpFCb0Uh7sl7qfP1IyILa8Z40ug==}
 
   ip-address@10.4.0:
     resolution: {integrity: sha512-oSK96Grm3aP6OrS263xVxbNDGVL7rzBtYdpGqlDG8iQdoenDoTs/nkki+DflYbAEE8Xl6o5YxhxlrKvI3nqKXQ==}
@@ -4169,6 +4215,22 @@ packages:
     peerDependencies:
       react: ^19.3.0
 
+  react-i18next@15.5.1:
+    resolution: {integrity: sha512-C8RZ7N7H0L+flitiX6ASjq9p5puVJU1Z8VyL3OgM/QOMRf40BMZX+5TkpxzZVcTmOLPX5zlti4InEX5pFyiVeA==}
+    peerDependencies:
+      i18next: '>= 23.2.3'
+      react: '>= 16.8.0'
+      react-dom: '*'
+      react-native: '*'
+      typescript: ^5
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+      react-native:
+        optional: true
+      typescript:
+        optional: true
+
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
 
@@ -4827,6 +4889,10 @@ packages:
         optional: true
       jsdom:
         optional: true
+
+  void-elements@3.1.0:
+    resolution: {integrity: sha512-Dhxzh5HZuiHQhbvTW9AMetFfBHDMYpo23Uo9btPXgdYP+3T5S+p+jgNy7spra+veYhBP2dCSgxR/i2Y02h5/6w==}
+    engines: {node: '>=0.10.0'}
 
   vscode-jsonrpc@9.0.0:
     resolution: {integrity: sha512-+VvMmQPJhtvJ+8O+zu2JKIRiLxXF8NW7krWgyMGeOHrp4Cn23T5hc0v2LknNeopDOB70wghHAds7mKtcZ0I4Sg==}
@@ -5924,6 +5990,32 @@ snapshots:
   '@fontsource/geist-mono@5.2.5': {}
 
   '@fontsource/geist-sans@5.2.5': {}
+
+  '@formatjs/ecma402-abstract@2.3.4':
+    dependencies:
+      '@formatjs/fast-memoize': 2.2.7
+      '@formatjs/intl-localematcher': 0.6.1
+      decimal.js: 10.6.0
+      tslib: 2.8.1
+
+  '@formatjs/fast-memoize@2.2.7':
+    dependencies:
+      tslib: 2.8.1
+
+  '@formatjs/icu-messageformat-parser@2.11.2':
+    dependencies:
+      '@formatjs/ecma402-abstract': 2.3.4
+      '@formatjs/icu-skeleton-parser': 1.8.14
+      tslib: 2.8.1
+
+  '@formatjs/icu-skeleton-parser@1.8.14':
+    dependencies:
+      '@formatjs/ecma402-abstract': 2.3.4
+      tslib: 2.8.1
+
+  '@formatjs/intl-localematcher@0.6.1':
+    dependencies:
+      tslib: 2.8.1
 
   '@gntik-ai/blocks@0.5.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)':
     dependencies:
@@ -8236,6 +8328,10 @@ snapshots:
 
   html-escaper@2.0.2: {}
 
+  html-parse-stringify@3.1.0:
+    dependencies:
+      void-elements: 3.1.0
+
   html-url-attributes@3.0.1: {}
 
   html-void-elements@3.0.0: {}
@@ -8263,6 +8359,16 @@ snapshots:
 
   hyperdyperid@1.2.0: {}
 
+  i18next-icu@2.3.0(intl-messageformat@10.7.16):
+    dependencies:
+      intl-messageformat: 10.7.16
+
+  i18next@25.0.1(typescript@5.9.3):
+    dependencies:
+      '@babel/runtime': 7.29.7
+    optionalDependencies:
+      typescript: 5.9.3
+
   iconv-lite@0.6.3:
     dependencies:
       safer-buffer: 2.1.2
@@ -8276,6 +8382,13 @@ snapshots:
   inline-style-parser@0.2.7: {}
 
   internmap@2.0.3: {}
+
+  intl-messageformat@10.7.16:
+    dependencies:
+      '@formatjs/ecma402-abstract': 2.3.4
+      '@formatjs/fast-memoize': 2.2.7
+      '@formatjs/icu-messageformat-parser': 2.11.2
+      tslib: 2.8.1
 
   ip-address@10.4.0:
     optional: true
@@ -9371,6 +9484,16 @@ snapshots:
       react: 19.3.0
       scheduler: 0.28.0
 
+  react-i18next@15.5.1(i18next@25.0.1(typescript@5.9.3))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3):
+    dependencies:
+      '@babel/runtime': 7.29.7
+      html-parse-stringify: 3.1.0
+      i18next: 25.0.1(typescript@5.9.3)
+      react: 19.3.0
+    optionalDependencies:
+      react-dom: 19.3.0(react@19.3.0)
+      typescript: 5.9.3
+
   react-is@17.0.2: {}
 
   react-markdown@10.1.0(@types/react@19.3.0)(react@19.3.0):
@@ -10220,6 +10343,8 @@ snapshots:
       jsdom: 25.0.1
     transitivePeerDependencies:
       - msw
+
+  void-elements@3.1.0: {}
 
   vscode-jsonrpc@9.0.0: {}
 
