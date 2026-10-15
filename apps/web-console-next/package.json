@@ -12,7 +12,11 @@
     "lint:colours": "node scripts/lint-colours.mjs",
     "validate:dist": "node scripts/validate-dist.mjs",
     "test:csp": "playwright test --config tests/csp/playwright.config.mjs",
-    "test:dist": "node --test tests/validate-dist.test.mjs"
+    "test:dist": "node --test tests/validate-dist.test.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "lint:i18n": "node scripts/lint-i18n.mjs",
+    "test:i18n": "node --test tests/check-i18n.test.mjs tests/lint-i18n.test.mjs",
+    "test:i18n-chunks": "node --test tests/i18n-chunks.test.mjs"
   },
   "dependencies": {
     "@fontsource/geist-mono": "5.2.5",

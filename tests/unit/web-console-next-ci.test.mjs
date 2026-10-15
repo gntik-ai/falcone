@@ -16,10 +16,20 @@ test('the next-console CI job checks the scaffold and legacy release commands wi
     'pnpm --filter @in-falcone/web-console-next typecheck',
     'pnpm --filter @in-falcone/web-console-next test',
     'pnpm --filter @in-falcone/web-console-next lint:colours',
+    'pnpm --filter @in-falcone/web-console-next check:i18n',
+    'pnpm --filter @in-falcone/web-console-next lint:i18n',
+    'pnpm --filter @in-falcone/web-console-next test:i18n',
     'node scripts/validate-gntik-ui-pin.mjs',
     'docker build -f apps/web-console/Dockerfile .',
   ]) assert.ok(commands.includes(command), `Missing CI check: ${command}`);
   assert.ok(commands.some((command) => command.includes('VITE_BASE_PATH=') && command.includes('/next/') && command.includes('web-console-next build')));
+  const build = job.steps.find((step) => step.name === 'Build the next console at both base paths');
+  assert.match(build.run, /web-console-next test:i18n-chunks/);
+  for (const command of ['check:i18n', 'lint:i18n', 'test:i18n']) {
+    const step = job.steps.find((step) => step.run === `pnpm --filter @in-falcone/web-console-next ${command}`);
+    assert.equal(step.if, undefined);
+    assert.equal(step['continue-on-error'], undefined);
+  }
 
   const release = YAML.parse(readFileSync('.github/workflows/release-images.yml', 'utf8'));
   const releaseSteps = Object.values(release.jobs).flatMap((job) => job.steps ?? []);

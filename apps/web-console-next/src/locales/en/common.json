@@ -1,0 +1,77 @@
+{
+  "shell": {
+    "console": "Console",
+    "about": "About",
+    "userMenu": "User menu"
+  },
+  "locale": {
+    "label": "Language",
+    "es": "Spanish",
+    "en": "English"
+  },
+  "placeholder": {
+    "body": "This page will be available soon."
+  },
+  "states": {
+    "loading": {
+      "title": "Loading",
+      "body": "Please wait."
+    },
+    "empty": {
+      "title": "No results",
+      "body": "There are no items to display."
+    },
+    "unauthorized": {
+      "title": "Sign in required",
+      "body": "Sign in to continue."
+    },
+    "forbidden": {
+      "title": "Access denied",
+      "body": "You do not have permission to view this page."
+    },
+    "notFound": {
+      "title": "Page not found",
+      "body": "The requested page could not be found."
+    },
+    "serverError": {
+      "title": "Server error",
+      "body": "The request could not be completed."
+    },
+    "network": {
+      "title": "Connection error",
+      "body": "Check your connection and try again."
+    }
+  },
+  "confirmations": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "title": "Do you want to continue?"
+  },
+  "pagination": {
+    "summary": "{count, plural, one {# item} other {# items}}",
+    "next": "Next",
+    "previous": "Previous",
+    "pageSize": "Items per page"
+  },
+  "filters": {
+    "label": "Filters",
+    "apply": "Apply",
+    "clear": "Clear",
+    "search": "Search"
+  },
+  "savedViews": {
+    "label": "Saved views",
+    "save": "Save view",
+    "delete": "Delete view"
+  },
+  "format": {
+    "number": "Number",
+    "date": "Date"
+  },
+  "navigation": {
+    "console": "Console",
+    "overview": "Overview",
+    "settings": "Settings",
+    "profile": "Profile"
+  }
+}

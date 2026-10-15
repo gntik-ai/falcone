@@ -71,3 +71,56 @@ bundled YAML worker, sends its bootstrap and language settings before Monaco's
 RPC messages, and leaves the shared Monaco API unchanged. The CSP harness checks
 actual YAML diagnostics and diff results, and rejects worker fallback warnings
 and uncaught page errors.
+
+## Internationalization (wave u0)
+
+Spanish (`es`) is the first-load default, even in an English browser. The header
+user menu and `/console/settings` share a native, labelled language select.
+English (`en`) is the other supported locale. `falcone-next-locale` in localStorage
+stores the preference; invalid or unavailable storage falls back safely to Spanish.
+Switching changes `<html lang>` and React copy without navigation. This preference
+is client-only; storing it on a user profile belongs to a later wave.
+
+`src/i18n/index.ts` initializes i18next/react-i18next with ICU and no HTTP backend.
+Common resources live in `src/locales/{es,en}/common.json`. Each lazy page imports
+its two local JSON files and registers its namespace through `placeholderPage`.
+The generic pending routes share the pendingPage chunk; migrated pages should get
+their own lazy module and namespace. Keep descriptive keys stable and use
+`useTranslation('namespace')` with `t('key')`, including all accessible labels.
+Do not import page resources into the entry or common module. `StatusPage` supplies
+loading, empty, unauthorized (401), forbidden (403), not-found (404), server-error
+(500) and network copy and localized live announcements for migrated routes.
+
+Use `src/i18n/format.ts` for Intl dates, numbers and relative times; it reads the
+active locale on every call. React consumers must subscribe with `useTranslation`
+so formatting re-renders on switches. Pass the active locale to kit Timestamp,
+Calendar and DatePicker when using their locale props in future page migrations.
+Pass kit label props explicitly; common provides pagination summaries (ICU plural),
+filter controls and saved-view fallbacks for lower-level compositions where kit
+controls have embedded English copy. The scaffold does not mount those controls.
+
+Additional checks:
+
+```sh
+pnpm check:i18n
+pnpm lint:i18n
+pnpm test:i18n
+pnpm build
+pnpm test:i18n-chunks
+```
+
+Run these from this package, or use the workspace filter. `check:i18n` accepts a
+locale root followed by source file/directory paths, defaulting to `src/locales`
+and `src`. It compares nested leaf keys in both directions and checks literal
+namespace declarations in lazyPage, placeholderPage and useTranslation calls.
+`lint:i18n` accepts file/directory arguments and parses JSX with the existing
+TypeScript toolchain. It rejects text nodes, literal text expressions and literal
+aria-label/title/placeholder attributes; class names, test IDs, comments and
+ordinary code strings are allowed. No ESLint or remote translation service is used.
+
+CI runs negative fixtures for both CLIs and checks the Vite manifest's static
+entry graph after each base-path build. The Vitest harness checks the shell and
+all seven statuses against explicit Spanish/English copy, including accessible
+labels and live regions. The existing CSP Playwright suite additionally checks
+switching and reload persistence with an English browser locale, corrupt storage,
+formatted samples and exclusively local requests at both base paths.

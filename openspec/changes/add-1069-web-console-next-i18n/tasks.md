@@ -1,0 +1,15 @@
+- [x] Continue on the assigned clean branch after platform dependency resolution.
+- [x] Write runtime, Intl, rendered locale and status harness tests before source.
+- [x] Add supported stored-locale initialization, ICU and translated common resources.
+- [x] Translate the shell and lazy placeholders, retaining Spanish copy and route paths.
+- [x] Add user-menu/settings locale controls and Intl formatting examples/helpers.
+- [x] Add public status UI with localized LiveAnnouncer messages.
+- [x] Write CLI fixtures, then implement key/namespace and JSX-literal checks.
+- [x] Write the CI assertion first, then add enforced checks and fixture suites.
+- [x] Add build manifest verification for route namespace isolation.
+- [x] Add browser locale-switch/reload/formatting scenarios to the CSP suite.
+- [x] Document the client-only preference and extension conventions.
+- [x] Run CLI negative/clean fixtures using the existing file-backed async subprocess pattern.
+- [x] Run typecheck, 37 Vitest assertions, colour/pin/CI checks and dist-validator fixtures.
+- [x] Build at / and /next/ and validate self-hosted assets and namespace chunk isolation.
+- [ ] Run Chromium CSP and locale suites in CI: sandbox listen on 127.0.0.1 reports EPERM.
