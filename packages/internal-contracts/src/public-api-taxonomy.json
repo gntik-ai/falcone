@@ -638,6 +638,105 @@
         "postgresql",
         "mongodb"
       ]
+    },
+    {
+      "id": "plans",
+      "title": "Plans",
+      "prefix": "/v1/plans",
+      "summary": "Plans console control-plane operations.",
+      "owning_service": "control_api",
+      "downstream_contracts": [
+        "control_api_command",
+        "audit_record"
+      ],
+      "resource_scopes": [
+        "platform"
+      ],
+      "audiences": [
+        "superadmin"
+      ],
+      "visibility": "public",
+      "apisix_route_class": "control"
+    },
+    {
+      "id": "quota-dimensions",
+      "title": "Quota dimensions",
+      "prefix": "/v1/quota-dimensions",
+      "summary": "Quota dimensions console control-plane operations.",
+      "owning_service": "control_api",
+      "downstream_contracts": [
+        "control_api_command",
+        "audit_record"
+      ],
+      "resource_scopes": [
+        "platform"
+      ],
+      "audiences": [
+        "superadmin"
+      ],
+      "visibility": "public",
+      "apisix_route_class": "control"
+    },
+    {
+      "id": "tenant-plan",
+      "title": "Tenant plan",
+      "prefix": "/v1/tenant",
+      "summary": "Tenant plan console control-plane operations.",
+      "owning_service": "control_api",
+      "downstream_contracts": [
+        "control_api_command",
+        "provisioning_request",
+        "audit_record"
+      ],
+      "resource_scopes": [
+        "tenant"
+      ],
+      "audiences": [
+        "tenant_owner",
+        "superadmin"
+      ],
+      "visibility": "public",
+      "apisix_route_class": "control"
+    },
+    {
+      "id": "console",
+      "title": "Console",
+      "prefix": "/v1/console",
+      "summary": "Console control-plane discovery.",
+      "owning_service": "control_api",
+      "downstream_contracts": [
+        "control_api_command",
+        "provisioning_request",
+        "audit_record"
+      ],
+      "resource_scopes": [
+        "platform"
+      ],
+      "audiences": [
+        "authenticated"
+      ],
+      "visibility": "public",
+      "apisix_route_class": "control"
+    },
+    {
+      "id": "async-operation-query",
+      "title": "Async operation query",
+      "prefix": "/v1/async-operation-query",
+      "summary": "Async operation query control-plane discovery.",
+      "owning_service": "control_api",
+      "downstream_contracts": [
+        "control_api_command",
+        "provisioning_request",
+        "audit_record"
+      ],
+      "resource_scopes": [
+        "tenant"
+      ],
+      "audiences": [
+        "authenticated"
+      ],
+      "visibility": "public",
+      "apisix_route_class": "control"
     }
   ],
   "resource_taxonomy": [

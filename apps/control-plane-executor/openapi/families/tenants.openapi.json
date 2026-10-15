@@ -246,6 +246,601 @@
         ],
         "type": "object"
       },
+      "ConsoleAuthConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "identityProviders": {
+            "items": {
+              "$ref": "#/components/schemas/ConsoleIdentityProviderView"
+            },
+            "type": "array"
+          },
+          "loginWithEmailAllowed": {
+            "type": "boolean"
+          },
+          "realm": {
+            "type": "string"
+          },
+          "registrationAllowed": {
+            "type": "boolean"
+          },
+          "rememberMe": {
+            "type": "boolean"
+          },
+          "resetPasswordAllowed": {
+            "type": "boolean"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "verifyEmail": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tenantId",
+          "realm",
+          "identityProviders"
+        ],
+        "type": "object"
+      },
+      "ConsoleAuthConfigWrite": {
+        "minProperties": 1,
+        "properties": {
+          "loginWithEmailAllowed": {
+            "type": "boolean"
+          },
+          "registrationAllowed": {
+            "type": "boolean"
+          },
+          "rememberMe": {
+            "type": "boolean"
+          },
+          "resetPasswordAllowed": {
+            "type": "boolean"
+          },
+          "verifyEmail": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ConsoleIdentityProviderDelete": {
+        "additionalProperties": false,
+        "properties": {
+          "alias": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "realm": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "realm",
+          "alias",
+          "deleted"
+        ],
+        "type": "object"
+      },
+      "ConsoleIdentityProviderResult": {
+        "additionalProperties": false,
+        "properties": {
+          "alias": {
+            "type": "string"
+          },
+          "identityProviders": {
+            "items": {
+              "$ref": "#/components/schemas/ConsoleIdentityProviderView"
+            },
+            "type": "array"
+          },
+          "providerId": {
+            "type": "string"
+          },
+          "realm": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "realm",
+          "alias",
+          "providerId",
+          "identityProviders"
+        ],
+        "type": "object"
+      },
+      "ConsoleIdentityProviderView": {
+        "additionalProperties": false,
+        "properties": {
+          "alias": {
+            "type": "string"
+          },
+          "callbackUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clientSecretSet": {
+            "type": "boolean"
+          },
+          "defaultScope": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "providerId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "alias",
+          "providerId",
+          "enabled",
+          "displayName",
+          "clientId",
+          "defaultScope",
+          "clientSecretSet",
+          "callbackUrl"
+        ],
+        "type": "object"
+      },
+      "ConsoleIdentityProviderWrite": {
+        "description": "Only built-in social provider templates are allowed. providerId defaults to the alias. New providers require non-empty config.clientId and config.clientSecret. Existing templates cannot be changed.",
+        "properties": {
+          "config": {
+            "additionalProperties": false,
+            "properties": {
+              "clientId": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              "clientSecret": {
+                "description": "Required with clientId on creation. Omit or leave empty to preserve the stored secret on update. Masked values are rejected; never returned.",
+                "maxLength": 4096,
+                "type": "string",
+                "writeOnly": true
+              },
+              "defaultScope": {
+                "maxLength": 4096,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "displayName": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "providerId": {
+            "enum": [
+              "google",
+              "github",
+              "microsoft",
+              "gitlab",
+              "facebook",
+              "linkedin-openid-connect"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConsolePlanAssign": {
+        "properties": {
+          "assignedBy": {
+            "type": "string"
+          },
+          "assignmentMetadata": {
+            "type": "object"
+          },
+          "changeReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "planId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "planId",
+          "assignedBy"
+        ],
+        "type": "object"
+      },
+      "ConsolePlanAssignment": {
+        "properties": {
+          "assignedBy": {
+            "type": "string"
+          },
+          "assignmentId": {
+            "type": "string"
+          },
+          "assignmentMetadata": {
+            "type": "object"
+          },
+          "effectiveFrom": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignmentId",
+          "tenantId",
+          "planId",
+          "effectiveFrom",
+          "assignedBy",
+          "assignmentMetadata"
+        ],
+        "type": "object"
+      },
+      "ConsolePlanAssignmentResult": {
+        "properties": {
+          "assignmentId": {
+            "type": "string"
+          },
+          "changeDirection": {
+            "type": "string"
+          },
+          "effectiveFrom": {
+            "type": "string"
+          },
+          "historyEntryId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "overLimitDimensionCount": {
+            "type": "integer"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "previousPlanId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "usageCollectionStatus": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignmentId",
+          "tenantId",
+          "planId",
+          "effectiveFrom",
+          "changeDirection",
+          "usageCollectionStatus",
+          "previousPlanId",
+          "historyEntryId",
+          "overLimitDimensionCount"
+        ],
+        "type": "object"
+      },
+      "ConsoleTenantPlan": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "noAssignment": {
+                "const": true
+              },
+              "tenantId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "noAssignment",
+              "tenantId"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "assignment": {
+                "$ref": "#/components/schemas/ConsolePlanAssignment"
+              },
+              "plan": {
+                "properties": {
+                  "capabilities": {
+                    "additionalProperties": {
+                      "type": "boolean"
+                    },
+                    "type": "object"
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "quotaDimensions": {
+                    "additionalProperties": {
+                      "type": "number"
+                    },
+                    "type": "object"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "draft",
+                      "active",
+                      "deprecated",
+                      "archived"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "slug",
+                  "displayName",
+                  "status",
+                  "capabilities",
+                  "quotaDimensions"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "assignment",
+              "plan"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ConsoleTenantUserCreated": {
+        "properties": {
+          "principalScope": {
+            "enum": [
+              "tenant",
+              "workspace"
+            ]
+          },
+          "realm": {
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "userId",
+          "username",
+          "realm",
+          "roles",
+          "workspaceId",
+          "principalScope"
+        ],
+        "type": "object"
+      },
+      "ConsoleTenantUserWrite": {
+        "anyOf": [
+          {
+            "required": [
+              "username"
+            ]
+          },
+          {
+            "required": [
+              "email"
+            ]
+          }
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "username": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConsoleWorkspaceCollection": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConsoleWorkspaceRecord"
+            },
+            "type": "array"
+          },
+          "page": {
+            "properties": {
+              "after": {
+                "type": "null"
+              },
+              "size": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "after",
+              "size"
+            ],
+            "type": "object"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "type": "object"
+      },
+      "ConsoleWorkspaceCreate": {
+        "anyOf": [
+          {
+            "required": [
+              "displayName"
+            ]
+          },
+          {
+            "required": [
+              "name"
+            ]
+          }
+        ],
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "environment": {
+            "enum": [
+              "dev",
+              "sandbox",
+              "staging",
+              "prod"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConsoleWorkspaceCreated": {
+        "properties": {
+          "database": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/ConsoleWorkspaceRecord"
+          }
+        },
+        "required": [
+          "workspace",
+          "database"
+        ],
+        "type": "object"
+      },
+      "ConsoleWorkspaceRecord": {
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "EffectiveCapabilityResolution": {
         "additionalProperties": false,
         "properties": {
@@ -4203,6 +4798,630 @@
         "x-visibility": "public"
       }
     },
+    "/v1/tenants/{tenantId}/auth-config": {
+      "get": {
+        "description": "Own-tenant owner/admin, or platform superadmin/internal. The tenant realm is resolved from the path and checked against the verified identity. Cross-tenant access returns FORBIDDEN.",
+        "operationId": "getTenantAuthConfig",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleAuthConfig"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read tenant login options and social providers",
+        "tags": [
+          "Tenants"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin",
+            "internal",
+            "tenant_owner",
+            "tenant_admin"
+          ]
+        },
+        "x-audiences": [
+          "superadmin",
+          "internal",
+          "tenant_owner",
+          "tenant_admin"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "tenants",
+        "x-scope": "tenant",
+        "x-visibility": "public"
+      },
+      "put": {
+        "description": "Own-tenant owner/admin, or platform superadmin/internal. The tenant realm is resolved from the path and checked against the verified identity. Cross-tenant access returns FORBIDDEN.",
+        "operationId": "setTenantAuthConfig",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleAuthConfigWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleAuthConfig"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected oversized request body."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update tenant login options",
+        "tags": [
+          "Tenants"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin",
+            "internal",
+            "tenant_owner",
+            "tenant_admin"
+          ]
+        },
+        "x-audiences": [
+          "superadmin",
+          "internal",
+          "tenant_owner",
+          "tenant_admin"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "tenants",
+        "x-scope": "tenant",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}": {
+      "delete": {
+        "description": "Own-tenant owner/admin, or platform superadmin/internal. Cross-tenant owners receive FORBIDDEN. Provider credentials are accepted only on writes and never appear in responses or audit records.",
+        "operationId": "deleteTenantIdentityProvider",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "in": "path",
+            "name": "alias",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$",
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleIdentityProviderDelete"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected oversized request body."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Keycloak administration failed; credential material is redacted."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a tenant social identity provider",
+        "tags": [
+          "Tenants"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin",
+            "internal",
+            "tenant_owner",
+            "tenant_admin"
+          ]
+        },
+        "x-audiences": [
+          "superadmin",
+          "internal",
+          "tenant_owner",
+          "tenant_admin"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "tenants",
+        "x-scope": "tenant",
+        "x-ui-inventory": {
+          "index": null,
+          "issue": 1095,
+          "parity": "Provider actions remain pending UI parity checks until the published contract is adopted.",
+          "source": "apps/web-console/src/services/authConfigApi.ts"
+        },
+        "x-visibility": "public"
+      },
+      "put": {
+        "description": "Own-tenant owner/admin, or platform superadmin/internal. Cross-tenant owners receive FORBIDDEN. Provider credentials are accepted only on writes and never appear in responses or audit records.",
+        "operationId": "upsertTenantIdentityProvider",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "in": "path",
+            "name": "alias",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$",
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "config": {
+                  "clientId": "placeholder-client-id"
+                },
+                "enabled": true,
+                "providerId": "github"
+              },
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleIdentityProviderWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleIdentityProviderResult"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected oversized request body."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Keycloak administration failed; credential material is redacted."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create or update a tenant social identity provider",
+        "tags": [
+          "Tenants"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin",
+            "internal",
+            "tenant_owner",
+            "tenant_admin"
+          ]
+        },
+        "x-audiences": [
+          "superadmin",
+          "internal",
+          "tenant_owner",
+          "tenant_admin"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "tenants",
+        "x-scope": "tenant",
+        "x-ui-inventory": {
+          "index": null,
+          "issue": 1095,
+          "parity": "Provider actions remain pending UI parity checks until the published contract is adopted.",
+          "source": "apps/web-console/src/services/authConfigApi.ts"
+        },
+        "x-visibility": "public"
+      }
+    },
     "/v1/tenants/{tenantId}/dashboard": {
       "get": {
         "operationId": "getTenantGovernanceDashboard",
@@ -6596,6 +7815,280 @@
         "x-visibility": "public"
       }
     },
+    "/v1/tenants/{tenantId}/plan": {
+      "get": {
+        "description": "Superadmin may read any tenant. A tenant_owner (including legacy tenant-owner) may read only their own tenant; cross-tenant reads return FORBIDDEN before querying the database.",
+        "operationId": "getTenantCurrentPlan",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleTenantPlan"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read a tenant current plan",
+        "tags": [
+          "Tenants"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin",
+            "tenant_owner"
+          ],
+          "legacyActorTypes": [
+            "tenant-owner"
+          ],
+          "superadminRequiresCallerTenant": false,
+          "tenantOwnerOwnTenantOnly": true,
+          "tenantResolution": "path"
+        },
+        "x-audiences": [
+          "superadmin",
+          "tenant_owner"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "tenants",
+        "x-scope": "tenant",
+        "x-tenant-binding": "required",
+        "x-visibility": "public",
+        "x-workspace-binding": "none"
+      },
+      "post": {
+        "operationId": "assignPlan",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsolePlanAssign"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsolePlanAssignmentResult"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected oversized request body."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Assign an active plan to a tenant",
+        "tags": [
+          "Tenants"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin"
+          ]
+        },
+        "x-audiences": [
+          "superadmin"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "tenants",
+        "x-scope": "tenant",
+        "x-visibility": "public"
+      }
+    },
     "/v1/tenants/{tenantId}/purge": {
       "post": {
         "operationId": "purgeTenant",
@@ -7195,6 +8688,156 @@
         "x-visibility": "public"
       }
     },
+    "/v1/tenants/{tenantId}/users": {
+      "post": {
+        "operationId": "createTenantUser",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleTenantUserWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleTenantUserCreated"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected oversized request body."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a user in a tenant realm",
+        "tags": [
+          "Tenants"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin",
+            "internal",
+            "tenant_owner",
+            "tenant_admin"
+          ]
+        },
+        "x-audiences": [
+          "superadmin",
+          "internal",
+          "tenant_owner",
+          "tenant_admin"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "tenants",
+        "x-scope": "tenant",
+        "x-visibility": "public"
+      }
+    },
     "/v1/tenants/{tenantId}/workflow-jobs/{jobRef}": {
       "get": {
         "operationId": "getTenantWorkflowJobStatus",
@@ -7390,6 +9033,281 @@
         "x-resource-type": "workflow_job",
         "x-scope": "tenant",
         "x-tenant-binding": "required",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/tenants/{tenantId}/workspaces": {
+      "get": {
+        "operationId": "listTenantWorkspaces",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleWorkspaceCollection"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List workspaces in a tenant",
+        "tags": [
+          "Tenants"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin",
+            "internal",
+            "tenant_owner",
+            "tenant_admin"
+          ]
+        },
+        "x-audiences": [
+          "superadmin",
+          "internal",
+          "tenant_owner",
+          "tenant_admin"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "tenants",
+        "x-scope": "tenant",
+        "x-visibility": "public"
+      },
+      "post": {
+        "operationId": "createTenantWorkspace",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleWorkspaceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleWorkspaceCreated"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected oversized request body."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a workspace in a tenant",
+        "tags": [
+          "Tenants"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin",
+            "internal",
+            "tenant_owner",
+            "tenant_admin"
+          ]
+        },
+        "x-audiences": [
+          "superadmin",
+          "internal",
+          "tenant_owner",
+          "tenant_admin"
+        ],
+        "x-family": "tenants",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "tenants",
+        "x-scope": "tenant",
         "x-visibility": "public"
       }
     }

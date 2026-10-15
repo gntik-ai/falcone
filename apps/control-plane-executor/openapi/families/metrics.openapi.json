@@ -874,6 +874,26 @@
         ],
         "type": "object"
       },
+      "ConsoleTenantMetricSeries": {
+        "properties": {
+          "metricKey": {
+            "const": "http_requests_per_second"
+          },
+          "points": {
+            "maxItems": 0,
+            "type": "array"
+          },
+          "source": {
+            "const": "tenant_scoped_unavailable"
+          }
+        },
+        "required": [
+          "metricKey",
+          "points",
+          "source"
+        ],
+        "type": "object"
+      },
       "ErrorDetail": {
         "additionalProperties": true,
         "properties": {
@@ -3040,6 +3060,158 @@
         "x-scope": "tenant",
         "x-tenant-binding": "required",
         "x-workspace-binding": "none"
+      }
+    },
+    "/v1/metrics/tenants/{tenantId}/series": {
+      "get": {
+        "description": "Own-tenant owner/admin, or trusted platform roles. The handler currently returns empty tenant-scoped points. Other metrics return 400 UNSUPPORTED_METRIC.",
+        "operationId": "getTenantMetricSeries",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "description": "Only http_requests_per_second is supported; metric takes precedence over metricKey.",
+            "in": "query",
+            "name": "metric",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only http_requests_per_second is supported; metric takes precedence over metricKey.",
+            "in": "query",
+            "name": "metricKey",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleTenantMetricSeries"
+                }
+              }
+            },
+            "description": "Resource returned."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: malformed or contextually inconsistent request."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN: caller lacks authority for the requested scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested entity was not found."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read a tenant metric series",
+        "tags": [
+          "Metrics"
+        ],
+        "x-actor-type-authorization": {
+          "allowedActorTypes": [
+            "superadmin",
+            "internal",
+            "tenant_owner",
+            "tenant_admin",
+            "platform_operator",
+            "platform_auditor",
+            "platform_admin"
+          ]
+        },
+        "x-audiences": [
+          "superadmin",
+          "internal",
+          "tenant_owner",
+          "tenant_admin",
+          "platform_operator",
+          "platform_auditor",
+          "platform_admin"
+        ],
+        "x-family": "metrics",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "metrics",
+        "x-scope": "tenant",
+        "x-visibility": "public"
       }
     },
     "/v1/metrics/tenants/{tenantId}/usage": {
