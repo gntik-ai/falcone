@@ -12,7 +12,11 @@
     "lint:colours": "node scripts/lint-colours.mjs",
     "validate:dist": "node scripts/validate-dist.mjs",
     "test:csp": "playwright test --config tests/csp/playwright.config.mjs",
-    "test:dist": "node --test tests/validate-dist.test.mjs"
+    "test:dist": "node --test tests/validate-dist.test.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "lint:i18n": "node scripts/lint-i18n.mjs",
+    "test:i18n": "node --test tests/check-i18n.test.mjs tests/lint-i18n.test.mjs",
+    "test:i18n-chunks": "node --test tests/i18n-chunks.test.mjs"
   },
   "dependencies": {
     "@fontsource/geist-mono": "5.2.5",
@@ -22,11 +26,15 @@
     "@gntik-ai/tokens": "0.2.1",
     "@gntik-ai/ui": "0.5.0",
     "@xyflow/react": "12.11.0",
+    "i18next": "25.0.1",
+    "i18next-icu": "2.3.0",
+    "intl-messageformat": "10.7.16",
     "lucide-react": "0.400.0",
     "monaco-editor": "0.54.0",
     "monaco-yaml": "5.5.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-i18next": "15.5.1",
     "react-router-dom": "^6.30.1"
   },
   "devDependencies": {

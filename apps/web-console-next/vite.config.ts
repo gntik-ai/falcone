@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
     },
     worker: { format: 'es' },
     build: {
+      manifest: true,
       rollupOptions: {
         input: {
           app: fileURLToPath(new URL('./index.html', import.meta.url)),

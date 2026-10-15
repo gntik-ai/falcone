@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '03bacde07bdddb092ebf3766b663913b893589c2'
+  FALCONE_CHARTS_REF: '7cc33194b0f09bef31ebd80933fde60db40a6bb2'
 
 jobs:
   quality:
@@ -364,6 +364,15 @@ jobs:
       - name: Enforce semantic colour tokens
         run: pnpm --filter @in-falcone/web-console-next lint:colours
 
+      - name: Check translation resource parity
+        run: pnpm --filter @in-falcone/web-console-next check:i18n
+
+      - name: Enforce translated console copy
+        run: pnpm --filter @in-falcone/web-console-next lint:i18n
+
+      - name: Test translation validation fixtures
+        run: pnpm --filter @in-falcone/web-console-next test:i18n
+
       - name: Validate exact public UI pins
         run: node scripts/validate-gntik-ui-pin.mjs
 
@@ -377,6 +386,7 @@ jobs:
         run: |
           for base in / /next/; do
             VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
+            pnpm --filter @in-falcone/web-console-next test:i18n-chunks
             BASE_PATH="$base" node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { readFileSync } from 'node:fs';

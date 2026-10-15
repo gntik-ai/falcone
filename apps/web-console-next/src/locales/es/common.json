@@ -1,0 +1,77 @@
+{
+  "shell": {
+    "console": "Consola",
+    "about": "Acerca de",
+    "userMenu": "Menú de usuario"
+  },
+  "locale": {
+    "label": "Idioma",
+    "es": "Español",
+    "en": "Inglés"
+  },
+  "placeholder": {
+    "body": "Esta página estará disponible próximamente."
+  },
+  "states": {
+    "loading": {
+      "title": "Cargando",
+      "body": "Espera un momento."
+    },
+    "empty": {
+      "title": "Sin resultados",
+      "body": "No hay elementos para mostrar."
+    },
+    "unauthorized": {
+      "title": "Acceso requerido",
+      "body": "Inicia sesión para continuar."
+    },
+    "forbidden": {
+      "title": "Acceso denegado",
+      "body": "No tienes permiso para ver esta página."
+    },
+    "notFound": {
+      "title": "Página no encontrada",
+      "body": "No se ha encontrado la página solicitada."
+    },
+    "serverError": {
+      "title": "Error del servidor",
+      "body": "No se pudo completar la solicitud."
+    },
+    "network": {
+      "title": "Error de conexión",
+      "body": "Comprueba tu conexión e inténtalo de nuevo."
+    }
+  },
+  "confirmations": {
+    "confirm": "Confirmar",
+    "cancel": "Cancelar",
+    "title": "¿Deseas continuar?"
+  },
+  "pagination": {
+    "summary": "{count, plural, one {# elemento} other {# elementos}}",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "pageSize": "Elementos por página"
+  },
+  "filters": {
+    "label": "Filtros",
+    "apply": "Aplicar",
+    "clear": "Limpiar",
+    "search": "Buscar"
+  },
+  "savedViews": {
+    "label": "Vistas guardadas",
+    "save": "Guardar vista",
+    "delete": "Eliminar vista"
+  },
+  "format": {
+    "number": "Número",
+    "date": "Fecha"
+  },
+  "navigation": {
+    "console": "Consola",
+    "overview": "Resumen",
+    "settings": "Configuración",
+    "profile": "Perfil"
+  }
+}

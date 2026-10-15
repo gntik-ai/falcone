@@ -24,9 +24,9 @@ test.each([
   ['/next/', '/next/console/overview', '/next'],
   ['/', '/console/overview', '/'],
   [undefined, '/console/overview', '/']
-])('the overview renders under base %s', (base, location, expectedBasename) => {
+])('the overview renders under base %s', async (base, location, expectedBasename) => {
   const basename = routerBasename(base)
   expect(basename).toBe(expectedBasename)
   render(<MemoryRouter basename={basename} initialEntries={[location]}><App /></MemoryRouter>)
-  expect(screen.getByRole('heading', { name: 'Resumen' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Resumen' })).toBeVisible()
 })
