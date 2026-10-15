@@ -23,7 +23,7 @@ export function assertPublication({ entries, seed, runtime, document, generated,
     }
     const key = routeKey(entry);
     for (const [name, routes] of Object.entries(sources)) {
-      if (entry.disposition === 'EXCLUDE' && !['openapi', 'gateway'].includes(name)) continue;
+      if (entry.disposition === 'EXCLUDE' && name === 'routing') continue;
       const present = routes.some(route => routeKey(route) === key);
       assert.equal(present, entry.disposition === 'PUBLISH', `${name}: ${entry.disposition} ${key}`);
     }

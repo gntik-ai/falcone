@@ -68,14 +68,14 @@ for (const boundary of ['openapi', 'generated', 'gateway']) {
     assert.throws(() => assertPublication(data), new RegExp(`${boundary}: PUBLISH GET /v1/plans`));
   });
 }
-for (const boundary of ['openapi', 'gateway']) {
+for (const boundary of ['openapi', 'generated', 'gateway']) {
   test(`publishing an EXCLUDE entry in ${boundary} fails the manifest cross-check`, () => {
     const data = snapshot();
     const entry = { id: 'excluded-fixture', inventory_index: null, method: 'GET', path: '/v1/excluded-fixture',
       disposition: 'EXCLUDE', reason: 'Synthetic excluded endpoint for the negative contract check.' };
     data.entries = [...entries, entry];
     if (boundary === 'openapi') data.document.paths[entry.path] = { [entry.method.toLowerCase()]: {} };
-    else data.gateway.push({ method: entry.method, path: entry.path });
+    else data[boundary].push({ method: entry.method, path: entry.path });
     assert.throws(() => assertPublication(data), new RegExp(`${boundary}: EXCLUDE`));
   });
 }
