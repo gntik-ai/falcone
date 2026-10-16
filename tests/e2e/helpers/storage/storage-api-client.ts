@@ -1,17 +1,18 @@
 /**
  * Storage API client for E2E specs (change: add-seaweedfs-storage-e2e).
  *
- * Wraps Playwright's `APIRequestContext` to call the five wired control-plane storage routes
- * directly, carrying the gateway-injected identity headers the control-plane reads (same pattern
- * as mcp-api-client / flows-api-client). No real JWT/Keycloak is needed: the control-plane
- * reads `x-tenant-id`, `x-workspace-id`, `x-auth-subject`, `x-pg-role` as trust headers.
+ * Wraps Playwright's `APIRequestContext` for bucket lifecycle and object routes. A Bearer JWT
+ * is authoritative on the standard build. Identity headers also support the gateway-bypass
+ * E2E profile; they do not replace authentication in the disposable fixture smoke.
  *
- * Wired routes asserted (apps/control-plane/routes.mjs:118-123):
+ * Public storage routes used by the specs:
  *   GET  /v1/storage/buckets
  *   POST /v1/storage/workspaces/{workspaceId}/buckets
+ *   DELETE /v1/storage/buckets/{bucketId}
  *   GET  /v1/storage/workspaces/{workspaceId}/usage
  *   GET  /v1/storage/buckets/{bucketId}/objects
  *   GET  /v1/storage/buckets/{bucketId}/objects/{objectKey}/metadata
+ *   PUT/GET/DELETE /v1/storage/buckets/{bucketId}/objects/{objectKey}
  *
  * Response shapes verified against apps/control-plane/storage-handlers.mjs:
  *   listBuckets       -> { items: BucketDescriptor[], page: { size: number } }
@@ -21,7 +22,7 @@
  *   objectMetadata    -> 200, { objectKey, bucketName, contentType, sizeBytes, etag, timestamps }
  */
 
-import type { APIRequestContext } from '@playwright/test'
+import type { APIRequestContext, APIResponse } from '@playwright/test'
 
 export interface TenantIdentity {
   tenantId: string
@@ -56,23 +57,32 @@ function identityHeaders(identity: TenantIdentity, bearerToken?: string | null):
 
 async function callApi<T = JsonBody>(
   request: APIRequestContext,
-  method: 'get' | 'post' | 'delete',
+  method: 'get' | 'post' | 'put' | 'delete',
   url: string,
   identity: TenantIdentity,
   bearerToken: string | null | undefined,
   data?: JsonBody,
 ): Promise<StorageApiResponse<T>> {
-  const res = await request[method](url, {
-    headers: identityHeaders(identity, bearerToken),
-    ...(data !== undefined ? { data } : {}),
-  })
+  let res: APIResponse
+  try {
+    res = await request[method](url, {
+      headers: identityHeaders(identity, bearerToken),
+      ...(data !== undefined ? { data } : {}),
+    })
+  } catch {
+    // Playwright request errors can carry the URL and auth headers in their call log.
+    throw new Error(`Storage API ${method.toUpperCase()} request failed`)
+  }
   let body: T
   try {
     body = (await res.json()) as T
   } catch {
     body = {} as T
   }
-  return { status: res.status(), body }
+  const status = res.status()
+  // APIRequestContext otherwise retains response bodies (including one-time credentials).
+  await res.dispose()
+  return { status, body }
 }
 
 export function createStorageApiClient(
@@ -93,13 +103,26 @@ export function createStorageApiClient(
     provisionBucket: (workspaceId: string, name: string) =>
       callApi(request, 'post', `${baseUrl}/v1/storage/workspaces/${enc(workspaceId)}/buckets`, identity, t, { name }),
 
+    deleteBucket: (bucketId: string) =>
+      callApi(request, 'delete', `${baseUrl}/v1/storage/buckets/${enc(bucketId)}`, identity, t),
+
     /** GET /v1/storage/workspaces/{workspaceId}/usage — per-workspace usage metrics */
     getWorkspaceUsage: (workspaceId: string) =>
       callApi(request, 'get', `${baseUrl}/v1/storage/workspaces/${enc(workspaceId)}/usage`, identity, t),
 
     /** GET /v1/storage/buckets/{bucketId}/objects — list objects in a bucket */
-    listObjects: (bucketId: string) =>
-      callApi(request, 'get', `${baseUrl}/v1/storage/buckets/${enc(bucketId)}/objects`, identity, t),
+    listObjects: (bucketId: string, after?: string) =>
+      callApi(request, 'get', `${baseUrl}/v1/storage/buckets/${enc(bucketId)}/objects${after ? `?page[after]=${enc(after)}` : ''}`, identity, t),
+
+    putObject: (bucketId: string, objectKey: string, bytes: Buffer) =>
+      callApi(request, 'put', `${baseUrl}/v1/storage/buckets/${enc(bucketId)}/objects/${enc(objectKey)}`, identity, t,
+        { contentBase64: bytes.toString('base64'), contentType: 'application/octet-stream' }),
+
+    getObject: (bucketId: string, objectKey: string) =>
+      callApi(request, 'get', `${baseUrl}/v1/storage/buckets/${enc(bucketId)}/objects/${enc(objectKey)}`, identity, t),
+
+    deleteObject: (bucketId: string, objectKey: string) =>
+      callApi(request, 'delete', `${baseUrl}/v1/storage/buckets/${enc(bucketId)}/objects/${enc(objectKey)}`, identity, t),
 
     /** GET /v1/storage/buckets/{bucketId}/objects/{objectKey}/metadata — object HEAD metadata */
     getObjectMetadata: (bucketId: string, objectKey: string) =>
