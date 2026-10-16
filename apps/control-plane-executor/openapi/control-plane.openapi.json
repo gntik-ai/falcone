@@ -62869,6 +62869,4302 @@
           "policy": "Authenticated verified actor within the owning tenant, or platform superadmin/internal."
         }
       }
+    },
+    "/v1/flows/workspaces/{workspaceId}/executions/{executionId}/events": {
+      "get": {
+        "operationId": "streamFlowExecutionEvents",
+        "summary": "Stream flow execution events",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Execution event stream; schema describes each SSE data frame.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowExecutionEventFrame"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}": {
+      "get": {
+        "operationId": "getFlow",
+        "summary": "Get flow",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful getFlow.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleFlowDefinition"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_definition",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      },
+      "patch": {
+        "operationId": "updateFlow",
+        "summary": "Update flow",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful updateFlow.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleFlowDefinition"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_definition",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": [],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "definition": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "definitionYaml": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions": {
+      "get": {
+        "operationId": "listFlowExecutions",
+        "summary": "List flow executions",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful listFlowExecutions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ConsoleFlowExecutionSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}": {
+      "get": {
+        "operationId": "getFlowExecution",
+        "summary": "Get flow execution",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful getFlowExecution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "executionId",
+                    "workflowId",
+                    "status",
+                    "version",
+                    "startedAt",
+                    "closedAt",
+                    "input",
+                    "result",
+                    "events"
+                  ],
+                  "properties": {
+                    "executionId": {
+                      "type": "string"
+                    },
+                    "workflowId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": [
+                        "integer",
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "startedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "closedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "input": {},
+                    "result": {},
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "nodeId",
+                          "eventId",
+                          "type"
+                        ],
+                        "properties": {
+                          "nodeId": {
+                            "type": "string"
+                          },
+                          "eventId": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "const": "ActivityScheduled"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/cancellations": {
+      "post": {
+        "operationId": "cancelFlowExecution",
+        "summary": "Cancel flow execution",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful cancelFlowExecution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "executionId",
+                    "workflowId",
+                    "status"
+                  ],
+                  "properties": {
+                    "executionId": {
+                      "type": "string"
+                    },
+                    "workflowId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "const": "Cancelling"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/retries": {
+      "post": {
+        "operationId": "retryFlowExecution",
+        "summary": "Retry flow execution",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful retryFlowExecution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "executionId",
+                    "workflowId",
+                    "runId",
+                    "version",
+                    "retriedFrom",
+                    "status"
+                  ],
+                  "properties": {
+                    "executionId": {
+                      "type": "string"
+                    },
+                    "workflowId": {
+                      "type": "string"
+                    },
+                    "runId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "retriedFrom": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "const": "Running"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/signals/{signalName}": {
+      "post": {
+        "operationId": "signalFlowExecution",
+        "summary": "Signal flow execution",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "signalName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful signalFlowExecution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "executionId",
+                    "workflowId",
+                    "signal",
+                    "delivered"
+                  ],
+                  "properties": {
+                    "executionId": {
+                      "type": "string"
+                    },
+                    "workflowId": {
+                      "type": "string"
+                    },
+                    "signal": {
+                      "type": "string"
+                    },
+                    "delivered": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": [],
+                "properties": {
+                  "approved": {
+                    "type": "boolean"
+                  },
+                  "actor": {
+                    "type": "string"
+                  },
+                  "nodeId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule": {
+      "get": {
+        "operationId": "getFlowSchedule",
+        "summary": "Get flow schedule",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful getFlowSchedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleFlowSchedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_schedule",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/pause": {
+      "post": {
+        "operationId": "pauseFlowSchedule",
+        "summary": "Pause flow schedule",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful pauseFlowSchedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleFlowSchedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_schedule",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/resume": {
+      "post": {
+        "operationId": "resumeFlowSchedule",
+        "summary": "Resume flow schedule",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful resumeFlowSchedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleFlowSchedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_schedule",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/trigger": {
+      "post": {
+        "operationId": "triggerFlowSchedule",
+        "summary": "Trigger flow schedule",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful triggerFlowSchedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "scheduleId"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "triggered"
+                    },
+                    "scheduleId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_schedule",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/validate": {
+      "post": {
+        "operationId": "validateFlow",
+        "summary": "Validate flow",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful validateFlow.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "valid"
+                  ],
+                  "properties": {
+                    "valid": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_definition",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/versions": {
+      "post": {
+        "operationId": "publishFlowVersion",
+        "summary": "Publish flow version",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful publishFlowVersion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "flowId",
+                    "version",
+                    "createdAt"
+                  ],
+                  "properties": {
+                    "flowId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "triggers": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_definition",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/schedules": {
+      "get": {
+        "operationId": "listFlowSchedules",
+        "summary": "List flow schedules",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful listFlowSchedules.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ConsoleFlowSchedule"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_schedule",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/task-types": {
+      "get": {
+        "operationId": "listFlowTaskTypes",
+        "summary": "List flow task types",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful listFlowTaskTypes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "label",
+                          "category",
+                          "inputSchema"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "inputSchema": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_task_type",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "temporal",
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/rows/bulk/insert": {
+      "post": {
+        "operationId": "bulkInsertPostgresRows",
+        "summary": "Bulk insert postgres rows",
+        "tags": [
+          "Postgres"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "databaseName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "schemaName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "tableName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful bulkInsertPostgresRows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostgresRowsBulkInsertResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "postgres",
+        "x-scope": "workspace",
+        "x-resource-type": "postgres_data_bulk",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostgresDataBulkInsertRequest"
+              }
+            }
+          }
+        },
+        "x-downstream-adapters": [
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/workspaces/{workspaceId}/api-keys": {
+      "get": {
+        "operationId": "listWorkspaceApiKeys",
+        "summary": "List workspace api keys",
+        "tags": [
+          "Workspaces"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful listWorkspaceApiKeys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "keyType",
+                          "prefix",
+                          "scopes",
+                          "status",
+                          "createdAt",
+                          "lastUsedAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "keyType": {
+                            "enum": [
+                              "anon",
+                              "service"
+                            ]
+                          },
+                          "prefix": {
+                            "type": "string"
+                          },
+                          "scopes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "status": {
+                            "enum": [
+                              "active",
+                              "revoked"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "lastUsedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-resource-type": "workspace_api_key",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "postgresql"
+        ]
+      },
+      "post": {
+        "operationId": "createWorkspaceApiKey",
+        "summary": "Create workspace api key",
+        "tags": [
+          "Workspaces"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful createWorkspaceApiKey.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceApiKeyIssued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-resource-type": "workspace_api_key",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {
+                  "keyType": {
+                    "type": "string",
+                    "enum": [
+                      "anon",
+                      "service"
+                    ],
+                    "default": "anon"
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "data:read",
+                        "data:write",
+                        "ddl:write"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-downstream-adapters": [
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/workspaces/{workspaceId}/api-keys/{keyId}": {
+      "delete": {
+        "operationId": "revokeWorkspaceApiKey",
+        "summary": "Revoke workspace api key",
+        "tags": [
+          "Workspaces"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "keyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful revokeWorkspaceApiKey.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "revoked"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "revoked": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-resource-type": "workspace_api_key",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "postgresql"
+        ]
+      }
+    },
+    "/v1/workspaces/{workspaceId}/api-keys/{keyId}/rotations": {
+      "post": {
+        "operationId": "rotateWorkspaceApiKey",
+        "summary": "Rotate workspace api key",
+        "tags": [
+          "Workspaces"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "keyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful rotateWorkspaceApiKey.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceApiKeyIssued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (INVALID_JSON, FLOW_DEFINITION_INVALID, INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE or PLAN_REJECTED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: missing or invalid credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: role or credential workspace mismatch; CROSS_TENANT_VIOLATION: workspace belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist (FLOW_NOT_FOUND, EXECUTION_NOT_FOUND, SCHEDULE_NOT_FOUND, KEY_NOT_FOUND or TABLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflicts with current resource state (EXECUTION_NOT_RUNNING or UNIQUE_VIOLATION).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Flow validation or signal validation failed (FLOW_VALIDATION_FAILED or UNKNOWN_SIGNAL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-resource-type": "workspace_api_key",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified",
+        "x-downstream-adapters": [
+          "postgresql"
+        ]
+      }
     }
   },
   "components": {
@@ -98806,6 +103102,379 @@
           "total"
         ],
         "type": "object"
+      },
+      "FlowExecutionEventFrame": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "id",
+              "nodeId",
+              "status",
+              "attemptNumber",
+              "startedAt",
+              "completedAt"
+            ],
+            "properties": {
+              "type": {
+                "const": "node-status"
+              },
+              "id": {
+                "type": "string"
+              },
+              "nodeId": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "scheduled",
+                  "started",
+                  "completed",
+                  "failed",
+                  "retrying",
+                  "skipped"
+                ]
+              },
+              "attemptNumber": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "startedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "completedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "error": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "id",
+              "nodeId",
+              "level",
+              "message",
+              "timestamp"
+            ],
+            "properties": {
+              "type": {
+                "const": "log-line"
+              },
+              "id": {
+                "type": "string"
+              },
+              "nodeId": {
+                "type": "string"
+              },
+              "level": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "status"
+            ],
+            "properties": {
+              "type": {
+                "const": "stream-end"
+              },
+              "status": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "ConsoleFlowDefinition": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flowId",
+          "name",
+          "status",
+          "dslApiVersion",
+          "definitionYaml",
+          "definition",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "flowId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "archived"
+            ]
+          },
+          "dslApiVersion": {
+            "type": "string"
+          },
+          "definitionYaml": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "definition": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ConsoleFlowExecutionSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "executionId",
+          "workflowId",
+          "runId",
+          "status",
+          "startedAt",
+          "closedAt"
+        ],
+        "properties": {
+          "executionId": {
+            "type": "string"
+          },
+          "workflowId": {
+            "type": "string"
+          },
+          "runId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "closedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ConsoleFlowSchedule": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scheduleId",
+          "flowId",
+          "workspaceId",
+          "paused",
+          "note",
+          "cron",
+          "nextActionTimes",
+          "recentActions"
+        ],
+        "properties": {
+          "scheduleId": {
+            "type": "string"
+          },
+          "flowId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cron": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextActionTimes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "recentActions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "scheduledAt",
+                "takenAt",
+                "workflowId"
+              ],
+              "properties": {
+                "scheduledAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "takenAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "workflowId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "PostgresRowsBulkInsertResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "affected",
+          "access"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "affected": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "access": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reason",
+              "rlsEnforced",
+              "rowPredicateRequired"
+            ],
+            "properties": {
+              "reason": {
+                "type": "string"
+              },
+              "rlsEnforced": {
+                "type": "boolean"
+              },
+              "rowPredicateRequired": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "WorkspaceApiKeyIssued": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "key",
+          "prefix",
+          "keyType",
+          "scopes",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "description": "Plaintext credential returned once at issuance or rotation."
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "keyType": {
+            "enum": [
+              "anon",
+              "service"
+            ]
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       }
     }
   }

@@ -1,0 +1,353 @@
+{
+  "provenance": {
+    "source": "engineering_control.engineering.ui_inventory",
+    "commit": "4d0968a8c87c8b6083ef389da0b5b35a3c152840",
+    "sha256": "ae4257b7a01f1c6acb362caa157ddb7476c6dabad87c927ace9e05a3955a6231"
+  },
+  "rows": [
+    {
+      "n": 1,
+      "method": "GET",
+      "path": "/v1/events/workspaces/{}/bridges/{}",
+      "console_file": "apps/web-console/src/pages/ConsoleKafkaPage.tsx",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "getEventBridge"
+    },
+    {
+      "n": 2,
+      "method": "GET",
+      "path": "/v1/flows/workspaces/{}/executions/{}/events",
+      "console_file": "apps/web-console/src/services/flowsMonitoringApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "streamFlowExecutionEvents"
+    },
+    {
+      "n": 3,
+      "method": "GET",
+      "path": "/v1/flows/workspaces/{}/flows",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "listFlows"
+    },
+    {
+      "n": 4,
+      "method": "POST",
+      "path": "/v1/flows/workspaces/{}/flows",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "createFlow"
+    },
+    {
+      "n": 5,
+      "method": "GET",
+      "path": "/v1/flows/workspaces/{}/flows/{}",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "getFlow"
+    },
+    {
+      "n": 6,
+      "method": "PATCH",
+      "path": "/v1/flows/workspaces/{}/flows/{}",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "updateFlow"
+    },
+    {
+      "n": 7,
+      "method": "GET",
+      "path": "/v1/flows/workspaces/{}/flows/{}/executions",
+      "console_file": "apps/web-console/src/services/flowsMonitoringApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "listFlowExecutions"
+    },
+    {
+      "n": 8,
+      "method": "GET",
+      "path": "/v1/flows/workspaces/{}/flows/{}/executions/{}",
+      "console_file": "apps/web-console/src/services/flowsMonitoringApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "getFlowExecution"
+    },
+    {
+      "n": 9,
+      "method": "POST",
+      "path": "/v1/flows/workspaces/{}/flows/{}/executions/{}/cancellations",
+      "console_file": "apps/web-console/src/services/flowsMonitoringApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "cancelFlowExecution"
+    },
+    {
+      "n": 10,
+      "method": "POST",
+      "path": "/v1/flows/workspaces/{}/flows/{}/executions/{}/retries",
+      "console_file": "apps/web-console/src/services/flowsMonitoringApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "retryFlowExecution"
+    },
+    {
+      "n": 11,
+      "method": "POST",
+      "path": "/v1/flows/workspaces/{}/flows/{}/executions/{}/signals/{}",
+      "console_file": "apps/web-console/src/services/flowsMonitoringApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "signalFlowExecution"
+    },
+    {
+      "n": 12,
+      "method": "GET",
+      "path": "/v1/flows/workspaces/{}/flows/{}/schedule",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "getFlowSchedule"
+    },
+    {
+      "n": 13,
+      "method": "POST",
+      "path": "/v1/flows/workspaces/{}/flows/{}/schedule/pause",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "pauseFlowSchedule"
+    },
+    {
+      "n": 14,
+      "method": "POST",
+      "path": "/v1/flows/workspaces/{}/flows/{}/schedule/resume",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "resumeFlowSchedule"
+    },
+    {
+      "n": 15,
+      "method": "POST",
+      "path": "/v1/flows/workspaces/{}/flows/{}/schedule/trigger",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "triggerFlowSchedule"
+    },
+    {
+      "n": 16,
+      "method": "POST",
+      "path": "/v1/flows/workspaces/{}/flows/{}/validate",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "validateFlow"
+    },
+    {
+      "n": 17,
+      "method": "POST",
+      "path": "/v1/flows/workspaces/{}/flows/{}/versions",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "publishFlowVersion"
+    },
+    {
+      "n": 18,
+      "method": "GET",
+      "path": "/v1/flows/workspaces/{}/schedules",
+      "console_file": "apps/web-console/src/services/flowsApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "listFlowSchedules"
+    },
+    {
+      "n": 19,
+      "method": "GET",
+      "path": "/v1/flows/workspaces/{}/task-types",
+      "console_file": "apps/web-console/src/services/taskTypeRegistryApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "listFlowTaskTypes"
+    },
+    {
+      "n": 20,
+      "method": "GET",
+      "path": "/v1/mcp/workspaces/{}/servers/{}",
+      "console_file": "apps/web-console/src/lib/mcp/mcp-api.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "getMcpServer"
+    },
+    {
+      "n": 21,
+      "method": "POST",
+      "path": "/v1/mcp/workspaces/{}/servers/{}/tool-calls",
+      "console_file": "apps/web-console/src/lib/mcp/mcp-api.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "invokeMcpServerTool"
+    },
+    {
+      "n": 22,
+      "method": "POST",
+      "path": "/v1/mongo/workspaces/{}/data/{}/collections/{}/documents",
+      "console_file": "apps/web-console/src/services/mongoApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "createMongoDataDocument"
+    },
+    {
+      "n": 23,
+      "method": "DELETE",
+      "path": "/v1/mongo/workspaces/{}/data/{}/collections/{}/documents/{}",
+      "console_file": "apps/web-console/src/services/mongoApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "deleteMongoDataDocument"
+    },
+    {
+      "n": 24,
+      "method": "GET",
+      "path": "/v1/mongo/workspaces/{}/data/{}/collections/{}/documents/{}",
+      "console_file": "apps/web-console/src/services/mongoApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "getMongoDataDocument"
+    },
+    {
+      "n": 25,
+      "method": "PATCH",
+      "path": "/v1/mongo/workspaces/{}/data/{}/collections/{}/documents/{}",
+      "console_file": "apps/web-console/src/services/mongoApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "updateMongoDataDocument"
+    },
+    {
+      "n": 26,
+      "method": "PUT",
+      "path": "/v1/mongo/workspaces/{}/data/{}/collections/{}/documents/{}",
+      "console_file": "apps/web-console/src/services/mongoApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "replaceMongoDataDocument"
+    },
+    {
+      "n": 27,
+      "method": "POST",
+      "path": "/v1/postgres/databases/{}/schemas",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "createPostgresSchema"
+    },
+    {
+      "n": 28,
+      "method": "PUT",
+      "path": "/v1/postgres/databases/{}/schemas/{}/materialized-views/{}",
+      "console_file": "apps/web-console/src/pages/ConsolePostgresPage.tsx",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "updatePostgresMaterializedView"
+    },
+    {
+      "n": 29,
+      "method": "POST",
+      "path": "/v1/postgres/databases/{}/schemas/{}/tables",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "createPostgresTable"
+    },
+    {
+      "n": 30,
+      "method": "PUT",
+      "path": "/v1/postgres/databases/{}/schemas/{}/tables/{}",
+      "console_file": "apps/web-console/src/pages/ConsolePostgresPage.tsx",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "updatePostgresTable"
+    },
+    {
+      "n": 31,
+      "method": "POST",
+      "path": "/v1/postgres/databases/{}/schemas/{}/tables/{}/columns",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "createPostgresColumn"
+    },
+    {
+      "n": 32,
+      "method": "POST",
+      "path": "/v1/postgres/databases/{}/schemas/{}/tables/{}/indexes",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "createPostgresIndex"
+    },
+    {
+      "n": 33,
+      "method": "PUT",
+      "path": "/v1/postgres/databases/{}/schemas/{}/views/{}",
+      "console_file": "apps/web-console/src/pages/ConsolePostgresPage.tsx",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "updatePostgresView"
+    },
+    {
+      "n": 34,
+      "method": "GET",
+      "path": "/v1/postgres/workspaces/{}/data/{}/schemas/{}/tables/{}/rows",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "listPostgresDataRows"
+    },
+    {
+      "n": 35,
+      "method": "POST",
+      "path": "/v1/postgres/workspaces/{}/data/{}/schemas/{}/tables/{}/rows",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "createPostgresDataRow"
+    },
+    {
+      "n": 36,
+      "method": "GET",
+      "path": "/v1/postgres/workspaces/{}/data/{}/schemas/{}/tables/{}/rows",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "listPostgresDataRows"
+    },
+    {
+      "n": 37,
+      "method": "POST",
+      "path": "/v1/postgres/workspaces/{}/data/{}/schemas/{}/tables/{}/rows/bulk/insert",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "bulkInsertPostgresRows"
+    },
+    {
+      "n": 38,
+      "method": "DELETE",
+      "path": "/v1/postgres/workspaces/{}/data/{}/schemas/{}/tables/{}/rows/by-primary-key",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "deletePostgresDataRowByPrimaryKey"
+    },
+    {
+      "n": 39,
+      "method": "PATCH",
+      "path": "/v1/postgres/workspaces/{}/data/{}/schemas/{}/tables/{}/rows/by-primary-key",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "ALREADY_PUBLISHED",
+      "operationId": "updatePostgresDataRowByPrimaryKey"
+    },
+    {
+      "n": 40,
+      "method": "GET",
+      "path": "/v1/workspaces/{}/api-keys",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "listWorkspaceApiKeys"
+    },
+    {
+      "n": 41,
+      "method": "POST",
+      "path": "/v1/workspaces/{}/api-keys",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "createWorkspaceApiKey"
+    },
+    {
+      "n": 42,
+      "method": "DELETE",
+      "path": "/v1/workspaces/{}/api-keys/{}",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "revokeWorkspaceApiKey"
+    },
+    {
+      "n": 43,
+      "method": "POST",
+      "path": "/v1/workspaces/{}/api-keys/{}/rotations",
+      "console_file": "apps/web-console/src/services/postgresApi.ts",
+      "disposition": "TO_PUBLISH",
+      "operationId": "rotateWorkspaceApiKey"
+    }
+  ]
+}

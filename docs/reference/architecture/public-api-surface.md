@@ -106,8 +106,24 @@ Workspace-scoped workflow definition, schedule, execution, event, and trigger ma
 
 | Method | Path | Scope | Resource | Summary |
 | --- | --- | --- | --- | --- |
+| GET | `/v1/flows/workspaces/{workspaceId}/executions/{executionId}/events` | workspace | flow_execution | Stream flow execution events |
 | GET | `/v1/flows/workspaces/{workspaceId}/flows` | workspace | flow_definition | List workflow definitions for one workspace |
 | POST | `/v1/flows/workspaces/{workspaceId}/flows` | workspace | flow_definition | Create or import a workflow definition for one workspace |
+| GET | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}` | workspace | flow_definition | Get flow |
+| PATCH | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}` | workspace | flow_definition | Update flow |
+| GET | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions` | workspace | flow_execution | List flow executions |
+| GET | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}` | workspace | flow_execution | Get flow execution |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/cancellations` | workspace | flow_execution | Cancel flow execution |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/retries` | workspace | flow_execution | Retry flow execution |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/signals/{signalName}` | workspace | flow_execution | Signal flow execution |
+| GET | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule` | workspace | flow_schedule | Get flow schedule |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/pause` | workspace | flow_schedule | Pause flow schedule |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/resume` | workspace | flow_schedule | Resume flow schedule |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/trigger` | workspace | flow_schedule | Trigger flow schedule |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/validate` | workspace | flow_definition | Validate flow |
+| POST | `/v1/flows/workspaces/{workspaceId}/flows/{flowId}/versions` | workspace | flow_definition | Publish flow version |
+| GET | `/v1/flows/workspaces/{workspaceId}/schedules` | workspace | flow_schedule | List flow schedules |
+| GET | `/v1/flows/workspaces/{workspaceId}/task-types` | workspace | flow_task_type | List flow task types |
 
 ## Functions
 
@@ -451,6 +467,7 @@ Workspace- and tenant-aware PostgreSQL control, structural administration, inven
 | POST | `/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/imports` | workspace | postgres_data_transfer | Import PostgreSQL rows in JSON or CSV while preserving validation, restore, and traceability expectations |
 | GET | `/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/rows` | workspace | postgres_data_rows | List rows from one workspace-scoped PostgreSQL table with filters, projection, ordering, pagination, and controlled one-hop relations |
 | POST | `/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/rows` | workspace | postgres_data_rows | Insert one row into one workspace-scoped PostgreSQL table while preserving effective-role, grants, and RLS guardrails |
+| POST | `/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/rows/bulk/insert` | workspace | postgres_data_bulk | Bulk insert postgres rows |
 | DELETE | `/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/rows/by-primary-key` | workspace | postgres_data_row | Delete one PostgreSQL row by primary-key selector while preserving effective-role, grants, and RLS guardrails |
 | GET | `/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/rows/by-primary-key` | workspace | postgres_data_row | Fetch one PostgreSQL row by primary-key selector with optional projection and controlled one-hop relations |
 | PATCH | `/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/rows/by-primary-key` | workspace | postgres_data_row | Update one PostgreSQL row by primary-key selector while preserving effective-role, grants, and RLS guardrails |
@@ -569,6 +586,10 @@ Workspace lifecycle, application inventory, workload identities, and managed-res
 | DELETE | `/v1/workspaces/{workspaceId}` | workspace | workspace | Soft-delete one canonical workspace while preserving audit and clone lineage metadata |
 | GET | `/v1/workspaces/{workspaceId}` | workspace | workspace | Fetch one canonical workspace entity under the workspaces family |
 | PUT | `/v1/workspaces/{workspaceId}` | workspace | workspace | Update one canonical workspace including IAM, lifecycle, and inheritance policy settings |
+| GET | `/v1/workspaces/{workspaceId}/api-keys` | workspace | workspace_api_key | List workspace api keys |
+| POST | `/v1/workspaces/{workspaceId}/api-keys` | workspace | workspace_api_key | Create workspace api key |
+| DELETE | `/v1/workspaces/{workspaceId}/api-keys/{keyId}` | workspace | workspace_api_key | Revoke workspace api key |
+| POST | `/v1/workspaces/{workspaceId}/api-keys/{keyId}/rotations` | workspace | workspace_api_key | Rotate workspace api key |
 | GET | `/v1/workspaces/{workspaceId}/api-surface` | workspace | workspace_api_surface | Fetch workspace-specific base URLs and application endpoint bindings for external clients |
 | GET | `/v1/workspaces/{workspaceId}/applications` | workspace | application | List canonical external applications, authentication flows, and validation status for one workspace |
 | POST | `/v1/workspaces/{workspaceId}/applications` | workspace | application | Register an OIDC application and materialize its client in the tenant realm |
