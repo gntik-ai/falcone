@@ -1,3 +1,4 @@
+import { rotationSideEffect } from './secret-rotation-side-effects.mjs';
 import crypto from 'node:crypto';
 import * as repo from '../repositories/secret-rotation-repo.mjs';
 import { assertSecretRotationOwnership } from './secret-path-ownership.mjs';
@@ -16,8 +17,10 @@ export function resolveDependencies(params = {}) {
     db: params.db,
     repo: params.repo ?? repo,
     vaultClient: params.vaultClient ?? null,
-    publishEvent: params.publishEvent ?? (async () => {}),
-    triggerEsoRefresh: params.triggerEsoRefresh ?? (async () => {})
+    publishEvent: (topic, payload) => rotationSideEffect(() => params.publishEvent?.(topic, payload), { op: 'publishEvent', topic }, params.logger),
+    triggerEsoRefresh: (name, namespace) => {
+      if (name != null) rotationSideEffect(() => params.triggerEsoRefresh?.(name, namespace), { op: 'triggerEsoRefresh', externalSecret: name, namespace }, params.logger);
+    }
   };
 }
 
@@ -28,12 +31,6 @@ export async function main(params = {}) {
 
   if (!allowed(auth, domain, tenantId)) return { error: { code: 'FORBIDDEN', status: 403 } };
 
-  // Bind the operated secretPath to the verified caller tenant BEFORE any read,
-  // state mutation, or Vault write (bug-001: cross-tenant rotation).
-  const ownership = await assertSecretRotationOwnership({ auth, secretPath, domain, tenantId, dataRepo, db });
-  if (ownership.error) return { error: ownership.error };
-  const ownerTenantId = ownership.ownerTenantId;
-
   if (typeof vaultClient?.writeSecret !== 'function') {
     return { error: { code: 'SECRET_BACKEND_UNAVAILABLE', status: 503 } };
   }
@@ -41,6 +38,16 @@ export async function main(params = {}) {
   if (!Number.isInteger(gracePeriodSeconds) || gracePeriodSeconds < SECRET_ROTATION_MIN_GRACE_SECONDS || gracePeriodSeconds > SECRET_ROTATION_MAX_GRACE_SECONDS) {
     return { error: { code: 'INVALID_GRACE_PERIOD', status: 422 } };
   }
+
+  if (typeof newValue !== 'string' || newValue.length === 0) {
+    return { error: { code: 'INVALID_NEW_VALUE', status: 422 } };
+  }
+
+  // Bind the operated secretPath to the verified caller tenant BEFORE any read,
+  // state mutation, or Vault write (bug-001: cross-tenant rotation).
+  const ownership = await assertSecretRotationOwnership({ auth, secretPath, domain, tenantId, dataRepo, db });
+  if (ownership.error) return { error: ownership.error };
+  const ownerTenantId = ownership.ownerTenantId;
 
   const client = db;
   const previousActive = await dataRepo.getActiveVersion(client, secretPath, ownerTenantId);

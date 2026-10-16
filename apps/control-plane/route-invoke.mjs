@@ -1,3 +1,5 @@
+import { getSecretRotationDependencies } from './secret-rotation-deps.mjs';
+
 export const SUPPORTED_INVOKES = new Set(['params-pg', 'params-only', 'params-overrides', 'callercontext-overrides', 'owhttp-overrides', 'params-auth', 'params-auth-overrides', 'owhttp', 'params-auth-db', 'params-auth-query', 'identity-overrides', 'workflow-status']);
 
 const PLATFORM_ROLES = new Set(['superadmin', 'platform_admin', 'platform_operator', 'platform_auditor',
@@ -54,14 +56,22 @@ export async function invokeRoute(route, handler, params, callerContext, identit
       return handler(params, { ...buildOverrides(route, db), identity: { ...identity, ...authFrom(identity) } });
     case 'params-auth-db': {
       if (!identity) return { statusCode: 401, body: { code: 'UNAUTHENTICATED' } };
+      const invalid = code => ({ statusCode: 400, body: { error: { code, status: 400 } } });
+      let secretName;
+      try { secretName = decodeURIComponent(params.secretName); } catch { return invalid('INVALID_SECRET_PATH'); }
+      if (!['platform', 'gateway', 'iam', 'functions', 'tenant'].includes(params.domain)
+          || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(secretName)) return invalid('INVALID_SECRET_PATH');
+      if (params.vaultVersion !== undefined && !/^[1-9][0-9]{0,8}$/.test(String(params.vaultVersion)))
+        return invalid('INVALID_VAULT_VERSION');
       const tenantId = params.domain === 'tenant' ? identity.tenantId : null;
       const secretPath = params.domain === 'tenant'
-        ? `tenant/${tenantId}/${params.secretName}` : `${params.domain}/${params.secretName}`;
+        ? `tenant/${tenantId}/${secretName}` : `${params.domain}/${secretName}`;
       const roleAliases = { tenant_owner: 'tenant-owner', tenant_operator: 'tenant-operator', platform_operator: 'platform-operator' };
       const auth = authFrom(identity);
       auth.roles = auth.roles.flatMap(role => roleAliases[role] ? [role, roleAliases[role]] : [role]);
-      const result = await handler({ ...params, tenantId, secretPath, auth, db,
-        vaultClient: undefined, repo: undefined, publishEvent: undefined, triggerEsoRefresh: undefined });
+      const result = await handler({ ...params, secretName, vaultVersion: params.vaultVersion === undefined ? undefined : Number(params.vaultVersion), tenantId, secretPath, auth, db,
+        repo: undefined, vaultClient: undefined, publishEvent: undefined, triggerEsoRefresh: undefined, logger: undefined,
+        ...(route.method === 'POST' ? getSecretRotationDependencies() : {}) });
       return result?.statusCode ? result : { statusCode: result?.error?.status ?? 200, body: result };
     }
     case 'params-pg': return handler({ ...params, pg: db });

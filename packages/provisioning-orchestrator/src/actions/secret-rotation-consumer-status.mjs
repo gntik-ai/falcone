@@ -1,15 +1,7 @@
 import * as repo from '../repositories/secret-rotation-repo.mjs';
 
-const PLATFORM_ROLES = new Set(['superadmin', 'platform-operator']);
-
-function isPlatformCaller(auth) {
-  const roles = auth?.roles ?? [];
-  return roles.some((r) => PLATFORM_ROLES.has(r));
-}
-
-function hasBasePermission(auth, secretPath) {
-  return Boolean(auth && Array.isArray(auth.roles) && auth.roles.length > 0 && secretPath);
-}
+import { assertSecretRotationOwnership, parseSecretPathOwner } from './secret-path-ownership.mjs';
+import { canReadSecretRotationHistory } from './secret-rotation-history.mjs';
 
 export function resolveDependencies(params = {}) {
   return { db: params.db, repo: params.repo ?? repo };
@@ -18,14 +10,21 @@ export function resolveDependencies(params = {}) {
 export async function main(params = {}) {
   const { db, repo: dataRepo } = resolveDependencies(params);
   const { auth, secretPath } = params;
-  if (!hasBasePermission(auth, secretPath)) return { error: { code: 'FORBIDDEN', status: 403 } };
+  const parsed = parseSecretPathOwner(secretPath);
+  const domain = params.domain ?? parsed.domain;
+  const tenantId = params.tenantId ?? parsed.tenantId;
+  if (!canReadSecretRotationHistory(auth, domain, tenantId)) return { error: { code: 'FORBIDDEN', status: 403 } };
 
-  const activeVersion = await dataRepo.getActiveVersion(db, secretPath);
-
-  if (!isPlatformCaller(auth)) {
-    if (!activeVersion) return { error: { code: 'FORBIDDEN', status: 403 } };
-    if (activeVersion.tenant_id !== auth.tenantId) return { error: { code: 'FORBIDDEN', status: 403 } };
-  }
+  const ownership = await assertSecretRotationOwnership({ auth, secretPath, domain, tenantId, dataRepo, db });
+  if (ownership.error) return { error: ownership.error };
+  const ownerTenantId = ownership.ownerTenantId;
+  if (params.vaultVersion !== undefined && (!Number.isInteger(params.vaultVersion) || params.vaultVersion < 1))
+    return { error: { code: 'INVALID_VAULT_VERSION', status: 400 } };
+  const activeVersion = params.vaultVersion === undefined
+    ? await dataRepo.getActiveVersion(db, secretPath, ownerTenantId)
+    : await dataRepo.getVersionByVaultVersion(db, { secretPath, vaultVersion: params.vaultVersion, tenantId: ownerTenantId });
+  if (!activeVersion) return { error: { code: 'VERSION_NOT_FOUND', status: 404 } };
+  if ((activeVersion.tenant_id ?? null) !== ownerTenantId) return { error: { code: 'FORBIDDEN', status: 403 } };
 
   const consumers = await dataRepo.listConsumers(db, secretPath);
   const vaultVersion = params.vaultVersion ?? activeVersion?.vault_version;

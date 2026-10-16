@@ -73,17 +73,16 @@ test('bbx-sec-consumer-status-cross-tenant-02: same-tenant caller reads their ow
 });
 
 // bbx-sec-consumer-status-cross-tenant-03
-// Platform-scoped caller reads any tenant's consumer status — must succeed.
-test('bbx-sec-consumer-status-cross-tenant-03: platform-scoped caller reads any tenant consumer status', async () => {
-  const repo = fakeRepo({ id: 'v1', vault_version: 1, tenant_id: TENANT_B });
+// Platform operators cannot read tenant consumer status.
+test('bbx-sec-consumer-status-cross-tenant-03: platform operator cannot read tenant consumer status', async () => {
+  const repo = new Proxy({}, { get() { throw Error('forbidden request must not read repo'); } });
   const result = await main({
     auth: platformCaller,
     secretPath: `tenant/${TENANT_B}/db-password`,
     db: fakeDb(),
     repo
   });
-  assert.equal(result?.error, undefined, `platform caller must not receive an error; got ${JSON.stringify(result?.error)}`);
-  assert.ok(Array.isArray(result?.consumers), 'result.consumers must be an array');
+  assert.deepEqual(result, { error: { code: 'FORBIDDEN', status: 403 } });
 });
 
 // bbx-sec-consumer-status-cross-tenant-04

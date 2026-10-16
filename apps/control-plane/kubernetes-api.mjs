@@ -27,6 +27,13 @@ function encode(value) {
   return encodeURIComponent(String(value));
 }
 
+export async function patchExternalSecret(request, name, namespace, patch) {
+  const result = await request('PATCH', `/apis/external-secrets.io/v1beta1/namespaces/${encode(namespace)}/externalsecrets/${encode(name)}`,
+    patch, 'application/merge-patch+json');
+  if (result.status < 200 || result.status >= 300) throw safeKubeError(`KUBE_HTTP_${result.status}`);
+  return result.body;
+}
+
 export async function createKubernetesApi(env = process.env) {
   const identity = await inClusterIdentity(env);
 
@@ -68,6 +75,7 @@ export async function createKubernetesApi(env = process.env) {
   const ns = encode(identity.namespace);
   return Object.freeze({
     namespace: identity.namespace,
+    patchExternalSecret: (name, namespace, patch) => patchExternalSecret(request, name, namespace, patch),
     async getSecret(name) {
       const result = await request('GET', `/api/v1/namespaces/${ns}/secrets/${encode(name)}`);
       return result.status === 404 ? null : result.body;

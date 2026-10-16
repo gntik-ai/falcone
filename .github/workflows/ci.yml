@@ -53,6 +53,11 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit
 
+      - name: Secret rotation regressions
+        run: |
+          node --test tests/blackbox/secret-consumer-status-cross-tenant.test.mjs \
+            tests/blackbox/control-plane-image-imports.test.mjs
+
       - name: Release images workflow tests
         run: node --test tests/blackbox/release-images-workflow.test.mjs
 

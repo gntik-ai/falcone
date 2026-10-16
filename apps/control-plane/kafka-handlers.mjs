@@ -69,7 +69,7 @@ async function admin() {
   if (!adminP) { const a = getKafka().admin(); adminP = a.connect().then(() => a).catch((e) => { adminP = null; throw e; }); }
   return adminP;
 }
-async function producer() {
+export async function producer() {
   if (!producerP) { const p = getKafka().producer(); producerP = p.connect().then(() => p).catch((e) => { producerP = null; throw e; }); }
   return producerP;
 }
