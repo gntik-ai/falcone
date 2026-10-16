@@ -141,7 +141,7 @@ test('postgres data API control-plane helpers expose the expanded CRUD/governanc
     'stable_endpoint_invoke',
     'knn_search'
   ]);
-  assert.equal(summary.routeCount, 27);
+  assert.equal(summary.routeCount, 28);
   assert.equal(summary.operations.find((entry) => entry.operation === 'bulk_insert').routeCount, 1);
   assert.equal(summary.operations.find((entry) => entry.operation === 'bulk_update').routeCount, 1);
   assert.equal(summary.operations.find((entry) => entry.operation === 'bulk_delete').routeCount, 1);
