@@ -11,3 +11,13 @@
 - [x] Run scoped workflow and Markdown checks; attempt lint/unit checks and report sandbox limits.
   Full lint cannot start because npm is absent; unit tests require sockets and a sibling charts checkout.
 - [ ] Operator after merge: verify the first public six-image release, no-op replay and queued runs.
+
+## CI repair handoff
+
+- [x] Review the clean assigned branch at `529f8e654cddd2e44fdc29cf26c70bc06a6b24a6`.
+  The workflow fixture suite passes, including the existing immutable-action repair.
+- [ ] Obtain the failed CodeQL run's diagnostic log or SARIF findings (rule ID, file and line).
+  The repair input names only the CodeQL job; it supplies no error or finding to repair.
+  This checkout has no CodeQL workflow/configuration or installed CodeQL CLI, and the sandbox
+  has no network access. No cause can be attributed to this ChangeSet from the job name alone.
+  Preserve the implementation and security gates until diagnostic evidence identifies a fix.
