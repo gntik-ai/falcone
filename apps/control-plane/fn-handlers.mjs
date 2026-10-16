@@ -648,8 +648,47 @@ async function fnActivations(ctx) {
   // Verify the action exists and belongs to the caller's tenant before listing its activations.
   const action = await store.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
   if (!functionVisible(ctx, action, 'read')) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.actionId} not found`);
-  const rows = await store.listFnActivations(ctx.pool, ctx.params.actionId);
-  return ok(200, { items: rows.map(activationOut), page: { total: rows.length } });
+  const rawSize = ctx.query?.['page[size]'] === undefined ? '50' : ctx.query['page[size]'];
+  const size = Number(rawSize);
+  if (typeof rawSize !== 'string' || !/^[0-9]+$/.test(rawSize) || size < 1 || size > 200) {
+    return err(400, 'VALIDATION_ERROR', 'page[size] must be an integer from 1 to 200');
+  }
+  const rawAfter = ctx.query?.['page[after]'];
+  let after;
+  if (rawAfter !== undefined) {
+    if (typeof rawAfter !== 'string' || rawAfter.length > 256 || !/^[A-Za-z0-9_-]+$/.test(rawAfter)) {
+      return err(400, 'VALIDATION_ERROR', 'invalid page[after]');
+    }
+    try {
+      const decoded = Buffer.from(rawAfter, 'base64url');
+      const cursor = JSON.parse(decoded.toString('utf8'));
+      if (decoded.toString('base64url') !== rawAfter || cursor?.v !== 1
+        || cursor.actionId !== ctx.params.actionId
+        || typeof cursor.startedAt !== 'string'
+        || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(cursor.startedAt)
+        || new Date(cursor.startedAt).toISOString() !== `${cursor.startedAt.slice(0, 23)}Z`
+        || typeof cursor.activationId !== 'string'
+        || !/^(?:act_[0-9a-f]{8}-[0-9a-f]{3}|act_[0-9a-z]{1,64})$/.test(cursor.activationId)) {
+        return err(400, 'VALIDATION_ERROR', 'invalid page[after]');
+      }
+      after = { v: 1, actionId: cursor.actionId, startedAt: cursor.startedAt, activationId: cursor.activationId };
+      if (Buffer.from(JSON.stringify(after)).toString('base64url') !== rawAfter) {
+        return err(400, 'VALIDATION_ERROR', 'invalid page[after]');
+      }
+    } catch { return err(400, 'VALIDATION_ERROR', 'invalid page[after]'); }
+  }
+  const rows = await store.listFnActivations(ctx.pool, ctx.params.actionId, { size, after });
+  const total = await store.countFnActivations(ctx.pool, ctx.params.actionId);
+  const items = rows.slice(0, size);
+  const page = { size, total };
+  if (rows.length > size) {
+    const last = items.at(-1);
+    page.nextCursor = Buffer.from(JSON.stringify({
+      v: 1, actionId: ctx.params.actionId,
+      startedAt: last.cursor_started_at, activationId: last.activation_id,
+    })).toString('base64url');
+  }
+  return ok(200, { items: items.map(activationOut), page });
 }
 // GET /v1/functions/actions/{actionId}/activations/{activationId}
 async function fnActivation(ctx) {

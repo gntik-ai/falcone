@@ -45254,15 +45254,6 @@
     "/v1/functions/actions/{resourceId}/activations": {
       "get": {
         "operationId": "listFunctionActivations",
-        "summary": "List activation summaries for one governed function action under the declared execution policy",
-        "tags": [
-          "Functions"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
         "parameters": [
           {
             "$ref": "#/components/parameters/XApiVersion"
@@ -45274,7 +45265,7 @@
             "$ref": "#/components/parameters/FunctionActionId"
           },
           {
-            "$ref": "#/components/parameters/PageSize"
+            "$ref": "#/components/parameters/FunctionActivationPageSize"
           },
           {
             "$ref": "#/components/parameters/PageAfter"
@@ -45285,89 +45276,95 @@
         ],
         "responses": {
           "200": {
-            "description": "Function activations returned.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FunctionActivationCollection"
                 }
               }
-            }
+            },
+            "description": "Function activations returned."
           },
           "400": {
-            "description": "The request is malformed or contextually inconsistent.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The request is malformed or contextually inconsistent."
           },
           "403": {
-            "description": "The caller is authenticated but not authorized for this scope.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The caller is authenticated but not authorized for this scope."
           },
           "404": {
-            "description": "The requested resource was not found.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "The requested resource was not found."
           },
           "429": {
-            "description": "Gateway QoS policy rejected the request rate for this route family.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
           },
           "431": {
-            "description": "Gateway rejected one or more invalid or oversized request headers.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
           },
           "504": {
-            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
           },
           "default": {
-            "description": "Unexpected gateway error.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unexpected gateway error."
           }
         },
-        "x-family": "functions",
-        "x-scope": "workspace",
-        "x-resource-type": "function_activation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List cursor-paginated activation summaries for one governed function action with a total count",
+        "tags": [
+          "Functions"
+        ],
         "x-audiences": [
           "workspace_owner",
           "workspace_admin",
@@ -45375,12 +45372,15 @@
           "workspace_service_account",
           "platform_team"
         ],
-        "x-visibility": "public",
-        "x-rate-limit-class": "observability",
-        "x-owning-service": "control_api",
         "x-downstream-adapters": [
           "openwhisk"
-        ]
+        ],
+        "x-family": "functions",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "observability",
+        "x-resource-type": "function_activation",
+        "x-scope": "workspace",
+        "x-visibility": "public"
       }
     },
     "/v1/functions/actions/{resourceId}/activations/{activationId}": {
@@ -64103,6 +64103,18 @@
         "schema": {
           "type": "string",
           "pattern": "^(?:fn_[0-9a-f]{8}-[0-9a-f]{3}|res_[0-9a-z]+)$"
+        }
+      },
+      "FunctionActivationPageSize": {
+        "description": "Maximum number of activations to return, newest first.",
+        "in": "query",
+        "name": "page[size]",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
         }
       }
     },
@@ -90283,23 +90295,23 @@
         }
       },
       "FunctionActivationCollection": {
-        "type": "object",
         "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FunctionActivation"
+            },
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/FunctionActivationPage"
+          }
+        },
         "required": [
           "items",
           "page"
         ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/FunctionActivation"
-            }
-          },
-          "page": {
-            "$ref": "#/components/schemas/FunctionAdminPage"
-          }
-        }
+        "type": "object"
       },
       "FunctionActivationLog": {
         "type": "object",
@@ -98770,6 +98782,30 @@
             "maxLength": 256
           }
         }
+      },
+      "FunctionActivationPage": {
+        "additionalProperties": false,
+        "properties": {
+          "nextCursor": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "size": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "size",
+          "total"
+        ],
+        "type": "object"
       }
     }
   }
