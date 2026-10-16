@@ -119,7 +119,7 @@ Workspace-scoped OpenWhisk-governed serverless package, trigger, rule, action, a
 | DELETE | `/v1/functions/actions/{resourceId}` | workspace | function_action | Delete one governed function action and its managed exposure bindings from the workspace serverless context |
 | GET | `/v1/functions/actions/{resourceId}` | workspace | function_action | Fetch one governed function action with normalized source, execution, policy, and trigger state |
 | PATCH | `/v1/functions/actions/{resourceId}` | workspace | function_action | Update one governed function action without exposing native namespace, subject, or unrestricted provider administration |
-| GET | `/v1/functions/actions/{resourceId}/activations` | workspace | function_activation | List activation summaries for one governed function action under the declared execution policy |
+| GET | `/v1/functions/actions/{resourceId}/activations` | workspace | function_activation | List cursor-paginated activation summaries for one governed function action with a total count |
 | GET | `/v1/functions/actions/{resourceId}/activations/{activationId}` | workspace | function_activation | Fetch one activation summary for a governed function action |
 | GET | `/v1/functions/actions/{resourceId}/activations/{activationId}/logs` | workspace | function_activation_log | Fetch redacted activation logs for one governed function action execution when policy allows it |
 | POST | `/v1/functions/actions/{resourceId}/activations/{activationId}/rerun` | workspace | function_invocation | Request one governed rerun for an existing function activation when the action policy permits it |

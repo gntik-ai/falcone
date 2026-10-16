@@ -5,6 +5,47 @@ import SwaggerParser from '@apidevtools/swagger-parser';
 import { OPENAPI_PATH, collectContractViolations, resolveParameters, readJson } from '../../scripts/lib/quality-gates.mjs';
 import { routes } from '../../apps/control-plane/routes.mjs';
 
+test('#1083: activation pagination has a route-specific size and total without changing shared paging', () => {
+  const family = readJson('apps/control-plane-executor/openapi/families/functions.openapi.json');
+  const aggregate = readJson(OPENAPI_PATH);
+  const path = '/v1/functions/actions/{resourceId}/activations';
+  for (const document of [family, aggregate]) {
+    const operation = document.paths[path].get;
+    const refs = operation.parameters.map((p) => p.$ref);
+    assert.ok(refs.includes('#/components/parameters/FunctionActivationPageSize'));
+    assert.ok(refs.includes('#/components/parameters/PageAfter'));
+    assert.ok(refs.includes('#/components/parameters/Sort'));
+    assert.ok(!refs.includes('#/components/parameters/PageSize'));
+    assert.deepEqual(document.components.parameters.FunctionActivationPageSize.schema,
+      { type: 'integer', default: 50, minimum: 1, maximum: 200 });
+    assert.deepEqual(document.components.parameters.PageSize.schema,
+      { type: 'integer', default: 25, minimum: 1, maximum: 200 });
+    assert.equal(document.components.schemas.FunctionActivationCollection.properties.page.$ref,
+      '#/components/schemas/FunctionActivationPage');
+    assert.deepEqual(document.components.schemas.FunctionActivationPage, {
+      additionalProperties: false,
+      properties: {
+        nextCursor: { maxLength: 256, minLength: 1, type: 'string' },
+        size: { maximum: 200, minimum: 1, type: 'integer' },
+        total: { minimum: 0, type: 'integer' },
+      },
+      required: ['size', 'total'], type: 'object',
+    });
+    assert.deepEqual(document.components.schemas.FunctionAdminPage, {
+      additionalProperties: false,
+      properties: {
+        nextCursor: { maxLength: 256, minLength: 1, type: 'string' },
+        size: { maximum: 200, minimum: 1, type: 'integer' },
+      },
+      required: ['size'], type: 'object',
+    });
+    assert.equal(operation.responses['200'].content['application/json'].schema.$ref,
+      '#/components/schemas/FunctionActivationCollection');
+    assertUsesErrorResponse(document, operation.responses['400'], 'invalid paging uses ErrorResponse');
+  }
+  assert.deepEqual(family.paths[path].get, aggregate.paths[path].get);
+});
+
 test('#1090: workspace bucket listing is registered with its cursor and safe error contracts', () => {
   const path = '/v1/storage/workspaces/{workspaceId}/buckets';
   const document = readJson(OPENAPI_PATH);

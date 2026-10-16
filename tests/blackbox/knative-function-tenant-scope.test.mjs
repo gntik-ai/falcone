@@ -86,6 +86,9 @@ function fakePool({ fnRow = FN_A, actRow = ACT_A } = {}) {
         // Unscoped query (pre-fix) — returns the row to any caller.
         return { rows: fnRow ? [fnRow] : [] };
       }
+      if (sql.includes('FROM fn_activations') && sql.includes('COUNT(*)')) {
+        return { rows: [{ total: actRow ? '1' : '0' }] };
+      }
       // fn_activations lookup by activation_id
       if (sql.includes('fn_activations') && sql.includes('activation_id')) {
         return { rows: actRow ? [actRow] : [] };
@@ -253,5 +256,56 @@ test('bbx-fn-scope-09: platform-trusted platform-team and superadmin identities 
     assert.equal(result.statusCode, 200,
       `expected 200 for ${identity.actorType} fn access, got ${result.statusCode}`);
     assert.equal(result.body?.resourceId, 'fn_aaaaaaaaaaaa', `${identity.actorType} must receive the function resource`);
+  }
+});
+
+test('#1083: inaccessible activation lists return 404 before paging validation or activation database reads', async () => {
+  const validCursor = Buffer.from(JSON.stringify({
+    v: 1, actionId: FN_A.resource_id,
+    startedAt: '2026-01-01T00:00:00.123456Z', activationId: ACT_A.activation_id,
+  })).toString('base64url');
+  const denied = [
+    IDENTITY_B,
+    { ...IDENTITY_A, actorType: 'workspace_viewer', roles: ['workspace_viewer'] },
+    { ...IDENTITY_A, actorType: 'tenant_member', roles: [], workspaceId: 'ws-a' },
+    { ...IDENTITY_B, actorType: 'superadmin', roles: ['superadmin'] },
+    { ...IDENTITY_B, actorType: 'internal', roles: [] },
+  ];
+  for (const identity of denied) {
+    for (const query of [
+      { 'page[size]': '50', 'page[after]': validCursor },
+      { 'page[size]': '0', 'page[after]': 'invalid' },
+    ]) {
+      const request = ctx(identity);
+      request.query = query;
+      const pool = request.pool;
+      request.pool = { async query(sql, params) {
+        if (sql.includes('fn_activations')) throw new Error('activation database unavailable');
+        return pool.query(sql, params);
+      } };
+      const result = await FN_HANDLERS.fnActivations(request);
+      assert.equal(result.statusCode, 404);
+      assert.equal(result.body.code, 'ACTION_NOT_FOUND');
+      for (const key of ['items', 'page', 'total', 'nextCursor']) {
+        assert.equal(Object.hasOwn(result.body, key), false);
+      }
+    }
+  }
+});
+
+test('#1083: trusted platform readers and same-tenant read roles receive the paged activation shape', async () => {
+  const platform = ['platform_operator', 'platform_auditor', 'platform_admin', 'superadmin'].map((role) => ({
+    sub: role, tenantId: null, roles: [role], trustKind: 'platform',
+  }));
+  const tenant = ['tenant_owner', 'tenant_admin'].map((role) => ({ ...IDENTITY_A, roles: [role] }));
+  const workspace = [
+    'workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_operator',
+    'workspace_viewer', 'workspace_auditor', 'service_account', 'developer_external',
+  ].map((role) => ({ ...IDENTITY_A, roles: [role], workspaceId: 'ws-a' }));
+  for (const identity of [...platform, ...tenant, ...workspace]) {
+    const result = await FN_HANDLERS.fnActivations(ctx(identity));
+    assert.equal(result.statusCode, 200, identity.roles[0]);
+    assert.deepEqual(result.body.page, { size: 50, total: 1 });
+    assert.equal(result.body.items[0].activationId, ACT_A.activation_id);
   }
 });

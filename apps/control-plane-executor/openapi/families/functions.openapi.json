@@ -20,6 +20,18 @@
           "type": "string"
         }
       },
+      "FunctionActivationPageSize": {
+        "description": "Maximum number of activations to return, newest first.",
+        "in": "query",
+        "name": "page[size]",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
       "FunctionPackageName": {
         "description": "Logical function package name scoped to the workspace serverless context.",
         "in": "path",
@@ -580,7 +592,7 @@
             "type": "array"
           },
           "page": {
-            "$ref": "#/components/schemas/FunctionAdminPage"
+            "$ref": "#/components/schemas/FunctionActivationPage"
           }
         },
         "required": [
@@ -615,6 +627,30 @@
           "lines",
           "truncated",
           "policy"
+        ],
+        "type": "object"
+      },
+      "FunctionActivationPage": {
+        "additionalProperties": false,
+        "properties": {
+          "nextCursor": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "size": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "size",
+          "total"
         ],
         "type": "object"
       },
@@ -4048,7 +4084,7 @@
             "$ref": "#/components/parameters/FunctionActionId"
           },
           {
-            "$ref": "#/components/parameters/PageSize"
+            "$ref": "#/components/parameters/FunctionActivationPageSize"
           },
           {
             "$ref": "#/components/parameters/PageAfter"
@@ -4144,7 +4180,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "List activation summaries for one governed function action under the declared execution policy",
+        "summary": "List cursor-paginated activation summaries for one governed function action with a total count",
         "tags": [
           "Functions"
         ],

@@ -285,6 +285,7 @@ export async function ensureSchema(pool) {
       started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       finished_at TIMESTAMPTZ
     )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS fn_activations_resource_started_idx ON fn_activations (resource_id, started_at DESC, activation_id DESC)');
   // Durable runtime cleanup obligations are shared by Knative-backed capabilities. Function
   // outage deletion uses them now; hosted MCP can use the same tenant-scoped/idempotent repository
   // without inventing a second lifecycle queue.
@@ -703,9 +704,28 @@ export async function insertFnActivation(pool, a) {
      a.durationMs, a.startedAt, a.finishedAt]);
   return rows[0];
 }
-export async function listFnActivations(pool, resourceId, limit = 50) {
-  const { rows } = await pool.query('SELECT * FROM fn_activations WHERE resource_id=$1 ORDER BY started_at DESC LIMIT $2', [resourceId, limit]);
+export async function listFnActivations(pool, resourceId, options = 50) {
+  // Preserve the existing numeric-limit interface for callers requesting a window.
+  if (typeof options === 'number') {
+    const { rows } = await pool.query('SELECT * FROM fn_activations WHERE resource_id=$1 ORDER BY started_at DESC LIMIT $2', [resourceId, options]);
+    return rows;
+  }
+  const { size = 50, after } = options;
+  const params = after
+    ? [resourceId, after.startedAt, after.activationId, size + 1]
+    : [resourceId, size + 1];
+  // pg converts timestamptz to Date (milliseconds). Keep a separate UTC text
+  // value for the cursor so PostgreSQL's microseconds survive the round trip.
+  const { rows } = await pool.query(
+    `SELECT *, to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_started_at
+     FROM fn_activations WHERE resource_id=$1
+     ${after ? 'AND (started_at, activation_id) < ($2::timestamptz, $3)' : ''}
+     ORDER BY started_at DESC, activation_id DESC LIMIT $${params.length}`, params);
   return rows;
+}
+export async function countFnActivations(pool, resourceId) {
+  const { rows } = await pool.query('SELECT COUNT(*) AS total FROM fn_activations WHERE resource_id=$1', [resourceId]);
+  return Number(rows[0].total);
 }
 export async function getFnActivation(pool, activationId) {
   const { rows } = await pool.query('SELECT * FROM fn_activations WHERE activation_id=$1 LIMIT 1', [activationId]);
