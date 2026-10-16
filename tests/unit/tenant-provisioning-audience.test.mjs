@@ -65,7 +65,13 @@ function serviceAccountContext(kc, query) {
       getWorkspace: async () => ({ id: 'workspace-one', slug: 'dev', tenant_id: 'tenant-one' }),
       getTenant: async () => ({ iam_realm: 'tenant-one' }),
     },
-    pool: { query }, kcAdmin: kc,
+    pool: { query }, kcAdmin: {
+      createRealmRole: async () => {}, ensureWorkspaceIdMapper: async () => {},
+      listClientDefaultScopes: async () => [], listClientOptionalScopes: async () => [],
+      inspectWorkspaceClaimSources: async () => {}, getServiceAccountUser: async () => ({ id: 'sa-user' }),
+      assignRealmRoles: async () => {}, listEffectiveRealmRoles: async () => [{ name: 'workspace_service_account' }],
+      setClientEnabled: async () => {}, ...kc,
+    },
   };
 }
 

@@ -80,7 +80,7 @@ function assertBucketDenied(result) {
 
 test('unbound tenant-realm service accounts cannot read even their own workspace buckets', async (t) => {
   const calls = fakeS3(t);
-  // createServiceAccount records ws2 ownership but mints neither a workspace role nor binding.
+  // Legacy SAs have registry ownership without a workspace role or verified binding.
   const caller = { sub: 'service-account-sa-prod', actorType: 'tenant_member',
     tenantId: TENANT, trustKind: 'tenant', isServiceAccount: true, roles: [],
     workspaceId: null, workspaceIds: [] };
@@ -102,6 +102,44 @@ test('unbound tenant-realm service accounts cannot read even their own workspace
   assert.equal(listing.statusCode, 200);
   assert.deepEqual(listing.body, { items: [], page: { size: 0 } });
   assert.equal(calls.length, 0, 'empty bucket list must not call S3');
+});
+
+test('workspace-bound service accounts read only their workspace buckets and cannot write', async t => {
+  const calls = fakeS3(t);
+  const caller = { actorType: 'tenant_member', roles: ['workspace_service_account'],
+    workspaceId: 'ws2', workspaceIds: ['ws2'], isServiceAccount: true, tenantId: TENANT };
+  for (const handler of ['storageGetObject', 'storageObjectMetadata', 'storageListObjects']) {
+    const result = await STORAGE_HANDLERS[handler](context(caller));
+    assert.equal(result.statusCode, 200, handler);
+    const before = calls.length;
+    const ctx = context(caller); ctx.params.bucketId = 'bucket-dev'; ctx.params.workspaceId = 'ws1';
+    const denied = await STORAGE_HANDLERS[handler](ctx);
+    assert.equal(denied.statusCode, 404, handler);
+    assert.equal(denied.body.code, 'BUCKET_NOT_FOUND');
+    assert.equal(calls.length, before, 'deny before S3');
+  }
+  const listing = await STORAGE_HANDLERS.storageListBuckets(context(caller));
+  assert.equal(listing.statusCode, 200);
+  assert.deepEqual(listing.body.items.map(item => item.resourceId), ['bucket-prod']);
+  for (const handler of ['storagePutObject', 'storageDeleteObject']) {
+    const before = calls.length;
+    const ctx = context(caller); ctx.body = { contentBase64: PAYLOAD.toString('base64') };
+    const denied = await STORAGE_HANDLERS[handler](ctx);
+    assert.equal(denied.statusCode, 403, handler);
+    assert.equal(denied.body.code, 'FORBIDDEN');
+    assert.equal(calls.length, before, 'deny writes before S3');
+  }
+  const otherTenant = { ...caller, tenantId: 'another-tenant' };
+  const before = calls.length;
+  for (const handler of ['storageGetObject', 'storageObjectMetadata', 'storageListObjects']) {
+    const denied = await STORAGE_HANDLERS[handler](context(otherTenant));
+    assert.equal(denied.statusCode, 404);
+    assert.equal(denied.body.code, 'BUCKET_NOT_FOUND');
+  }
+  const foreignListing = await STORAGE_HANDLERS.storageListBuckets(context(otherTenant));
+  assert.equal(foreignListing.statusCode, 200);
+  assert.deepEqual(foreignListing.body, { items: [], page: { size: 0 } });
+  assert.equal(calls.length, before, 'cross-tenant denials never reach S3');
 });
 
 test('production metadata is hidden from unbound and development callers', async (t) => {
