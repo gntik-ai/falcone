@@ -273,7 +273,7 @@ test('bbx-1101-preflight: credentials gate builds without exposing values', () =
   assert.equal(buildPush.permissions, undefined);
   const [check, login] = preflight.steps;
   assert.deepEqual(check.env, {DOCKERHUB_USERNAME: '${{ secrets.DOCKERHUB_USERNAME }}', DOCKERHUB_TOKEN: '${{ secrets.DOCKERHUB_TOKEN }}'});
-  assert.equal(login.uses, 'docker/login-action@v3');
+  assert.equal(login.uses, 'docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567');
   assert.deepEqual(login.with, {registry: 'docker.io', username: '${{ secrets.DOCKERHUB_USERNAME }}', password: '${{ secrets.DOCKERHUB_TOKEN }}'});
   assert.equal(login.if, undefined);
   assert.equal(stepNamed('Log in to Docker Hub (base-image pulls)').if, undefined);
@@ -305,6 +305,12 @@ test('bbx-1101-ci: workflow fixtures run unconditionally after unit tests', () =
 const hub = () => workflow.jobs['dockerhub-publish'];
 const hubStep = (name) => hub()?.steps.find((step) => step.name === name);
 const fnCondition = "github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime";
+
+test('bbx-1101-login-actions: new credential consumers use an immutable v3 action commit', () => {
+  for (const step of [workflow.jobs.preflight.steps[1], ...hub().steps.filter(({uses}) => uses)]) {
+    assert.equal(step.uses, 'docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567', step.name);
+  }
+});
 
 test('bbx-1101-dockerhub-job-isolation', () => {
   assert.equal(workflow.env.DOCKERHUB_NAMESPACE, 'gntik');
