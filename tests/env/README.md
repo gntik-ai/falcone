@@ -1,5 +1,8 @@
 # Falcone test environment (`tests/env`)
 
+For per-run application buckets, use the [disposable Storage fixture contract](../e2e/helpers/storage/README.md)
+(public API setup, credential-free handoff, teardown, and stale-fixture sweep).
+
 A `docker compose` stack of the **real backing services** Falcone runs in-cluster,
 so changes can be exercised against real infrastructure instead of mocks. This is
 the preferred local integration target (lighter than a throwaway Kubernetes).
