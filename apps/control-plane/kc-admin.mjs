@@ -14,6 +14,21 @@ const ADMIN_USER = process.env.KEYCLOAK_ADMIN_USERNAME || 'admin';
 const ADMIN_PASS = process.env.KEYCLOAK_ADMIN_PASSWORD || '';
 
 export const TENANT_AUDIENCE_MAPPER_NAME = 'falcone-data-api-audience';
+export const WORKSPACE_ID_MAPPER = Object.freeze({
+  name: 'workspace_id', protocol: 'openid-connect', protocolMapper: 'oidc-hardcoded-claim-mapper',
+  config: Object.freeze({
+    'claim.name': 'workspace_id', 'jsonType.label': 'String',
+    'access.token.claim': 'true', 'id.token.claim': 'true', 'userinfo.token.claim': 'true',
+  }),
+});
+
+function isWorkspaceIdMapper(mapper, workspaceId) {
+  const expected = { ...WORKSPACE_ID_MAPPER.config, 'claim.value': workspaceId };
+  return mapper?.name === WORKSPACE_ID_MAPPER.name && mapper.protocol === WORKSPACE_ID_MAPPER.protocol
+    && mapper.protocolMapper === WORKSPACE_ID_MAPPER.protocolMapper
+    && Object.keys(mapper.config ?? {}).length === Object.keys(expected).length
+    && Object.entries(expected).every(([key, value]) => mapper.config?.[key] === value);
+}
 
 export function tenantDataApiAudience(env = process.env) {
   const audience = env.KEYCLOAK_TENANT_AUDIENCE ?? 'falcone-data-api';
@@ -457,12 +472,12 @@ export const kcAdmin = {
     return (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}`)).json;
   },
   async createConfidentialClient(realm, {
-    clientId, name, serviceAccountsEnabled = true, standardFlowEnabled = false,
+    clientId, name, serviceAccountsEnabled = true, standardFlowEnabled = false, enabled = true,
     redirectUris, webOrigins, defaultClientScopes, optionalClientScopes, protocolMappers,
     frontchannelLogout, frontchannelLogoutUrl, attributes = { 'in-falcone.kind': 'service-account' },
   }) {
     const created = await kc('POST', `/realms/${encodeURIComponent(realm)}/clients`, {
-      clientId, name: name ?? clientId, enabled: true, protocol: 'openid-connect',
+      clientId, name: name ?? clientId, enabled, protocol: 'openid-connect',
       publicClient: false, serviceAccountsEnabled, standardFlowEnabled, directAccessGrantsEnabled: false,
       redirectUris, webOrigins, defaultClientScopes, optionalClientScopes, protocolMappers,
       frontchannelLogout, frontchannelLogoutUrl, attributes,
@@ -538,6 +553,61 @@ export const kcAdmin = {
   },
   async listClientMappers(realm, clientUuid) {
     return (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/protocol-mappers/models`)).json ?? [];
+  },
+  async listClientDefaultScopes(realm, clientUuid) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/default-client-scopes`)).json ?? [];
+  },
+  async listClientOptionalScopes(realm, clientUuid) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/optional-client-scopes`)).json ?? [];
+  },
+  async removeClientDefaultScope(realm, clientUuid, scopeId) {
+    await kc('DELETE', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/default-client-scopes/${encodeURIComponent(scopeId)}`);
+  },
+  async removeClientOptionalScope(realm, clientUuid, scopeId) {
+    await kc('DELETE', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/optional-client-scopes/${encodeURIComponent(scopeId)}`);
+  },
+  async listScopeMappers(realm, scopeId) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/client-scopes/${encodeURIComponent(scopeId)}/protocol-mappers/models`)).json ?? [];
+  },
+  async getServiceAccountUser(realm, clientUuid) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/service-account-user`)).json;
+  },
+  async listEffectiveRealmRoles(realm, userId) {
+    return (await kc('GET', `/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}/role-mappings/realm/composite`)).json;
+  },
+  async inspectWorkspaceClaimSources(realm, clientUuid, workspaceId) {
+    const clientMappers = await this.listClientMappers(realm, clientUuid);
+    const scopes = [...await this.listClientDefaultScopes(realm, clientUuid), ...await this.listClientOptionalScopes(realm, clientUuid)];
+    const scopedMappers = [];
+    for (const scopeId of new Set(scopes.map(scope => scope.id))) {
+      scopedMappers.push(...await this.listScopeMappers(realm, scopeId));
+    }
+    const sources = clientMappers.filter(mapper => ['workspace_id', 'workspace_ids'].includes(mapper.config?.['claim.name']));
+    if (sources.length !== 1 || !isWorkspaceIdMapper(sources[0], workspaceId)) {
+      throw new Error('Service-account workspace claim sources are not allowed');
+    }
+    for (const mapper of [...clientMappers, ...scopedMappers]) {
+      const claim = mapper.config?.['claim.name'];
+      if (['oidc-hardcoded-role-mapper', 'oidc-role-name-mapper'].includes(mapper.protocolMapper)
+        || ['realm_access', 'resource_access', 'roles', 'actor_type'].includes(claim)
+        || (scopedMappers.includes(mapper) && ['workspace_id', 'workspace_ids'].includes(claim))) {
+        throw new Error('Service-account token mapper is not allowed');
+      }
+    }
+  },
+  async ensureWorkspaceIdMapper(realm, clientUuid, workspaceId) {
+    if (!realm || !clientUuid || typeof workspaceId !== 'string' || !workspaceId.trim()) {
+      throw new Error('realm, client and workspace are required');
+    }
+    const existing = (await this.listClientMappers(realm, clientUuid)).filter(mapper => mapper.name === WORKSPACE_ID_MAPPER.name);
+    if (existing.length) {
+      if (existing.length !== 1 || !isWorkspaceIdMapper(existing[0], workspaceId)) {
+        throw new Error('workspace identity mapper configuration mismatch');
+      }
+      return { created: false };
+    }
+    await this.addHardcodedClaimMapper(realm, clientUuid, { name: WORKSPACE_ID_MAPPER.name, claimName: 'workspace_id', claimValue: workspaceId });
+    return { created: true };
   },
   // Keep WF-CON-002 app clients aligned with the saga, including on retries.
   async ensureTenantIdMapper(realm, clientUuid) {

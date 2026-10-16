@@ -789,23 +789,77 @@ async function createServiceAccount(ctx) {
   const saId = randomUUID();
   const clientId = `sa-${r.ws.slug ?? r.ws.id.slice(0, 8)}-${slugify(displayName)}`;
   const kc = ctx.kcAdmin ?? kcAdmin;
-  let unrecordedClientUuid;
+  let clientUuid;
+  let registryInsertAttempted = false;
+  let clientMayBeEnabled = false;
+  const cleanupErrors = [];
+  const cleanupFailed = (operation) => {
+    // Cleanup exceptions may contain arbitrary transport/driver material.
+    const failure = { operation, message: KEYCLOAK_ADMIN_SAFE_MESSAGE };
+    cleanupErrors.push(failure);
+    console.error('[control-plane] service-account cleanup failed', { serviceAccountId: saId, ...failure });
+  };
   try {
     if (await kc.findClient(r.realm, clientId)) return err(409, 'SA_EXISTS', `service account client ${clientId} already exists`);
-    const uuid = await kc.createConfidentialClient(r.realm, { clientId, name: displayName, serviceAccountsEnabled: true });
-    unrecordedClientUuid = uuid;
+    const uuid = await kc.createConfidentialClient(r.realm, { clientId, name: displayName, serviceAccountsEnabled: true, enabled: false });
+    clientUuid = uuid;
+    if (!uuid) throw new Error('Service-account client ID is missing');
     await kc.ensureTenantAudienceMapper(r.realm, uuid);
+    await kc.createRealmRole(r.realm, 'workspace_service_account');
+    await kc.ensureWorkspaceIdMapper(r.realm, uuid, r.ws.id);
+    for (const scope of await kc.listClientDefaultScopes(r.realm, uuid)) {
+      if (scope.name === 'workspace-context') await kc.removeClientDefaultScope(r.realm, uuid, scope.id);
+    }
+    for (const scope of await kc.listClientOptionalScopes(r.realm, uuid)) {
+      if (scope.name === 'workspace-context') await kc.removeClientOptionalScope(r.realm, uuid, scope.id);
+    }
+    await kc.inspectWorkspaceClaimSources(r.realm, uuid, r.ws.id);
+    const saUser = await kc.getServiceAccountUser(r.realm, uuid);
+    if (!saUser?.id) throw new Error('Service-account user is missing');
+    await kc.assignRealmRoles(r.realm, saUser.id, ['workspace_service_account']);
+    const roles = await kc.listEffectiveRealmRoles(r.realm, saUser.id);
+    const allowedRoles = new Set(['workspace_service_account', 'offline_access', 'uma_authorization', `default-roles-${r.realm}`]);
+    if (!roles.some(role => role.name === 'workspace_service_account') || roles.some(role => !allowedRoles.has(role.name))) {
+      throw new Error('Service-account effective roles are not allowed');
+    }
+    registryInsertAttempted = true;
     const rec = await store.insertServiceAccount(pool, { id: saId, workspaceId: r.ws.id, tenantId: r.ws.tenant_id, iamRealm: r.realm, kcClientId: clientId, kcClientUuid: uuid, displayName, createdBy: identity.sub });
-    unrecordedClientUuid = undefined;
+    // This is the sole enable point. A lost acknowledgement may still mean success.
+    clientMayBeEnabled = true;
+    try { await kc.setClientEnabled(r.realm, uuid, true); }
+    catch (enableError) {
+      let client;
+      try {
+        client = await kc.getClient(r.realm, uuid);
+        if (typeof client?.enabled !== 'boolean') throw new Error('Service-account client state is unknown');
+      } catch {
+        cleanupFailed('getClient');
+        try { await kc.setClientEnabled(r.realm, uuid, false); clientMayBeEnabled = false; }
+        catch { cleanupFailed('setClientEnabled(false)'); }
+        throw enableError;
+      }
+      if (!client.enabled) { clientMayBeEnabled = false; throw enableError; }
+    }
     // Top-level serviceAccountId is what the console persists to fetch the SA back.
     return ok(201, { serviceAccountId: rec.id, ...serviceAccountOut({ ...rec, iam_realm: r.realm }), serviceAccount: rec });
   } catch (e) {
-    // Compensate only this attempt's client when mapper setup or recording fails.
-    // Cleanup is best-effort; retain the original redacted error if Keycloak is unavailable.
-    if (unrecordedClientUuid) {
-      try { await kc.deleteClient(r.realm, unrecordedClientUuid); } catch { /* best-effort */ }
+    const result = kcBackedErr(e, 'CREATE_SA_FAILED');
+    if (clientUuid) {
+      try { await kc.deleteClient(r.realm, clientUuid); clientMayBeEnabled = false; }
+      catch { cleanupFailed('deleteClient'); }
     }
-    return kcBackedErr(e, 'CREATE_SA_FAILED');
+    // Retain the revocation handle until disabling or deleting is confirmed.
+    let needsOperatorReview = registryInsertAttempted && clientMayBeEnabled;
+    if (registryInsertAttempted && !clientMayBeEnabled) {
+      try { await store.deleteServiceAccount(pool, saId); }
+      catch { cleanupFailed('deleteServiceAccount'); needsOperatorReview = true; }
+    }
+    if (cleanupErrors.length) result.body.cleanupErrors = cleanupErrors;
+    if (needsOperatorReview) {
+      Object.assign(result.body, { needsOperatorReview: true, serviceAccountId: saId });
+      console.error('[control-plane] service-account needs operator review', { serviceAccountId: saId });
+    }
+    return result;
   }
 }
 // GET /v1/workspaces/{workspaceId}/service-accounts/{serviceAccountId}

@@ -34,7 +34,7 @@ function declaration(source, name) {
   return source.slice(start, source.indexOf('\n}', start) + 2);
 }
 
-export async function startMetricsServer({ databasePool, logger = { error() {}, warn() {} }, jwksFetch } = {}) {
+export async function startMetricsServer({ databasePool, logger = { error() {}, warn() {} }, jwksFetch, localHandlers = {} } = {}) {
   const pool = databasePool ?? {
     async query(sql, values = []) {
       if (sql === 'SELECT 1') return { rows: [{ '?column?': 1 }] };
@@ -66,7 +66,7 @@ export async function startMetricsServer({ databasePool, logger = { error() {}, 
     'return { getTenant };',
   ].join('\n'))(store);
   const bindings = {
-    http, pool, jwtVerifier, normalizeWorkspaceBinding, reserveHttpRequest, requestErrorForLog, compileRoutes, matchCompiledRoute, invokeRoute, PORT: 0, seedRoutes: routes, LOCAL_HANDLERS: locals,
+    http, pool, jwtVerifier, normalizeWorkspaceBinding, reserveHttpRequest, requestErrorForLog, compileRoutes, matchCompiledRoute, invokeRoute, PORT: 0, seedRoutes: routes, LOCAL_HANDLERS: { ...locals, ...localHandlers },
     console: logger,
     webhookRuntimePool: null, webhookWritePool: null, knativeRuntime: null, runtimeTeardownCoordinator: null,
     createRuntimeCleanupRepository, secretBackendHealth, respondHealth,
