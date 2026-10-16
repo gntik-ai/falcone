@@ -356,6 +356,10 @@ Cross-tenant platform governance, catalog, and operator discovery surfaces.
 | GET | `/v1/platform/provider-capabilities/{providerCapabilityId}` | platform | provider_capability | Fetch one provider capability record |
 | GET | `/v1/platform/route-catalog` | platform | route_catalog | List public gateway routes and filter them by family, scope, resource type, method, audience, or visibility |
 | GET | `/v1/platform/runtime/knative` | platform | knative_runtime_status | Read the installation-wide Knative runtime mode and sanitized readiness status |
+| GET | `/v1/platform/secrets/{domain}/{secretName}/consumer-status` | platform | secret_metadata | Read secret consumer propagation status |
+| GET | `/v1/platform/secrets/{domain}/{secretName}/history` | platform | secret_metadata | Read secret rotation history |
+| POST | `/v1/platform/secrets/{domain}/{secretName}/rotate` | platform | secret_metadata | Rotate a secret with a grace period |
+| POST | `/v1/platform/secrets/{domain}/{secretName}/versions/{vaultVersion}/revoke` | platform | secret_metadata | Soft delete a secret version |
 | GET | `/v1/platform/storage/provider` | platform | storage_provider | Inspect the active storage provider abstraction and common capability manifest |
 | GET | `/v1/platform/topology/regions` | platform | topology_region | List the supported data residency regions for tenant provisioning |
 | POST | `/v1/platform/users` | platform | platform_user | Submit a canonical platform user write request under the platform family |

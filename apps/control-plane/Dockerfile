@@ -46,7 +46,7 @@ COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
      apps/control-plane/fn-handlers.mjs apps/control-plane/function-executor.mjs \
      apps/control-plane/function-invocation-auth.mjs \
      apps/control-plane/application-handlers.mjs \
-     apps/control-plane/vault-secrets.mjs \
+     apps/control-plane/vault-secrets.mjs apps/control-plane/secret-rotation-deps.mjs \
      apps/control-plane/realtime-handlers.mjs \
      apps/control-plane/webhook-handlers.mjs apps/control-plane/webhook-db.mjs \
      apps/control-plane/webhook-schema.mjs apps/control-plane/webhook-key-runtime.mjs \

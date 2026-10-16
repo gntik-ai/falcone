@@ -276,6 +276,11 @@ export function createVaultKvClient({ addr, token, tokenProvider, mount = 'secre
       const json = await res.json().catch(() => ({}));
       return { version: Number(json?.data?.version ?? 1) };
     },
+    async deleteSecretVersion(path, version) {
+      const res = await send('POST', `${base}/v1/${ENC(mount)}/delete/${seg(path)}`, { versions: [version] });
+      if (!res.ok) throw vaultError('delete-version', path, res.status);
+      return { deleted: true };
+    },
     async readSecret(path) {
       const res = await send('GET', dataUrl(path));
       if (res.status === 404) return null;
@@ -504,7 +509,7 @@ export function createWorkspaceSecretStore(client) {
  * configuration keeps working unchanged after the Vault -> OpenBao swap. The wire header stays
  * X-Vault-Token (OpenBao honors it).
  */
-export function vaultStoreFromEnv(env = process.env, fetchImpl) {
+export function vaultKvClientFromEnv(env = process.env, fetchImpl) {
   const addr = env.BAO_ADDR ?? env.VAULT_ADDR;
   const token = env.BAO_TOKEN ?? env.VAULT_TOKEN;
   const kubernetesRole = env.BAO_KUBERNETES_AUTH_ROLE ?? env.VAULT_KUBERNETES_AUTH_ROLE;
@@ -525,7 +530,12 @@ export function vaultStoreFromEnv(env = process.env, fetchImpl) {
     namespace,
     fetchImpl,
   });
-  return createWorkspaceSecretStore(client);
+  return client;
+}
+
+export function vaultStoreFromEnv(env = process.env, fetchImpl) {
+  const client = vaultKvClientFromEnv(env, fetchImpl);
+  return client ? createWorkspaceSecretStore(client) : null;
 }
 
 let sharedVaultStore;

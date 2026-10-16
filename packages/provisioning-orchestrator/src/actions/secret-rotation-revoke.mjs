@@ -1,3 +1,4 @@
+import { rotationSideEffect } from './secret-rotation-side-effects.mjs';
 import * as repo from '../repositories/secret-rotation-repo.mjs';
 import { assertSecretRotationOwnership } from './secret-path-ownership.mjs';
 
@@ -14,7 +15,7 @@ export function resolveDependencies(params = {}) {
     db: params.db,
     repo: params.repo ?? repo,
     vaultClient: params.vaultClient ?? null,
-    publishEvent: params.publishEvent ?? (async () => {})
+    publishEvent: (topic, payload) => rotationSideEffect(() => params.publishEvent?.(topic, payload), { op: 'publishEvent', topic }, params.logger)
   };
 }
 
@@ -67,7 +68,12 @@ export async function main(params = {}) {
         detail: { justification }
       });
     }
-    await vaultClient.deleteSecretVersion(secretPath, vaultVersion);
+    try {
+      await vaultClient.deleteSecretVersion(secretPath, vaultVersion);
+    } catch {
+      await db.query('ROLLBACK');
+      return { error: { code: 'VAULT_DELETE_FAILED', status: 502 } };
+    }
     await db.query('COMMIT');
     await publishEvent('console.secrets.rotation.revoked', { secretPath, vaultVersion, revokedBy: auth.sub, justification, forceRevoke });
     return { revokedVersion: vaultVersion, effectiveAt: new Date().toISOString() };

@@ -67165,6 +67165,912 @@
           "postgresql"
         ]
       }
+    },
+    "/v1/platform/secrets/{domain}/{secretName}/rotate": {
+      "post": {
+        "operationId": "rotateSecret",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "platform",
+                "gateway",
+                "iam",
+                "functions",
+                "tenant"
+              ]
+            }
+          },
+          {
+            "name": "secretName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful secret rotation operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rotationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "vaultVersionNew": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "vaultVersionOld": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "nullable": true
+                    },
+                    "gracePeriodSeconds": {
+                      "type": "integer"
+                    },
+                    "graceExpiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "rotationId",
+                    "vaultVersionNew",
+                    "vaultVersionOld",
+                    "gracePeriodSeconds",
+                    "graceExpiresAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_SECRET_PATH",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No authenticated identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretInventoryUnauthenticated"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN or TENANT_ISOLATION_VIOLATION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "INVALID_NEW_VALUE or INVALID_GRACE_PERIOD",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "VAULT_WRITE_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SECRET_BACKEND_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected gateway discovery error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rotate a secret with a grace period",
+        "tags": [
+          "Platform"
+        ],
+        "x-family": "platform",
+        "x-scope": "platform",
+        "x-resource-type": "secret_metadata",
+        "x-owning-service": "control_api",
+        "x-tenant-binding": "trusted_identity",
+        "x-audiences": [
+          "superadmin",
+          "platform_operator",
+          "tenant_owner"
+        ],
+        "x-authorized-role-claims": [
+          "superadmin",
+          "platform-operator",
+          "platform_operator",
+          "tenant-owner",
+          "tenant_owner"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "justification": {
+                    "type": "string"
+                  },
+                  "newValue": {
+                    "type": "string",
+                    "minLength": 1,
+                    "writeOnly": true
+                  },
+                  "gracePeriodSeconds": {
+                    "type": "integer",
+                    "minimum": 300,
+                    "maximum": 86400,
+                    "default": 1800
+                  }
+                },
+                "required": [
+                  "newValue"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/secrets/{domain}/{secretName}/versions/{vaultVersion}/revoke": {
+      "post": {
+        "operationId": "revokeSecretVersion",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "platform",
+                "gateway",
+                "iam",
+                "functions",
+                "tenant"
+              ]
+            }
+          },
+          {
+            "name": "secretName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+            }
+          },
+          {
+            "name": "vaultVersion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 999999999
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful secret rotation operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revokedVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "effectiveAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "revokedVersion",
+                    "effectiveAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_SECRET_PATH or INVALID_VAULT_VERSION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No authenticated identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretInventoryUnauthenticated"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN or TENANT_ISOLATION_VIOLATION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "VERSION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "REVOKE_LEAVES_NO_ACTIVE_VERSION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "VAULT_DELETE_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SECRET_BACKEND_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected gateway discovery error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Soft delete a secret version",
+        "tags": [
+          "Platform"
+        ],
+        "x-family": "platform",
+        "x-scope": "platform",
+        "x-resource-type": "secret_metadata",
+        "x-owning-service": "control_api",
+        "x-tenant-binding": "trusted_identity",
+        "x-audiences": [
+          "superadmin",
+          "platform_operator",
+          "tenant_owner"
+        ],
+        "x-authorized-role-claims": [
+          "superadmin",
+          "platform-operator",
+          "platform_operator",
+          "tenant-owner",
+          "tenant_owner"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "justification": {
+                    "type": "string"
+                  },
+                  "forceRevoke": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/secrets/{domain}/{secretName}/consumer-status": {
+      "get": {
+        "operationId": "getSecretConsumerStatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "platform",
+                "gateway",
+                "iam",
+                "functions",
+                "tenant"
+              ]
+            }
+          },
+          {
+            "name": "secretName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+            }
+          },
+          {
+            "name": "vaultVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 999999999
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful secret rotation operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consumers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "consumer_id": {
+                            "type": "string"
+                          },
+                          "reload_mechanism": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "confirmedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "timeoutAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "consumer_id",
+                          "reload_mechanism",
+                          "state",
+                          "confirmedAt",
+                          "timeoutAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "consumers"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_SECRET_PATH or INVALID_VAULT_VERSION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No authenticated identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretInventoryUnauthenticated"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN or TENANT_ISOLATION_VIOLATION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "VERSION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected gateway discovery error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read secret consumer propagation status",
+        "tags": [
+          "Platform"
+        ],
+        "x-family": "platform",
+        "x-scope": "platform",
+        "x-resource-type": "secret_metadata",
+        "x-owning-service": "control_api",
+        "x-tenant-binding": "trusted_identity",
+        "x-audiences": [
+          "superadmin",
+          "platform_operator",
+          "tenant_owner",
+          "tenant_operator"
+        ],
+        "x-authorized-role-claims": [
+          "superadmin",
+          "platform-operator",
+          "platform_operator",
+          "tenant-owner",
+          "tenant_owner",
+          "tenant-operator",
+          "tenant_operator"
+        ]
+      }
+    },
+    "/v1/platform/secrets/{domain}/{secretName}/history": {
+      "get": {
+        "operationId": "getSecretHistory",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "platform",
+                "gateway",
+                "iam",
+                "functions",
+                "tenant"
+              ]
+            }
+          },
+          {
+            "name": "secretName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful secret rotation operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "event_type": {
+                            "type": "string"
+                          },
+                          "actor_id": {
+                            "type": "string"
+                          },
+                          "occurred_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "actor_roles": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "detail": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "required": [
+                          "event_type",
+                          "actor_id",
+                          "occurred_at"
+                        ]
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_SECRET_PATH or INVALID_PAGINATION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No authenticated identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretInventoryUnauthenticated"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN or TENANT_ISOLATION_VIOLATION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretRotationErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway QoS policy rejected the request rate for this route family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected one or more invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected gateway discovery error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read secret rotation history",
+        "tags": [
+          "Platform"
+        ],
+        "x-family": "platform",
+        "x-scope": "platform",
+        "x-resource-type": "secret_metadata",
+        "x-owning-service": "control_api",
+        "x-tenant-binding": "trusted_identity",
+        "x-audiences": [
+          "superadmin",
+          "platform_operator",
+          "tenant_owner",
+          "tenant_operator"
+        ],
+        "x-authorized-role-claims": [
+          "superadmin",
+          "platform-operator",
+          "platform_operator",
+          "tenant-owner",
+          "tenant_owner",
+          "tenant-operator",
+          "tenant_operator"
+        ]
+      }
     }
   },
   "components": {
@@ -103475,6 +104381,31 @@
             "format": "date-time"
           }
         }
+      },
+      "SecretRotationErrorBody": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              }
+            },
+            "required": [
+              "code",
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
       }
     }
   }
