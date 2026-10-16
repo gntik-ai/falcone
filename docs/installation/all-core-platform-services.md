@@ -169,6 +169,68 @@ the captured target state; it does not delete OpenBao, Temporal, pgvector, or an
 PVC. Keep those PVCs until the failed rollout is understood and a separate decommission step is
 approved.
 
+## Container images
+
+The `release-images` workflow publishes all six Falcone application images to GHCR, then mirrors
+release tags by digest to Docker Hub under `docker.io/gntik`. GHCR remains the source of truth;
+the mirror never rebuilds an image. Both registries offer `<version>` and `sha-<short>` tags.
+Existing immutable Docker Hub tags are checked before any write and never overwritten.
+Only `latest` can move: the mirror repairs it when GHCR `latest` equals this release's digest,
+including re-runs and manual runs with `push_latest=false`. A post-write GHCR re-read fails loudly
+if another release moved `latest`; that release's queued mirror job reconciles it.
+
+Pull a released image from either registry (replace the example version with a published release):
+
+```bash
+VERSION=1.2.3
+docker pull ghcr.io/gntik-ai/in-falcone-control-plane:$VERSION
+docker pull docker.io/gntik/in-falcone-control-plane:$VERSION
+```
+
+The other image names are `in-falcone-control-plane-executor`, `in-falcone-web-console`,
+`in-falcone-fn-runtime`, `in-falcone-workflow-worker`, and `in-falcone-mcp-runtime`.
+Compare manifest digests for each version and immutable commit tag:
+
+```bash
+SHORT_SHA=abcdef0 # Replace with the release commit's first seven characters.
+for TAG in "$VERSION" "sha-$SHORT_SHA"; do
+  docker buildx imagetools inspect --format '{{.Manifest.Digest}}' \
+    ghcr.io/gntik-ai/in-falcone-control-plane:$TAG
+  docker buildx imagetools inspect --format '{{.Manifest.Digest}}' \
+    docker.io/gntik/in-falcone-control-plane:$TAG
+done
+```
+
+Each pair must print the same `sha256:` digest. The mirror first checks a Buildx dry-run manifest's
+SHA-256 against GHCR, copies with `--prefer-index=false`, and verifies both Hub tags afterwards.
+The Actions step summary records the source ref, digest, repository state, and copied, unchanged
+or skipped Docker Hub refs.
+
+Configure repository Actions secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. The token must
+have **push and create rights** in the `gntik` namespace, and the namespace's default repository
+visibility must be **Public** before the first release. Docker Hub auto-creates a missing repository
+on its first push; no repository API mutation or manual creation is needed. An unauthenticated
+post-push check verifies public visibility, including on no-copy replays, retrying a 404 five times.
+A private default or insufficient rights fails the mirror job: fix visibility or token rights and
+re-run. Never put token values in commands or logs.
+
+A credential check and Docker Hub preflight login gate GHCR builds; the existing authenticated
+base-image pull login also remains a gate. Repository lookups and publication run in the separate
+`dockerhub-publish` job with read-only GitHub permissions and a 30-minute timeout. A failed or slow
+mirror leaves GHCR published and releases its build queue independently.
+
+GHCR and Docker Hub each serialize per image with separate concurrency groups and `queue: max`.
+GitHub accepts up to **100 pending jobs per group**; overflow or manual cancellation is surfaced
+by `release-images-cancelled`. Its error includes the run URL and recovery command:
+
+```bash
+gh run rerun <run-id>
+```
+
+Re-runs use the verified GHCR skip path, copy only missing immutable Hub tags and reconcile
+`latest` against GHCR. Equal tags require no writes. Confirm public matching digests after the
+first real release; live registry checks remain operator verification after merge.
+
 ## Image Publication Status
 
 Third-party defaults were verified with `docker manifest inspect` for

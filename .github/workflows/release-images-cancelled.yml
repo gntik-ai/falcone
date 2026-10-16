@@ -1,0 +1,21 @@
+name: release-images-cancelled
+
+on:
+  workflow_run:
+    workflows: [release-images]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  report-cancellation:
+    if: github.event.workflow_run.conclusion == 'cancelled'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail on cancelled release run
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          echo "::error::release-images run $RUN_ID was cancelled ($RUN_URL); re-run it with: gh run rerun $RUN_ID"
+          exit 1

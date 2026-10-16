@@ -46,14 +46,40 @@ permissions:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
-
-concurrency:
-  # Canonicalize manual X.Y.Z inputs to vX.Y.Z so they serialize with tag and release events.
-  group: release-images-${{ github.event_name == 'workflow_dispatch' && (startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag)) || github.event.release.tag_name || github.ref_name }}
-  cancel-in-progress: false
+  DOCKERHUB_NAMESPACE: gntik
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Check Docker Hub credentials
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          missing=0
+          for name in DOCKERHUB_USERNAME DOCKERHUB_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is empty"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
   build-push:
+    needs: preflight
+    concurrency:
+      group: release-images-publish-${{ matrix.image }}
+      cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -334,3 +360,320 @@ jobs:
             fi
           done
           printf '\nVerified web-console and web-console-next HTML version: `%s`.\n' "$VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+  # Registry work is isolated: this queue never holds the GHCR build/push group.
+  dockerhub-publish:
+    needs: build-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: release-images-dockerhub-${{ matrix.image }}
+      cancel-in-progress: false
+      queue: max
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: in-falcone-control-plane
+            dockerfile: apps/control-plane/Dockerfile
+          - image: in-falcone-control-plane-executor
+            dockerfile: apps/control-plane-executor/Dockerfile
+          - image: in-falcone-web-console
+            dockerfile: apps/web-console/Dockerfile
+            build_spa: 'true'
+          - image: in-falcone-fn-runtime
+            dockerfile: apps/fn-runtime/Dockerfile
+          - image: in-falcone-workflow-worker
+            dockerfile: apps/workflow-worker/Dockerfile
+          - image: in-falcone-mcp-runtime
+            dockerfile: apps/mcp-runtime/Dockerfile
+    steps:
+      - name: Resolve version and registry namespace
+        id: meta
+        if: github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_PUSH_LATEST: ${{ inputs.push_latest }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          SHA: ${{ github.sha }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          if [ "$EVENT_NAME" = "release" ]; then
+            raw="$RELEASE_TAG"
+            latest="true"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            raw="$REF_NAME"
+            latest="true"
+          else
+            raw="$INPUT_TAG"
+            latest="$INPUT_PUSH_LATEST"
+          fi
+          if ! [[ "$raw" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag must be strict vX.Y.Z or X.Y.Z, got invalid value"
+            exit 1
+          fi
+          version="${raw#v}"
+          short_sha="${SHA:0:7}"
+          if ! [[ "$short_sha" =~ ^[0-9a-f]{7}$ ]]; then
+            echo "::error::github.sha did not provide a valid short commit SHA"
+            exit 1
+          fi
+          owner="$REPOSITORY_OWNER"
+          owner_lc="$(echo "$owner" | tr '[:upper:]' '[:lower:]')"
+          {
+            echo "version=$version"
+            echo "short_sha=$short_sha"
+            echo "namespace=ghcr.io/${owner_lc}"
+            echo "push_latest=$latest"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing $IMAGE:$version and sha-$short_sha to ghcr.io/${owner_lc}"
+
+      - name: Log in to GHCR (read)
+        if: github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Resolve GHCR digest
+        id: source
+        if: github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime
+        env:
+          NAMESPACE: ${{ steps.meta.outputs.namespace }}
+          IMAGE: ${{ matrix.image }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+        run: |
+          version_ref="${NAMESPACE}/${IMAGE}:${VERSION}"
+          sha_ref="${NAMESPACE}/${IMAGE}:sha-${SHORT_SHA}"
+          if ! version_digest="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$version_ref")"; then
+            echo "::error::could not inspect $version_ref"
+            exit 1
+          fi
+          if ! sha_digest="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$sha_ref")"; then
+            echo "::error::could not inspect $sha_ref"
+            exit 1
+          fi
+          if ! [[ "$version_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || [ "$version_digest" != "$sha_digest" ]; then
+            echo "::error::$version_ref and $sha_ref have invalid or different digests"
+            exit 1
+          fi
+          {
+            echo "DIGEST=$version_digest"
+            echo "GHCR_REF=${NAMESPACE}/${IMAGE}@${version_digest}"
+          } >> "$GITHUB_OUTPUT"
+          echo "GHCR ${NAMESPACE}/${IMAGE}@${version_digest}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Copy release tags to Docker Hub
+        if: github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime
+        env:
+          IMAGE: ${{ matrix.image }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+          DIGEST: ${{ steps.source.outputs.DIGEST }}
+          GHCR_REF: ${{ steps.source.outputs.GHCR_REF }}
+        run: |
+          repo="docker.io/${DOCKERHUB_NAMESPACE}/${IMAGE}"
+          refs=("${repo}:${VERSION}" "${repo}:sha-${SHORT_SHA}")
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          # The API is deliberately unauthenticated; registry logins are only used by Docker.
+          lookup_repo() {
+            local status
+            if ! status="$(curl -sS -o "$work/repository.json" -w '%{http_code}' "https://hub.docker.com/v2/repositories/${DOCKERHUB_NAMESPACE}/${IMAGE}/")"; then
+              echo "::error::could not look up $repo" >&2
+              return 2
+            fi
+            case "$status" in
+              200)
+                if ! jq -e '.is_private == false' "$work/repository.json" >/dev/null; then
+                  echo "::error::$repo is missing or not public" >&2
+                  return 2
+                fi
+                return 0 ;;
+              404) return 1 ;;
+              *) echo "::error::could not look up $repo (HTTP $status)" >&2; return 2 ;;
+            esac
+          }
+
+          if lookup_repo; then
+            repo_state="public"
+          else
+            status=$?
+            if [ "$status" -ne 1 ]; then exit 1; fi
+            repo_state="absent or private"
+          fi
+          {
+            echo "### Docker Hub mirror: $IMAGE"
+            echo "GHCR $GHCR_REF ($DIGEST); repository state: $repo_state"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          inspect_tag() {
+            local result
+            if result="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$1" 2>"$work/inspect.err")"; then
+              printf '%s\n' "$result"
+              return 0
+            fi
+            if grep -Eqi '(not found|manifest unknown|name unknown)' "$work/inspect.err"; then return 1; fi
+            if [ "$repo_state" = "absent or private" ] && grep -Eqi '(denied|unauthorized|insufficient_scope)' "$work/inspect.err"; then return 1; fi
+            echo "::error::could not inspect $1" >&2
+            return 2
+          }
+
+          # Inspect both immutable tags before deciding whether any write is allowed.
+          missing=()
+          actions=(unchanged unchanged)
+          invalid=0
+          for i in 0 1; do
+            ref="${refs[$i]}"
+            if current="$(inspect_tag "$ref")"; then
+              if [ "$repo_state" != "public" ]; then
+                echo "::error::$ref exists but is not public"
+                invalid=1
+              elif [ "$current" != "$DIGEST" ]; then
+                echo "::error::$ref conflicts with $GHCR_REF; refusing to overwrite"
+                invalid=1
+              fi
+            else
+              status=$?
+              if [ "$status" -eq 1 ]; then
+                missing+=("$ref")
+                actions[$i]=copied
+              else
+                invalid=1
+              fi
+            fi
+          done
+          if [ "$invalid" -ne 0 ]; then exit 1; fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            if ! docker buildx imagetools create --dry-run --prefer-index=false -t "${missing[0]}" "$GHCR_REF" > "$work/manifest"; then
+              echo "::error::dry-run failed for ${missing[*]}"
+              exit 1
+            fi
+            # Buildx terminates its manifest output with a newline. Remove exactly that byte.
+            if [ "$(tail -c 1 "$work/manifest" | wc -l)" -eq 1 ]; then truncate -s -1 "$work/manifest"; fi
+            dry_digest="sha256:$(sha256sum "$work/manifest" | cut -d ' ' -f1)"
+            if [ "$dry_digest" != "$DIGEST" ]; then
+              echo "::error::dry-run digest mismatch for ${missing[*]} (expected $DIGEST)"
+              exit 1
+            fi
+            targets=()
+            for ref in "${missing[@]}"; do targets+=(-t "$ref"); done
+            if ! docker buildx imagetools create --prefer-index=false "${targets[@]}" "$GHCR_REF"; then
+              echo "::error::could not copy ${missing[*]} from $GHCR_REF"
+              exit 1
+            fi
+          fi
+
+          for ref in "${refs[@]}"; do
+            if ! actual="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$ref")"; then
+              echo "::error::could not verify $ref"
+              exit 1
+            fi
+            if [ "$actual" != "$DIGEST" ]; then
+              echo "::error::digest mismatch for $ref (expected $DIGEST)"
+              exit 1
+            fi
+          done
+
+          # A first push can auto-create a private repository. Check even on no-copy replays.
+          for attempt in 0 1 2 3 4 5; do
+            if lookup_repo; then break; else status=$?; fi
+            if [ "$status" -ne 1 ]; then exit 1; fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::$repo is missing or not public"
+              exit 1
+            fi
+            sleep "${DOCKERHUB_VISIBILITY_RETRY_DELAY:-5}"
+          done
+          for i in 0 1; do
+            echo "${refs[$i]} $DIGEST ${actions[$i]} (public)" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Reconcile Docker Hub latest
+        if: github.event_name != 'workflow_dispatch' || matrix.image != 'in-falcone-fn-runtime' || inputs.publish_fn_runtime
+        env:
+          IMAGE: ${{ matrix.image }}
+          NAMESPACE: ${{ steps.meta.outputs.namespace }}
+          DIGEST: ${{ steps.source.outputs.DIGEST }}
+          GHCR_REF: ${{ steps.source.outputs.GHCR_REF }}
+        run: |
+          ghcr_latest="${NAMESPACE}/${IMAGE}:latest"
+          hub_latest="docker.io/${DOCKERHUB_NAMESPACE}/${IMAGE}:latest"
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          inspect_tag() {
+            local result
+            if result="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$1" 2>"$work/inspect.err")"; then
+              printf '%s\n' "$result"
+              return 0
+            fi
+            if grep -Eqi '(not found|manifest unknown|name unknown)' "$work/inspect.err"; then return 1; fi
+            echo "::error::could not inspect $1" >&2
+            return 2
+          }
+
+          if current="$(inspect_tag "$ghcr_latest")"; then
+            if [ "$current" != "$DIGEST" ]; then
+              echo "$hub_latest skipped: $ghcr_latest is $current, source is $GHCR_REF ($DIGEST)" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          else
+            status=$?
+            if [ "$status" -ne 1 ]; then exit 1; fi
+            echo "$hub_latest skipped: $ghcr_latest not found, source is $GHCR_REF ($DIGEST)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if current="$(inspect_tag "$hub_latest")"; then
+            if [ "$current" = "$DIGEST" ]; then
+              echo "$hub_latest $DIGEST unchanged (GHCR $GHCR_REF)" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          else
+            status=$?
+            if [ "$status" -ne 1 ]; then exit 1; fi
+          fi
+
+          if ! docker buildx imagetools create --dry-run --prefer-index=false -t "$hub_latest" "$GHCR_REF" > "$work/manifest"; then
+            echo "::error::dry-run failed for $hub_latest"
+            exit 1
+          fi
+          # Hash the exact manifest bytes, excluding one Buildx output newline.
+          if [ "$(tail -c 1 "$work/manifest" | wc -l)" -eq 1 ]; then truncate -s -1 "$work/manifest"; fi
+          dry_digest="sha256:$(sha256sum "$work/manifest" | cut -d ' ' -f1)"
+          if [ "$dry_digest" != "$DIGEST" ]; then
+            echo "::error::dry-run digest mismatch for $hub_latest (expected $DIGEST)"
+            exit 1
+          fi
+          if ! docker buildx imagetools create --prefer-index=false -t "$hub_latest" "$GHCR_REF"; then
+            echo "::error::could not copy $hub_latest from $GHCR_REF"
+            exit 1
+          fi
+          if ! actual="$(inspect_tag "$hub_latest")" || [ "$actual" != "$DIGEST" ]; then
+            echo "::error::digest mismatch or verification failure for $hub_latest (expected $DIGEST)"
+            exit 1
+          fi
+          if ! current="$(inspect_tag "$ghcr_latest")" || [ "$current" != "$DIGEST" ]; then
+            echo "::error::$ghcr_latest changed while copying $hub_latest; re-run its release to reconcile"
+            exit 1
+          fi
+          echo "$hub_latest $DIGEST copied (GHCR $GHCR_REF)" >> "$GITHUB_STEP_SUMMARY"

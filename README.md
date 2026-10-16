@@ -272,6 +272,8 @@ cd tests/env
 
 ---
 
+Pull release images from GHCR or Docker Hub: [container images](docs/installation/all-core-platform-services.md#container-images).
+
 ## Repository layout
 
 ```text
