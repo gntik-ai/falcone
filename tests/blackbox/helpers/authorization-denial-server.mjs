@@ -20,6 +20,7 @@ import { createRuntimeCleanupRepository } from '../../../apps/control-plane/runt
 import { createMultiRealmVerifier } from '../../../apps/control-plane/jwt-verify.mjs';
 import { can } from '../../../apps/control-plane/model-authz.mjs';
 import { reserveHttpRequest } from '../../../packages/internal-contracts/src/http-idempotency.mjs';
+import { normalizeWorkspaceBinding } from '../../../packages/internal-contracts/src/workspace-binding.mjs';
 import { requestErrorForLog } from '../../../packages/internal-contracts/src/request-log.mjs';
 
 export const TEN_A = '11111111-1111-1111-1111-111111111111';
@@ -35,7 +36,7 @@ function declaration(source, name) {
   return source.slice(start, source.indexOf('\n}', start) + 2);
 }
 
-export async function startDenialServer({ insert = null, extraRoutes = [] } = {}) {
+export async function startDenialServer({ insert = null, extraRoutes = [], workspaceRow = { id: WS_B, tenant_id: TEN_B } } = {}) {
   const rows = [];
   const warnings = [];
   const pool = {
@@ -49,7 +50,7 @@ export async function startDenialServer({ insert = null, extraRoutes = [] } = {}
         return { rows: [row] };
       }
       if (sql.includes('FROM tenants')) return { rows: [ { id: values[0], iam_realm: values[0] } ] };
-      if (sql.includes('FROM workspaces')) return { rows: [{ id: WS_B, tenant_id: TEN_B }] };
+      if (sql.includes('FROM workspaces')) return { rows: [workspaceRow] };
       if (sql.includes('FROM scope_enforcement_denials')) {
         let found = rows;
         for (const column of ['tenant_id', 'denial_type', 'actor_id']) {
@@ -90,7 +91,7 @@ export async function startDenialServer({ insert = null, extraRoutes = [] } = {}
     ...(route.module ? { module: fileURLToPath(new URL(`../../../${route.module.replace('/repo/', '')}`, import.meta.url)) } : {})
   });
   const bindings = {
-    http, pool, jwtVerifier, reserveHttpRequest, requestErrorForLog, compileRoutes, matchCompiledRoute, invokeRoute, PORT: 0,
+    http, pool, jwtVerifier, normalizeWorkspaceBinding, reserveHttpRequest, requestErrorForLog, compileRoutes, matchCompiledRoute, invokeRoute, PORT: 0,
     seedRoutes: [...routes, ...extraRoutes].map(remap),
     LOCAL_HANDLERS: locals,
     console: { error() {}, warn: (line) => warnings.push(line) },

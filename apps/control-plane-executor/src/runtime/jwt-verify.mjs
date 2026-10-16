@@ -19,17 +19,11 @@
 // per-resource tenant scoping downstream then enforces cross-tenant isolation. Tokens from an
 // issuer outside the trusted base are rejected.
 import crypto from 'node:crypto';
+import { normalizeWorkspaceBinding } from '../../../../packages/internal-contracts/src/workspace-binding.mjs';
 
 const b64urlToBuf = (s) => Buffer.from(s, 'base64url');
 const b64urlToJson = (s) => JSON.parse(b64urlToBuf(s).toString('utf8'));
 const ALG_DIGEST = { RS256: 'sha256', RS384: 'sha384', RS512: 'sha512' };
-
-function workspaceIdsFromClaims(claims) {
-  if (Array.isArray(claims.workspace_ids)) return claims.workspace_ids.map(String).filter(Boolean);
-  if (typeof claims.workspace_ids === 'string') return claims.workspace_ids.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean);
-  if (claims.workspace_id) return [String(claims.workspace_id)];
-  return undefined;
-}
 
 export function deriveIdentityFromClaims(claims, pathWorkspaceId) {
   const roles = claims.realm_access?.roles ?? [];
@@ -40,12 +34,16 @@ export function deriveIdentityFromClaims(claims, pathWorkspaceId) {
   // A tenant-only token (no workspace_id claim) leaves credentialWorkspaceId undefined,
   // which suppresses the path↔credential workspace binding check (the token is not
   // workspace-scoped and must not be rejected for addressing a specific workspace path).
-  const credentialWorkspaceId = claims.workspace_id ?? undefined;
-  const workspaceIds = workspaceIdsFromClaims(claims);
+  const binding = normalizeWorkspaceBinding(claims.workspace_id, claims.workspace_ids);
+  const credentialWorkspaceId = binding.singular;
+  const workspaceIds = binding.valid
+    ? binding.plural ?? (credentialWorkspaceId === undefined ? undefined : [credentialWorkspaceId])
+    : [];
   return {
     tenantId: claims.tenant_id ?? undefined,
-    workspaceId: credentialWorkspaceId ?? pathWorkspaceId,
-    credentialWorkspaceId,
+    workspaceId: binding.valid ? credentialWorkspaceId ?? pathWorkspaceId : null,
+    ...(credentialWorkspaceId !== undefined ? { credentialWorkspaceId } : {}),
+    ...(!binding.valid ? { invalidWorkspaceBinding: true } : {}),
     actorId: claims.sub,
     roleName: 'falcone_app', // a user/admin JWT is not an api-key → no SET ROLE / RLS dbRole
     roles,
