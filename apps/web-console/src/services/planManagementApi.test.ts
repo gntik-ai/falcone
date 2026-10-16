@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@in-falcone/console-api/session', () => ({ requestConsoleSessionJson: vi.fn() }))
 
 import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
-import { getMyPlanHistory } from './planManagementApi'
+import { getMyPlanHistory, getPlanLifecycleHistory, type PlanLifecycleHistoryEntry, type PaginationEnvelope } from './planManagementApi'
 
 const request = vi.mocked(requestConsoleSessionJson)
 const item = {
@@ -12,7 +12,7 @@ const item = {
   effectiveFrom: '2026-03-01T00:00:00Z', supersededAt: null
 }
 
-beforeEach(() => request.mockReset())
+beforeEach(() => { request.mockReset() })
 
 describe('getMyPlanHistory', () => {
   it('normalizes assignments from the self-history response and sends pagination only', async () => {
@@ -35,5 +35,23 @@ describe('getMyPlanHistory', () => {
   it('prefers items when present and preserves zero totals', async () => {
     request.mockResolvedValue({ items: [], assignments: [item], total: 0, page: 2, pageSize: 10 })
     expect(await getMyPlanHistory()).toEqual({ items: [], total: 0, page: 2, pageSize: 10 })
+  })
+})
+
+describe('getPlanLifecycleHistory', () => {
+  it('requests the plan lifecycle route with pagination and preserves its typed envelope', async () => {
+    const envelope: PaginationEnvelope<PlanLifecycleHistoryEntry> = {
+      items: [{ id: 'event-1', planId: 'plan-a', previousStatus: null, newStatus: 'active', transitionedAt: '2026-02-01T00:00:00.000Z', actorId: 'admin-1', correlationId: 'request-1' }],
+      total: 4, page: 2, pageSize: 3
+    }
+    request.mockResolvedValue(envelope)
+    expect(await getPlanLifecycleHistory('plan-a', { page: 2, pageSize: 3 })).toEqual(envelope)
+    expect(request).toHaveBeenCalledWith('/v1/plans/plan-a/lifecycle-history?page=2&pageSize=3', { method: 'GET', body: undefined })
+  })
+
+  it('uses the default pagination and propagates unavailable history', async () => {
+    request.mockRejectedValue(Object.assign(new Error('Forbidden'), { status: 403, code: 'FORBIDDEN' }))
+    await expect(getPlanLifecycleHistory('plan-a')).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
+    expect(request).toHaveBeenCalledWith('/v1/plans/plan-a/lifecycle-history?page=1&pageSize=20', { method: 'GET', body: undefined })
   })
 })

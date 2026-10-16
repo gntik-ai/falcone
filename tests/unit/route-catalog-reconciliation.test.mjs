@@ -93,3 +93,15 @@ test('handler export introspection is isolated from the caller environment', asy
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('plan lifecycle history resolves as an internal superadmin route with pagination', () => {
+  const path = '/v1/plans/{planId}/lifecycle-history';
+  const matched = matchRoute(loadRoutes(runtime, routes), 'GET', '/v1/plans/plan-a/lifecycle-history');
+  assert.ok(matched);
+  assert.equal(matched.route.module, '/repo/packages/provisioning-orchestrator/src/actions/plan-lifecycle-history.mjs');
+  assert.equal(matched.route.auth, 'superadmin');
+  assert.equal(matched.route.invoke, 'callercontext-overrides');
+  assert.equal(matched.route.mergeQueryIntoParams, true);
+  assert.deepEqual(matched.route.deps, ['db']);
+  assert.ok(catalog.some(route => route.path === path && route.family === 'plans' && route.auth === 'superadmin'));
+});
