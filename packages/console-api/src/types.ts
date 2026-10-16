@@ -8,6 +8,25 @@ export interface WorkspaceCollectionResponse {
   page: PageInfo
 }
 
+export interface IamUserRoleAssignmentResponse {
+  userId: string
+  realm: string
+  assigned: string[]
+}
+
+export interface IamUserRoleRemovalResponse {
+  userId: string
+  realm: string
+  removed: string[]
+}
+
+export interface IamUserGroupMembershipResponse {
+  userId: string
+  groupId: string
+  realm: string
+  member: boolean
+}
+
 export interface PageInfo {
   after?: string | null
 }
