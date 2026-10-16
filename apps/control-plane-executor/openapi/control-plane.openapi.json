@@ -62869,6 +62869,4024 @@
           "policy": "Authenticated verified actor within the owning tenant, or platform superadmin/internal."
         }
       }
+    },
+    "/v1/flows/workspaces/{workspaceId}/executions/{executionId}/events": {
+      "get": {
+        "operationId": "streamFlowExecutionEvents",
+        "summary": "Stream execution monitoring events",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "required": false,
+            "description": "Resume after this event sequence.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "headerApiKey": []
+          },
+          {
+            "queryApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Named SSE events. Ignore retry and comment frames; each data field is a FlowExecutionEventFrame.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowExecutionEventFrame"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}": {
+      "get": {
+        "operationId": "getFlowDefinition",
+        "summary": "Get a flow definition",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowDefinitionRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_definition",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified"
+      },
+      "patch": {
+        "operationId": "updateFlowDefinition",
+        "summary": "Update a flow draft",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlowDefinitionUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowDefinitionRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_definition",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions": {
+      "get": {
+        "operationId": "listFlowExecutions",
+        "summary": "List executions of a flow",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FlowExecutionSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}": {
+      "get": {
+        "operationId": "getFlowExecution",
+        "summary": "Get execution details and scheduled activity events",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowExecutionDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/cancellations": {
+      "post": {
+        "operationId": "cancelFlowExecution",
+        "summary": "Request execution cancellation",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowExecutionCancellation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/retries": {
+      "post": {
+        "operationId": "retryFlowExecution",
+        "summary": "Retry an execution using its pinned version",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowExecutionRetry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions/{executionId}/signals/{signalName}": {
+      "post": {
+        "operationId": "signalFlowExecution",
+        "summary": "Deliver an allowed approval signal",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "signalName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlowSignalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowSignalDelivery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_execution",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule": {
+      "get": {
+        "operationId": "getFlowSchedule",
+        "summary": "Get a published flow schedule",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowSchedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_schedule",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/pause": {
+      "post": {
+        "operationId": "pauseFlowSchedule",
+        "summary": "Pause a flow schedule",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowSchedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_schedule",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/resume": {
+      "post": {
+        "operationId": "resumeFlowSchedule",
+        "summary": "Resume a flow schedule",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowSchedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_schedule",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/schedule/trigger": {
+      "post": {
+        "operationId": "triggerFlowSchedule",
+        "summary": "Trigger a flow schedule now",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowScheduleTrigger"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_schedule",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/validate": {
+      "post": {
+        "operationId": "validateFlowDefinition",
+        "summary": "Validate the stored flow draft",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowDefinitionValidation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_definition",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/flows/{flowId}/versions": {
+      "post": {
+        "operationId": "publishFlowVersion",
+        "summary": "Validate and publish a flow version",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowVersionPublication"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_definition",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/schedules": {
+      "get": {
+        "operationId": "listFlowSchedules",
+        "summary": "List workspace flow schedules",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FlowSchedule"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_schedule",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/flows/workspaces/{workspaceId}/task-types": {
+      "get": {
+        "operationId": "listFlowTaskTypes",
+        "summary": "List first-party task-type descriptors",
+        "tags": [
+          "Flows"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FlowTaskTypeDescriptor"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "flows",
+        "x-scope": "workspace",
+        "x-resource-type": "flow_task_type",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/rows/bulk/insert": {
+      "post": {
+        "operationId": "bulkInsertPostgresRows",
+        "summary": "Insert PostgreSQL rows through the rows bulk alias",
+        "tags": [
+          "Postgres"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/DatabaseName"
+          },
+          {
+            "$ref": "#/components/parameters/SchemaName"
+          },
+          {
+            "$ref": "#/components/parameters/TableName"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "headerApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostgresDataBulkInsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostgresRowsBulkInsertResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "postgres",
+        "x-scope": "workspace",
+        "x-resource-type": "postgres_data_bulk",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/workspaces/{workspaceId}/api-keys": {
+      "get": {
+        "operationId": "listWorkspaceApiKeys",
+        "summary": "List workspace API keys without credential values",
+        "tags": [
+          "Workspaces"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WorkspaceApiKeyRecord"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-resource-type": "workspace_api_key",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-read",
+        "x-contract-source": "unified"
+      },
+      "post": {
+        "operationId": "createWorkspaceApiKey",
+        "summary": "Issue a workspace API key",
+        "tags": [
+          "Workspaces"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceApiKeyIssueRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceApiKeyIssued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-resource-type": "workspace_api_key",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/workspaces/{workspaceId}/api-keys/{keyId}": {
+      "delete": {
+        "operationId": "revokeWorkspaceApiKey",
+        "summary": "Revoke a workspace API key",
+        "tags": [
+          "Workspaces"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "keyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceApiKeyRevocation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-resource-type": "workspace_api_key",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
+    },
+    "/v1/workspaces/{workspaceId}/api-keys/{keyId}/rotations": {
+      "post": {
+        "operationId": "rotateWorkspaceApiKey",
+        "summary": "Rotate a workspace API key",
+        "tags": [
+          "Workspaces"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "keyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Operation completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceApiKeyIssued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: no verified tenant identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested mutation conflicts with the resource state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Gateway rejected an oversized request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit or flow quota exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Gateway rejected invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the downstream response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected executor or gateway error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-resource-type": "workspace_api_key",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin"
+        ],
+        "x-tenant-binding": "required",
+        "x-workspace-binding": "required",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-contract-source": "unified"
+      }
     }
   },
   "components": {
@@ -98806,6 +102824,865 @@
           "total"
         ],
         "type": "object"
+      },
+      "FlowExecutionEventFrame": {
+        "description": "JSON data in each named SSE event; retry and comment frames carry no JSON data.",
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "id",
+              "nodeId",
+              "status"
+            ],
+            "properties": {
+              "type": {
+                "const": "node-status"
+              },
+              "id": {
+                "type": "string"
+              },
+              "nodeId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "scheduled",
+                  "started",
+                  "retrying",
+                  "completed",
+                  "failed",
+                  "skipped",
+                  "waiting-approval"
+                ]
+              },
+              "attemptNumber": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "startedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "completedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "error": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "message"
+                ],
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  },
+                  "stack": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "id",
+              "level",
+              "message"
+            ],
+            "properties": {
+              "type": {
+                "const": "log-line"
+              },
+              "id": {
+                "type": "string"
+              },
+              "nodeId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "level": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "status"
+            ],
+            "properties": {
+              "type": {
+                "const": "stream-end"
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "properties": {
+              "code": {
+                "const": "FLOW_MONITORING_STREAM_ERROR"
+              }
+            }
+          }
+        ]
+      },
+      "FlowDefinitionRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flowId",
+          "name",
+          "status",
+          "dslApiVersion",
+          "definitionYaml",
+          "definition",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "flowId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string"
+          },
+          "dslApiVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "definitionYaml": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "definition": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FlowDefinitionUpdateRequest": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "definition": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "definition_json": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "definitionJson": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "definition_yaml": {
+            "type": "string"
+          },
+          "definitionYaml": {
+            "type": "string"
+          }
+        }
+      },
+      "FlowExecutionSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "executionId",
+          "workflowId",
+          "runId",
+          "status",
+          "startedAt",
+          "closedAt"
+        ],
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workflowId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "runId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "FlowExecutionDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "executionId",
+          "workflowId",
+          "status",
+          "version",
+          "startedAt",
+          "closedAt",
+          "input",
+          "result",
+          "events"
+        ],
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workflowId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": [
+              "string",
+              "integer",
+              "null"
+            ]
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "input": {
+            "type": "null"
+          },
+          "result": {
+            "type": "null"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "nodeId",
+                "eventId",
+                "type"
+              ],
+              "properties": {
+                "nodeId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "eventId": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "ActivityScheduled"
+                }
+              }
+            }
+          }
+        }
+      },
+      "FlowExecutionCancellation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "executionId",
+          "workflowId",
+          "status"
+        ],
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workflowId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "Cancelling"
+          }
+        }
+      },
+      "FlowExecutionRetry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "executionId",
+          "workflowId",
+          "runId",
+          "version",
+          "retriedFrom",
+          "status"
+        ],
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workflowId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "runId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "retriedFrom": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "Running"
+          }
+        }
+      },
+      "FlowSignalRequest": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [],
+        "properties": {
+          "approved": {
+            "type": "boolean"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "nodeId": {
+            "type": "string"
+          }
+        }
+      },
+      "FlowSignalDelivery": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "executionId",
+          "workflowId",
+          "signal",
+          "delivered"
+        ],
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workflowId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "signal": {
+            "type": "string",
+            "minLength": 1
+          },
+          "delivered": {
+            "const": true
+          }
+        }
+      },
+      "FlowSchedule": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scheduleId",
+          "flowId",
+          "workspaceId",
+          "paused",
+          "note",
+          "cron",
+          "nextActionTimes",
+          "recentActions"
+        ],
+        "properties": {
+          "scheduleId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "flowId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cron": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextActionTimes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "recentActions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "scheduledAt",
+                "takenAt",
+                "workflowId"
+              ],
+              "properties": {
+                "scheduledAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "takenAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "workflowId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "FlowScheduleTrigger": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "scheduleId"
+        ],
+        "properties": {
+          "status": {
+            "const": "triggered"
+          },
+          "scheduleId": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "FlowDefinitionValidation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "valid"
+        ],
+        "properties": {
+          "valid": {
+            "const": true
+          }
+        }
+      },
+      "FlowVersionPublication": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flowId",
+          "version",
+          "createdAt"
+        ],
+        "properties": {
+          "flowId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "triggers": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cron",
+              "webhooks",
+              "events"
+            ],
+            "properties": {
+              "cron": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "webhooks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "triggerId",
+                    "secret"
+                  ],
+                  "properties": {
+                    "triggerId": {
+                      "type": "string"
+                    },
+                    "secret": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "triggerId",
+                    "topicRef"
+                  ],
+                  "properties": {
+                    "triggerId": {
+                      "type": "string"
+                    },
+                    "topicRef": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "FlowTaskTypeDescriptor": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "category",
+          "inputSchema"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1
+          },
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "PostgresRowsBulkInsertResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "affected",
+          "access"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "affected": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "access": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reason",
+              "rlsEnforced",
+              "rowPredicateRequired"
+            ],
+            "properties": {
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rlsEnforced": {
+                "type": "boolean"
+              },
+              "rowPredicateRequired": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "WorkspaceApiKeyRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "keyType",
+          "prefix",
+          "scopes",
+          "status",
+          "createdAt",
+          "lastUsedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "keyType": {
+            "enum": [
+              "anon",
+              "service"
+            ]
+          },
+          "prefix": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "enum": [
+              "active",
+              "revoked"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "WorkspaceApiKeyIssueRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "keyType": {
+            "type": "string",
+            "enum": [
+              "anon",
+              "service"
+            ],
+            "default": "anon"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "data:read",
+                "data:write",
+                "ddl:write"
+              ]
+            }
+          }
+        }
+      },
+      "WorkspaceApiKeyIssued": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "key",
+          "prefix",
+          "keyType",
+          "scopes",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "key": {
+            "type": "string",
+            "description": "Generated credential returned once; never included in list responses.",
+            "writeOnly": false
+          },
+          "prefix": {
+            "type": "string",
+            "minLength": 1
+          },
+          "keyType": {
+            "enum": [
+              "anon",
+              "service"
+            ]
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WorkspaceApiKeyRevocation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "revoked"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revoked": {
+            "const": true
+          }
+        }
       }
     }
   }

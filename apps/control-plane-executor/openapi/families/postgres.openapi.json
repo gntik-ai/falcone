@@ -6208,6 +6208,49 @@
         ],
         "type": "object"
       },
+      "PostgresRowsBulkInsertResult": {
+        "additionalProperties": false,
+        "properties": {
+          "access": {
+            "additionalProperties": false,
+            "properties": {
+              "reason": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "rlsEnforced": {
+                "type": "boolean"
+              },
+              "rowPredicateRequired": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "reason",
+              "rlsEnforced",
+              "rowPredicateRequired"
+            ],
+            "type": "object"
+          },
+          "affected": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "affected",
+          "access"
+        ],
+        "type": "object"
+      },
       "PostgresSavedQueryCollection": {
         "additionalProperties": false,
         "properties": {
@@ -22898,6 +22941,212 @@
         "x-resource-type": "postgres_data_rows",
         "x-scope": "workspace",
         "x-visibility": "public"
+      }
+    },
+    "/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/rows/bulk/insert": {
+      "post": {
+        "operationId": "bulkInsertPostgresRows",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/DatabaseName"
+          },
+          {
+            "$ref": "#/components/parameters/SchemaName"
+          },
+          {
+            "$ref": "#/components/parameters/TableName"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostgresDataBulkInsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostgresRowsBulkInsertResult"
+                }
+              }
+            },
+            "description": "Operation completed."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Malformed request or invalid definition (FLOW_DEFINITION_INVALID), SQL plan (PLAN_REJECTED), or API key type/scopes (INVALID_KEY_TYPE, SCOPE_EXCEEDS_KEY_TYPE)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "UNAUTHENTICATED: no verified tenant identity."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "CROSS_TENANT_VIOLATION: workspace belongs to another tenant. FORBIDDEN: credential workspace binding or caller role does not permit access. INSUFFICIENT_SCOPE: API key lacks the required data scope."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested workspace, flow, execution, schedule, table or key was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The requested mutation conflicts with the resource state."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected an oversized request body."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FLOW_VALIDATION_FAILED, INVALID_YAML or UNKNOWN_SIGNAL: flow validation or signal delivery was rejected."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rate limit or flow quota exceeded."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected invalid or oversized request headers."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The external dependency is unavailable or the mutation audit could not be persisted."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out waiting for the downstream response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected executor or gateway error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "headerApiKey": []
+          }
+        ],
+        "summary": "Insert PostgreSQL rows through the rows bulk alias",
+        "tags": [
+          "Postgres"
+        ],
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_admin",
+          "superadmin",
+          "tenant_developer",
+          "tenant_viewer",
+          "workspace_developer",
+          "workspace_viewer",
+          "workspace_service_account",
+          "developer_external",
+          "platform_team"
+        ],
+        "x-contract-source": "unified",
+        "x-family": "postgres",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "data-write",
+        "x-resource-type": "postgres_data_bulk",
+        "x-scope": "workspace",
+        "x-tenant-binding": "required",
+        "x-visibility": "public",
+        "x-workspace-binding": "required"
       }
     },
     "/v1/postgres/workspaces/{workspaceId}/data/{databaseName}/schemas/{schemaName}/tables/{tableName}/rows/by-primary-key": {
