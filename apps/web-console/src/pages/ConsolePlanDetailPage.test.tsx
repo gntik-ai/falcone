@@ -1,12 +1,13 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ConsolePlanDetailPage } from './ConsolePlanDetailPage'
 import type { LimitProfileRow, PlanRecord } from '@/services/planManagementApi'
 
 const planApi = vi.hoisted(() => ({
   getPlan: vi.fn(),
+  getPlanLifecycleHistory: vi.fn(),
   getPlanLimitsProfile: vi.fn(),
   setPlanLimit: vi.fn(),
   removePlanLimit: vi.fn(),
@@ -58,7 +59,10 @@ async function openLimitsTab() {
 const apiError = (status: number, code: string) => Object.assign(new Error(code), { status, code })
 
 describe('ConsolePlanDetailPage', () => {
+  afterEach(() => { vi.unstubAllEnvs() })
   beforeEach(() => {
+    vi.stubEnv('VITE_PLAN_LIFECYCLE_HISTORY_ENABLED', undefined)
+    planApi.getPlanLifecycleHistory.mockReset()
     planApi.getPlan.mockReset()
     planApi.getPlanLimitsProfile.mockReset()
     planApi.setPlanLimit.mockReset()
@@ -75,6 +79,63 @@ describe('ConsolePlanDetailPage', () => {
       transitionedAt: '2026-07-01T00:00:00Z'
     })
     planApi.deletePlan.mockResolvedValue({ planId: 'p1', deleted: true })
+  })
+
+  it.each([undefined, '2026-07-01T00:00:00Z'])('shows exactly the current state and optional time with history disabled (%s)', async (updatedAt) => {
+    planApi.getPlan.mockResolvedValue({ ...plan, updatedAt })
+    renderPage()
+    const timeline = await screen.findByRole('list', { name: 'Historial de estados' })
+    expect(within(timeline).getAllByRole('listitem')).toHaveLength(1)
+    expect(timeline).toHaveTextContent('Activo')
+    expect(timeline).not.toHaveTextContent('Actor:')
+    expect(timeline.querySelector('time')?.getAttribute('datetime')).toBe(updatedAt)
+    expect(planApi.getPlanLifecycleHistory).not.toHaveBeenCalled()
+    expect(within(screen.getByRole('list', { name: 'Secuencia de estados del plan' })).getAllByRole('listitem')).toHaveLength(4)
+  })
+
+  it('shows recorded transitions newest first with actors beside the stepper', async () => {
+    vi.stubEnv('VITE_PLAN_LIFECYCLE_HISTORY_ENABLED', 'true')
+    planApi.getPlanLifecycleHistory.mockResolvedValue({ items: [
+      { id: 'newer', planId: 'p1', previousStatus: 'active', newStatus: 'deprecated', transitionedAt: '2026-07-02T00:00:00Z', actorId: 'admin-new', correlationId: 'r2' },
+      { id: 'older', planId: 'p1', previousStatus: 'draft', newStatus: 'active', transitionedAt: '2026-07-01T00:00:00Z', actorId: 'admin-old', correlationId: 'r1' }
+    ], total: 2, page: 1, pageSize: 20 })
+    renderPage()
+    await screen.findByText('Actor: admin-new')
+    const timeline = screen.getByRole('list', { name: 'Historial de estados' })
+    const entries = within(timeline).getAllByRole('listitem')
+    expect(entries).toHaveLength(2)
+    expect(entries[0]).toHaveTextContent('Activo → Obsoleto')
+    expect(entries[0]).toHaveTextContent('Actor: admin-new')
+    expect(entries[0].querySelector('time')).toHaveAttribute('datetime', '2026-07-02T00:00:00Z')
+    expect(entries[1]).toHaveTextContent('Borrador → Activo')
+    expect(entries[1]).toHaveTextContent('Actor: admin-old')
+    expect(planApi.getPlanLifecycleHistory).toHaveBeenCalledWith('p1')
+    expect(within(screen.getByRole('list', { name: 'Secuencia de estados del plan' })).getAllByRole('listitem')).toHaveLength(4)
+  })
+
+  it('keeps the interim entry and distinguishes no recorded transitions', async () => {
+    vi.stubEnv('VITE_PLAN_LIFECYCLE_HISTORY_ENABLED', 'true')
+    planApi.getPlanLifecycleHistory.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 })
+    renderPage()
+    expect(await screen.findByText('No hay transiciones registradas.')).toBeInTheDocument()
+    const timeline = screen.getByRole('list', { name: 'Historial de estados' })
+    expect(within(timeline).getAllByRole('listitem')).toHaveLength(1)
+    expect(timeline).toHaveTextContent('Activo')
+    expect(screen.queryByText('El historial de estados no está disponible.')).not.toBeInTheDocument()
+  })
+
+  it.each([403, 404, 400, 500, 'network'])('keeps the interim entry and shows unavailable rather than empty history on %s', async (failure) => {
+    vi.stubEnv('VITE_PLAN_LIFECYCLE_HISTORY_ENABLED', 'true')
+    planApi.getPlan.mockResolvedValue({ ...plan, updatedAt: '2026-07-01T00:00:00Z' })
+    planApi.getPlanLifecycleHistory.mockRejectedValue(typeof failure === 'number' ? apiError(failure, 'UNAVAILABLE') : new TypeError('Failed to fetch'))
+    renderPage()
+    expect(await screen.findByText('El historial de estados no está disponible.')).toBeInTheDocument()
+    const timeline = screen.getByRole('list', { name: 'Historial de estados' })
+    expect(within(timeline).getAllByRole('listitem')).toHaveLength(1)
+    expect(timeline).toHaveTextContent('Activo')
+    expect(timeline.querySelector('time')).toHaveAttribute('datetime', '2026-07-01T00:00:00Z')
+    expect(timeline).not.toHaveTextContent('Actor:')
+    expect(screen.queryByText('No hay transiciones registradas.')).not.toBeInTheDocument()
   })
 
   it('renders plan detail tabs', async () => {

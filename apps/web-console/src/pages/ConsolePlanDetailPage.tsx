@@ -194,6 +194,21 @@ export function ConsolePlanDetailPage() {
   const navigate = useNavigate()
   const destructiveOp = useDestructiveOp()
   const [plan, setPlan] = useState<api.PlanRecord | null>(null)
+  const historyEnabled =
+    import.meta.env.VITE_PLAN_LIFECYCLE_HISTORY_ENABLED === 'true'
+  const [history, setHistory] = useState<{ plan: api.PlanRecord; items: api.PlanLifecycleHistoryEntry[] | null } | null>(null)
+
+  useEffect(() => {
+    if (!historyEnabled || !plan) return
+    let cancelled = false
+    void api.getPlanLifecycleHistory(plan.id).then((result) => {
+      if (!cancelled) setHistory({ plan, items: result.items })
+    }).catch(() => {
+      if (!cancelled) setHistory({ plan, items: null })
+    })
+    return () => { cancelled = true }
+  }, [historyEnabled, plan])
+
   const [profile, setProfile] = useState<api.LimitProfileRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<PlanDetailTab>('info')
@@ -551,6 +566,25 @@ export function ConsolePlanDetailPage() {
             <p id="plan-lifecycle-help" className="max-w-3xl text-sm leading-6 text-muted-foreground">{lifecycleHelp}</p>
           </div>
           <div className="space-y-4 border-t border-border/70 pt-4 text-sm leading-6 text-muted-foreground lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+            <section aria-labelledby="plan-history-heading">
+              <h2 id="plan-history-heading" className="text-sm font-semibold text-foreground">Historial de estados</h2>
+              <ol aria-label="Historial de estados" className="mt-3 space-y-3 border-l border-border pl-4">
+                {historyEnabled && history?.plan === plan && history.items && history.items.length > 0 ? history.items.map((entry) => (
+                  <li key={entry.id}>
+                    <span className="font-medium text-foreground">{entry.previousStatus ? `${statusDisplayLabel(entry.previousStatus)} → ` : ''}{statusDisplayLabel(entry.newStatus)}</span>
+                    <time className="block text-xs" dateTime={entry.transitionedAt}>{new Date(entry.transitionedAt).toLocaleString('es')}</time>
+                    {entry.actorId ? <span className="block text-xs">Actor: {entry.actorId}</span> : null}
+                  </li>
+                )) : (
+                  <li>
+                    <span className="font-medium text-foreground">{statusDisplayLabel(plan.status)}</span>
+                    {plan.updatedAt ? <time className="block text-xs" dateTime={plan.updatedAt}>{new Date(plan.updatedAt).toLocaleString('es')}</time> : null}
+                  </li>
+                )}
+              </ol>
+              {historyEnabled && history?.plan === plan && history.items?.length === 0 ? <p className="mt-3 text-xs">No hay transiciones registradas.</p> : null}
+              {historyEnabled && history?.plan === plan && history.items === null ? <p role="alert" className="mt-3 text-xs text-destructive">El historial de estados no está disponible.</p> : null}
+            </section>
             <div className="flex gap-3">
               <Users className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               <p>{assignedTenantSummary(activeAssignmentCount)}</p>

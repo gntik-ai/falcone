@@ -145,6 +145,16 @@ export interface PlanLifecycleTransitionResponse {
   transitionedAt?: string
 }
 
+export interface PlanLifecycleHistoryEntry {
+  id: string
+  planId: string
+  previousStatus: PlanStatus | null
+  newStatus: PlanStatus
+  transitionedAt: string
+  actorId: string | null
+  correlationId: string | null
+}
+
 export interface PlanDeleteResponse {
   planId: string
   deleted: boolean
@@ -293,6 +303,9 @@ export function getPlan(planIdOrSlug: string) { return request<PlanRecord>(`/v1/
 export function updatePlan(planId: string, body: Record<string, unknown>) { return request<PlanRecord>(`/v1/plans/${planId}`, { method: 'PUT', body: JSON.stringify(body) }) }
 export function deletePlan(planId: string) { return request<PlanDeleteResponse>(`/v1/plans/${planId}`, { method: 'DELETE' }) }
 export function transitionPlanLifecycle(planId: string, body: { targetStatus: PlanStatus }) { return request<PlanLifecycleTransitionResponse>(`/v1/plans/${planId}/lifecycle`, { method: 'POST', body: JSON.stringify(body) }) }
+export function getPlanLifecycleHistory(planId: string, params: { page?: number; pageSize?: number } = {}) {
+  return request<PaginationEnvelope<PlanLifecycleHistoryEntry>>(withSearch(`/v1/plans/${encodeURIComponent(planId)}/lifecycle-history`, { page: params.page ?? 1, pageSize: params.pageSize ?? 20 }))
+}
 export function getPlanLimitsProfile(planId: string) { return request<{ planId: string; profile: LimitProfileRow[] }>(`/v1/plans/${planId}/limits`) }
 export function setPlanLimit(planId: string, dimensionKey: string, value: number) { return request<PlanLimitSetResponse>(`/v1/plans/${planId}/limits/${dimensionKey}`, { method: 'PUT', body: JSON.stringify({ value }) }) }
 export function removePlanLimit(planId: string, dimensionKey: string) { return request<PlanLimitRemoveResponse>(`/v1/plans/${planId}/limits/${dimensionKey}`, { method: 'DELETE' }) }
