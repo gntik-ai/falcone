@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Duplex } from 'node:stream';
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { deriveIdentityFromClaims } from '../../apps/control-plane-executor/src/runtime/jwt-verify.mjs';
 import { createApiKeyStore } from '../../apps/control-plane-executor/src/runtime/api-keys.mjs';
 import { createLlmExecutor } from '../../apps/control-plane-executor/src/runtime/llm-executor.mjs';
 import { createEmbeddingExecutor } from '../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
@@ -35,9 +36,12 @@ function serverFor({ role, binding, transport = 'jwt', foreignTenant = false }) 
     llmExecutor: createLlmExecutor(), embeddingExecutor: createEmbeddingExecutor(),
     resolveWorkspaceTenant: async () => tenantId,
     ...(transport === 'jwt' ? { jwtVerifier: { verify: async () => identity } } : {}),
+    ...(transport === 'claims' ? { jwtVerifier: { verify: async (_token, pathWorkspaceId) =>
+      deriveIdentityFromClaims({ tenant_id: identity.tenantId, sub: identity.actorId,
+        realm_access: { roles: [role] }, ...binding.claims }, pathWorkspaceId) } } : {}),
     logger: { error() {} },
   });
-  const headers = transport === 'jwt' ? { authorization: 'Bearer fixture' }
+  const headers = transport !== 'headers' ? { authorization: 'Bearer fixture' }
     : { 'x-tenant-id': identity.tenantId, 'x-actor-roles': role, 'x-auth-subject': identity.actorId,
       ...(binding.credentialWorkspaceId === undefined ? {} : { 'x-workspace-id': binding.credentialWorkspaceId }),
       ...(binding.workspaceIds === undefined ? {} : { 'x-actor-workspace-ids': binding.workspaceIds.length ? binding.workspaceIds.join(',') : ',' }) };
@@ -89,20 +93,24 @@ test('executor accepts an explicit singular trusted workspace binding for worksp
   }
 });
 
-for (const role of roles) for (const binding of [
+for (const role of [...roles, 'superadmin', 'platform_admin']) for (const binding of [
   { name: 'singular match', credentialWorkspaceId: workspaceId },
+  { name: 'equal pair', credentialWorkspaceId: workspaceId, workspaceIds: [workspaceId] },
+  { name: 'malformed singular', credentialWorkspaceId: `${workspaceId}, fixture-other`, invalid: true },
   { name: 'singular mismatch', credentialWorkspaceId: 'fixture-other' },
-  { name: 'singular match with empty plural', credentialWorkspaceId: workspaceId, workspaceIds: [] },
-  { name: 'singular match with different plural', credentialWorkspaceId: workspaceId, workspaceIds: ['fixture-other'] },
+  { name: 'singular match with empty plural', credentialWorkspaceId: workspaceId, workspaceIds: [], invalid: true },
+  { name: 'singular match with different plural', credentialWorkspaceId: workspaceId, workspaceIds: ['fixture-other'], invalid: true },
 ]) {
   test(`executor singular binding preserves role and plural restrictions: ${role}, ${binding.name}`, async () => {
     const { server, headers } = serverFor({ role, binding, transport: 'headers' });
-    const allowed = binding.name !== 'singular mismatch' && (['tenant_owner', 'tenant_admin'].includes(role)
-      || (['workspace_admin', 'workspace_owner'].includes(role) && binding.name === 'singular match'));
+    const allowed = !binding.invalid && binding.name !== 'singular mismatch'
+      && (['tenant_owner', 'tenant_admin', 'superadmin', 'platform_admin'].includes(role)
+        || ['workspace_admin', 'workspace_owner'].includes(role));
     for (const [method, path, success] of routes) {
       const result = await request(server, headers, method, path);
       assert.equal(result.status, allowed ? success : 403, `${method} ${path}`);
       if (!allowed) assert.equal(result.body.code, 'FORBIDDEN');
+      if (binding.invalid) assert.equal(result.body.message, 'Invalid workspace binding');
     }
   });
 }
@@ -151,4 +159,69 @@ for (const role of ['superadmin', 'platform_admin']) for (const binding of bindi
     const { server, headers } = serverFor({ role, binding });
     for (const [method, path, success] of routes) assert.equal((await request(server, headers, method, path)).status, success);
   });
+}
+
+// Transport actual JWT claim shapes through the production identity derivation;
+// a pre-normalized fixture identity would miss the coercion vulnerability.
+const invalidClaims = [
+  ['array singular', { workspace_id: [workspaceId] }],
+  ['number singular', { workspace_id: 7 }],
+  ['empty singular', { workspace_id: '' }],
+  ['spaces singular', { workspace_id: `${workspaceId} fixture-other` }],
+  ['comma singular', { workspace_id: `${workspaceId},fixture-other` }],
+  ['object singular', { workspace_id: {} }],
+  ['boolean singular', { workspace_id: false }],
+  ['nested plural', { workspace_ids: [[workspaceId]] }],
+  ['number element', { workspace_ids: [workspaceId, 7] }],
+  ['empty element', { workspace_ids: [''] }],
+  ['spaces element', { workspace_ids: [`${workspaceId} fixture-other`] }],
+  ['comma element', { workspace_ids: [`${workspaceId},fixture-other`] }],
+  ['object plural', { workspace_ids: {} }],
+  ['number plural', { workspace_ids: 7 }],
+  ['boolean plural', { workspace_ids: false }],
+  ['tab plural', { workspace_ids: `${workspaceId}\tfixture-other` }],
+  ['different pair', { workspace_id: workspaceId, workspace_ids: ['fixture-other'] }],
+  ['additional workspace', { workspace_id: workspaceId, workspace_ids: [workspaceId, 'fixture-other'] }],
+  ['empty array pair', { workspace_id: workspaceId, workspace_ids: [] }],
+  ['empty string pair', { workspace_id: workspaceId, workspace_ids: '' }],
+  ['empty separators pair', { workspace_id: workspaceId, workspace_ids: ',' }],
+  ['different string pair', { workspace_id: workspaceId, workspace_ids: 'fixture-other' }],
+];
+for (const role of [...roles, 'superadmin', 'platform_admin']) {
+  for (const [name, claims] of invalidClaims) {
+    test(`executor invalid JWT claims deny every structural route: ${role}, ${name}`, async () => {
+      const { server, headers } = serverFor({ role, binding: { claims }, transport: 'claims' });
+      for (const [method, path] of routes) {
+        const result = await request(server, headers, method, path);
+        assert.equal(result.status, 403, `${method} ${path}`);
+        assert.deepEqual(result.body, { code: 'FORBIDDEN', message: 'Invalid workspace binding' });
+      }
+    });
+  }
+  for (const [name, claims, bound = false, mismatch = false] of [
+    ['absent', {}],
+    ['null', { workspace_id: null, workspace_ids: null }],
+    ['empty array', { workspace_ids: [] }],
+    ['empty string', { workspace_ids: '' }],
+    ['empty separators', { workspace_ids: ',' }],
+    ['singular', { workspace_id: workspaceId }, true],
+    ['plural', { workspace_ids: [workspaceId] }, true],
+    ['plural string', { workspace_ids: workspaceId }, true],
+    ['equal pair', { workspace_id: workspaceId, workspace_ids: [workspaceId] }, true],
+    ['equal string pair', { workspace_id: workspaceId, workspace_ids: workspaceId }, true],
+    ['equal duplicates', { workspace_id: workspaceId, workspace_ids: `${workspaceId},${workspaceId}` }, true],
+    ['other plural', { workspace_ids: ['fixture-other'] }],
+    ['other singular', { workspace_id: 'fixture-other' }, false, true],
+  ]) {
+    test(`executor valid JWT claims preserve structural role matrix: ${role}, ${name}`, async () => {
+      const { server, headers } = serverFor({ role, binding: { claims }, transport: 'claims' });
+      const allowed = !mismatch && (['superadmin', 'platform_admin', 'tenant_owner', 'tenant_admin'].includes(role)
+        || (['workspace_admin', 'workspace_owner'].includes(role) && bound));
+      for (const [method, path, success] of routes) {
+        const result = await request(server, headers, method, path);
+        assert.equal(result.status, allowed ? success : 403, `${method} ${path}`);
+        if (!allowed) assert.equal(result.body.code, 'FORBIDDEN');
+      }
+    });
+  }
 }

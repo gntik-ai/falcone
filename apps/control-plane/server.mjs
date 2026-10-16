@@ -17,6 +17,7 @@
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { reserveHttpRequest } from '../../packages/internal-contracts/src/http-idempotency.mjs';
+import { normalizeWorkspaceBinding } from '../../packages/internal-contracts/src/workspace-binding.mjs';
 import { requestErrorForLog } from '../../packages/internal-contracts/src/request-log.mjs';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
@@ -199,12 +200,6 @@ function deriveActorType(claims) {
   for (const [role, type] of KNOWN_ROLE_TO_ACTORTYPE) if (roles.includes(role)) return type;
   return 'tenant_member';
 }
-function workspaceIdsFromClaims(claims) {
-  if (Array.isArray(claims.workspace_ids)) return claims.workspace_ids.map(String).filter(Boolean);
-  if (typeof claims.workspace_ids === 'string') return claims.workspace_ids.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean);
-  if (claims.workspace_id) return [String(claims.workspace_id)];
-  return [];
-}
 async function authenticate(headers) {
   const auth = headers['authorization'];
   if (!auth || !/^bearer\s+/i.test(auth)) return null;
@@ -217,11 +212,13 @@ async function authenticate(headers) {
   // cryptographically bound to the signature and cannot be forged by a claim, so a tenant-A token
   // can never act as tenant B. Platform/legacy tokens keep the tenant_id claim.
   const tenantId = trust.kind === 'tenant' ? trust.realm : (payload.tenant_id ?? null);
-  const workspaceIds = workspaceIdsFromClaims(payload);
+  const binding = normalizeWorkspaceBinding(payload.workspace_id, payload.workspace_ids);
+  const workspaceIds = binding.plural ?? (binding.singular === undefined ? [] : [binding.singular]);
   return {
     sub: payload.sub,
     tenantId,
-    workspaceId: payload.workspace_id ?? null,
+    workspaceId: binding.singular ?? null,
+    ...(!binding.valid ? { invalidWorkspaceBinding: true } : {}),
     workspaceIds,
     actorType: deriveActorType(payload),
     privilegeDomains: payload.privilegeDomains ?? payload.privilege_domains ?? {},
@@ -232,7 +229,7 @@ async function authenticate(headers) {
     trustedHeaders: {
       'x-auth-subject': payload.sub ?? '',
       'x-tenant-id': tenantId ?? '',
-      'x-workspace-id': payload.workspace_id ?? '',
+      'x-workspace-id': binding.singular ?? '',
       'x-actor-type': deriveActorType(payload),
       'x-actor-roles': roles.join(','),
       'x-actor-scopes': scopes.join(',')
@@ -339,6 +336,13 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 401, route.auth === 'knative_status'
           ? knativeRuntimeAuthenticationError('UNAUTHENTICATED', correlationId)
           : { code: 'UNAUTHENTICATED', message: 'Missing or invalid Bearer token' });
+      }
+      if (identity.invalidWorkspaceBinding) {
+        void recordRouteDenial(pool, route, { identity, params: matched.params, req },
+          { statusCode: 403 }, correlationId, console, 'WORKSPACE_SCOPE_MISMATCH');
+        return sendJson(res, 403, route.auth === 'knative_status'
+          ? knativeRuntimeAuthorizationError(correlationId)
+          : { code: 'FORBIDDEN', message: 'Invalid workspace binding' });
       }
       if (!authzOk(route, identity)) {
         // Route-gate denials must carry the required role too (#958).

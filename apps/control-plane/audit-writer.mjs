@@ -210,7 +210,7 @@ function denialActorType(actorType) {
 // (best-effort). Attributed to the caller's verified tenant + actor and the request
 // correlation id (generated if absent), so a tenant's audit query surfaces its own denied
 // attempts. Unattributable denials are logged without request or credential material.
-export async function recordRouteDenial(db, route, ctx, result, correlationId, log = console) {
+export async function recordRouteDenial(db, route, ctx, result, correlationId, log = console, denialType = 'ROLE_INSUFFICIENT') {
   try {
     if ((result?.statusCode ?? 200) !== 403) return null;
     const identity = ctx.identity ?? {};
@@ -232,7 +232,7 @@ export async function recordRouteDenial(db, route, ctx, result, correlationId, l
       workspaceId: identity.workspaceId ?? null,
       actorId,
       actorType,
-      denialType: 'ROLE_INSUFFICIENT',
+      denialType,
       requiredRole: route?.auth ?? null,
       httpMethod: ctx.req?.method ?? route?.method ?? 'GET',
       requestPath: route?.path ?? '/',

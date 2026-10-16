@@ -11,6 +11,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { randomUUID } from 'node:crypto';
 import { reserveHttpRequest, invalidIdempotencyKeyResponse, isMutationMethod } from '../../../../packages/internal-contracts/src/http-idempotency.mjs';
+import { normalizeWorkspaceBinding } from '../../../../packages/internal-contracts/src/workspace-binding.mjs';
 import { requestErrorForLog } from '../../../../packages/internal-contracts/src/request-log.mjs';
 import { recordHttp, recordMcpDependency, renderMetrics, setHttpRouteTemplates, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
 import { executePostgresData } from './postgres-data-executor.mjs';
@@ -145,13 +146,13 @@ function identityFromHeaders(headers, pathWorkspaceId) {
     ? rawRoles.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean)
     : undefined;
   const rawWorkspaceIds = headers['x-actor-workspace-ids'] || headers['x-workspace-ids'];
-  const workspaceIds = typeof rawWorkspaceIds === 'string'
-    ? rawWorkspaceIds.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean)
-    : undefined;
-  const credentialWorkspaceId = headers['x-workspace-id'] || undefined;
+  const binding = normalizeWorkspaceBinding(headers['x-workspace-id'] || undefined, rawWorkspaceIds || undefined);
+  const workspaceIds = binding.valid ? binding.plural : [];
+  const credentialWorkspaceId = binding.singular;
   return {
     tenantId: headers['x-tenant-id'],
-    workspaceId: credentialWorkspaceId || pathWorkspaceId,
+    workspaceId: binding.valid ? credentialWorkspaceId ?? pathWorkspaceId : null,
+    ...(!binding.valid ? { invalidWorkspaceBinding: true } : {}),
     // A trusted gateway header is an explicit singular credential binding just like an API key or
     // JWT workspace_id claim. Keeping this distinct from the path fallback prevents a caller whose
     // verified header names workspace B from addressing workspace A through any hosted MCP route.
@@ -1429,6 +1430,9 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       metric.tenantId = identity.tenantId ?? '';
       if (!opts?.noAuth && !identity.tenantId) {
         return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
+      }
+      if (!opts?.noAuth && identity.invalidWorkspaceBinding) {
+        return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Invalid workspace binding' });
       }
       const workspaceInPath = workspaceIdFromPath(url.pathname);
       const structuralWrite = !opts?.noAuth && isStructuralWriteRequest(method, url.pathname);
