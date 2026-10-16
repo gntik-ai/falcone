@@ -587,7 +587,7 @@ test('bbx-1101-watcher: a cancelled release fails loudly with a rerun command', 
   });
   assert.equal(result.status, 1);
   assert.match(result.stdout, /::error::.*123.*gh run rerun 123/);
-  assert.ok(result.stdout.includes('https://github.com/gntik-ai/falcone/actions/runs/123'));
+  assert.match(result.stdout, /\(https:\/\/github\.com\/gntik-ai\/falcone\/actions\/runs\/123\)/);
 });
 
 test('bbx-1101-gates: no failure bypasses, credential leaks or expressions in shell scripts', () => {
