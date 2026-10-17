@@ -1,6 +1,6 @@
 export function compilePath(tmpl) {
   const rx = tmpl
-    .replace(/[.+^${}()|[\]\\]/g, (m) => '\\' + m)         // escape regex metas (our { } handled next)
+    .replace(/[.+^${}()|[\]\\*]/g, (m) => '\\' + m)         // escape regex metas (our { } handled next)
     .replace(/\\\{([a-zA-Z0-9_]+)\\\}/g, '(?<$1>[^/]+)')    // {param} -> named group
     .replace(/\/\\\*$/, '(?:/.*)?')                          // trailing /* -> optional rest
     .replace(/\\\*/g, '.*');                                 // bare * -> rest
