@@ -60,6 +60,7 @@ jobs:
         run: |
           node --test tests/blackbox/llm-stores.test.mjs \
             tests/blackbox/llm-completion-routes.test.mjs \
+            tests/blackbox/llm-connection-selection.test.mjs \
             tests/blackbox/llm-provider-connections-registry.test.mjs \
             tests/blackbox/llm-connection-models.test.mjs \
             tests/blackbox/llm-model-admission.test.mjs \

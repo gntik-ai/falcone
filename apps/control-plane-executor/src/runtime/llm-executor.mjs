@@ -612,6 +612,19 @@ export function createLlmExecutor(options = {}) {
     return config;
   }
 
+  // Named selection fails closed; admin connection routes retain the store's status codes.
+  async function resolveConnectionOrThrow(workspaceId, connectionId, tenantId) {
+    validateConnection({}, connectionId);
+    try {
+      return await providerStore.getConnection(workspaceId, connectionId, tenantId);
+    } catch (err) {
+      if (err.statusCode === 404 || err.code === '42P01') {
+        throw clientError('LLM connection not found', 422, 'LLM_CONNECTION_NOT_FOUND');
+      }
+      throw err;
+    }
+  }
+
   // Pick the effective model and enforce the allow-list BEFORE any provider call. An empty
   // allow-list is treated as "no model permitted" so a misconfigured provider fails closed.
   function resolveAllowedModel(config, model) {
@@ -641,10 +654,12 @@ export function createLlmExecutor(options = {}) {
     return httpLlmBackend({ providerType: config.providerType, fetchImpl });
   }
 
-  async function prepare(workspaceId, { tenantId, model, responseFormat, promptCache, stream, maxTokens } = {}) {
+  async function prepare(workspaceId, { tenantId, connectionId, model, responseFormat, promptCache, stream, maxTokens } = {}) {
     if (promptCache !== undefined && promptCache !== 'system') throw clientError('Invalid promptCache', 400, 'INVALID_PROMPT_CACHE');
     assertResponseFormat(responseFormat);
-    const config = await resolveProviderOrThrow(workspaceId, tenantId);
+    const config = connectionId === undefined
+      ? await resolveProviderOrThrow(workspaceId, tenantId)
+      : await resolveConnectionOrThrow(workspaceId, connectionId, tenantId);
     if (responseFormat !== undefined && !resolveLlmAdapter(config.providerType).surface.structuredOutput) {
       throw clientError('Structured output is unsupported by this provider', 422, 'LLM_STRUCTURED_OUTPUT_UNSUPPORTED');
     }
@@ -673,8 +688,8 @@ export function createLlmExecutor(options = {}) {
     return providerStore.deployProvider(workspaceId, config);
   }
 
-  async function complete(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache, stream = false } = {}) {
-    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat, promptCache, stream, maxTokens });
+  async function complete(workspaceId, { tenantId, connectionId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache, stream = false } = {}) {
+    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, connectionId, model, responseFormat, promptCache, stream, maxTokens });
     const built = normalizeMessages({ messages, prompt, system });
     const out = await backend.complete({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat, promptCache });
     if (responseFormat !== undefined && out.finishReason === 'stop') {
@@ -688,8 +703,8 @@ export function createLlmExecutor(options = {}) {
 
   // Streaming variant: yields `{ type:'delta', content }` frames, records usage when the terminal
   // usage frame arrives, then yields a final `{ type:'usage', usage }` frame.
-  async function* completeStream(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache } = {}) {
-    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat, promptCache, stream: true, maxTokens });
+  async function* completeStream(workspaceId, { tenantId, connectionId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache } = {}) {
+    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, connectionId, model, responseFormat, promptCache, stream: true, maxTokens });
     const built = normalizeMessages({ messages, prompt, system });
     for await (const frame of backend.stream({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat, promptCache })) {
       if (frame?.type === 'error') {

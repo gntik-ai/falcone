@@ -158,6 +158,7 @@ const DESCRIPTORS = [
       required: ['model'],
       properties: {
         model: { type: 'string' },
+        connectionId: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]{0,62}$' },
         messages: {
           type: 'array',
           items: {

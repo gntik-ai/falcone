@@ -6,6 +6,7 @@
 // non-retryable MODEL_NOT_ALLOWED classification of an executor allow-list rejection.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import Ajv from 'ajv';
 
 import {
   dispatchTask,
@@ -68,4 +69,36 @@ test('bbx-llm-act-04: executor MODEL_NOT_ALLOWED (422) → non-retryable MODEL_N
       return true;
     },
   );
+});
+
+test('llm.complete forwards a literal connectionId with the token-bound workspace', async () => {
+  const tenant = { ...TENANT, executionToken: await mintExecutionToken(TENANT.tenantId, TENANT.workspaceId) };
+  let request;
+  const out = await dispatchTask({ ...base, tenant, params: { model: 'gpt-allowed', connectionId: 'anthropic-main' } }, {
+    executeLlmComplete: async req => { request = req; return { content: 'named' }; },
+  });
+  assert.equal(out.output.content, 'named');
+  assert.equal(request.connectionId, 'anthropic-main');
+  assert.equal(request.workspaceId, TENANT.workspaceId);
+  assert.equal(request.tenantId, TENANT.tenantId);
+});
+
+
+test('connection selection errors are non-retryable', async () => {
+  for (const [statusCode, code] of [[422, 'LLM_CONNECTION_NOT_FOUND'], [400, 'INVALID_CONNECTION_ID']]) {
+    await assert.rejects(() => llmComplete({ params: { model: 'gpt-allowed', connectionId: 'anthropic-main' }, tenant: TENANT }, {
+      executeLlmComplete: async () => { throw clientError('connection rejected', statusCode, code); },
+    }), { type: code, nonRetryable: true });
+  }
+});
+
+test('activity schema accepts an optional literal connectionId and rejects non-strings', () => {
+  const schema = resolveActivity('llm.complete').inputSchema;
+  const validate = new Ajv({ strict: false }).compile(schema);
+  assert.deepEqual(schema.required, ['model']);
+  assert.equal(validate({ model: 'gpt-allowed' }), true);
+  assert.equal(validate({ model: 'gpt-allowed', connectionId: 'anthropic-main' }), true);
+  for (const connectionId of [null, false, 1, {}, []]) {
+    assert.equal(validate({ model: 'gpt-allowed', connectionId }), false);
+  }
 });
