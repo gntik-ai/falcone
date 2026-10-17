@@ -650,5 +650,20 @@
     "method": "POST",
     "path": "/v1/workspaces/{workspaceId}/databases",
     "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/workspaces/{id}/llm-providers",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/workspaces/{id}/llm-providers/{connectionId}",
+    "privilege_domain": "structural_admin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/workspaces/{id}/llm-providers/{connectionId}",
+    "privilege_domain": "structural_admin"
   }
 ]
