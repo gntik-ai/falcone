@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: 'c28964f8474d5d765648984f2db1b6a732224531'
+  FALCONE_CHARTS_REF: 'cdaa49ba8ef317a56b2f70595a66db6d957e9d46'
 
 jobs:
   quality:
@@ -334,6 +334,12 @@ jobs:
           FLOW_CREDENTIALS_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
           FLOW_CREDENTIALS_TEST_REQUIRED: '1'
         run: node --test tests/integration/flow-execution-credentials-postgres.test.mjs
+
+      - name: Real Postgres quota overrides
+        env:
+          QUOTA_OVERRIDES_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+          QUOTA_OVERRIDES_TEST_REQUIRED: '1'
+        run: node --test tests/integration/quota-overrides-postgres.test.mjs
 
       - name: Real Postgres workspace bucket pagination
         env:
