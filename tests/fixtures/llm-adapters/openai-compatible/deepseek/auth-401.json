@@ -1,0 +1,25 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "deepseek-chat",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 401,
+    "headers": {},
+    "body": {
+      "error": {
+        "message": "private upstream diagnostic"
+      }
+    }
+  },
+  "expect": {
+    "code": "LLM_PROVIDER_AUTH_FAILED",
+    "status": 424
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "deepseek-chat",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "body": "not JSON"
+  },
+  "expect": {
+    "code": "LLM_PROVIDER_RESPONSE_INVALID",
+    "status": 502
+  }
+}

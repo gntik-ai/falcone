@@ -1,0 +1,40 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "body": {
+      "model": "fixture-model",
+      "choices": [
+        {
+          "message": {
+            "content": "Hello"
+          },
+          "finish_reason": "length"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "content": "Hello",
+    "model": "fixture-model",
+    "usage": {
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "cacheReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null
+    },
+    "finishReason": "length"
+  }
+}

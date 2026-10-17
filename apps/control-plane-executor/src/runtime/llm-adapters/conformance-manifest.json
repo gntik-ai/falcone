@@ -1,0 +1,76 @@
+{
+  "openai-compatible": {
+    "deepseek": {
+      "cases": [
+        "auth-401",
+        "eof-after-deltas",
+        "eof-after-usage",
+        "length-finish-reason",
+        "malformed-data-line",
+        "malformed-json-body",
+        "non-streaming-success",
+        "rate-limit-429",
+        "separate-finish-usage",
+        "split-utf8",
+        "stream-without-usage",
+        "streaming-success",
+        "unavailable-500"
+      ],
+      "surface": {
+        "streaming": true,
+        "usageInStream": true,
+        "systemRole": true,
+        "toolCalls": false,
+        "structuredOutput": false
+      }
+    },
+    "generic": {
+      "cases": [
+        "auth-401",
+        "eof-after-deltas",
+        "eof-after-usage",
+        "length-finish-reason",
+        "malformed-data-line",
+        "malformed-json-body",
+        "non-streaming-success",
+        "rate-limit-429",
+        "separate-finish-usage",
+        "split-utf8",
+        "stream-without-usage",
+        "streaming-success",
+        "unavailable-500"
+      ],
+      "surface": {
+        "streaming": true,
+        "usageInStream": true,
+        "systemRole": true,
+        "toolCalls": false,
+        "structuredOutput": false
+      }
+    },
+    "moonshot-kimi": {
+      "cases": [
+        "auth-401",
+        "eof-after-deltas",
+        "eof-after-usage",
+        "length-finish-reason",
+        "malformed-data-line",
+        "malformed-json-body",
+        "non-streaming-success",
+        "rate-limit-429",
+        "separate-finish-usage",
+        "split-utf8",
+        "stream-without-usage",
+        "streaming-success",
+        "unavailable-500"
+      ],
+      "surface": {
+        "streaming": true,
+        "usageInStream": true,
+        "systemRole": true,
+        "toolCalls": false,
+        "structuredOutput": false
+      }
+    }
+  }
+}

@@ -16,6 +16,9 @@
 // request time (fail-closed for any pre-existing malicious row). The DEFAULT secretResolver is
 // the confined resolver, so a non-allow-listed env var is NEVER read.
 import { clientError } from './errors.mjs';
+import { resolveLlmAdapter } from './llm-adapters/registry.mjs';
+import { createLlmTransport } from './llm-adapters/transport.mjs';
+import { normalizeUsage, normalizeFinishReason, adapterError } from './llm-adapters/contract.mjs';
 import {
   assertSecretRefAllowed,
   assertEndpointAllowed,
@@ -64,88 +67,7 @@ export function localMockLlmBackend({ promptTokens = 4, completionTokens = 6 } =
 // `endpoint` and `apiKey` are supplied PER CALL by the executor (which resolves the secret), so the
 // backend itself is stateless and holds no credential. fetchImpl is injectable for tests.
 export function httpLlmBackend({ providerType, fetchImpl } = {}) {
-  const doFetch = fetchImpl ?? globalThis.fetch;
-  if (typeof doFetch !== 'function') {
-    throw clientError('httpLlmBackend requires a fetch implementation', 500, 'LLM_CONFIG');
-  }
-  function bodyFor({ model, messages, maxTokens, temperature, stream }) {
-    return {
-      model,
-      messages,
-      ...(maxTokens != null ? { max_tokens: Number(maxTokens) } : {}),
-      ...(temperature != null ? { temperature: Number(temperature) } : {}),
-      ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}),
-    };
-  }
-  function headers(apiKey) {
-    return { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` };
-  }
-  return {
-    providerType,
-    async complete({ endpoint, apiKey, model, messages, maxTokens, temperature }) {
-      let response;
-      try {
-        response = await doFetch(endpoint, {
-          method: 'POST',
-          headers: headers(apiKey),
-          body: JSON.stringify(bodyFor({ model, messages, maxTokens, temperature })),
-        });
-      } catch (error) {
-        throw clientError(`LLM provider request failed: ${error.message}`, 502, 'LLM_PROVIDER_ERROR');
-      }
-      if (!response.ok) {
-        throw clientError(`LLM provider returned status ${response.status}`, 502, 'LLM_PROVIDER_ERROR');
-      }
-      const json = await response.json();
-      const content = json?.choices?.[0]?.message?.content ?? '';
-      return { content: String(content), usage: normalizeUsage(json?.usage) };
-    },
-    async *stream({ endpoint, apiKey, model, messages, maxTokens, temperature }) {
-      let response;
-      try {
-        response = await doFetch(endpoint, {
-          method: 'POST',
-          headers: headers(apiKey),
-          body: JSON.stringify(bodyFor({ model, messages, maxTokens, temperature, stream: true })),
-        });
-      } catch (error) {
-        throw clientError(`LLM provider request failed: ${error.message}`, 502, 'LLM_PROVIDER_ERROR');
-      }
-      if (!response.ok || !response.body) {
-        throw clientError(`LLM provider returned status ${response.status}`, 502, 'LLM_PROVIDER_ERROR');
-      }
-      let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-      // Parse the provider's SSE frames: `data: {json}` lines, terminating on `data: [DONE]`.
-      const decoder = new TextDecoder();
-      let buffer = '';
-      for await (const chunk of response.body) {
-        buffer += decoder.decode(chunk, { stream: true });
-        let nl;
-        while ((nl = buffer.indexOf('\n')) !== -1) {
-          const line = buffer.slice(0, nl).trim();
-          buffer = buffer.slice(nl + 1);
-          if (!line.startsWith('data:')) continue;
-          const data = line.slice(5).trim();
-          if (data === '[DONE]') continue;
-          let frame;
-          try { frame = JSON.parse(data); } catch { continue; }
-          const delta = frame?.choices?.[0]?.delta?.content;
-          if (delta) yield { type: 'delta', content: String(delta) };
-          if (frame?.usage) usage = normalizeUsage(frame.usage);
-        }
-      }
-      yield { type: 'usage', usage };
-    },
-  };
-}
-
-// Coerce a provider usage object (snake_case OpenAI shape OR our camelCase) into the canonical
-// `{ promptTokens, completionTokens, totalTokens }` shape, defaulting total to the sum.
-function normalizeUsage(u = {}) {
-  const prompt = Number(u?.promptTokens ?? u?.prompt_tokens ?? 0) || 0;
-  const completion = Number(u?.completionTokens ?? u?.completion_tokens ?? 0) || 0;
-  const total = Number(u?.totalTokens ?? u?.total_tokens ?? prompt + completion) || prompt + completion;
-  return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
+  return { providerType, ...createLlmTransport({ adapter: resolveLlmAdapter(providerType), fetchImpl }) };
 }
 
 // Build the message array the provider sees. An explicit `messages` array wins; otherwise a
@@ -640,7 +562,7 @@ export function createLlmExecutor(options = {}) {
     const out = await backend.complete({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature });
     const usage = normalizeUsage(out.usage);
     await usageStore.recordUsage(workspaceId, { tenantId, model: chosen, ...usage });
-    return { content: out.content ?? '', usage, model: chosen };
+    return { content: out.content ?? '', usage, model: out.model ?? chosen, finishReason: normalizeFinishReason(out.finishReason) };
   }
 
   // Streaming variant: yields `{ type:'delta', content }` frames, records usage when the terminal
@@ -648,13 +570,20 @@ export function createLlmExecutor(options = {}) {
   async function* completeStream(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature } = {}) {
     const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model });
     const built = normalizeMessages({ messages, prompt, system });
-    let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
     for await (const frame of backend.stream({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature })) {
-      if (frame?.type === 'usage') { usage = normalizeUsage(frame.usage); continue; }
+      if (frame?.type === 'error') {
+        yield { type: 'error', code: frame.code };
+        return;
+      }
+      if (frame?.type === 'usage') {
+        const usage = normalizeUsage(frame.usage);
+        await usageStore.recordUsage(workspaceId, { tenantId, model: chosen, ...usage });
+        yield { type: 'usage', usage, model: frame.model ?? chosen, finishReason: normalizeFinishReason(frame.finishReason) };
+        return;
+      }
       yield { type: 'delta', content: frame?.content ?? '' };
     }
-    await usageStore.recordUsage(workspaceId, { tenantId, model: chosen, ...usage });
-    yield { type: 'usage', usage, model: chosen };
+    throw adapterError('LLM_PROVIDER_RESPONSE_INVALID');
   }
 
   async function getUsage(workspaceId, { tenantId } = {}) {

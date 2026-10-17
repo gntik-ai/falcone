@@ -1,0 +1,41 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: {\"model\":\"fixture-model\",\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}",
+      "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}",
+      "data: [DONE]"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "Hello"
+    },
+    {
+      "type": "usage",
+      "usage": {
+        "promptTokens": 0,
+        "completionTokens": 0,
+        "totalTokens": 0,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null,
+        "reasoningTokens": null
+      },
+      "model": "fixture-model",
+      "finishReason": "stop"
+    }
+  ]
+}

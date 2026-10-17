@@ -77,6 +77,7 @@ COPY apps/control-plane-executor/src/runtime/connection-registry.mjs \
      apps/control-plane-executor/src/runtime/byok-provider-guard.mjs \
      apps/control-plane-executor/src/runtime/errors.mjs \
      /app/apps/control-plane-executor/src/runtime/
+COPY apps/control-plane-executor/src/runtime/llm-adapters/ /app/apps/control-plane-executor/src/runtime/llm-adapters/
 COPY packages/adapters/src/postgresql-data-api.mjs \
      packages/adapters/src/postgresql-governance-admin.mjs \
      /app/packages/adapters/src/
@@ -88,10 +89,9 @@ COPY packages/internal-contracts/src/transport-security.mjs \
 # apps/control-plane/Dockerfile for fix-scheduling-handler-dockerfile). The COPY
 # allow-list above has drifted from worker-deps.mjs::wireActivityDeps three times (#640,
 # #645, #659), each time crash-looping the worker at boot with ERR_MODULE_NOT_FOUND.
-# This step parses the SHIPPED dist/worker-deps.mjs for every relative `.mjs` specifier it
-# dynamicImport()s, resolves each against the dist dir exactly as Node will at runtime, and
-# fails the build if any are absent — converting a runtime crash-loop into a build error.
-RUN node --input-type=module -e "import { readFileSync, existsSync } from 'node:fs'; import { resolve, dirname } from 'node:path'; const distDir = '/app/apps/workflow-worker/dist'; const src = readFileSync(resolve(distDir, 'worker-deps.mjs'), 'utf8'); const specs = [...src.matchAll(/dynamicImport\(\s*[\x27\x22]([^\x27\x22]+)[\x27\x22]/g)].map((m) => m[1]).filter((s) => s.startsWith('.') && s.endsWith('.mjs')); const missing = specs.filter((s) => !existsSync(resolve(distDir, s))); if (missing.length) { console.error('[worker-image-guard] worker-deps.mjs dynamic-imports modules not copied into the image (#660): ' + missing.join(', ')); process.exit(1); } console.log('[worker-image-guard] OK: ' + specs.length + ' dynamic-imported runtime module(s) present');"
+# Starting from SHIPPED worker-deps.mjs dynamic imports, follow static relative imports
+# and re-exports transitively. Every file must exist at its original relative path.
+RUN node --input-type=module -e "import { readFileSync, existsSync } from 'node:fs'; import { resolve, dirname } from 'node:path'; const distDir = '/app/apps/workflow-worker/dist'; const src = readFileSync(resolve(distDir, 'worker-deps.mjs'), 'utf8'); const specs = [...src.matchAll(/dynamicImport\(\s*[\x27\x22]([^\x27\x22]+)[\x27\x22]/g)].map((m) => m[1]).filter((s) => s.startsWith('.')); const pending = specs.map((s) => resolve(distDir, s)); const visited = new Set(); const missing = []; while (pending.length) { const path = pending.pop(); if (visited.has(path)) continue; visited.add(path); if (!existsSync(path)) { missing.push(path); continue; } const source = readFileSync(path, 'utf8'); for (const match of source.matchAll(/\b(?:import|export)\s+(?:[^\x27\x22;]*?\s+from\s*)?[\x27\x22](\.[^\x27\x22]+)[\x27\x22]/g)) pending.push(resolve(dirname(path), match[1])); } if (missing.length) { console.error('[worker-image-guard] missing transitive runtime modules (#660, #940): ' + missing.join(', ')); process.exit(1); } console.log('[worker-image-guard] OK: ' + visited.size + ' runtime modules present');"
 
 ENV NODE_ENV=production \
     TEMPORAL_ADDRESS=temporal-frontend:7233 \

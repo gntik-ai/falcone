@@ -59,8 +59,9 @@ export async function llmComplete(input, deps = {}) {
   const output = {
     status: 'success',
     content: result?.content ?? '',
-    usage: result?.usage ?? { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, ...result?.usage },
     model: result?.model ?? params.model,
+    finishReason: result?.finishReason ?? null,
   };
   assertPayloadSize(output, 'output', MAX_OUTPUT_BYTES);
   return output;
@@ -90,19 +91,24 @@ export const llmCompleteInputSchema = Object.freeze({
 export const llmCompleteOutputSchema = Object.freeze({
   $id: 'flows/activity/llm.complete/output',
   type: 'object',
-  required: ['status', 'content'],
+  required: ['status', 'content', 'usage', 'model', 'finishReason'],
   properties: {
     status: { type: 'string', const: 'success' },
     content: { type: 'string' },
     usage: {
       type: 'object',
+      required: ['promptTokens', 'completionTokens', 'totalTokens', 'cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens'],
       properties: {
         promptTokens: { type: 'integer' },
         completionTokens: { type: 'integer' },
         totalTokens: { type: 'integer' },
+        cacheReadTokens: { type: ['integer', 'null'] },
+        cacheWriteTokens: { type: ['integer', 'null'] },
+        reasoningTokens: { type: ['integer', 'null'] },
       },
     },
     model: { type: 'string' },
+    finishReason: { enum: ['stop', 'length', 'content_filter', 'tool_calls', 'other', null] },
   },
   additionalProperties: false,
 });

@@ -1,0 +1,30 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "moonshot-v1-8k",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: {\"model\":\"moonshot-v1-8k\",\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "Hello"
+    },
+    {
+      "type": "error",
+      "code": "LLM_PROVIDER_RESPONSE_INVALID"
+    }
+  ]
+}
