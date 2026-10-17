@@ -335,6 +335,12 @@ jobs:
           FLOW_CREDENTIALS_TEST_REQUIRED: '1'
         run: node --test tests/integration/flow-execution-credentials-postgres.test.mjs
 
+      - name: Real Postgres quota overrides
+        env:
+          QUOTA_OVERRIDES_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+          QUOTA_OVERRIDES_TEST_REQUIRED: '1'
+        run: node --test tests/integration/quota-overrides-postgres.test.mjs
+
       - name: Real Postgres workspace bucket pagination
         env:
           STORAGE_BUCKET_LIST_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
