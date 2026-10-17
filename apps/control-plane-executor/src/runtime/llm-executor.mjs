@@ -161,7 +161,7 @@ function normalizeMessages({ messages, prompt, system } = {}) {
 // ---------------------------------------------------------------------------
 // Provider store — persists ONLY the secretRef (never a resolved key). Tenant-scoped by
 // (tenant_id, workspace_id). With no `pool` it is an in-memory Map (test seam / single-process
-// fallback); with a `pool` it persists to `workspace_llm_providers` on the metadata DB.
+// fallback); with a `pool` it persists to `workspace_llm_connections` on the metadata DB.
 // ---------------------------------------------------------------------------
 export function createLlmProviderStore({ pool } = {}) {
   if (!pool) return createInMemoryProviderStore();
@@ -169,7 +169,7 @@ export function createLlmProviderStore({ pool } = {}) {
 }
 
 function providerKey(tenantId, workspaceId) {
-  return `${tenantId ?? TENANT_SENTINEL}${workspaceId}`;
+  return JSON.stringify([tenantId ?? TENANT_SENTINEL, workspaceId]);
 }
 
 // Strip any plaintext secret a caller may have (mis)passed; persist only secretRef + config.
@@ -184,97 +184,276 @@ function sanitizeProviderConfig(config = {}) {
   };
 }
 
-function createInMemoryProviderStore() {
-  const providers = new Map(); // (tenant, workspace) -> record
+function validateConnection(config, connectionId) {
+  if (typeof connectionId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(connectionId)) {
+    throw clientError('Invalid connection identifier', 400, 'INVALID_CONNECTION_ID');
+  }
+  if (config.displayName != null && (typeof config.displayName !== 'string' || config.displayName.length > 128)) {
+    throw clientError('displayName must be at most 128 characters', 400, 'INVALID_DISPLAY_NAME');
+  }
+}
+
+function connectionRecord(workspaceId, config, connectionId, existing, isDefault) {
+  validateConnection(config, connectionId);
   return {
-    async ensureSchema() {},
-    async deployProvider(workspaceId, config = {}) {
-      if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
-      const record = {
-        ...sanitizeProviderConfig(config),
-        workspaceId,
-        tenantId: config.tenantId ?? TENANT_SENTINEL,
-        updatedAt: new Date().toISOString(),
-      };
-      providers.set(providerKey(config.tenantId, workspaceId), record);
-      return { ...record };
-    },
-    async getProvider(workspaceId, tenantId) {
-      return providers.get(providerKey(tenantId, workspaceId)) ?? null;
-    },
-    async removeProvider(workspaceId, tenantId) {
-      const had = providers.delete(providerKey(tenantId, workspaceId));
-      return { removed: had };
-    },
+    ...sanitizeProviderConfig(config),
+    tenantId: config.tenantId ?? TENANT_SENTINEL, workspaceId, connectionId,
+    displayName: config.displayName ?? null, isDefault,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
+function createInMemoryProviderStore() {
+  const workspaces = new Map();
+  const records = (workspaceId, tenantId) => workspaces.get(providerKey(tenantId, workspaceId)) ?? [];
+  const copy = value => structuredClone(value);
+  const store = {
+    async ensureSchema() {},
+    async listConnections(workspaceId, tenantId) { return copy(records(workspaceId, tenantId).slice().sort((a, b) => (a.connectionId < b.connectionId ? -1 : a.connectionId > b.connectionId ? 1 : 0))); },
+    async getConnection(workspaceId, connectionId, tenantId) {
+      const record = records(workspaceId, tenantId).find(r => r.connectionId === connectionId);
+      if (!record) throw clientError('LLM connection not found', 404, 'LLM_CONNECTION_NOT_FOUND');
+      return copy(record);
+    },
+    async createConnection(workspaceId, config = {}) {
+      if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
+      const rows = records(workspaceId, config.tenantId);
+      validateConnection(config, config.connectionId);
+      if (rows.some(r => r.connectionId === config.connectionId)) throw clientError('LLM connection exists', 409, 'LLM_CONNECTION_EXISTS');
+      if (rows.length >= 32) throw clientError('LLM connection limit reached', 409, 'LLM_CONNECTION_LIMIT_REACHED');
+      const record = connectionRecord(workspaceId, config, config.connectionId, null, rows.length === 0 || config.isDefault === true);
+      if (record.isDefault) rows.forEach(r => { r.isDefault = false; });
+      workspaces.set(providerKey(config.tenantId, workspaceId), [...rows, copy(record)]);
+      return copy(record);
+    },
+    async replaceConnection(workspaceId, connectionId, config = {}) {
+      const rows = records(workspaceId, config.tenantId);
+      const existing = rows.find(r => r.connectionId === connectionId);
+      if (!existing) throw clientError('LLM connection not found', 404, 'LLM_CONNECTION_NOT_FOUND');
+      if (existing.isDefault && config.isDefault === false) throw clientError('A default connection is required', 409, 'LLM_DEFAULT_REQUIRED');
+      const record = connectionRecord(workspaceId, config, connectionId, existing, existing.isDefault || config.isDefault === true);
+      if (record.isDefault) rows.forEach(r => { r.isDefault = false; });
+      rows[rows.indexOf(existing)] = copy(record);
+      return copy(record);
+    },
+    async deleteConnection(workspaceId, connectionId, tenantId) {
+      const rows = records(workspaceId, tenantId);
+      if (!rows.some(r => r.connectionId === connectionId)) throw clientError('LLM connection not found', 404, 'LLM_CONNECTION_NOT_FOUND');
+      workspaces.set(providerKey(tenantId, workspaceId), rows.filter(r => r.connectionId !== connectionId));
+      return { removed: true };
+    },
+    async deployProvider(workspaceId, config = {}) {
+      const rows = records(workspaceId, config.tenantId);
+      const current = rows.find(r => r.isDefault) ?? rows.find(r => r.connectionId === 'default');
+      if (!current) return store.createConnection(workspaceId, { ...config, connectionId: 'default', isDefault: true });
+      const displayName = config.displayName === undefined ? current.displayName : config.displayName;
+      const record = connectionRecord(workspaceId, { ...config, displayName }, current.connectionId, current, true);
+      rows[rows.indexOf(current)] = copy(record);
+      return copy(record);
+    },
+    async getProvider(workspaceId, tenantId) { return copy(records(workspaceId, tenantId).find(r => r.isDefault) ?? null); },
+    async removeProvider(workspaceId, tenantId) {
+      const rows = records(workspaceId, tenantId);
+      const remaining = rows.filter(r => !r.isDefault);
+      workspaces.set(providerKey(tenantId, workspaceId), remaining);
+      return { removed: remaining.length !== rows.length };
+    },
+  };
+  return store;
+}
+
 function createPostgresProviderStore(pool) {
-  async function ensureSchema() {
-    await pool.query(`CREATE TABLE IF NOT EXISTS workspace_llm_providers (
-      tenant_id      text NOT NULL,
-      workspace_id   text NOT NULL,
-      provider_type  text,
-      endpoint       text,
-      allowed_models jsonb NOT NULL DEFAULT '[]'::jsonb,
-      default_model  text,
-      secret_ref     jsonb,
-      updated_at     timestamptz NOT NULL DEFAULT now(),
-      UNIQUE (tenant_id, workspace_id)
-    )`);
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_wlp_workspace ON workspace_llm_providers (workspace_id)');
+  async function transaction(fn) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      if (error.message === 'LLM_CONNECTION_LIMIT_REACHED') throw clientError('LLM connection limit reached', 409, 'LLM_CONNECTION_LIMIT_REACHED');
+      throw error;
+    } finally { client.release(); }
   }
+
+  async function ensureSchema() {
+    await transaction(async client => {
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('workspace_llm_connections'))");
+      // Keep the old table and its unique key for rolling updates and rollbacks.
+      await client.query(`CREATE TABLE IF NOT EXISTS workspace_llm_providers (
+        tenant_id text NOT NULL, workspace_id text NOT NULL, provider_type text, endpoint text,
+        allowed_models jsonb NOT NULL DEFAULT '[]'::jsonb, default_model text, secret_ref jsonb,
+        updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE (tenant_id, workspace_id)
+      )`);
+      await client.query('LOCK TABLE workspace_llm_providers IN SHARE ROW EXCLUSIVE MODE');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_wlp_workspace ON workspace_llm_providers (workspace_id)');
+      await client.query('ALTER TABLE workspace_llm_providers ADD COLUMN IF NOT EXISTS migrated_at timestamptz');
+      await client.query(`CREATE TABLE IF NOT EXISTS workspace_llm_connections (
+        tenant_id text NOT NULL, workspace_id text NOT NULL,
+        connection_id text NOT NULL CHECK (connection_id ~ '^[a-z0-9][a-z0-9-]{0,62}$'),
+        display_name text, provider_type text, endpoint text,
+        allowed_models jsonb NOT NULL DEFAULT '[]'::jsonb, default_model text, secret_ref jsonb,
+        is_default boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (tenant_id, workspace_id, connection_id)
+      )`);
+      await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_wlc_default ON workspace_llm_connections (tenant_id, workspace_id) WHERE is_default');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_wlc_workspace ON workspace_llm_connections (workspace_id)');
+      await client.query(`INSERT INTO workspace_llm_connections
+        (tenant_id, workspace_id, connection_id, provider_type, endpoint, allowed_models, default_model, secret_ref, is_default, created_at, updated_at)
+        SELECT tenant_id, workspace_id, 'default', provider_type, endpoint, allowed_models, default_model, secret_ref, true, updated_at, updated_at
+        FROM workspace_llm_providers WHERE migrated_at IS NULL ON CONFLICT DO NOTHING`);
+      await client.query('UPDATE workspace_llm_providers SET migrated_at = now() WHERE migrated_at IS NULL');
+      // All writers share the same workspace lock. Updates at capacity remain legal.
+      await client.query(`CREATE OR REPLACE FUNCTION enforce_llm_connection_limit() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        PERFORM pg_advisory_xact_lock(hashtext('workspace_llm_connections'), hashtext(json_build_array(NEW.tenant_id, NEW.workspace_id)::text));
+        IF NOT EXISTS (SELECT 1 FROM workspace_llm_connections WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id AND connection_id=NEW.connection_id)
+          AND (SELECT count(*) FROM workspace_llm_connections WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id) >= 32 THEN
+          RAISE EXCEPTION 'LLM_CONNECTION_LIMIT_REACHED';
+        END IF;
+        RETURN NEW;
+      END; $$`);
+      await client.query(`CREATE OR REPLACE TRIGGER workspace_llm_connections_limit
+        BEFORE INSERT ON workspace_llm_connections FOR EACH ROW EXECUTE FUNCTION enforce_llm_connection_limit()`);
+      await client.query(`CREATE OR REPLACE FUNCTION mirror_legacy_llm_provider() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF TG_OP = 'DELETE' THEN
+          PERFORM pg_advisory_xact_lock(hashtext('workspace_llm_connections'), hashtext(json_build_array(OLD.tenant_id, OLD.workspace_id)::text));
+          DELETE FROM workspace_llm_connections WHERE tenant_id=OLD.tenant_id AND workspace_id=OLD.workspace_id AND is_default;
+          RETURN OLD;
+        END IF;
+        IF TG_OP = 'UPDATE' THEN
+          IF ROW(NEW.provider_type, NEW.endpoint, NEW.allowed_models, NEW.default_model, NEW.secret_ref)
+            IS NOT DISTINCT FROM ROW(OLD.provider_type, OLD.endpoint, OLD.allowed_models, OLD.default_model, OLD.secret_ref) THEN
+            RETURN NEW;
+          END IF;
+        END IF;
+        PERFORM pg_advisory_xact_lock(hashtext('workspace_llm_connections'), hashtext(json_build_array(NEW.tenant_id, NEW.workspace_id)::text));
+        UPDATE workspace_llm_connections SET
+          provider_type=NEW.provider_type, endpoint=NEW.endpoint, allowed_models=NEW.allowed_models,
+          default_model=NEW.default_model, secret_ref=NEW.secret_ref, updated_at=NEW.updated_at
+          WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id AND is_default;
+        IF NOT FOUND THEN
+          UPDATE workspace_llm_connections SET
+            provider_type=NEW.provider_type, endpoint=NEW.endpoint, allowed_models=NEW.allowed_models,
+            default_model=NEW.default_model, secret_ref=NEW.secret_ref, updated_at=NEW.updated_at, is_default=true
+            WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id AND connection_id='default';
+          IF NOT FOUND THEN
+            IF (SELECT count(*) FROM workspace_llm_connections WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id) >= 32 THEN
+              RAISE EXCEPTION 'LLM_CONNECTION_LIMIT_REACHED';
+            END IF;
+            INSERT INTO workspace_llm_connections
+              (tenant_id, workspace_id, connection_id, provider_type, endpoint, allowed_models, default_model, secret_ref, is_default, created_at, updated_at)
+              VALUES (NEW.tenant_id, NEW.workspace_id, 'default', NEW.provider_type, NEW.endpoint, NEW.allowed_models, NEW.default_model, NEW.secret_ref, true, NEW.updated_at, NEW.updated_at);
+          END IF;
+        END IF;
+        NEW.migrated_at = now();
+        RETURN NEW;
+      END; $$`);
+      await client.query(`CREATE OR REPLACE TRIGGER workspace_llm_providers_mirror
+        BEFORE INSERT OR UPDATE OR DELETE ON workspace_llm_providers FOR EACH ROW EXECUTE FUNCTION mirror_legacy_llm_provider()`);
+    });
+  }
+
   function rowToRecord(row) {
     if (!row) return null;
+    const timestamp = value => value instanceof Date ? value.toISOString() : value;
     return {
-      tenantId: row.tenant_id,
-      workspaceId: row.workspace_id,
-      providerType: row.provider_type ?? undefined,
-      endpoint: row.endpoint ?? undefined,
+      tenantId: row.tenant_id, workspaceId: row.workspace_id,
+      connectionId: row.connection_id ?? 'default', displayName: row.display_name ?? null,
+      isDefault: row.is_default ?? true, createdAt: timestamp(row.created_at), updatedAt: timestamp(row.updated_at),
+      providerType: row.provider_type ?? undefined, endpoint: row.endpoint ?? undefined,
       allowedModels: Array.isArray(row.allowed_models) ? row.allowed_models : [],
-      defaultModel: row.default_model ?? undefined,
-      secretRef: row.secret_ref ?? undefined,
-      updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+      defaultModel: row.default_model ?? undefined, secretRef: row.secret_ref ?? undefined,
     };
   }
+
+  async function lockWorkspace(client, tenant, workspaceId) {
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('workspace_llm_connections'), hashtext(json_build_array($1::text, $2::text)::text))", [tenant, workspaceId]);
+  }
+
+  async function writeConnection(workspaceId, connectionId, config, mode) {
+    if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
+    if (mode !== 'replace') validateConnection(config, connectionId);
+    const tenant = config.tenantId ?? TENANT_SENTINEL;
+    const safe = sanitizeProviderConfig(config);
+    return transaction(async client => {
+      await lockWorkspace(client, tenant, workspaceId);
+      const { rows } = await client.query('SELECT * FROM workspace_llm_connections WHERE tenant_id=$1 AND workspace_id=$2', [tenant, workspaceId]);
+      let existing = rows.find(r => r.connection_id === connectionId);
+      if (mode === 'default') {
+        existing = rows.find(r => r.is_default) ?? existing;
+        connectionId = existing?.connection_id ?? 'default';
+      }
+      if (mode === 'create' && existing) throw clientError('LLM connection exists', 409, 'LLM_CONNECTION_EXISTS');
+      if (mode === 'replace' && !existing) throw clientError('LLM connection not found', 404, 'LLM_CONNECTION_NOT_FOUND');
+      if (mode === 'replace') validateConnection(config, connectionId);
+      if (!existing && rows.length >= 32) throw clientError('LLM connection limit reached', 409, 'LLM_CONNECTION_LIMIT_REACHED');
+      if (mode === 'replace' && existing.is_default && config.isDefault === false) throw clientError('A default connection is required', 409, 'LLM_DEFAULT_REQUIRED');
+      const isDefault = mode === 'default' || config.isDefault === true || (existing ? existing.is_default : rows.length === 0);
+      if (isDefault) await client.query('UPDATE workspace_llm_connections SET is_default=false WHERE tenant_id=$1 AND workspace_id=$2 AND is_default AND connection_id<>$3', [tenant, workspaceId, connectionId]);
+      const displayName = mode === 'default' && config.displayName === undefined ? existing?.display_name : config.displayName;
+      const values = [tenant, workspaceId, connectionId, displayName ?? null, safe.providerType ?? null, safe.endpoint ?? null,
+        JSON.stringify(safe.allowedModels), safe.defaultModel ?? null, safe.secretRef === undefined ? null : JSON.stringify(safe.secretRef), isDefault];
+      const result = existing
+        ? await client.query(`UPDATE workspace_llm_connections SET display_name=$4, provider_type=$5, endpoint=$6,
+            allowed_models=$7::jsonb, default_model=$8, secret_ref=$9::jsonb, is_default=$10, updated_at=now()
+            WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3 RETURNING *`, values)
+        : await client.query(`INSERT INTO workspace_llm_connections
+            (tenant_id, workspace_id, connection_id, display_name, provider_type, endpoint, allowed_models, default_model, secret_ref, is_default)
+            VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10) RETURNING *`, values);
+      return rowToRecord(result.rows[0]);
+    });
+  }
+
   return {
-    pool,
-    ensureSchema,
-    async deployProvider(workspaceId, config = {}) {
-      if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
-      const safe = sanitizeProviderConfig(config);
-      const tenant = config.tenantId ?? TENANT_SENTINEL;
-      const res = await pool.query(
-        `INSERT INTO workspace_llm_providers
-           (tenant_id, workspace_id, provider_type, endpoint, allowed_models, default_model, secret_ref, updated_at)
-         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7::jsonb, now())
-         ON CONFLICT (tenant_id, workspace_id) DO UPDATE SET
-           provider_type  = EXCLUDED.provider_type,
-           endpoint       = EXCLUDED.endpoint,
-           allowed_models = EXCLUDED.allowed_models,
-           default_model  = EXCLUDED.default_model,
-           secret_ref     = EXCLUDED.secret_ref,
-           updated_at     = now()
-         RETURNING tenant_id, workspace_id, provider_type, endpoint, allowed_models, default_model, secret_ref, updated_at`,
-        [
-          tenant, workspaceId, safe.providerType ?? null, safe.endpoint ?? null,
-          JSON.stringify(safe.allowedModels ?? []), safe.defaultModel ?? null,
-          safe.secretRef !== undefined ? JSON.stringify(safe.secretRef) : null,
-        ],
-      );
-      return rowToRecord(res.rows[0]);
+    pool, ensureSchema,
+    async listConnections(workspaceId, tenantId) {
+      const result = await pool.query('SELECT * FROM workspace_llm_connections WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY connection_id COLLATE "C"', [tenantId ?? TENANT_SENTINEL, workspaceId]);
+      return result.rows.map(rowToRecord);
+    },
+    async getConnection(workspaceId, connectionId, tenantId) {
+      const result = await pool.query('SELECT * FROM workspace_llm_connections WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3', [tenantId ?? TENANT_SENTINEL, workspaceId, connectionId]);
+      if (!result.rows[0]) throw clientError('LLM connection not found', 404, 'LLM_CONNECTION_NOT_FOUND');
+      return rowToRecord(result.rows[0]);
+    },
+    createConnection: (workspaceId, config = {}) => writeConnection(workspaceId, config.connectionId, config, 'create'),
+    replaceConnection: (workspaceId, connectionId, config = {}) => writeConnection(workspaceId, connectionId, config, 'replace'),
+    deployProvider: (workspaceId, config = {}) => writeConnection(workspaceId, 'default', config, 'default'),
+    async deleteConnection(workspaceId, connectionId, tenantId) {
+      return transaction(async client => {
+        await lockWorkspace(client, tenantId ?? TENANT_SENTINEL, workspaceId);
+        const result = await client.query('DELETE FROM workspace_llm_connections WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3 RETURNING connection_id', [tenantId ?? TENANT_SENTINEL, workspaceId, connectionId]);
+        if (!result.rowCount) throw clientError('LLM connection not found', 404, 'LLM_CONNECTION_NOT_FOUND');
+        return { removed: true };
+      });
     },
     async getProvider(workspaceId, tenantId) {
-      const res = tenantId
-        ? await pool.query('SELECT * FROM workspace_llm_providers WHERE tenant_id = $1 AND workspace_id = $2 LIMIT 1', [tenantId, workspaceId])
-        : await pool.query('SELECT * FROM workspace_llm_providers WHERE workspace_id = $1 LIMIT 1', [workspaceId]);
+      let res;
+      try {
+        res = tenantId
+          ? await pool.query('SELECT * FROM workspace_llm_connections WHERE tenant_id = $1 AND workspace_id = $2 AND is_default', [tenantId, workspaceId])
+          : await pool.query('SELECT * FROM workspace_llm_connections WHERE workspace_id = $1 AND is_default LIMIT 1', [workspaceId]);
+      } catch (error) {
+        // Workers do not own schema setup. Only a missing registry permits the pre-upgrade read.
+        if (error.code !== '42P01') throw error;
+        res = tenantId
+          ? await pool.query('SELECT * FROM workspace_llm_providers WHERE tenant_id = $1 AND workspace_id = $2 LIMIT 1', [tenantId, workspaceId])
+          : await pool.query('SELECT * FROM workspace_llm_providers WHERE workspace_id = $1 LIMIT 1', [workspaceId]);
+      }
       return rowToRecord(res.rows[0]);
     },
     async removeProvider(workspaceId, tenantId) {
-      const res = tenantId
-        ? await pool.query('DELETE FROM workspace_llm_providers WHERE tenant_id = $1 AND workspace_id = $2 RETURNING workspace_id', [tenantId, workspaceId])
-        : await pool.query('DELETE FROM workspace_llm_providers WHERE workspace_id = $1 RETURNING workspace_id', [workspaceId]);
-      return { removed: res.rowCount > 0 };
+      return transaction(async client => {
+        if (tenantId) await lockWorkspace(client, tenantId, workspaceId);
+        const res = tenantId
+          ? await client.query('DELETE FROM workspace_llm_connections WHERE tenant_id = $1 AND workspace_id = $2 AND is_default RETURNING workspace_id', [tenantId, workspaceId])
+          : await client.query('DELETE FROM workspace_llm_connections WHERE workspace_id = $1 AND is_default RETURNING workspace_id', [workspaceId]);
+        return { removed: res.rowCount > 0 };
+      });
     },
   };
 }
@@ -493,6 +672,19 @@ export function createLlmExecutor(options = {}) {
     // Config-plane convenience wrappers (the HTTP routes call these). setProvider confines the
     // secretRef + SSRF-validates the endpoint before persisting (#659).
     setProvider,
+    async createConnection(workspaceId, config = {}) {
+      assertSecretRefAllowed(config.secretRef, prefixes);
+      await assertEndpoint(config.endpoint);
+      return providerStore.createConnection(workspaceId, config);
+    },
+    async replaceConnection(workspaceId, connectionId, config = {}) {
+      assertSecretRefAllowed(config.secretRef, prefixes);
+      await assertEndpoint(config.endpoint);
+      return providerStore.replaceConnection(workspaceId, connectionId, config);
+    },
+    deleteConnection: (workspaceId, connectionId, tenantId) => providerStore.deleteConnection(workspaceId, connectionId, tenantId),
+    listConnections: (workspaceId, tenantId) => providerStore.listConnections(workspaceId, tenantId),
+    getConnection: (workspaceId, connectionId, tenantId) => providerStore.getConnection(workspaceId, connectionId, tenantId),
     getProvider: (workspaceId, tenantId) => providerStore.getProvider(workspaceId, tenantId),
     removeProvider: (workspaceId, tenantId) => providerStore.removeProvider(workspaceId, tenantId),
     complete,

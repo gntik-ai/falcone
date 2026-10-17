@@ -389,6 +389,9 @@ function isStructuralWriteRequest(method, pathname) {
   if (/^\/v1\/workspaces\/[^/]+\/api-keys(?:\/|$)/.test(pathname)) {
     return method === 'POST' || method === 'DELETE';
   }
+  if (/^\/v1\/workspaces\/[^/]+\/llm-providers(?:\/[^/]+)?$/.test(pathname)) {
+    return method === 'POST' || method === 'PUT' || method === 'DELETE';
+  }
   if (/^\/v1\/workspaces\/[^/]+\/(?:embedding-provider|llm-provider)$/.test(pathname)) {
     return method === 'PUT' || method === 'DELETE';
   }
@@ -498,6 +501,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
   // embedding-provider config under the same workspace prefix. Served by THIS executor (the
   // dedicated APISIX route forwards these subpaths here, like 2003-embedding).
   const llmp = '^/v1/workspaces/([^/]+)/llm-provider';
+  const llmpr = '^/v1/workspaces/([^/]+)/llm-providers';
   const llmc = '^/v1/workspaces/([^/]+)/llm/completions';
   const llmu = '^/v1/workspaces/([^/]+)/llm-usage';
   const mdoc = '^/v1/mongo/workspaces/([^/]+)/data/([^/]+)/collections/([^/]+)/documents';
@@ -531,6 +535,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     emb: '/v1/workspaces/{workspaceId}/embedding-provider',
     wdocs: '/v1/workspaces/{workspaceId}/docs',
     llmp: '/v1/workspaces/{workspaceId}/llm-provider',
+    llmpr: '/v1/workspaces/{workspaceId}/llm-providers',
     llmc: '/v1/workspaces/{workspaceId}/llm/completions',
     llmu: '/v1/workspaces/{workspaceId}/llm-usage',
     mdoc: '/v1/mongo/workspaces/{workspaceId}/data/{db}/collections/{collection}/documents',
@@ -675,6 +680,16 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     // ---- BYOK LLM provider config + completion + usage (workspace-scoped) — change #640 ----
     // The verified identity's tenantId is injected so the store keys the record by
     // (tenant_id, workspace_id) and usage is metered per tenant — never trusting a body tenantId.
+    ['GET', new RegExp(`${llmpr}$`), templates.llmpr, ([w], c) =>
+      runLlmConnection(llmExecutor, 'listConnections', [w, c.identity.tenantId])],
+    ['POST', new RegExp(`${llmpr}$`), templates.llmpr, ([w], c) =>
+      runLlmConnection(llmExecutor, 'createConnection', [w, { ...c.body, tenantId: c.identity.tenantId }], 201)],
+    ['GET', new RegExp(`${llmpr}/([^/]+)$`), `${templates.llmpr}/{connectionId}`, ([w, id], c) =>
+      runLlmConnection(llmExecutor, 'getConnection', [w, id, c.identity.tenantId])],
+    ['PUT', new RegExp(`${llmpr}/([^/]+)$`), `${templates.llmpr}/{connectionId}`, ([w, id], c) =>
+      runLlmConnection(llmExecutor, 'replaceConnection', [w, id, { ...c.body, tenantId: c.identity.tenantId }])],
+    ['DELETE', new RegExp(`${llmpr}/([^/]+)$`), `${templates.llmpr}/{connectionId}`, ([w, id], c) =>
+      runLlmConnection(llmExecutor, 'deleteConnection', [w, id, c.identity.tenantId])],
     ['PUT', new RegExp(`${llmp}$`), templates.llmp, ([w], c) =>
       runLlmProvider(llmExecutor, 'set', { workspaceId: w, tenantId: c.identity.tenantId, config: c.body }, 200)],
     ['GET', new RegExp(`${llmp}$`), templates.llmp, ([w], c) =>
@@ -1231,16 +1246,27 @@ async function runEmbeddingProvider(embeddingExecutor, action, params, successSt
 // BYOK LLM provider config plane (change: add-llm-agent-flow-task / #640). Mirrors
 // runEmbeddingProvider: tenantId from the verified identity (never the body), GET returns the
 // stored record (which carries a `secretRef` ONLY — the plaintext key is never persisted).
+async function runLlmConnection(llmExecutor, method, args, status = 200) {
+  if (!llmExecutor) throw Object.assign(new Error('LLM provider is not enabled'), { statusCode: 501, code: 'LLM_DISABLED' });
+  const result = await llmExecutor[method](...args);
+  return { status, body: method === 'listConnections' ? { items: result } : result };
+}
+
+function legacyLlmProvider(record) {
+  const { displayName, isDefault, createdAt, ...legacy } = record;
+  return legacy;
+}
+
 async function runLlmProvider(llmExecutor, action, params, successStatus) {
   if (!llmExecutor) throw Object.assign(new Error('LLM provider is not enabled'), { statusCode: 501, code: 'LLM_DISABLED' });
   if (action === 'set') {
     const result = await llmExecutor.setProvider(params.workspaceId, { ...(params.config ?? {}), tenantId: params.tenantId });
-    return { status: successStatus, body: result };
+    return { status: successStatus, body: legacyLlmProvider(result) };
   }
   if (action === 'get') {
     const record = await llmExecutor.getProvider(params.workspaceId, params.tenantId);
     if (!record) throw Object.assign(new Error('No LLM provider configured for this workspace'), { statusCode: 404, code: 'LLM_PROVIDER_NOT_FOUND' });
-    return { status: successStatus, body: record };
+    return { status: successStatus, body: legacyLlmProvider(record) };
   }
   const result = await llmExecutor.removeProvider(params.workspaceId, params.tenantId);
   return { status: successStatus, body: result };
