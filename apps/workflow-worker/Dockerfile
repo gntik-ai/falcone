@@ -82,6 +82,7 @@ COPY packages/adapters/src/postgresql-data-api.mjs \
      packages/adapters/src/postgresql-governance-admin.mjs \
      /app/packages/adapters/src/
 COPY packages/internal-contracts/src/transport-security.mjs \
+     packages/internal-contracts/src/flow-execution-credentials.mjs \
      packages/internal-contracts/src/postgres-extension-availability.mjs \
      /app/packages/internal-contracts/src/
 

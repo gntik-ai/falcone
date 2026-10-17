@@ -6,7 +6,7 @@
 // The memo copy was redundant: the worker reads the token from the workflow ARGS (tenant
 // envelope), never the memo. The fix drops the memo. This boots the real control-plane server with
 // an injected fake Temporal client that records every workflow.start(), publishes a flow, starts an
-// execution, and asserts the memo carries no token while the args still do.
+// execution, and asserts both args and memo carry no token.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
@@ -89,16 +89,13 @@ test('bbx-flow-memo-01: starting an execution does NOT write the execution token
 
     // The memo must carry NO token (a memo is plaintext in Temporal visibility/history).
     const memoStr = JSON.stringify(opts.memo ?? {});
-    assert.ok(opts.memo == null || Object.keys(opts.memo).length === 0, `no memo expected, got ${memoStr}`);
+    assert.deepEqual(Object.keys(opts.memo), ['falconeCredentialAttempt']);
     assert.ok(!memoStr.includes('falconeExecutionToken'), 'memo has no execution-token key');
-
-    // The token IS still carried in the workflow args (tenant envelope) where the worker reads it.
-    const token = opts.args?.[0]?.tenant?.executionToken;
-    assert.ok(typeof token === 'string' && token.length > 0, 'token is still passed via workflow args');
-
-    // And the plaintext token value never appears in the memo.
-    assert.ok(!memoStr.includes(token), 'token value absent from the memo');
-    assert.ok(!JSON.stringify(opts.searchAttributes).includes(token), 'token value absent from search attributes');
+    const tenant = opts.args?.[0]?.tenant;
+    assert.equal(Object.hasOwn(tenant, 'executionToken'), false);
+    assert.match(tenant.executionTokenRef, /^fxr_[A-Za-z0-9_-]{43}$/);
+    assert.ok(!memoStr.includes(tenant.executionTokenRef), 'reference absent from memo');
+    assert.ok(!JSON.stringify(opts.searchAttributes).includes(tenant.executionTokenRef), 'reference absent from search attributes');
   });
 });
 

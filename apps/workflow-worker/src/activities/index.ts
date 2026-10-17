@@ -73,6 +73,11 @@ export async function mintCronExecutionToken(input: { tenant: ActivityInput['ten
   return module.mintCronExecutionToken(input, activityDeps) as Promise<string>;
 }
 
+export async function mintCronExecutionTokenRef(input: { tenant: ActivityInput['tenant'] }): Promise<string> {
+  const module = await dynamicImport('./cron-execution-token.mjs');
+  return module.mintCronExecutionTokenRef(input, activityDeps) as Promise<string>;
+}
+
 /**
  * Evaluate a CEL boolean/data expression OUTSIDE the workflow sandbox (design.md D4).
  * cel-js is pure + side-effect-free, but delegating keeps any future engine internals

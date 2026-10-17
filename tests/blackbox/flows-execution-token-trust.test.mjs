@@ -12,6 +12,7 @@ const { createFlowTriggerRegistry, scheduleIdFor } = await import('../../apps/co
 const { validateExecutionToken } = await import('../../apps/control-plane-executor/src/runtime/execution-token.mjs');
 const workerTokens = await import('../../apps/workflow-worker/src/activities/execution-token.mjs');
 const cronTokens = await import('../../apps/workflow-worker/src/activities/cron-execution-token.mjs');
+const { createExecutionCredentialStore, hashExecutionTokenRef } = await import('../../packages/internal-contracts/src/flow-execution-credentials.mjs');
 
 let savedEnv;
 beforeEach(() => {
@@ -78,7 +79,7 @@ test('cron fires more than 24h after registration with a fresh scoped activity t
     }] }),
     pgRegistry: {}, executePostgresData: async () => { accessed = true; return { items: [] }; },
   });
-  setRuntime({ activities, calls,
+  setRuntime({ activities, calls, patched: { 'fix-976-cron-execution-token': true, 'fix-951-execution-token-ref': false },
     workflowInfo: { workflowId: `${scheduleId}-firing`, searchAttributes: { TemporalScheduledById: [scheduleId], triggerType: ['cron'] } },
     activityInfo: { workflowExecution: { workflowId: `${scheduleId}-firing`, runId: 'run_A' } },
   });
@@ -205,4 +206,35 @@ test('old history without the cron patch schedules no new mint command', async (
   await DslInterpreterWorkflow({ tenant: { tenantId: 'tenant_A', workspaceId: 'ws_A', executionToken: token },
     definition: { apiVersion: 'v1.0', name: 'old-cron', nodes: [{ id: 'echo', type: 'task', taskType: 'noop-a' }] } });
   assert.equal(calls.some((call) => call.name === 'mintCronExecutionToken'), false);
+});
+
+test('cron refs bind this run and expire exactly 24h after firing under delay or skew', async (t) => {
+  const firedAt = 200_000_000;
+  t.mock.timers.enable({ apis: ['Date'], now: firedAt });
+  const tenant = { tenantId: 'tenant_A', workspaceId: 'ws_A', flowId: 'flow_A' };
+  setRuntime({ activityInfo: { workflowExecution: { workflowId: 'cron-ref', runId: 'run-ref' } } });
+  const store = createExecutionCredentialStore();
+  const deps = { executionCredentials: store, describeWorkflow: async () => ({ startTime: new Date(firedAt),
+    searchAttributes: { TemporalScheduledById: ['tenant_A:ws_A:flow_A'] } }) };
+  for (const offset of [-5_000, 60_000]) {
+    t.mock.timers.setTime(firedAt + offset);
+    const ref = await cronTokens.mintCronExecutionTokenRef({ tenant }, deps);
+    assert.match(ref, /^fxr_[A-Za-z0-9_-]{43}$/);
+    const row = await store.get(hashExecutionTokenRef(ref));
+    assert.equal(row.workflow_id, 'cron-ref');
+    assert.equal(row.run_id, 'run-ref');
+    assert.equal(+new Date(row.expires_at), firedAt + 86_400_000);
+    assert.equal(assertExecutionToken(row.token, tenant.tenantId, tenant.workspaceId).expiresAt, firedAt + 86_400_000);
+    assert.equal(JSON.stringify(row).includes(ref), false);
+  }
+  const noWrites = { ...deps, executionCredentials: { insert() { assert.fail('unexpected insert'); }, sweep() { assert.fail('unexpected sweep'); } } };
+  for (const foreign of [{ ...tenant, tenantId: 'foreign' }, { ...tenant, workspaceId: 'foreign' }, { ...tenant, flowId: 'foreign' }]) {
+    await assert.rejects(() => cronTokens.mintCronExecutionTokenRef({ tenant: foreign }, noWrites),
+      (err) => err.type === 'EXECUTION_TOKEN_TENANT_MISMATCH' && err.nonRetryable);
+  }
+  for (const offset of [86_400_000, 86_400_001]) {
+    t.mock.timers.setTime(firedAt + offset);
+    await assert.rejects(() => cronTokens.mintCronExecutionTokenRef({ tenant }, noWrites),
+      (err) => err.type === 'EXECUTION_TOKEN_INVALID' && err.nonRetryable);
+  }
 });

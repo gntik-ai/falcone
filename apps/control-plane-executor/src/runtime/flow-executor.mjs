@@ -25,6 +25,7 @@
 // split api-keys.mjs / embedding-executor.mjs use.
 
 import { randomUUID } from 'node:crypto';
+import { createExecutionCredentialStore, newExecutionCredential, originalCredentialRun, matchesCredentialAttempt } from '../../../../packages/internal-contracts/src/flow-execution-credentials.mjs';
 import { parse as parseYaml } from 'yaml';
 import {
   validateFlowDefinition,
@@ -241,7 +242,14 @@ function assertOwnedWorkflowId(workflowId, identity, { workspaceId, flowId, forb
 // ---------------------------------------------------------------------------------------------
 
 export function createFlowStore({ pool } = {}) {
-  return pool ? createPostgresFlowStore(pool) : createInMemoryFlowStore();
+  const store = pool ? createPostgresFlowStore(pool) : createInMemoryFlowStore();
+  store.executionCredentials = createExecutionCredentialStore({ pool });
+  const ensureSchema = store.ensureSchema.bind(store);
+  store.ensureSchema = async () => {
+    await ensureSchema();
+    await store.executionCredentials.ensureSchema();
+  };
+  return store;
 }
 
 function defRowToResource(row) {
@@ -783,23 +791,40 @@ export function createFlowExecutor({
     return count;
   }
 
-  // Map a stored version row's pinned definition to the Temporal start input (the interpreter's
-  // InlineWorkflowInput: parsed definition + tenant-context envelope). The per-execution token is
-  // carried IN the tenant envelope (the workflow args) so every activity can validate it against
-  // the execution's tenant + workspace before touching tenant data. It is deliberately NOT mirrored
-  // into the Temporal memo, which would store it as plaintext in visibility/history (#633).
-  function startInputFor({ identity, flowId, version, definition, state, executionToken }) {
+  // Only the opaque reference enters Temporal history. The credential stays in Postgres.
+  function startInputFor({ identity, flowId, version, definition, state, executionTokenRef }) {
     return {
       definition,
       tenant: {
-        tenantId: identity.tenantId,
-        workspaceId: identity.workspaceId,
-        flowId,
-        flowVersion: String(version),
-        ...(executionToken ? { executionToken } : {}),
+        tenantId: identity.tenantId, workspaceId: identity.workspaceId,
+        flowId, flowVersion: String(version), executionTokenRef,
       },
       ...(state !== undefined ? { state } : {}),
     };
+  }
+
+  async function prepareCredential(identity, workflowId, client) {
+    const credentials = store.executionCredentials;
+    // Cleanup is bounded and demand-driven; no start error ever removes a credential.
+    await credentials.sweep();
+    for (const row of await credentials.unbound()) {
+      try {
+        const executions = [];
+        const query = `WorkflowId = '${row.workflow_id.replaceAll("'", "''")}'`;
+        for await (const execution of client.workflow.list({ query })) executions.push(execution);
+        const runId = originalCredentialRun(row, executions);
+        if (runId) {
+          const description = await client.workflow.getHandle(row.workflow_id, runId).describe();
+          if (Date.now() < +new Date(row.created_at) + 300_000 && matchesCredentialAttempt(row, description)) {
+            await credentials.claim(row.ref_hash, runId);
+          }
+        }
+      } catch { /* Visibility/store failures leave the row unbound for a later reconciliation. */ }
+    }
+    const token = await mintExecutionToken(identity.tenantId, identity.workspaceId, maxRunDurationMs);
+    const credential = newExecutionCredential({ ...identity, workflowId, token });
+    await credentials.insert(credential.row);
+    return credential;
   }
 
   // triggerType (cron | webhook | platform_event | manual) is stamped on EVERY trigger-initiated
@@ -846,18 +871,15 @@ export function createFlowExecutor({
       ? buildWorkflowId(identity.tenantId, identity.workspaceId, flowId, workflowIdOverride)
       : buildWorkflowId(identity.tenantId, identity.workspaceId, flowId);
     // Mint the short-lived, tenant+workspace-scoped token; expiry never outlasts the run.
-    const executionToken = await mintExecutionToken(identity.tenantId, identity.workspaceId, maxRunDurationMs);
+    const credential = await prepareCredential(identity, workflowId, client);
     let handle;
     try {
       handle = await client.workflow.start(WORKFLOW_TYPE, {
         workflowId,
         taskQueue: temporal.taskQueue,
-        args: [startInputFor({ identity, flowId, version: pinned.version, definition: pinned.definition, state: input, executionToken })],
+        args: [startInputFor({ identity, flowId, version: pinned.version, definition: pinned.definition, state: input, executionTokenRef: credential.ref })],
         searchAttributes: searchAttributesFor({ identity, flowId, version: pinned.version, triggerType }),
-        // The token is carried in the workflow args (tenant envelope) where the worker reads it; it
-        // is NOT mirrored into the Temporal memo. A memo is persisted as json/plain in Temporal
-        // visibility/history (no PayloadCodec is configured on the client or worker), so a memo copy
-        // would expose the bearer token in plaintext to anyone with Temporal visibility access (#633).
+        memo: { falconeCredentialAttempt: credential.row.attempt_id },
       });
     } catch (err) {
       // Duplicate workflow id (replayed webhook delivery / redelivered Kafka offset) -> the run
@@ -867,6 +889,8 @@ export function createFlowExecutor({
       }
       throw err;
     }
+    const runId = handle.firstExecutionRunId ?? handle.runId;
+    if (runId) await store.executionCredentials.claim(credential.row.ref_hash, runId);
     // Audit AFTER the Temporal ack (the run exists). Best-effort; never fails the request.
     await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_STARTED, { identity, flowId, flowVersion: pinned.version, executionId: workflowId, triggerType });
     return {
@@ -1043,15 +1067,16 @@ export function createFlowExecutor({
     const pinned = await resolvePinnedVersion({ identity, flowId, requestedVersion: version });
     const workflowId = buildWorkflowId(identity.tenantId, identity.workspaceId, flowId);
     // A retry is a fresh run → mint a fresh per-execution token scoped to the caller.
-    const executionToken = await mintExecutionToken(identity.tenantId, identity.workspaceId, maxRunDurationMs);
+    const credential = await prepareCredential(identity, workflowId, client);
     const handle = await client.workflow.start(WORKFLOW_TYPE, {
       workflowId,
       taskQueue: temporal.taskQueue,
-      args: [startInputFor({ identity, flowId, version: pinned.version, definition: pinned.definition, executionToken })],
+      args: [startInputFor({ identity, flowId, version: pinned.version, definition: pinned.definition, executionTokenRef: credential.ref })],
       searchAttributes: searchAttributesFor({ identity, flowId, version: pinned.version }),
-      // No memo: the token travels in the workflow args (tenant envelope), never in a plaintext
-      // Temporal memo/visibility entry (#633).
+      memo: { falconeCredentialAttempt: credential.row.attempt_id },
     });
+    const runId = handle.firstExecutionRunId ?? handle.runId;
+    if (runId) await store.executionCredentials.claim(credential.row.ref_hash, runId);
     await emitAudit(FLOW_AUDIT_EVENT_TYPES.EXECUTION_RETRY, { identity, flowId, flowVersion: pinned.version, executionId: workflowId });
     return {
       executionId: workflowId,

@@ -131,6 +131,7 @@ export async function wireActivityDeps(opts = {}) {
   let keyPool;
   let executeLlmComplete;
   let loadFlowDefinition;
+  let executionCredentials;
 
   if (!registry) {
     const [
@@ -140,6 +141,7 @@ export async function wireActivityDeps(opts = {}) {
       { parseAllowedSecretPrefixes },
       pgModule,
       { withPostgresSsl },
+      { createExecutionCredentialStore },
     ] = await Promise.all([
       dynamicImport('../../../apps/control-plane-executor/src/runtime/connection-registry.mjs'),
       dynamicImport('../../../apps/control-plane-executor/src/runtime/workspace-dsn-resolver.mjs'),
@@ -147,6 +149,7 @@ export async function wireActivityDeps(opts = {}) {
       dynamicImport('../../../apps/control-plane-executor/src/runtime/byok-provider-guard.mjs'),
       dynamicImport('pg'),
       dynamicImport('../../../packages/internal-contracts/src/transport-security.mjs'),
+      dynamicImport('../../../packages/internal-contracts/src/flow-execution-credentials.mjs'),
     ]);
 
     const dsn = buildDataDsn(process.env);
@@ -179,6 +182,7 @@ export async function wireActivityDeps(opts = {}) {
     // worker's DSN already reaches the shared `in_falcone` control DB where flow_versions lives,
     // so no separate control-DB pool is needed.
     loadFlowDefinition = createFlowDefinitionLoader({ pool: keyPool });
+    executionCredentials = createExecutionCredentialStore({ pool: keyPool });
   }
 
   const deps = {
@@ -186,6 +190,7 @@ export async function wireActivityDeps(opts = {}) {
     pgRegistry: registry,
     ...(executeLlmComplete ? { executeLlmComplete } : {}),
     ...(loadFlowDefinition ? { loadFlowDefinition } : {}),
+    ...(executionCredentials ? { executionCredentials } : {}),
   };
 
   return {

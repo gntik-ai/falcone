@@ -77,6 +77,7 @@ async function run(): Promise<void> {
   const client = new Client({ connection: clientConnection, namespace: NAMESPACE });
   activities.setActivityDeps({ ...deps,
     describeWorkflow: (workflowId: string, runId: string) => client.workflow.getHandle(workflowId, runId).describe(),
+    listWorkflowExecutions: (workflowId: string) => client.workflow.list({ query: `WorkflowId = '${workflowId.replaceAll("'", "''")}'` }),
   });
   const worker = await Worker.create({
     connection,

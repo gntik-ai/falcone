@@ -1,5 +1,6 @@
 import { Context } from '@temporalio/activity';
-import { toNonRetryable } from './errors.mjs';
+import { toNonRetryable, toRetryable } from './errors.mjs';
+import { newExecutionCredential } from '../../../../packages/internal-contracts/src/flow-execution-credentials.mjs';
 import { mintExecutionToken, DEFAULT_MAX_RUN_DURATION_MS, EXECUTION_TOKEN_INVALID, EXECUTION_TOKEN_TENANT_MISMATCH } from './execution-token.mjs';
 
 // Must match the executor's scheduleIdFor without importing control-plane code.
@@ -28,4 +29,18 @@ export async function mintCronExecutionToken({ tenant }, { describeWorkflow } = 
     throw toNonRetryable(EXECUTION_TOKEN_INVALID, 'cron firing time is invalid or expired');
   }
   return mintExecutionToken(tenant.tenantId, tenant.workspaceId, firedAt + DEFAULT_MAX_RUN_DURATION_MS - now, { now });
+}
+
+/** Only the opaque reference is returned across the activity/history boundary. */
+export async function mintCronExecutionTokenRef(input, deps = {}) {
+  const token = await mintCronExecutionToken(input, deps);
+  const { workflowId, runId } = Context.current().info.workflowExecution;
+  const { ref, row } = newExecutionCredential({ ...input.tenant, workflowId, runId, token });
+  try {
+    await deps.executionCredentials.sweep();
+    await deps.executionCredentials.insert(row);
+  } catch {
+    throw toRetryable('EXECUTION_TOKEN_STORE_UNAVAILABLE', 'execution credential store unavailable');
+  }
+  return ref;
 }

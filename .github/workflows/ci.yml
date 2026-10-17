@@ -81,6 +81,9 @@ jobs:
           pnpm --filter @in-falcone/workflow-worker build
           node --test tests/blackbox/flows-execution-secret-production.test.mjs \
             tests/blackbox/flows-execution-token-trust.test.mjs \
+            tests/blackbox/flows-execution-token-ref-workflow.test.mjs \
+            tests/blackbox/flows-execution-token-not-in-history.test.mjs \
+            tests/blackbox/flows-activity-token-ref.test.mjs \
             tests/blackbox/flows-execution-credentials.test.mjs \
             tests/blackbox/flows-activity-token-gate.test.mjs \
             tests/blackbox/flows-execution-token-not-in-memo.test.mjs \
@@ -125,6 +128,7 @@ jobs:
         run: |
           helm version --short
           node --test tests/blackbox/mongo-gateway-route.test.mjs \
+            tests/blackbox/flows-credential-store-role-parity.test.mjs \
             tests/blackbox/postgres-gateway-route.test.mjs \
             tests/blackbox/structural-write-role-gates-executor.test.mjs
 
@@ -321,6 +325,12 @@ jobs:
           LLM_CONNECTIONS_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
           LLM_CONNECTIONS_TEST_REQUIRED: '1'
         run: node --test tests/integration/llm-provider-connections-postgres.test.mjs
+
+      - name: Real Postgres flow execution credentials
+        env:
+          FLOW_CREDENTIALS_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+          FLOW_CREDENTIALS_TEST_REQUIRED: '1'
+        run: node --test tests/integration/flow-execution-credentials-postgres.test.mjs
 
       - name: Real Postgres workspace bucket pagination
         env:
