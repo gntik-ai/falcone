@@ -114,13 +114,10 @@ export interface TenantContext {
   flowId?: string;
   /** The pinned definition version for this execution (version pinning). */
   flowVersion?: string;
-  /**
-   * Per-execution short-lived credential (change: add-flows-tenancy-isolation-limits). Minted by
-   * the control-plane at execution start, scoped to `{ tenantId, workspaceId }`, expiring with the
-   * run. A REGISTERED catalog activity validates it (assertExecutionToken) before touching any
-   * tenant data store; a missing/expired/cross-tenant token fails the activity non-retryably.
-   */
+  /** Legacy histories only. New starts carry executionTokenRef. */
   executionToken?: string;
+  /** Opaque, run-bound credential reference resolved before tenant data access. */
+  executionTokenRef?: string;
 }
 
 /**

@@ -10,6 +10,7 @@ import { TASK_TYPE_NAMES } from './catalog-names.mjs';
 import { toNonRetryable } from './errors.mjs';
 import { assertPayloadSize } from './limits.mjs';
 import { assertExecutionToken } from './execution-token.mjs';
+import { resolveExecutionTokenRef } from './execution-token-ref.mjs';
 
 import { dbQuery, dbQueryInputSchema, dbQueryOutputSchema } from './db-query.mjs';
 import { storagePut, storagePutInputSchema, storagePutOutputSchema } from './storage-put.mjs';
@@ -89,9 +90,11 @@ export async function dispatchTask(input, deps = {}) {
   // (first-party) activity touches a tenant data store, so before it runs the short-lived token
   // the control-plane minted at execution start MUST validate against the execution's tenant +
   // workspace. A missing / expired / cross-tenant token fails the activity NON-RETRYABLY and no
-  // tenant data is accessed. The token is carried in the workflow argument's tenant envelope as
-  // `executionToken`. Missing credentials fail closed, including cron-fired runs.
-  const token = input.tenant?.executionToken;
+  // tenant data is accessed. New envelopes carry a ref resolved using server ancestry; legacy
+  // histories still carry an inline token. Missing credentials fail closed, including cron runs.
+  const token = input.tenant?.executionTokenRef !== undefined
+    ? await resolveExecutionTokenRef(input.tenant, deps)
+    : input.tenant?.executionToken;
   assertExecutionToken(token, input.tenant?.tenantId, input.tenant?.workspaceId);
   const output = await entry.activity(
     { params: input.params ?? {}, tenant: input.tenant, credential: deps.credential },

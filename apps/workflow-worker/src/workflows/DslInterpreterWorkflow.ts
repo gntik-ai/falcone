@@ -71,7 +71,7 @@ export const approvalSignal = defineSignal<[ApprovalSignalPayload]>('flowApprova
 /** Query the ordered trace of visited node ids (monitoring / tests). */
 export const traceQuery = defineQuery<string[]>('flowTrace');
 
-const { evaluateExpression, loadFlowDefinition, mintCronExecutionToken } = proxyActivities<typeof activities>({
+const { evaluateExpression, loadFlowDefinition, mintCronExecutionToken, mintCronExecutionTokenRef } = proxyActivities<typeof activities>({
   startToCloseTimeout: '1 minute',
 });
 
@@ -109,8 +109,12 @@ export async function DslInterpreterWorkflow(input: WorkflowInput): Promise<Work
   // The activity independently reads THIS run's server metadata before minting anything.
   const scheduledExecution = Boolean(workflowInfo().searchAttributes.TemporalScheduledById?.length) &&
     patched('fix-976-cron-execution-token');
-  if (scheduledExecution && !tenant.executionToken) {
-    tenant = { ...tenant, executionToken: await mintCronExecutionToken({ tenant }) };
+  if (scheduledExecution && !tenant.executionToken && !tenant.executionTokenRef) {
+    if (patched('fix-951-execution-token-ref')) {
+      tenant = { ...tenant, executionTokenRef: await mintCronExecutionTokenRef({ tenant }) };
+    } else {
+      tenant = { ...tenant, executionToken: await mintCronExecutionToken({ tenant }) };
+    }
   }
   let definition: FlowDefinition;
   if (isReferenceInput(input)) {

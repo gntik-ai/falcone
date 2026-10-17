@@ -8,17 +8,23 @@ export class ApplicationFailure extends Error {
 }
 export const Context = { current: () => ({ info: runtime.activityInfo }) };
 export function workflowInfo() { return runtime.workflowInfo; }
-export function patched() { return runtime.patched ?? true; }
+export function patched(id) { return typeof runtime.patched === 'object' ? runtime.patched[id] ?? true : runtime.patched ?? true; }
 export function proxyActivities() {
   return new Proxy({}, { get: (_, name) => async (...args) => {
-    runtime.calls?.push({ name, args });
-    return runtime.activities[name](...args);
+    const call = { name, args };
+    runtime.calls?.push(call);
+    const result = await runtime.activities[name](...args);
+    call.result = result;
+    return result;
   } });
 }
 export function defineSignal(name) { return name; }
 export function defineQuery(name) { return name; }
 export function setHandler() {}
-export async function executeChild(fn, options) { return fn(...options.args); }
+export async function executeChild(fn, options) {
+  runtime.calls?.push({ name: 'executeChild', workflowId: options.workflowId, args: options.args });
+  return fn(...options.args);
+}
 export const CancellationScope = { cancellable: (fn) => fn() };
 export async function condition(predicate) { return predicate(); }
 export async function sleep() {}
