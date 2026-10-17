@@ -156,13 +156,13 @@ const jwtVerifier = createMultiRealmVerifier({
 // or `*` -> match-rest. Compiled to a RegExp with named groups once at load.
 let ROUTES = [];
 const warnedUnauditedRoutes = new Set();
-function loadRoutes(extra = []) {
+function loadRoutes(extra = [], { warnUnaudited = false } = {}) {
   // Seed gaps fail startup; external-only route gaps remain warnings (#971).
   validateRouteAuditCoverage(seedRoutes);
   ROUTES = compileRoutes(extra, seedRoutes);
   for (const route of ROUTES) {
     const key = `${route.method} ${route.path}`;
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method) && route.audit == null
+    if (warnUnaudited && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method) && route.audit == null
       && !warnedUnauditedRoutes.has(key)) {
       warnedUnauditedRoutes.add(key);
       console.warn(`[control-plane] unaudited ROUTE_MAP_FILE route: ${key}`);
@@ -512,7 +512,8 @@ export async function bootstrapControlPlane() {
     loadRoutes();
     if (ROUTE_MAP_FILE) {
       const extra = JSON.parse(await readFile(ROUTE_MAP_FILE, 'utf8'));
-      loadRoutes(Array.isArray(extra) ? extra : []);
+      // Only process startup reports file coverage; embedded route loading stays quiet (#971).
+      loadRoutes(Array.isArray(extra) ? extra : [], { warnUnaudited: true });
       console.log(`[control-plane] loaded ${ROUTES.length} routes (seed + route map)`);
     }
     if (!webhookSchemaPool

@@ -134,7 +134,7 @@ test('#971: self-recorded routes name a recorder present in their source', () =>
   }
 });
 
-test('#971: server startup rejects a seed audit gap but warns once for extra-only mutations', async () => {
+test('#971: route loading rejects seed gaps and reports extra gaps only when requested at startup', async () => {
   const { startDenialServer } = await import('../blackbox/helpers/authorization-denial-server.mjs');
   await assert.rejects(startDenialServer({ seed: [{ method: 'POST', path: '/seed-gap', localHandler: 'fake' }] }), /POST \/seed-gap/);
   const server = await startDenialServer();
@@ -142,6 +142,10 @@ test('#971: server startup rejects a seed audit gap but warns once for extra-onl
   // The actual loader is exposed by the source-only HTTP harness.
   server.loadRoutes([route, route]);
   server.loadRoutes([route]);
+  assert.equal(server.warnings.filter((line) => line.includes('/extra-gap')).length, 0,
+    'embedded route loading must not emit process-startup diagnostics');
+  server.loadRoutes([route, route], { warnUnaudited: true });
+  server.loadRoutes([route], { warnUnaudited: true });
   const warnings = server.warnings.filter((line) => line.includes('/extra-gap'));
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /unaudited/);
