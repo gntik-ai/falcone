@@ -36,15 +36,15 @@ tokens and imports no page components from those transitive packages.
 
 | Package | Version | Integrity |
 | --- | --- | --- |
-| @gntik-ai/blocks | 0.5.0 | sha512-U82KxZ/pch7DPEjHdCnJijTJaTcCt7Qmob47xskked00tT2dI63A3EjQHdfMCXpQIfPGqDY/NaU/pRf51nlK2Q== |
+| @gntik-ai/blocks | 0.7.0 | sha512-Gr0N98GWsQ1VRCcbOha52vOPYGaaUDOkkZecegO+3gYkLWgOxQznQoQTGlld6ybj0pxFj+nBzOJurfb6eTiZ9w== |
 | @gntik-ai/charts | 0.5.0 | sha512-yTQpTfDK+MHLqce17o36xgLueQoWRQ4wz4abw/AwWBswTOXiB94pasuoGOOqV1jGVWfrliOAuMcqqd1IYoFbEA== |
-| @gntik-ai/chat | 0.5.0 | sha512-zuy5BMSSVpudaCvwdQaXl6hRu2X+xB0N+JkZwiY0r+VjsY/2igS+Cbs+1rak5eAxH3A3W7bC8fbLdieI9MN3IA== |
+| @gntik-ai/chat | 0.7.0 | sha512-78oT4HZzvDxDzI7qYp48hV+HJy/NnU7YOCApPi5mjyBypjENlKUROwMNXkzjrH4qfXZcH/2x7Go/5TMKGjVpdw== |
 | @gntik-ai/editor | 0.5.0 | sha512-xBW1oqDRskvdojCD+kS4vqorN8rL8Ch5akXSZh4q5dEdlUbnGIJxNEVquO6k36OeytS7m6Mm6duLSH7AMniz3g== |
 | @gntik-ai/flow | 0.5.0 | sha512-kebbJ3/Tfnd4rnReQUkTVDSqBx8qjevEi1mDDbHDrgTR9he+xjjPaUt35+61hv3E4pMTKoMdOOeaE62nlMQETA== |
 | @gntik-ai/icons | 0.5.0 | sha512-sj6o4hBsPMEipWUff8NMBgxVCt451gAPr6HoyPDNx8ZQQX8uIeWyRnYR7BlFdyRLVRyBWpPSbd2JKpjdkibB4g== |
-| @gntik-ai/templates | 0.5.0 | sha512-/XvpKKOv4MYr6GVp2Ya8J8HKjAY3nFWQrM+J+QM99s6fkYngVtBXIz/mpljZ3RVLvhYLshFktdkJo6abtKFdcw== |
+| @gntik-ai/templates | 0.7.0 | sha512-l7jM3ts9C97HmC/CGXnhdqJdBGFqTDLO7vefdnnVOeZIw7/1irCgyQLxadohsogvLkrM6nrQS5urxEC2XJAY3g== |
 | @gntik-ai/tokens | 0.2.1 | sha512-Ys7tPnkMylielio3HIxQMTPp1tnmxnEqbp7JGnIaXdcdiAdZieudaLm2xnDCTZ+SWfq5AFTxmH0JQxIB+6CRSA== |
-| @gntik-ai/ui | 0.5.0 | sha512-QAw3Yklf3txCdXSdPrPR/PJxoQlZZ9hoQ5R38DRIWD4Dmd62HVeRaMiG/tqwLysoONJ5Ku1KM3Ijje4wMTB06w== |
+| @gntik-ai/ui | 0.7.0 | sha512-ArmGytrErocY/X65f4l0IxW0vK0AYOQ3e2RaeOYFeQEyyVY1mMOPOC3mmuBl+OMAdavbrxnUfVh3peLBVJTjOw== |
 
 CSP asset checks use the unchanged headers parsed from `../web-console/static-server.mjs`.
 The body font is Geist Sans; the test page's `code[data-testid="mono"]` uses Geist Mono.
