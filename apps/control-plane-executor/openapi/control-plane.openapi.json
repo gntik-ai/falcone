@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "In Falcone Public API",
-    "version": "1.22.0",
+    "version": "1.23.0",
     "summary": "Unified, versioned, and documented public API surface grouped into coherent /v1 families.",
     "description": "Unified public gateway contract for the In Falcone BaaS platform. The surface is exposed through APISIX, versioned under /v1, pinned with X-API-Version, and organized into stable families for platform, tenants, workspaces, authorization, PostgreSQL administration and data control, events, functions, storage, metrics, and realtime routes.",
     "license": {
@@ -68125,8 +68125,7 @@
         "description": "Stable tenant identifier.",
         "schema": {
           "type": "string",
-          "minLength": 3,
-          "pattern": "^ten_[0-9a-z]+$"
+          "minLength": 3
         }
       },
       "WorkspaceId": {
@@ -68136,8 +68135,7 @@
         "description": "Stable workspace identifier.",
         "schema": {
           "type": "string",
-          "minLength": 3,
-          "pattern": "^wrk_[0-9a-z]+$"
+          "minLength": 3
         }
       },
       "UserId": {
@@ -68146,8 +68144,7 @@
         "required": true,
         "description": "Stable platform user identifier.",
         "schema": {
-          "type": "string",
-          "pattern": "^usr_[0-9a-z]+$"
+          "type": "string"
         }
       },
       "ApplicationId": {
@@ -68543,8 +68540,7 @@
         "required": true,
         "description": "Restrict workspace discovery to one tenant boundary.",
         "schema": {
-          "type": "string",
-          "pattern": "^ten_[0-9a-z]+$"
+          "type": "string"
         }
       },
       "FilterWorkspaceSlug": {
@@ -70049,12 +70045,10 @@
             "type": "string"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           }
         }
       },
@@ -70385,12 +70379,10 @@
             "pattern": "^tmb_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "role": {
             "$ref": "#/components/schemas/TenantRole"
@@ -70403,8 +70395,7 @@
             "pattern": "^inv_[0-9a-z]+$"
           },
           "grantedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "state": {
             "$ref": "#/components/schemas/EntityState"
@@ -70442,16 +70433,13 @@
             "pattern": "^wmb_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "role": {
             "$ref": "#/components/schemas/WorkspaceRole"
@@ -70464,8 +70452,7 @@
             "pattern": "^inv_[0-9a-z]+$"
           },
           "grantedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "state": {
             "$ref": "#/components/schemas/EntityState"
@@ -70498,8 +70485,7 @@
             "const": "platform_user"
           },
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "username": {
             "type": "string",
@@ -70648,8 +70634,7 @@
             "const": "tenant"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "slug": {
             "type": "string",
@@ -70810,12 +70795,10 @@
             "const": "workspace"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "slug": {
             "type": "string",
@@ -70913,7 +70896,6 @@
           },
           "tenantId": {
             "type": "string",
-            "pattern": "^ten_[0-9a-z]+$",
             "description": "Stable tenant identifier for the parent tenant that will own the workspace."
           },
           "iamBoundary": {
@@ -70957,12 +70939,10 @@
             "pattern": "^app_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "slug": {
             "type": "string",
@@ -71107,12 +71087,10 @@
             "maxLength": 128
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "status": {
             "type": "string",
@@ -71488,12 +71466,10 @@
             "pattern": "^svc_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "slug": {
             "type": "string",
@@ -71656,12 +71632,10 @@
             "pattern": "^res_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "slug": {
             "type": "string",
@@ -71729,8 +71703,7 @@
           "consumerWorkspaceIds": {
             "type": "array",
             "items": {
-              "type": "string",
-              "pattern": "^wrk_[0-9a-z]+$"
+              "type": "string"
             }
           },
           "authorizedApplicationIds": {
@@ -71851,12 +71824,10 @@
             "maxLength": 128
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "status": {
             "type": "string",
@@ -72004,12 +71975,10 @@
             "pattern": "^tmb_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "role": {
             "$ref": "#/components/schemas/TenantRole"
@@ -72022,8 +71991,7 @@
             "pattern": "^inv_[0-9a-z]+$"
           },
           "grantedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "state": {
             "$ref": "#/components/schemas/EntityState"
@@ -72077,8 +72045,7 @@
             "const": "tenant_membership"
           },
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "role": {
             "$ref": "#/components/schemas/TenantRole"
@@ -72145,16 +72112,13 @@
             "pattern": "^wmb_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "role": {
             "$ref": "#/components/schemas/WorkspaceRole"
@@ -72167,8 +72131,7 @@
             "pattern": "^inv_[0-9a-z]+$"
           },
           "grantedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "state": {
             "$ref": "#/components/schemas/EntityState"
@@ -72223,12 +72186,10 @@
             "const": "workspace_membership"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "role": {
             "$ref": "#/components/schemas/WorkspaceRole"
@@ -73023,12 +72984,10 @@
             ]
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "planId": {
             "type": "string",
@@ -73436,12 +73395,10 @@
             "pattern": "^res_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "engine": {
             "type": "string",
@@ -73493,12 +73450,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "engineVersion": {
             "type": "string",
@@ -73677,12 +73632,10 @@
             "pattern": "^res_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "topicName": {
             "type": "string",
@@ -73848,12 +73801,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "topicName": {
             "type": "string",
@@ -73972,12 +73923,10 @@
             "pattern": "^(?:fn_[0-9a-f]{8}-[0-9a-f]{3}|res_[0-9a-z]+)$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "actionName": {
             "type": "string",
@@ -74098,12 +74047,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "actionName": {
             "type": "string",
@@ -74165,12 +74112,10 @@
             "pattern": "^res_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "bucketName": {
             "type": "string",
@@ -74215,12 +74160,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "bucketName": {
             "type": "string",
@@ -74257,12 +74200,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "metricKey": {
             "type": "string",
@@ -74328,12 +74269,10 @@
             "pattern": "^wss_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "channel": {
             "type": "string",
@@ -74397,12 +74336,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "channel": {
             "type": "string",
@@ -74737,12 +74674,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "channel": {
             "type": "string",
@@ -74944,12 +74879,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "window": {
             "type": "string",
@@ -75695,12 +75628,10 @@
             "maxLength": 128
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "status": {
             "type": "string",
@@ -76854,8 +76785,7 @@
         ],
         "properties": {
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "username": {
             "type": "string",
@@ -76882,15 +76812,13 @@
           "tenantIds": {
             "type": "array",
             "items": {
-              "type": "string",
-              "pattern": "^ten_[0-9a-z]+$"
+              "type": "string"
             }
           },
           "workspaceIds": {
             "type": "array",
             "items": {
-              "type": "string",
-              "pattern": "^wrk_[0-9a-z]+$"
+              "type": "string"
             }
           }
         }
@@ -77128,8 +77056,7 @@
             "pattern": "^reg_[0-9a-z]+$"
           },
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "activationMode": {
             "$ref": "#/components/schemas/ConsoleSignupActivationMode"
@@ -77150,12 +77077,10 @@
             "maxLength": 280
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "provisioning": {
             "$ref": "#/components/schemas/ProvisioningSummary"
@@ -77206,8 +77131,7 @@
             "pattern": "^reg_[0-9a-z]+$"
           },
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "decision": {
             "type": "string",
@@ -77224,8 +77148,7 @@
             "format": "date-time"
           },
           "actorUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "tenant": {
             "$ref": "#/components/schemas/Tenant"
@@ -77584,8 +77507,7 @@
             "maxLength": 120
           },
           "iamUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "iamGroupIds": {
             "type": "array",
@@ -77840,8 +77762,7 @@
         ],
         "properties": {
           "requestedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "requestedTtl": {
             "$ref": "#/components/schemas/DurationString"
@@ -77865,8 +77786,7 @@
         ],
         "properties": {
           "requestedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "rotateReason": {
             "type": "string",
@@ -77890,8 +77810,7 @@
         ],
         "properties": {
           "requestedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "revocationReason": {
             "type": "string",
@@ -78472,8 +78391,7 @@
         ],
         "properties": {
           "requestedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "state": {
             "type": "string",
@@ -78534,8 +78452,7 @@
             "format": "date-time"
           },
           "lastChangedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "reason": {
             "type": "string",
@@ -78683,12 +78600,10 @@
             "maxLength": 160
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "realmId": {
             "type": "string",
@@ -78947,16 +78862,13 @@
             "maxLength": 80
           },
           "userId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "status": {
             "type": "string",
@@ -79218,8 +79130,7 @@
             ]
           },
           "sourceWorkspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "targetResourceId": {
             "type": "string",
@@ -79252,8 +79163,7 @@
             ]
           },
           "sourceWorkspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "logicalResources": {
             "type": "array",
@@ -79307,8 +79217,7 @@
         ],
         "properties": {
           "sourceWorkspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "clonedAt": {
             "type": "string",
@@ -79383,8 +79292,7 @@
             ],
             "properties": {
               "sourceWorkspaceId": {
-                "type": "string",
-                "pattern": "^wrk_[0-9a-z]+$"
+                "type": "string"
               },
               "clonePolicy": {
                 "$ref": "#/components/schemas/WorkspaceClonePolicy"
@@ -79471,8 +79379,7 @@
         ],
         "properties": {
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceSlug": {
             "type": "string",
@@ -79572,8 +79479,7 @@
             "$ref": "#/components/schemas/PermissionRecalculationStatus"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           }
         }
       },
@@ -79603,12 +79509,10 @@
             "pattern": "^epr_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "scope": {
             "$ref": "#/components/schemas/EffectivePermissionScope"
@@ -79631,8 +79535,7 @@
             "maxLength": 80
           },
           "triggeredByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "affectedResourceCount": {
             "type": "integer",
@@ -79693,16 +79596,13 @@
             "pattern": "^otf_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "currentOwnerUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "targetUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "currentOwnerMembershipId": {
             "type": "string",
@@ -79716,12 +79616,10 @@
             "$ref": "#/components/schemas/OwnershipTransferStatus"
           },
           "initiatedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "acceptedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "acceptedAt": {
             "type": "string",
@@ -79764,12 +79662,10 @@
             "const": "ownership_transfer"
           },
           "currentOwnerUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "targetUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           },
           "targetMembershipId": {
             "type": "string",
@@ -79789,8 +79685,7 @@
             "$ref": "#/components/schemas/EntityMetadata"
           },
           "initiatedByUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           }
         }
       },
@@ -79808,8 +79703,7 @@
             "maxLength": 512
           },
           "actorUserId": {
-            "type": "string",
-            "pattern": "^usr_[0-9a-z]+$"
+            "type": "string"
           }
         }
       },
@@ -79928,8 +79822,7 @@
         ],
         "properties": {
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceSlug": {
             "type": "string",
@@ -80086,8 +79979,7 @@
         ],
         "properties": {
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceSlug": {
             "type": "string",
@@ -80145,8 +80037,7 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "generatedAt": {
             "type": "string",
@@ -80318,8 +80209,7 @@
             "pattern": "^exp_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "generatedAt": {
             "type": "string",
@@ -80377,8 +80267,7 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "state": {
             "$ref": "#/components/schemas/TenantLifecycleState"
@@ -80585,8 +80474,7 @@
             "maxLength": 128
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "status": {
             "type": "string",
@@ -80989,8 +80877,7 @@
           "workspaceBindings": {
             "type": "array",
             "items": {
-              "type": "string",
-              "pattern": "^wrk_[0-9a-z]+$"
+              "type": "string"
             }
           }
         }
@@ -81014,8 +80901,7 @@
           "workspaceBindings": {
             "type": "array",
             "items": {
-              "type": "string",
-              "pattern": "^wrk_[0-9a-z]+$"
+              "type": "string"
             }
           },
           "viewCount": {
@@ -81072,12 +80958,10 @@
             "pattern": "^[a-z][a-z0-9_]{2,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "principalType": {
             "type": "string",
@@ -81103,12 +80987,10 @@
             "additionalProperties": false,
             "properties": {
               "tenantId": {
-                "type": "string",
-                "pattern": "^ten_[0-9a-z]+$"
+                "type": "string"
               },
               "workspaceId": {
-                "type": "string",
-                "pattern": "^wrk_[0-9a-z]+$"
+                "type": "string"
               },
               "managedBy": {
                 "type": "string",
@@ -81148,12 +81030,10 @@
             "pattern": "^[a-z][a-z0-9_]{2,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "principalType": {
             "type": "string",
@@ -81185,12 +81065,10 @@
             "additionalProperties": false,
             "properties": {
               "tenantId": {
-                "type": "string",
-                "pattern": "^ten_[0-9a-z]+$"
+                "type": "string"
               },
               "workspaceId": {
-                "type": "string",
-                "pattern": "^wrk_[0-9a-z]+$"
+                "type": "string"
               },
               "managedBy": {
                 "type": "string",
@@ -81228,12 +81106,10 @@
             "pattern": "^[a-z][a-z0-9_]{2,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "ownerRoleName": {
             "type": "string",
@@ -81260,12 +81136,10 @@
             "additionalProperties": false,
             "properties": {
               "tenantId": {
-                "type": "string",
-                "pattern": "^ten_[0-9a-z]+$"
+                "type": "string"
               },
               "workspaceId": {
-                "type": "string",
-                "pattern": "^wrk_[0-9a-z]+$"
+                "type": "string"
               },
               "isolationBoundary": {
                 "type": "string",
@@ -81349,12 +81223,10 @@
             "pattern": "^[a-z][a-z0-9_]{2,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "ownerRoleName": {
             "type": "string",
@@ -81379,8 +81251,7 @@
           "workspaceBindings": {
             "type": "array",
             "items": {
-              "type": "string",
-              "pattern": "^wrk_[0-9a-z]+$"
+              "type": "string"
             }
           },
           "accessPolicy": {
@@ -81462,12 +81333,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "roleName": {
             "type": "string",
@@ -81506,12 +81375,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "userName": {
             "type": "string",
@@ -81556,12 +81423,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -81637,12 +81502,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -81664,8 +81527,7 @@
           "workspaceBindings": {
             "type": "array",
             "items": {
-              "type": "string",
-              "pattern": "^wrk_[0-9a-z]+$"
+              "type": "string"
             }
           },
           "metadata": {
@@ -81891,12 +81753,10 @@
             "maxLength": 255
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "planId": {
             "type": "string",
@@ -82335,12 +82195,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "ordinalPosition": {
             "type": "integer",
@@ -82400,12 +82258,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -82510,12 +82366,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "tableKind": {
             "type": "string",
@@ -82573,12 +82427,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -82908,12 +82760,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "constraintType": {
             "type": "string",
@@ -83013,12 +82863,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -83258,12 +83106,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "indexMethod": {
             "type": "string",
@@ -83362,12 +83208,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -83479,12 +83323,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "query": {
             "type": "string",
@@ -83569,12 +83411,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -83697,12 +83537,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "query": {
             "type": "string",
@@ -83794,12 +83632,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -83952,12 +83788,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "signature": {
             "type": "string",
@@ -84072,12 +83906,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -84195,12 +84027,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "signature": {
             "type": "string",
@@ -84294,12 +84124,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -84423,12 +84251,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "rlsEnabled": {
             "type": "boolean"
@@ -84477,12 +84303,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -84597,12 +84421,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "policyMode": {
             "type": "string",
@@ -84686,12 +84508,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -84844,12 +84664,10 @@
             "pattern": "^[a-z0-9_:-]{3,255}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "granteeRoleName": {
             "type": "string",
@@ -84931,12 +84749,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "grantId": {
             "type": "string",
@@ -85018,12 +84834,10 @@
             "pattern": "^[a-z][a-z0-9_]{0,62}$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "installedVersion": {
             "type": "string",
@@ -85097,12 +84911,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "databaseName": {
             "type": "string",
@@ -85198,8 +85010,7 @@
           "workspaceBindings": {
             "type": "array",
             "items": {
-              "type": "string",
-              "pattern": "^wrk_[0-9a-z]+$"
+              "type": "string"
             }
           },
           "comment": {
@@ -85250,12 +85061,10 @@
             ]
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "ownerRoleName": {
             "type": "string",
@@ -85322,12 +85131,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "templateId": {
             "type": "string",
@@ -85706,12 +85513,10 @@
             "type": "string"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "tenantDatabaseName": {
             "type": "string",
@@ -85729,8 +85534,7 @@
           "workspaceBindings": {
             "type": "array",
             "items": {
-              "type": "string",
-              "pattern": "^wrk_[0-9a-z]+$"
+              "type": "string"
             }
           },
           "defaultPrivileges": {
@@ -89931,8 +89735,7 @@
         "properties": {
           "workspaceId": {
             "type": "string",
-            "minLength": 3,
-            "pattern": "^wrk_[0-9a-z]+$"
+            "minLength": 3
           },
           "templateId": {
             "type": "string",
@@ -92485,12 +92288,10 @@
             "pattern": "^res_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "topicName": {
             "type": "string",
@@ -92541,12 +92342,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "topicName": {
             "type": "string",
@@ -92592,12 +92391,10 @@
             "maxLength": 128
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "brokerMode": {
             "type": "string",
@@ -93493,12 +93290,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "provider": {
             "type": "string",
@@ -93630,12 +93425,10 @@
             "pattern": "^res_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "packageName": {
             "type": "string",
@@ -93730,12 +93523,10 @@
             "pattern": "^res_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "triggerName": {
             "type": "string",
@@ -93834,12 +93625,10 @@
             "pattern": "^res_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "ruleName": {
             "type": "string",
@@ -93926,8 +93715,7 @@
         ],
         "properties": {
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "serverlessContext": {
             "$ref": "#/components/schemas/FunctionServerlessContext"
@@ -94186,12 +93974,10 @@
             "pattern": "^evb_[0-9a-z-]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "topicRef": {
             "type": "string",
@@ -94232,12 +94018,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "sourceType": {
             "type": "string",
@@ -94343,12 +94127,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "resourceId": {
             "type": "string",
@@ -94627,12 +94409,10 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "window": {
             "type": "string",
@@ -94698,8 +94478,7 @@
         ],
         "properties": {
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "window": {
             "type": "string",
@@ -95633,11 +95412,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "versionNumber": {
@@ -95790,11 +95567,9 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "description": {
@@ -95856,11 +95631,9 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -95885,7 +95658,6 @@
             "type": "boolean"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -96066,11 +95838,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "scope": {
@@ -96078,11 +95848,9 @@
             "type": "object",
             "properties": {
               "tenantId": {
-                "pattern": "^ten_[0-9a-z]+$",
                 "type": "string"
               },
               "workspaceId": {
-                "pattern": "^wrk_[0-9a-z]+$",
                 "type": "string"
               }
             },
@@ -96167,11 +95935,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "visibility": {
@@ -96200,11 +95966,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "resources": {
@@ -97046,12 +96810,10 @@
             "pattern": "^res_[0-9a-z]+$"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "bucketResourceId": {
             "type": "string",
@@ -99027,8 +98789,7 @@
             "maximum": 10000
           },
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "maskingProfileId": {
             "type": "string",
@@ -101234,8 +100995,7 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "status": {
             "type": "string",
@@ -101260,8 +101020,7 @@
         ],
         "properties": {
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "purged": {
             "const": true
@@ -101394,12 +101153,10 @@
         ],
         "properties": {
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "status": {
             "type": "string",
@@ -101425,12 +101182,10 @@
         ],
         "properties": {
           "workspaceId": {
-            "type": "string",
-            "pattern": "^wrk_[0-9a-z]+$"
+            "type": "string"
           },
           "tenantId": {
-            "type": "string",
-            "pattern": "^ten_[0-9a-z]+$"
+            "type": "string"
           },
           "deleted": {
             "const": true

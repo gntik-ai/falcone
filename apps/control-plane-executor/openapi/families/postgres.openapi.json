@@ -378,7 +378,6 @@
         "required": true,
         "schema": {
           "minLength": 3,
-          "pattern": "^wrk_[0-9a-z]+$",
           "type": "string"
         }
       },
@@ -867,7 +866,6 @@
             "type": "array"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
@@ -888,7 +886,6 @@
             "type": "array"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1479,11 +1476,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1629,11 +1624,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1740,11 +1733,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1921,11 +1912,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -3324,25 +3313,21 @@
                 "type": "string"
               },
               "tenantId": {
-                "pattern": "^ten_[0-9a-z]+$",
                 "type": "string"
               },
               "workspaceId": {
-                "pattern": "^wrk_[0-9a-z]+$",
                 "type": "string"
               }
             },
             "type": "object"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
             "$ref": "#/components/schemas/PostgresTenantIsolationProfile"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -3417,7 +3402,6 @@
           },
           "workspaceBindings": {
             "items": {
-              "pattern": "^wrk_[0-9a-z]+$",
               "type": "string"
             },
             "type": "array"
@@ -3497,11 +3481,9 @@
             "type": "object"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -3872,11 +3854,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -3982,11 +3962,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4129,7 +4107,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "volatility": {
@@ -4141,7 +4118,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4254,7 +4230,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "volatility": {
@@ -4266,7 +4241,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4355,14 +4329,12 @@
             "$ref": "#/components/schemas/PostgresGrantTarget"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
             "$ref": "#/components/schemas/PostgresTenantIsolationProfile"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4536,11 +4508,9 @@
             "$ref": "#/components/schemas/PostgresGrantTarget"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4640,14 +4610,12 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "unique": {
             "type": "boolean"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4819,14 +4787,12 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "unique": {
             "type": "boolean"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4882,14 +4848,12 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4934,11 +4898,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -5122,7 +5084,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "viewName": {
@@ -5135,7 +5096,6 @@
             "type": "boolean"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -5249,7 +5209,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "viewName": {
@@ -5262,7 +5221,6 @@
             "type": "boolean"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -5392,7 +5350,6 @@
             "$ref": "#/components/schemas/PostgresTableSecurity"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
@@ -5409,7 +5366,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -5596,7 +5552,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "usingExpression": {
@@ -5610,7 +5565,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -5769,11 +5723,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -5873,11 +5825,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -6049,11 +5999,9 @@
                 "type": "string"
               },
               "tenantId": {
-                "pattern": "^ten_[0-9a-z]+$",
                 "type": "string"
               },
               "workspaceId": {
-                "pattern": "^wrk_[0-9a-z]+$",
                 "type": "string"
               }
             },
@@ -6080,11 +6028,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -6146,11 +6092,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -6672,7 +6616,6 @@
             "$ref": "#/components/schemas/PostgresTemplateBinding"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
@@ -6680,13 +6623,11 @@
           },
           "workspaceBindings": {
             "items": {
-              "pattern": "^wrk_[0-9a-z]+$",
               "type": "string"
             },
             "type": "array"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -6765,7 +6706,6 @@
           },
           "workspaceBindings": {
             "items": {
-              "pattern": "^wrk_[0-9a-z]+$",
               "type": "string"
             },
             "type": "array"
@@ -6827,18 +6767,15 @@
             "type": "object"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceBindings": {
             "items": {
-              "pattern": "^wrk_[0-9a-z]+$",
               "type": "string"
             },
             "type": "array"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -6948,14 +6885,12 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
             "$ref": "#/components/schemas/PostgresTenantIsolationProfile"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -7042,14 +6977,12 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
             "$ref": "#/components/schemas/PostgresTenantIsolationProfile"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -7150,11 +7083,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -7222,11 +7153,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -7283,7 +7212,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "variables": {
@@ -7293,7 +7221,6 @@
             "type": "array"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -7404,7 +7331,6 @@
           },
           "workspaceBindings": {
             "items": {
-              "pattern": "^wrk_[0-9a-z]+$",
               "type": "string"
             },
             "type": "array"
@@ -7506,7 +7432,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "variables": {
@@ -7516,7 +7441,6 @@
             "type": "array"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -7576,18 +7500,15 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceBindings": {
             "items": {
-              "pattern": "^wrk_[0-9a-z]+$",
               "type": "string"
             },
             "type": "array"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -7647,11 +7568,9 @@
                 "type": "string"
               },
               "tenantId": {
-                "pattern": "^ten_[0-9a-z]+$",
                 "type": "string"
               },
               "workspaceId": {
-                "pattern": "^wrk_[0-9a-z]+$",
                 "type": "string"
               }
             },
@@ -7672,7 +7591,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "userName": {
@@ -7682,7 +7600,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -7746,7 +7663,6 @@
             "type": "object"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "userName": {
@@ -7756,7 +7672,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -7833,7 +7748,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "viewName": {
@@ -7843,7 +7757,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -7938,7 +7851,6 @@
             "type": "boolean"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "viewName": {
@@ -7948,7 +7860,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -8076,7 +7987,7 @@
     "description": "Workspace- and tenant-aware PostgreSQL control, structural administration, inventory, and Data API routes exposed through safe BaaS contracts. Includes CRUD/query, bulk ops, import/export, scoped credentials, saved queries, stable endpoints, workspace-scoped RPC routines, and a restricted admin SQL channel. Generated from the unified public API contract for v1.",
     "summary": "Workspace- and tenant-aware PostgreSQL control, structural administration, inventory, and Data API routes exposed through safe BaaS contracts. Includes CRUD/query, bulk ops, import/export, scoped credentials, saved queries, stable endpoints, workspace-scoped RPC routines, and a restricted admin SQL channel.",
     "title": "In Falcone Postgres API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

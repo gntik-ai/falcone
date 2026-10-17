@@ -166,7 +166,6 @@
         "required": true,
         "schema": {
           "minLength": 3,
-          "pattern": "^ten_[0-9a-z]+$",
           "type": "string"
         }
       },
@@ -177,7 +176,6 @@
         "required": true,
         "schema": {
           "minLength": 3,
-          "pattern": "^wrk_[0-9a-z]+$",
           "type": "string"
         }
       },
@@ -974,11 +972,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1044,11 +1040,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2450,7 +2444,7 @@
     "description": "Tenant-scoped IAM administration for Keycloak realms, clients, roles, scopes, and users through normalized BaaS contracts. Generated from the unified public API contract for v1.",
     "summary": "Tenant-scoped IAM administration for Keycloak realms, clients, roles, scopes, and users through normalized BaaS contracts.",
     "title": "In Falcone IAM API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

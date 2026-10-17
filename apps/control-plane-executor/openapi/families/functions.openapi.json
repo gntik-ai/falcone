@@ -106,7 +106,6 @@
         "required": true,
         "schema": {
           "minLength": 3,
-          "pattern": "^wrk_[0-9a-z]+$",
           "type": "string"
         }
       },
@@ -318,7 +317,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
@@ -336,7 +334,6 @@
             "type": "integer"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -494,11 +491,9 @@
             "$ref": "#/components/schemas/FunctionDeploymentSource"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -912,11 +907,9 @@
             "additionalProperties": false,
             "properties": {
               "tenantId": {
-                "pattern": "^ten_[0-9a-z]+$",
                 "type": "string"
               },
               "workspaceId": {
-                "pattern": "^wrk_[0-9a-z]+$",
                 "type": "string"
               }
             },
@@ -927,11 +920,9 @@
             "type": "object"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -970,11 +961,9 @@
             "type": "array"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1039,7 +1028,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "visibility": {
@@ -1050,7 +1038,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1479,7 +1466,6 @@
             "type": "array"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1741,7 +1727,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
@@ -1758,7 +1743,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2174,7 +2158,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
@@ -2188,7 +2171,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2263,7 +2245,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2371,7 +2352,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
@@ -2383,7 +2363,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2700,7 +2679,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
@@ -2714,7 +2692,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2781,7 +2758,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
@@ -2796,7 +2772,6 @@
             "type": "integer"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2880,14 +2855,12 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2937,11 +2910,9 @@
             "writeOnly": true
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -3352,7 +3323,7 @@
     "description": "Workspace-scoped OpenWhisk-governed serverless package, trigger, rule, action, and inventory contracts routed by the gateway. Generated from the unified public API contract for v1.",
     "summary": "Workspace-scoped OpenWhisk-governed serverless package, trigger, rule, action, and inventory contracts routed by the gateway.",
     "title": "In Falcone Functions API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

@@ -170,7 +170,7 @@
     "description": "Quota dimensions console control-plane operations. Generated from the unified public API contract for v1.",
     "summary": "Quota dimensions console control-plane operations.",
     "title": "In Falcone Quota dimensions API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

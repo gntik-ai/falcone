@@ -230,7 +230,7 @@
     "description": "Tenant plan console control-plane operations. Generated from the unified public API contract for v1.",
     "summary": "Tenant plan console control-plane operations.",
     "title": "In Falcone Tenant plan API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

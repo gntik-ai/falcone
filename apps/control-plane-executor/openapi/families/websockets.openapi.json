@@ -465,11 +465,9 @@
             "type": "array"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -527,11 +525,9 @@
             "type": "array"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -549,7 +545,7 @@
     "description": "Realtime websocket session negotiation and channel subscriptions for workspace-scoped event delivery through the gateway. Generated from the unified public API contract for v1.",
     "summary": "Realtime websocket session negotiation and channel subscriptions for workspace-scoped event delivery through the gateway.",
     "title": "In Falcone WebSockets API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
