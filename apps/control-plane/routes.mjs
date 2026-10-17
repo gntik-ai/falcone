@@ -9,8 +9,7 @@
 // `module` paths resolve under /repo (the repo subset COPYd into the image).
 const PO = '/repo/packages/provisioning-orchestrator/src/actions';
 
-// Every mutation declares dispatch, self-recorded or exempt audit coverage (#971).
-export const routes = [
+export const routes = [ // Every mutation declares dispatch, self-recorded or exempt audit coverage (#971).
   // Platform-wide Knative dependency status. This route is deliberately GET-only: the selected
   // mode and readiness record come from installer/chart configuration, never a tenant API write.
   { method: 'GET', path: '/v1/platform/runtime/knative', localHandler: 'getKnativeRuntimeStatus', auth: 'knative_status' },
