@@ -72,5 +72,38 @@
         "structuredOutput": false
       }
     }
+  },
+  "openai-responses": {
+    "openai-responses": {
+      "cases": [
+        "auth-401",
+        "cache-and-reasoning-usage",
+        "eof-after-deltas",
+        "eof-after-usage",
+        "failed-200-rate-limit",
+        "failed-200-server-error",
+        "incomplete-max-output-tokens",
+        "length-finish-reason",
+        "malformed-data-line",
+        "malformed-json-body",
+        "non-streaming-success",
+        "rate-limit-429",
+        "refusal",
+        "separate-finish-usage",
+        "split-utf8",
+        "stream-response-failed",
+        "stream-without-usage",
+        "streaming-success",
+        "structured-output-success",
+        "unavailable-500"
+      ],
+      "surface": {
+        "streaming": true,
+        "usageInStream": true,
+        "systemRole": true,
+        "toolCalls": false,
+        "structuredOutput": true
+      }
+    }
   }
 }

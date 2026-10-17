@@ -101,51 +101,73 @@ test('transport obeys a synthetic adapter end event and reports EOF before it', 
   ]);
 });
 
+test('transport preserves classified adapter failures and rewrites every other parser exception', async () => {
+  const { createLlmTransport } = await import('../../apps/control-plane-executor/src/runtime/llm-adapters/transport.mjs');
+  const { openaiCompatibleAdapter } = await import('../../apps/control-plane-executor/src/runtime/llm-adapters/openai-compatible.mjs');
+  const { adapterError } = await import('../../apps/control-plane-executor/src/runtime/llm-adapters/contract.mjs');
+  for (const [cause, code] of [
+    [adapterError('LLM_PROVIDER_RATE_LIMITED'), 'LLM_PROVIDER_RATE_LIMITED'],
+    [new Error('private parser diagnostic'), 'LLM_PROVIDER_RESPONSE_INVALID'],
+    [Object.assign(new Error('private parser diagnostic'), { name: 'AdapterError', code: 'LLM_PROVIDER_RATE_LIMITED' }), 'LLM_PROVIDER_RESPONSE_INVALID'],
+    [null, 'LLM_PROVIDER_RESPONSE_INVALID'],
+  ]) {
+    const adapter = { ...openaiCompatibleAdapter, parseStreamData() { throw cause; } };
+    const transport = createLlmTransport({ adapter, fetchImpl: async () => sseResponse(['data: {}']) });
+    assert.deepEqual(await collect(transport.stream(request)), [{ type: 'error', code }]);
+  }
+});
+
 // Fixtures are documentation-derived wire examples. Stream fixtures are replayed one byte
 // at a time, including inside multi-byte code points, independently of network packet sizes.
 test('all documented provider profiles conform and the manifest equals the passing surface', async () => {
   const { readFile, readdir } = await import('node:fs/promises');
   const { resolveLlmAdapter } = await import('../../apps/control-plane-executor/src/runtime/llm-adapters/registry.mjs');
   const { assertNormalizedCompletion, assertNormalizedFrame } = await import('../../apps/control-plane-executor/src/runtime/llm-adapters/contract.mjs');
-  const fixtureRoot = new URL('../fixtures/llm-adapters/openai-compatible/', import.meta.url);
+  const fixtureRoot = new URL('../fixtures/llm-adapters/', import.meta.url);
   const recomputed = {};
-  for (const profile of (await readdir(fixtureRoot)).sort()) {
-    const adapter = resolveLlmAdapter(profile);
-    const cases = [];
-    const directory = new URL(`${profile}/`, fixtureRoot);
-    for (const file of (await readdir(directory)).filter(file => file.endsWith('.json')).sort()) {
-      const fixture = JSON.parse(await readFile(new URL(file, directory), 'utf8'));
-      assert.equal(fixture.source, 'documented-wire-format');
-      const backend = httpLlmBackend({ providerType: profile, fetchImpl: async (_url, init) => {
-        assert.equal(JSON.parse(init.body).model, fixture.request.model);
-        const upstream = fixture.upstream;
-        if (upstream.sse) {
-          const bytes = new TextEncoder().encode(upstream.sse.join('\n'));
-          return new Response(new ReadableStream({ start(controller) { for (const byte of bytes) controller.enqueue(Uint8Array.of(byte)); controller.close(); } }), upstream);
+  for (const entry of (await readdir(fixtureRoot, { withFileTypes: true })).filter(entry => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+    const adapterRoot = new URL(`${entry.name}/`, fixtureRoot);
+    for (const profile of (await readdir(adapterRoot)).sort()) {
+      const adapter = resolveLlmAdapter(profile);
+      assert.equal(adapter.id, entry.name, `${entry.name}/${profile}`);
+      const cases = [];
+      const directory = new URL(`${profile}/`, adapterRoot);
+      for (const file of (await readdir(directory)).filter(file => file.endsWith('.json')).sort()) {
+        const fixture = JSON.parse(await readFile(new URL(file, directory), 'utf8'));
+        assert.equal(fixture.source, 'documented-wire-format');
+        const backend = httpLlmBackend({ providerType: profile, fetchImpl: async (_url, init) => {
+          assert.equal(JSON.parse(init.body).model, fixture.request.model);
+          const upstream = fixture.upstream;
+          if (upstream.sse) {
+            const bytes = new TextEncoder().encode(upstream.sse.join('\n'));
+            return new Response(new ReadableStream({ start(controller) { for (const byte of bytes) controller.enqueue(Uint8Array.of(byte)); controller.close(); } }), upstream);
+          }
+          return new Response(typeof upstream.body === 'string' ? upstream.body : JSON.stringify(upstream.body), upstream);
+        } });
+        const input = { ...request, ...fixture.request };
+        if (fixture.expect.code) {
+          await assert.rejects(() => backend.complete(input), { code: fixture.expect.code, statusCode: fixture.expect.status }, `${profile}/${file}`);
+        } else if (input.stream) {
+          const frames = await collect(backend.stream(input));
+          frames.forEach(assertNormalizedFrame);
+          assert.deepEqual(frames, fixture.expect, `${profile}/${file}`);
+          assert.equal(frames.filter(frame => frame.type !== 'delta').length, 1);
+          if (frames.at(-1).type === 'error') assert.equal(frames.some(frame => frame.type === 'usage'), false);
+        } else {
+          const completion = await backend.complete(input);
+          assertNormalizedCompletion(completion);
+          assert.deepEqual(completion, fixture.expect, `${profile}/${file}`);
         }
-        return new Response(typeof upstream.body === 'string' ? upstream.body : JSON.stringify(upstream.body), upstream);
-      } });
-      const input = { ...request, ...fixture.request };
-      if (fixture.expect.code) {
-        await assert.rejects(() => backend.complete(input), { code: fixture.expect.code, statusCode: fixture.expect.status }, `${profile}/${file}`);
-      } else if (input.stream) {
-        const frames = await collect(backend.stream(input));
-        frames.forEach(assertNormalizedFrame);
-        assert.deepEqual(frames, fixture.expect, `${profile}/${file}`);
-        assert.equal(frames.filter(frame => frame.type !== 'delta').length, 1);
-        if (frames.at(-1).type === 'error') assert.equal(frames.some(frame => frame.type === 'usage'), false);
-      } else {
-        const completion = await backend.complete(input);
-        assertNormalizedCompletion(completion);
-        assert.deepEqual(completion, fixture.expect, `${profile}/${file}`);
+        cases.push(file.slice(0, -5));
       }
-      cases.push(file.slice(0, -5));
+      assert.equal(cases.length, entry.name === 'openai-responses' ? 20 : 13);
+      (recomputed[adapter.id] ??= {})[profile] = { cases, surface: adapter.surface };
     }
-    assert.equal(cases.length, 13);
-    (recomputed[adapter.id] ??= {})[profile] = { cases, surface: adapter.surface };
   }
   assert.equal(resolveLlmAdapter('unknown-future-provider').id, 'openai-compatible');
   assert.equal(resolveLlmAdapter(undefined).id, 'openai-compatible');
+  assert.equal(resolveLlmAdapter('openai').id, 'openai-compatible');
+  assert.equal(resolveLlmAdapter('openai-responses').id, 'openai-responses');
   const manifest = JSON.parse(await readFile(new URL('../../apps/control-plane-executor/src/runtime/llm-adapters/conformance-manifest.json', import.meta.url), 'utf8'));
   assert.deepEqual(manifest, recomputed);
 });

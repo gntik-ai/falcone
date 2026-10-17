@@ -1,6 +1,4 @@
 // Shared pure provider adapter contract (add-compatible-provider-adapter-contract / #940).
-import { clientError } from '../errors.mjs';
-
 export const ERROR_CODES = Object.freeze({
   LLM_PROVIDER_AUTH_FAILED: 424,
   LLM_PROVIDER_REQUEST_REJECTED: 424,
@@ -10,15 +8,20 @@ export const ERROR_CODES = Object.freeze({
   LLM_PROVIDER_ERROR: 502,
 });
 
-export function adapterError(code, retryAfterMs) {
-  const statusCode = ERROR_CODES[code];
-  return Object.assign(clientError(`LLM provider request failed (${code})`, statusCode, code), {
-    name: 'AdapterError', retryable: statusCode !== 424,
-    ...(retryAfterMs != null ? { retryAfterMs } : {}),
-  });
+export class AdapterError extends Error {
+  constructor(code, retryAfterMs) {
+    super(`LLM provider request failed (${code})`);
+    Object.assign(this, { statusCode: ERROR_CODES[code], code, name: 'AdapterError', retryable: ERROR_CODES[code] !== 424,
+      ...(retryAfterMs != null ? { retryAfterMs } : {}),
+    });
+  }
 }
 
-export const REQUEST_FIELDS = Object.freeze(['model', 'messages', 'prompt', 'system', 'maxTokens', 'temperature', 'stream']);
+export function adapterError(code, retryAfterMs) {
+  return new AdapterError(code, retryAfterMs);
+}
+
+export const REQUEST_FIELDS = Object.freeze(['model', 'messages', 'prompt', 'system', 'maxTokens', 'temperature', 'stream', 'responseFormat']);
 export const COMPLETION_FIELDS = Object.freeze(['content', 'model', 'usage', 'finishReason']);
 export const USAGE_FIELDS = Object.freeze(['promptTokens', 'completionTokens', 'totalTokens', 'cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens']);
 export const FINISH_REASONS = Object.freeze(['stop', 'length', 'content_filter', 'tool_calls', 'other']);

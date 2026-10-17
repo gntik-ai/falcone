@@ -1,0 +1,42 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      ": documented comment",
+      "event: response.output_text.delta",
+      "data: {\"type\":\"response.output_text.delta\",\"delta\":\"你好 🌙\"}",
+      "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"model\":\"fixture-model\",\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"你好 🌙\"}]}]}}"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "你好 🌙"
+    },
+    {
+      "type": "usage",
+      "usage": {
+        "promptTokens": 0,
+        "completionTokens": 0,
+        "totalTokens": 0,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null,
+        "reasoningTokens": null
+      },
+      "model": "fixture-model",
+      "finishReason": "stop"
+    }
+  ]
+}

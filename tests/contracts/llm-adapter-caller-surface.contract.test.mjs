@@ -46,9 +46,9 @@ function harness(fetchImpl) {
     },
   };
 }
-async function configured(fetchImpl) {
+async function configured(fetchImpl, config = provider) {
   const api = harness(fetchImpl);
-  assert.equal((await api.request(`${base}/llm-provider`, provider, 'PUT')).status, 200);
+  assert.equal((await api.request(`${base}/llm-provider`, config, 'PUT')).status, 200);
   return api;
 }
 
@@ -120,4 +120,43 @@ test('activity preserves status-driven retry classification for 424, 429, 503 an
       return true;
     });
   }
+});
+
+const responseFormat = { type: 'json_schema', name: 'answer', schema: { type: 'object', properties: { answer: { type: 'integer' } }, required: ['answer'], additionalProperties: false } };
+const responsesBody = { model: 'fixture-model', status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: '{"answer":42}' }] }] };
+
+test('HTTP completion forwards structured output and rejects invalid literals before provider I/O', async () => {
+  let calls = 0;
+  let sent;
+  const api = await configured(async (_url, init) => { calls++; sent = JSON.parse(init.body); return Response.json(responsesBody); }, { ...provider, providerType: 'openai-responses' });
+  const output = await api.request(`${base}/llm/completions`, { model: 'fixture-model', prompt: 'hi', responseFormat });
+  assert.equal(output.status, 200);
+  assert.equal(assertNormalizedCompletion(output.json()).content, '{"answer":42}');
+  assert.deepEqual(sent.text, { format: { ...responseFormat, strict: true } });
+  assert.equal(calls, 1);
+  calls = 0;
+  for (const stream of [false, true]) {
+    const invalid = await api.request(`${base}/llm/completions`, { model: 'fixture-model', prompt: 'hi', responseFormat: { ...responseFormat, strict: true }, stream });
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.json().code, 'INVALID_RESPONSE_FORMAT');
+  }
+  assert.equal(calls, 0);
+});
+
+test('llm.complete forwards responseFormat through HTTP to the Responses provider', async () => {
+  let sent;
+  let calls = 0;
+  const api = await configured(async (_url, init) => { calls++; sent = JSON.parse(init.body); return Response.json(responsesBody); }, { ...provider, providerType: 'openai-responses' });
+  const deps = { executeLlmComplete: async input => {
+    const result = await api.request(`${base}/llm/completions`, input);
+    if (result.status !== 200) throw Object.assign(new Error('Completion rejected'), { statusCode: result.status, code: result.json().code });
+    return result.json();
+  } };
+  const output = await llmComplete({ tenant, params: { model: 'fixture-model', prompt: 'hi', responseFormat } }, deps);
+  assert.equal(output.content, '{"answer":42}');
+  assert.deepEqual(sent.text, { format: { ...responseFormat, strict: true } });
+  assert.equal(new Ajv().compile(llmCompleteOutputSchema)(output), true);
+  calls = 0;
+  await assert.rejects(() => llmComplete({ tenant, params: { model: 'fixture-model', prompt: 'hi', responseFormat: { ...responseFormat, strict: true } } }, deps), { type: 'INVALID_RESPONSE_FORMAT', nonRetryable: true });
+  assert.equal(calls, 0);
 });

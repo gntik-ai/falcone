@@ -1,0 +1,27 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "body": {
+      "status": "failed",
+      "error": {
+        "code": "server_error",
+        "message": "private diagnostic"
+      }
+    }
+  },
+  "expect": {
+    "code": "LLM_PROVIDER_UNAVAILABLE",
+    "status": 503
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "body": {
+      "status": "completed",
+      "model": "fixture-model",
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Hello"
+            }
+          ]
+        }
+      ],
+      "usage": {
+        "input_tokens": 4,
+        "output_tokens": 6,
+        "total_tokens": 10,
+        "input_tokens_details": {
+          "cached_tokens": 2
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 3
+        }
+      }
+    }
+  },
+  "expect": {
+    "content": "Hello",
+    "model": "fixture-model",
+    "usage": {
+      "promptTokens": 4,
+      "completionTokens": 6,
+      "totalTokens": 10,
+      "cacheReadTokens": 2,
+      "cacheWriteTokens": null,
+      "reasoningTokens": 3
+    },
+    "finishReason": "stop"
+  }
+}

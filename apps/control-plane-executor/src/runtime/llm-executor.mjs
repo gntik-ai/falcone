@@ -80,6 +80,21 @@ function normalizeMessages({ messages, prompt, system } = {}) {
   return out;
 }
 
+// Structured output is a literal request option; schema conformance belongs to provider strict mode (#941).
+function assertResponseFormat(value) {
+  if (value === undefined) return;
+  const isObject = item => item !== null && typeof item === 'object' && !Array.isArray(item);
+  let valid = isObject(value) && Object.keys(value).length === 3
+    && ['type', 'name', 'schema'].every(key => Object.hasOwn(value, key))
+    && value.type === 'json_schema' && typeof value.name === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value.name)
+    && isObject(value.schema);
+  if (valid) {
+    try { valid = Buffer.byteLength(JSON.stringify(value.schema), 'utf8') <= 16 * 1024; }
+    catch { valid = false; }
+  }
+  if (!valid) throw clientError('Invalid responseFormat', 400, 'INVALID_RESPONSE_FORMAT');
+}
+
 // ---------------------------------------------------------------------------
 // Provider store — persists ONLY the secretRef (never a resolved key). Tenant-scoped by
 // (tenant_id, workspace_id). With no `pool` it is an in-memory Map (test seam / single-process
@@ -538,8 +553,12 @@ export function createLlmExecutor(options = {}) {
     return httpLlmBackend({ providerType: config.providerType, fetchImpl });
   }
 
-  async function prepare(workspaceId, { tenantId, model } = {}) {
+  async function prepare(workspaceId, { tenantId, model, responseFormat } = {}) {
+    assertResponseFormat(responseFormat);
     const config = await resolveProviderOrThrow(workspaceId, tenantId);
+    if (responseFormat !== undefined && !resolveLlmAdapter(config.providerType).surface.structuredOutput) {
+      throw clientError('Structured output is unsupported by this provider', 422, 'LLM_STRUCTURED_OUTPUT_UNSUPPORTED');
+    }
     const chosen = resolveAllowedModel(config, model);
     // Re-validate the endpoint just before the outbound call (DNS-rebinding defense + fail-closed
     // for any malicious row persisted before this guard shipped).
@@ -556,10 +575,14 @@ export function createLlmExecutor(options = {}) {
     return providerStore.deployProvider(workspaceId, config);
   }
 
-  async function complete(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature } = {}) {
-    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model });
+  async function complete(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat } = {}) {
+    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat });
     const built = normalizeMessages({ messages, prompt, system });
-    const out = await backend.complete({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature });
+    const out = await backend.complete({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat });
+    if (responseFormat !== undefined && out.finishReason === 'stop') {
+      try { JSON.parse(out.content); }
+      catch { throw adapterError('LLM_PROVIDER_RESPONSE_INVALID'); }
+    }
     const usage = normalizeUsage(out.usage);
     await usageStore.recordUsage(workspaceId, { tenantId, model: chosen, ...usage });
     return { content: out.content ?? '', usage, model: out.model ?? chosen, finishReason: normalizeFinishReason(out.finishReason) };
@@ -567,10 +590,10 @@ export function createLlmExecutor(options = {}) {
 
   // Streaming variant: yields `{ type:'delta', content }` frames, records usage when the terminal
   // usage frame arrives, then yields a final `{ type:'usage', usage }` frame.
-  async function* completeStream(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature } = {}) {
-    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model });
+  async function* completeStream(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat } = {}) {
+    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat });
     const built = normalizeMessages({ messages, prompt, system });
-    for await (const frame of backend.stream({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature })) {
+    for await (const frame of backend.stream({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat })) {
       if (frame?.type === 'error') {
         yield { type: 'error', code: frame.code };
         return;

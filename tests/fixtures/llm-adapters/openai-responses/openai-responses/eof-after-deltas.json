@@ -1,0 +1,30 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hello\"}"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "Hello"
+    },
+    {
+      "type": "error",
+      "code": "LLM_PROVIDER_RESPONSE_INVALID"
+    }
+  ]
+}
