@@ -6,7 +6,7 @@ import { recordKnativeDependencyEvent, renderMetrics } from '../../apps/control-
 
 test('knative-observability-01: Function unavailable audit is scoped, correlated upstream, and secret-safe', () => {
   const event = auditEventForRoute(
-    { method: 'POST', path: '/v1/functions/actions', localHandler: 'fnDeploy' },
+    { method: 'POST', path: '/v1/functions/actions', localHandler: 'fnDeploy', audit: 'workspace.function.deploy' },
     {
       params: {},
       body: { source: { inlineCode: 'SECRET_SOURCE' }, credential: 'SECRET_TOKEN' },

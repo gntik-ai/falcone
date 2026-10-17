@@ -288,7 +288,7 @@ test('Keycloak errors are normalized and redacted, and verification mismatch com
 test('audit descriptors record redacted requested config, actor, target tenant and realized UUID on success and compensation failure', async (t) => {
   const logs = ['log', 'info', 'warn', 'error', 'debug'].map((method) => t.mock.method(console, method, () => {}));
   const { auditEventForRoute } = await import('../../apps/control-plane/audit-writer.mjs');
-  const route = { method: 'POST', path: '/v1/workspaces/{workspaceId}/iam/clients', localHandler: 'createWorkspaceIamClient' };
+  const route = { method: 'POST', path: '/v1/workspaces/{workspaceId}/iam/clients', localHandler: 'createWorkspaceIamClient', audit: 'workspace.iam-client.create' };
   for (const mismatch of [false, true]) {
     await keycloakBoundary(async () => {
       const ctx = context({ clientType: 'confidential', clientSecret: 'request-secret-canary', redirectUris: ['https://app.example/callback?token=query-secret-canary'] });

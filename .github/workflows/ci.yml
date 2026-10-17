@@ -136,7 +136,7 @@ jobs:
             tests/blackbox/structural-write-role-gates-executor.test.mjs
 
       - name: Authorization denial audit harness
-        run: node --test tests/blackbox/authorization-denial-audit.test.mjs
+        run: node --test tests/blackbox/authorization-denial-audit.test.mjs tests/blackbox/audit-write-and-scope-enforcement.test.mjs tests/blackbox/audit-trail-integrity.test.mjs
 
       - name: Self-tenant plan history authorization and projection
         run: node --test tests/blackbox/self-tenant-plan-history.test.mjs

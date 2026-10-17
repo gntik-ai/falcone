@@ -135,7 +135,8 @@ export async function webhookManage(ctx, deps = {}) {
     auth: { tenantId, workspaceId, actorId: identity.sub },
     resolver: deps.resolver, // undefined in prod -> action uses real DNS for SSRF validation
   });
-  return { statusCode: result.statusCode, body: result.body };
+  // Scope comes from the resolved workspace or verified identity, never the body (#971).
+  return { statusCode: result.statusCode, body: result.body, auditScope: { tenantId, workspaceId } };
 }
 
 export const WEBHOOK_HANDLERS = { webhookManage };

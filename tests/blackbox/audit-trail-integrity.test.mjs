@@ -15,7 +15,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { auditCanonical, computeRowHash, verifyAuditChain } from '../../apps/control-plane/audit-hash.mjs';
 import { recordAuditEvent, recordAuditEventInTransaction, queryAuditEvents, auditRowToRecord } from '../../apps/control-plane/audit-store.mjs';
-import { auditEventForRoute, recordRouteAudit, AUDITABLE_LOCAL_HANDLERS } from '../../apps/control-plane/audit-writer.mjs';
+import { auditEventForRoute, recordRouteAudit } from '../../apps/control-plane/audit-writer.mjs';
 import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
 import { routes } from '../../apps/control-plane/routes.mjs';
 
@@ -199,7 +199,7 @@ test('bbx-audit-store-record: auditRowToRecord reads outcome from the row and ex
 // ---- writer: failures/denials recorded, secret-access auditable ------------
 
 const IDENT = { sub: 'u', tenantId: 'ten-a', workspaceId: 'ws-a', actorType: 'tenant_owner' };
-const routeFor = (lh, method = 'POST') => ({ method, path: `/x/${lh}`, localHandler: lh });
+const routeFor = (lh) => routes.find((route) => route.localHandler === lh);
 
 test('bbx-audit-no-shortcircuit: auditEventForRoute records failures/denials with the derived outcome', () => {
   const ctx = { params: { tenantId: 'ten-a' }, identity: IDENT, body: {} };
@@ -218,7 +218,7 @@ test('bbx-audit-no-shortcircuit: auditEventForRoute records failures/denials wit
 
 test('bbx-audit-secret-handlers: secret-access handlers are auditable', () => {
   for (const lh of ['secretSet', 'secretGet', 'secretList', 'secretDelete']) {
-    assert.ok(AUDITABLE_LOCAL_HANDLERS[lh], `${lh} is in the auditable set`);
+    assert.equal(typeof routeFor(lh).audit, 'string', `${lh} declares an audit type`);
     const desc = auditEventForRoute(routeFor(lh), { params: { workspaceId: 'ws-a' }, identity: IDENT, body: {} }, { statusCode: 200, body: {} });
     assert.ok(desc, `${lh} yields an audit descriptor`);
     assert.equal(desc.tenantId, 'ten-a', `${lh} scoped to the actor tenant`);
@@ -402,11 +402,12 @@ test('bbx-974-denied: own-tenant forbidden mutations retain resolved scope and e
   }
 });
 
-test('bbx-974-replace-body: the fifth secret route keeps its existing body and headers without audit scope', async () => {
+test('bbx-974-replace-body: secret replacement keeps its existing body and headers with dispatch audit scope (#971)', async () => {
   const ctx = secretContext({ vault: { async exists() { return true; } }, body: { secretValue: 'sentinel-974' } });
   const result = await FN_HANDLERS.secretReplace(ctx);
   assert.equal(result.statusCode, 200);
   assert.equal(JSON.stringify(result.body), SECRET_META_BODY);
   assert.deepEqual(result.headers ?? {}, {});
-  assert.equal(secretDescriptor('secretReplace', ctx, result), null, 'PUT audit allow-list is a separate issue');
+  assert.deepEqual(result.auditScope, { tenantId: 'ten-a', workspaceId: 'ws-a' });
+  assert.equal(secretDescriptor('secretReplace', ctx, result)?.actionType, 'workspace.secret.replace');
 });

@@ -861,28 +861,30 @@ async function secretReplace(ctx) {
   if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
   // Role gate (#798): replacing a secret value requires an admin tenant role (see secretSet). After
   // the 404 so cross-tenant stays 404; own-tenant non-admin is 403, before any existence probe/write.
   if (!canManageTenant(ctx.identity, ws.tenant_id)) {
-    return err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin');
+    return scoped(err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin'));
   }
   const name = ctx.params.secretName;
   const b = ctx.body ?? {};
   const value = b.secretValue ?? b.value;
   const description = typeof b.description === 'string' ? b.description : undefined;
-  if (!vault.validName(name)) return err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$');
+  if (!vault.validName(name)) return scoped(err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$'));
   const valueError = validateSecretValue(value);
-  if (valueError) return valueError;
+  if (valueError) return scoped(valueError);
   try {
     // Replace-only: a PUT to a non-existent secret must NOT silently create it (POST is create-only).
     // Probe existence at the verified tenant/workspace path; if absent, 404 and write nothing.
     if (!(await vault.exists(ws.tenant_id, ws.id, name))) {
-      return err(404, 'SECRET_NOT_FOUND', `secret ${name} not found`);
+      return scoped(err(404, 'SECRET_NOT_FOUND', `secret ${name} not found`));
     }
     const meta = await vault.replace(ws.tenant_id, ws.id, name, value, description);
     const refCount = await resolvedRefCount(ctx, ws, name);
-    return ok(200, secretMetaOut(meta, ws, refCount));
-  } catch (e) { return err(502, 'SECRET_WRITE_FAILED', String(e.message ?? e)); }
+    return scoped(ok(200, secretMetaOut(meta, ws, refCount)));
+  } catch (e) { return scoped(err(502, 'SECRET_WRITE_FAILED', String(e.message ?? e))); }
 }
 
 // GET /v1/functions/workspaces/{workspaceId}/secrets  → FunctionWorkspaceSecretCollection
@@ -1013,6 +1015,8 @@ async function fnPackageDefinitionExport(ctx) {
 async function importDefinitions(ctx, { expectPackage = false } = {}) {
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
   const bundle = ctx.body ?? {};
   // Scope validation (reuse the product builder): a bundle whose resources reference another
   // tenant/workspace is rejected BEFORE any write. The kind runtime keys scope on the workspace's
@@ -1023,10 +1027,10 @@ async function importDefinitions(ctx, { expectPackage = false } = {}) {
     { ...bundle, bundleVersion: bundle.bundleVersion ?? '2026-03-27' },
     { tenantId: ws.tenant_id, workspaceId: ws.id });
   if (!verdict.valid && verdict.code === IMPORT_ERROR_CODES.SCOPE_VIOLATION) {
-    return err(403, 'IMPORT_SCOPE_VIOLATION', verdict.violations?.[0] ?? 'import bundle is out of the caller scope');
+    return scoped(err(403, 'IMPORT_SCOPE_VIOLATION', verdict.violations?.[0] ?? 'import bundle is out of the caller scope'));
   }
   const defs = Array.isArray(bundle.definitions) ? bundle.definitions : [];
-  if (defs.length === 0) return err(400, 'VALIDATION_ERROR', 'definitions (array) is required to import function code');
+  if (defs.length === 0) return scoped(err(400, 'VALIDATION_ERROR', 'definitions (array) is required to import function code'));
   const imported = [];
   const skipped = [];
   for (const def of defs) {
@@ -1045,7 +1049,7 @@ async function importDefinitions(ctx, { expectPackage = false } = {}) {
     });
     imported.push({ resourceId: rec.resource_id, actionName: qualifiedName });
   }
-  return ok(200, {
+  return scoped(ok(200, {
     entityType: 'function_definition_import_result',
     targetTenantId: ws.tenant_id, targetWorkspaceId: ws.id,
     importedAt: new Date().toISOString(),
@@ -1054,7 +1058,7 @@ async function importDefinitions(ctx, { expectPackage = false } = {}) {
     // Registry rows are created; redeploying the Knative service from imported source is a separate
     // deploy step (POST /v1/functions/actions) and is intentionally not performed here.
     notDeployed: imported.length > 0 ? 'knative-service' : null
-  });
+  }));
 }
 
 // POST /v1/functions/workspaces/{workspaceId}/definition-imports

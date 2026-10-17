@@ -4,6 +4,7 @@
 // where ctx = { params, query, body, identity, pool, callerContext }.
 import { randomUUID } from 'node:crypto';
 import { can } from './model-authz.mjs';
+import { deriveRealmTopology } from './jwt-verify.mjs';
 import { resolveWorkspaceForManage, kcBackedErr, statusFromError } from './workspace-iam-context.mjs';
 import { createWorkspaceIamClient } from './workspace-iam-client-handlers.mjs';
 import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, normalizeKeycloakAttributes, TENANT_REALM_ROLES } from './kc-admin.mjs';
@@ -588,6 +589,8 @@ async function exportTenantConfiguration(ctx) {
   if (!tenant || !canManageTenantId(identity, tenant.id)) {
     return err(404, 'TENANT_NOT_FOUND', `tenant ${params.tenantId} not found`);
   }
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: tenant.id } });
   const [workspaces, environments] = await Promise.all([
     store.listWorkspaces(pool, { tenantId: tenant.id, limit: 1000 }),
     store.listTenantEnvironments(pool, tenant.id)
@@ -604,7 +607,7 @@ async function exportTenantConfiguration(ctx) {
     tenant, workspaces: workspaces.items ?? [], environments, quotaLimits,
     environmentCatalog: ENVIRONMENT_CATALOG
   });
-  return ok(200, snapshot);
+  return scoped(ok(200, snapshot));
 }
 
 // ---- workspace clone (#683, data-export-import-clone) -----------------------
@@ -645,29 +648,31 @@ async function cloneWorkspace(ctx) {
   if (!source || !canManageTenantId(identity, source.tenant_id)) {
     return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${params.workspaceId} not found`);
   }
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: source.tenant_id, workspaceId: source.id } });
   const displayName = body.displayName ?? body.targetWorkspace?.displayName ?? `${source.display_name} (clone)`;
   const slug = slugify(body.slug ?? body.targetWorkspace?.slug ?? `${source.slug}-clone`);
-  if (!slug) return err(400, 'VALIDATION_ERROR', 'a valid target slug could not be derived');
+  if (!slug) return scoped(err(400, 'VALIDATION_ERROR', 'a valid target slug could not be derived'));
   // Reject a body that tries to target a DIFFERENT tenant (defense in depth: the target is created
   // under the source's tenant regardless, but an explicit foreign targetTenantId is a clear signal
   // of a cross-tenant attempt → denied, mirroring promoteWorkspace's cross-tenant 404).
   const requestedTenantId = body.targetTenantId ?? body.targetWorkspace?.tenantId ?? null;
   if (requestedTenantId && requestedTenantId !== source.tenant_id) {
-    return err(404, 'TENANT_NOT_FOUND', 'cannot clone a workspace into another tenant');
+    return scoped(err(404, 'TENANT_NOT_FOUND', 'cannot clone a workspace into another tenant'));
   }
   if (await store.workspaceSlugTaken(pool, source.tenant_id, slug)) {
-    return err(409, 'SLUG_TAKEN', `workspace slug '${slug}' already exists in tenant`);
+    return scoped(err(409, 'SLUG_TAKEN', `workspace slug '${slug}' already exists in tenant`));
   }
   const environment = String(body.environment ?? body.targetWorkspace?.environment ?? source.environment ?? 'dev').toLowerCase();
   if (!ENVIRONMENT_CATALOG.includes(environment)) {
-    return err(400, 'INVALID_ENVIRONMENT', `environment must be one of: ${ENVIRONMENT_CATALOG.join(', ')}`);
+    return scoped(err(400, 'INVALID_ENVIRONMENT', `environment must be one of: ${ENVIRONMENT_CATALOG.join(', ')}`));
   }
   // Enforce the tenant's max_workspaces entitlement (the clone creates a NEW workspace) — same gate
   // createWorkspace applies. Fails open if governance is unavailable.
   const usedWorkspaces = await store.countTenantWorkspaces(pool, source.tenant_id);
   const quota = await checkWorkspaceQuota(pool, source.tenant_id, usedWorkspaces);
   if (!quota.allowed) {
-    return err(402, 'QUOTA_EXCEEDED', `workspace quota reached (max_workspaces): ${usedWorkspaces}/${quota.effectiveLimit ?? '?'}`);
+    return scoped(err(402, 'QUOTA_EXCEEDED', `workspace quota reached (max_workspaces): ${usedWorkspaces}/${quota.effectiveLimit ?? '?'}`));
   }
   // Build the clone draft (records the clone policy; resetCredentialReferences:true). The draft is
   // descriptive — the actual copy below honours it (function registry only, never credentials).
@@ -683,7 +688,7 @@ async function cloneWorkspace(ctx) {
   try {
     target = await store.insertWorkspace(pool, { id: randomUUID(), tenantId: source.tenant_id, slug, displayName, environment, createdBy: identity.sub });
   } catch (e) {
-    if (e?.code === '23505') return err(409, 'WORKSPACE_SLUG_CONFLICT', `workspace slug '${slug}' already exists in tenant`);
+    if (e?.code === '23505') return scoped(err(409, 'WORKSPACE_SLUG_CONFLICT', `workspace slug '${slug}' already exists in tenant`));
     throw e;
   }
   // Provision the target's own fresh backing database (best-effort; mirrors createWorkspace).
@@ -707,7 +712,7 @@ async function cloneWorkspace(ctx) {
       copied.push(fn.name);
     }
   } catch { /* registry copy is best-effort; the target workspace already exists */ }
-  return ok(201, {
+  return scoped(ok(201, {
     clone: {
       sourceWorkspaceId: source.id,
       targetWorkspaceId: target.id,
@@ -721,7 +726,7 @@ async function cloneWorkspace(ctx) {
     },
     workspace: workspaceOut(target),
     database,
-  });
+  }));
 }
 
 // DELETE /v1/workspaces/{workspaceId} — single-workspace cascading teardown
@@ -745,11 +750,13 @@ async function deleteWorkspace(ctx) {
   // internal bypass the tenant match; everyone else must own the workspace's tenant.
   const owns = ws && canManageTenantId(identity, ws.tenant_id);
   if (!ws || !owns) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${params.workspaceId} not found`);
-  if (!ctx.runtimeTeardownCoordinator) return err(503, 'RUNTIME_TEARDOWN_UNAVAILABLE', 'runtime teardown coordinator is required');
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
+  if (!ctx.runtimeTeardownCoordinator) return scoped(err(503, 'RUNTIME_TEARDOWN_UNAVAILABLE', 'runtime teardown coordinator is required'));
   const pending = await ctx.runtimeTeardownCoordinator.purgeWorkspace(pool, ws.id, ctx.callerContext?.correlationId);
-  if (pending.pending) return ok(202, { workspaceId: ws.id, tenantId: ws.tenant_id, status: 'cleanup_pending', obligations: (pending.obligations ?? []).map((o) => ({ resourceType: o.resourceType ?? (o.type === 'mcp' ? 'mcp' : (o.ksvcName ? 'function' : 'mcp')), resourceId: o.resourceId ?? o.id ?? o.ksvcName, status: 'pending' })) });
+  if (pending.pending) return scoped(ok(202, { workspaceId: ws.id, tenantId: ws.tenant_id, status: 'cleanup_pending', obligations: (pending.obligations ?? []).map((o) => ({ resourceType: o.resourceType ?? (o.type === 'mcp' ? 'mcp' : (o.ksvcName ? 'function' : 'mcp')), resourceId: o.resourceId ?? o.id ?? o.ksvcName, status: 'pending' })) }));
   const secrets = await tearDownSecrets(ctx, { tenantId: ws.tenant_id, workspaceId: ws.id });
-  if (secrets.error) return secrets.error;
+  if (secrets.error) return scoped(secrets.error);
 
   // 1. Delete the workspace's registry rows + collect the physical resources to tear down.
   const phys = await store.purgeWorkspace(pool, ws.id);
@@ -767,7 +774,7 @@ async function deleteWorkspace(ctx) {
   //    (a shared db with another tenant's data is retained). Best-effort.
   const mongo = await tearDownMongo(ctx, ws.tenant_id, phys.mongoDatabases);
 
-  return ok(200, {
+  return scoped(ok(200, {
     workspaceId: ws.id, tenantId: ws.tenant_id, deleted: true,
     removed: {
       databases: databasesDropped, buckets: bucketsDeleted, topics: topicsDeleted,
@@ -776,7 +783,7 @@ async function deleteWorkspace(ctx) {
     },
     // Resources whose physical teardown is not wired in this runtime (rows ARE removed).
     residual: { knativeServices: [], ...secrets.residual },
-  });
+  }));
 }
 
 // ---- service accounts (= confidential Keycloak client in the tenant realm) --
@@ -951,16 +958,18 @@ async function revokeCredential(ctx) {
 async function deleteServiceAccount(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin; const st = ctx.store ?? store;
   const r = await saForCredential(ctx); if (r.error) return r.error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: r.sa.tenant_id, workspaceId: r.sa.workspace_id } });
   try {
     await kc.deleteClient(r.sa.iam_realm, r.sa.kc_client_uuid);
   } catch (e) {
     // deleteClient already swallows 404 (idempotent); any other KC failure is a downstream error —
     // surface it as a 502 (mirrors createServiceAccount) WITHOUT removing the PG row, so the caller
     // can retry rather than orphan a still-present Keycloak client.
-    return kcBackedErr(e, 'DELETE_SA_FAILED');
+    return scoped(kcBackedErr(e, 'DELETE_SA_FAILED'));
   }
   await st.deleteServiceAccount(ctx.pool, r.sa.id);
-  return ok(200, { serviceAccountId: r.sa.id, deleted: true, deletedAt: new Date().toISOString() });
+  return scoped(ok(200, { serviceAccountId: r.sa.id, deleted: true, deletedAt: new Date().toISOString() }));
 }
 
 // ---- fine-grained IAM (platform admin; realmId in the path) ----------------
@@ -1247,14 +1256,22 @@ async function iamGetRole(ctx) {
     description: r.description ?? null, composite: Boolean(r.composite), compositeRoles: [], attributes: r.attributes ?? {},
   });
 }
+// Use the same configured platform realm as JWT verification (#971).
+function realmAuditScope(realm) {
+  const { platformRealm } = deriveRealmTopology(process.env.KEYCLOAK_ISSUER,
+    process.env.KEYCLOAK_JWKS_URL ?? 'http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs');
+  return realm === platformRealm ? { tenantId: null, global: true } : { tenantId: realm };
+}
 // DELETE /v1/iam/realms/{realmId}/roles/{roleName} — superadmin (route-gated). Idempotent (KC 404 → ok).
 async function iamDeleteRole(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: realmAuditScope(ctx.params.realmId) });
   try {
     await kc.deleteRealmRole(ctx.params.realmId, ctx.params.roleName);
-    return ok(200, { roleName: ctx.params.roleName, realmId: ctx.params.realmId, deleted: true });
+    return scoped(ok(200, { roleName: ctx.params.roleName, realmId: ctx.params.realmId, deleted: true }));
   } catch (e) {
-    return kcBackedErr(e, 'DELETE_ROLE_FAILED');
+    return scoped(kcBackedErr(e, 'DELETE_ROLE_FAILED'));
   }
 }
 // GET /v1/iam/realms — superadmin lists every tenant realm (route-gated to superadmin).
@@ -1286,13 +1303,15 @@ async function iamUpdateRealm(ctx) {
   const kc = ctx.kcAdmin ?? kcAdmin;
   const az = await authorizeRealmManage(ctx);
   if (az.error) return az.error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: realmAuditScope(az.realm) });
   try {
     await kc.setRealmAuthConfig(az.realm, ctx.body ?? {});
     const authConfig = await kc.getRealmAuthConfig(az.realm);
-    return ok(200, { realmId: az.realm, realm: az.realm, authConfig });
+    return scoped(ok(200, { realmId: az.realm, realm: az.realm, authConfig }));
   } catch (e) {
-    if (e.kcStatus === 404) return err(404, 'REALM_NOT_FOUND', `realm ${az.realm} not found`);
-    return kcBackedErr(e, 'IAM_UPDATE_REALM_FAILED');
+    if (e.kcStatus === 404) return scoped(err(404, 'REALM_NOT_FOUND', `realm ${az.realm} not found`));
+    return scoped(kcBackedErr(e, 'IAM_UPDATE_REALM_FAILED'));
   }
 }
 
@@ -1403,13 +1422,14 @@ async function provisionDatabaseGeneric(ctx) {
 // registry resource, physical database first so a failed drop remains retryable (#967).
 async function deleteDatabase(ctx) {
   const { pool, identity, params } = ctx;
-  let auditScope;
+  const platform = identity?.actorType === 'superadmin' || identity?.actorType === 'internal';
+  // Preserve platform attempts even when workspace resolution fails (#971).
+  let auditScope = platform ? { tenantId: null, global: true } : undefined;
   const scoped = (result) => auditScope ? { ...result, auditScope } : result;
   try {
     const ws = await store.getWorkspace(pool, params.workspaceId);
-    const platform = identity?.actorType === 'superadmin' || identity?.actorType === 'internal';
     if (!ws || (!platform && identity?.tenantId !== ws.tenant_id)) {
-      return err(404, 'WORKSPACE_NOT_FOUND', 'workspace not found');
+      return scoped(err(404, 'WORKSPACE_NOT_FOUND', 'workspace not found'));
     }
     auditScope = { tenantId: ws.tenant_id, workspaceId: ws.id };
     if (!can(identity, 'database.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {

@@ -381,15 +381,17 @@ async function eventsInventory(ctx) {
 async function eventsProvisionTopic(ctx) {
   const rw = await resolveOwnedWorkspace(ctx); if (rw.error) return rw.error;
   const ws = rw.ws;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
   if (!can(ctx.identity, 'topic.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
-    return err(403, 'FORBIDDEN', 'caller may not administer topics in this workspace');
+    return scoped(err(403, 'FORBIDDEN', 'caller may not administer topics in this workspace'));
   }
   const topicName = slug(ctx.body?.name);
-  if (!topicName) return err(400, 'VALIDATION_ERROR', 'topic name is required');
+  if (!topicName) return scoped(err(400, 'VALIDATION_ERROR', 'topic name is required'));
   const decision = await checkDimensionQuota(ctx.pool, ws.tenant_id, 'max_kafka_topics',
     () => getStore().countTenantTopics(ctx.pool, ws.tenant_id), ctx.quotaOptions);
   const denial = await quotaDenial(ctx, ws, decision, 'topic.create');
-  if (denial) return denial;
+  if (denial) return scoped(denial);
   const partitions = Number(ctx.body?.partitions ?? 1) || 1;
   const physical = physicalTopicName(ws.id, topicName);
   const resourceId = `res_topic_${randomUUID().slice(0, 8)}`;
@@ -401,9 +403,9 @@ async function eventsProvisionTopic(ctx) {
       { treatTopicAlreadyExistsAfterRecoveryAsSuccess: true }
     );
     const rec = await getStore().insertTopic(ctx.pool, { id: resourceId, workspaceId: ws.id, tenantId: ws.tenant_id, topicName, physicalTopicName: physical, partitions });
-    return ok(201, { resourceId: rec.id, topic: rec.topic_name, topicName: rec.topic_name, physicalTopicName: rec.physical_topic_name, partitionCount: partitions, partitions, status: 'active' });
+    return scoped(ok(201, { resourceId: rec.id, topic: rec.topic_name, topicName: rec.topic_name, physicalTopicName: rec.physical_topic_name, partitionCount: partitions, partitions, status: 'active' }));
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'TOPIC_PROVISION_FAILED', String(e.message ?? e));
+    return scoped(err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'TOPIC_PROVISION_FAILED', String(e.message ?? e)));
   }
 }
 
