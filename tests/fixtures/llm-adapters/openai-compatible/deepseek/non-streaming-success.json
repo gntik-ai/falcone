@@ -1,0 +1,51 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "deepseek-chat",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "body": {
+      "model": "deepseek-chat",
+      "choices": [
+        {
+          "message": {
+            "content": "Hello"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 4,
+        "completion_tokens": 6,
+        "total_tokens": 10,
+        "prompt_tokens_details": {
+          "cached_tokens": 2
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3
+        }
+      }
+    }
+  },
+  "expect": {
+    "content": "Hello",
+    "model": "deepseek-chat",
+    "usage": {
+      "promptTokens": 4,
+      "completionTokens": 6,
+      "totalTokens": 10,
+      "cacheReadTokens": 2,
+      "cacheWriteTokens": null,
+      "reasoningTokens": 3
+    },
+    "finishReason": "stop"
+  }
+}

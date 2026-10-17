@@ -1,0 +1,31 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "deepseek-chat",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: {\"model\":\"deepseek-chat\",\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}",
+      "data: not JSON"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "Hello"
+    },
+    {
+      "type": "error",
+      "code": "LLM_PROVIDER_RESPONSE_INVALID"
+    }
+  ]
+}

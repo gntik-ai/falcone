@@ -1,0 +1,43 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "moonshot-v1-8k",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      ": documented comment",
+      "event: message",
+      "data: {\"model\":\"moonshot-v1-8k\",\"choices\":[{\"delta\":{\"content\":\"你好 🌙\"}}]}",
+      "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}",
+      "data: [DONE]"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "你好 🌙"
+    },
+    {
+      "type": "usage",
+      "usage": {
+        "promptTokens": 0,
+        "completionTokens": 0,
+        "totalTokens": 0,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null,
+        "reasoningTokens": null
+      },
+      "model": "moonshot-v1-8k",
+      "finishReason": "stop"
+    }
+  ]
+}

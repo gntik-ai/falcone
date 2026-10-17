@@ -19,7 +19,9 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync, mkdtempSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { resolve, dirname, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -54,21 +56,44 @@ function specToRepoPath(spec) {
 // Join continued lines, then inspect only COPY sources (not comments or RUN guards).
 // Both apps/* and packages/* modules must land at /app/<repo path> to resolve from
 // the shipped dist/ directory. Merely appearing as a source is not sufficient.
-const copiedModules = new Set(
-  [...dockerfile.replace(/\\\s*\r?\n/g, ' ').matchAll(/^\s*COPY\s+([^\r\n]+)/gim)]
-    .flatMap((m) => {
-      const tokens = m[1].trim().split(/\s+/);
-      const destination = tokens.at(-1);
-      const sources = tokens.slice(0, -1);
-      return sources.filter((source) => {
-        if (!/^(?:apps|packages)\/[^\s]+\.mjs$/.test(source)) return false;
-        const imagePath = sources.length > 1 || destination.endsWith('/')
-          ? posix.join(destination, posix.basename(source))
-          : posix.normalize(destination);
-        return imagePath === posix.join('/app', source);
+function filesUnder(source) {
+  if (!existsSync(resolve(REPO_ROOT, source))) return [];
+  if (!statSync(resolve(REPO_ROOT, source)).isDirectory()) return [source];
+  return readdirSync(resolve(REPO_ROOT, source)).flatMap(name => filesUnder(posix.join(source, name)));
+}
+
+function modulesCopiedBy(text) {
+  return new Set([...text.replace(/\\\s*\r?\n/g, ' ').matchAll(/^\s*COPY\s+([^\r\n]+)/gim)].flatMap(match => {
+    const tokens = match[1].trim().split(/\s+/);
+    const destination = tokens.at(-1);
+    const sources = tokens.slice(0, -1);
+    return sources.filter(source => /^(?:apps|packages)\//.test(source)).flatMap(source => {
+      const directory = existsSync(resolve(REPO_ROOT, source)) && statSync(resolve(REPO_ROOT, source)).isDirectory();
+      return filesUnder(source).filter(file => {
+        const imagePath = directory ? posix.join(destination, file.slice(source.replace(/\/$/, '').length + 1))
+          : sources.length > 1 || destination.endsWith('/') ? posix.join(destination, posix.basename(file)) : posix.normalize(destination);
+        return imagePath === posix.join('/app', file);
       });
-    }),
-);
+    });
+  }));
+}
+const copiedModules = modulesCopiedBy(dockerfile);
+
+// Follow static relative imports/re-exports from every dynamically imported entry point.
+function transitiveModules() {
+  const pending = importedSpecs.map(specToRepoPath);
+  const visited = new Set();
+  while (pending.length) {
+    const path = pending.pop();
+    if (visited.has(path)) continue;
+    visited.add(path);
+    const source = readFileSync(resolve(REPO_ROOT, path), 'utf8');
+    for (const match of source.matchAll(/\b(?:import|export)\s+(?:[^'";]*?\s+from\s*)?['"](\.[^'"]+)['"]/g)) {
+      pending.push(posix.normalize(posix.join(posix.dirname(path), match[1])));
+    }
+  }
+  return [...visited];
+}
 
 test('bbx-flows-worker-dockerfile-01: every module worker-deps.mjs dynamic-imports is COPYed into the image (no drift)', () => {
   assert.ok(importedSpecs.length > 0, 'worker-deps.mjs should dynamic-import at least one relative .mjs module');
@@ -114,4 +139,34 @@ test('bbx-flows-worker-dockerfile-04: the Dockerfile fails the build when a dyna
     /RUN node[\s\S]*worker-deps\.mjs[\s\S]*process\.exit\(1\)/,
     'a build-time worker-deps module-resolution guard must be present',
   );
+});
+
+
+test('bbx-flows-worker-dockerfile-05: transitive imports are shipped at the same relative paths', () => {
+  assert.deepEqual(transitiveModules().filter(path => !copiedModules.has(path)), []);
+  const withoutAdapters = dockerfile.replace(/^COPY apps\/control-plane-executor\/src\/runtime\/llm-adapters\/[^\n]*\n/m, '');
+  assert.ok(transitiveModules().some(path => !modulesCopiedBy(withoutAdapters).has(path)), 'removing the adapter directory COPY must be detected');
+});
+
+test('bbx-flows-worker-dockerfile-06: actual image guard rejects a missing transitive module', () => {
+  const guard = dockerfile.match(/^RUN node --input-type=module -e "(.*)"$/m)?.[1];
+  assert.ok(guard, 'build-time guard must be executable offline');
+  const root = mkdtempSync(resolve(tmpdir(), 'falcone-worker-image-'));
+  try {
+    const distDir = resolve(root, ...DIST_REL);
+    mkdirSync(distDir, { recursive: true });
+    copyFileSync(resolve(WORKER_DIR, 'src/worker-deps.mjs'), resolve(distDir, 'worker-deps.mjs'));
+    for (const path of copiedModules) {
+      const destination = resolve(root, path);
+      mkdirSync(dirname(destination), { recursive: true });
+      copyFileSync(resolve(REPO_ROOT, path), destination);
+    }
+    const program = guard.replace("'/app/apps/workflow-worker/dist'", JSON.stringify(distDir));
+    const run = () => spawnSync(process.execPath, ['--input-type=module', '-e', program], { encoding: 'utf8' });
+    const complete = run();
+    assert.equal(complete.status, 0, complete.stderr);
+    rmSync(resolve(root, 'apps/control-plane-executor/src/runtime/llm-adapters/contract.mjs'));
+    const incomplete = run();
+    assert.equal(incomplete.status, 1, incomplete.stderr);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

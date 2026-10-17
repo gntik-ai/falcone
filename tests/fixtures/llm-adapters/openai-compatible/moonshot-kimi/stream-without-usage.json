@@ -1,0 +1,41 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "moonshot-v1-8k",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: {\"model\":\"moonshot-v1-8k\",\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}",
+      "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}",
+      "data: [DONE]"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "Hello"
+    },
+    {
+      "type": "usage",
+      "usage": {
+        "promptTokens": 0,
+        "completionTokens": 0,
+        "totalTokens": 0,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null,
+        "reasoningTokens": null
+      },
+      "model": "moonshot-v1-8k",
+      "finishReason": "stop"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "deepseek-chat",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: {\"model\":\"deepseek-chat\",\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}",
+      "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}",
+      "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":6,\"total_tokens\":10,\"prompt_tokens_details\":{\"cached_tokens\":2},\"completion_tokens_details\":{\"reasoning_tokens\":3}}}",
+      "data: [DONE]"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "Hello"
+    },
+    {
+      "type": "usage",
+      "usage": {
+        "promptTokens": 4,
+        "completionTokens": 6,
+        "totalTokens": 10,
+        "cacheReadTokens": 2,
+        "cacheWriteTokens": null,
+        "reasoningTokens": 3
+      },
+      "model": "deepseek-chat",
+      "finishReason": "stop"
+    }
+  ]
+}

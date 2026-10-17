@@ -1,0 +1,27 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "deepseek-chat",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 429,
+    "headers": {
+      "retry-after": "2"
+    },
+    "body": {
+      "error": {
+        "message": "private upstream diagnostic"
+      }
+    }
+  },
+  "expect": {
+    "code": "LLM_PROVIDER_RATE_LIMITED",
+    "status": 429
+  }
+}
