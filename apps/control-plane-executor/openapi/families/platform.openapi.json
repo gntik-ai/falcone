@@ -195,7 +195,6 @@
         "required": true,
         "schema": {
           "minLength": 3,
-          "pattern": "^ten_[0-9a-z]+$",
           "type": "string"
         }
       },
@@ -205,7 +204,6 @@
         "name": "userId",
         "required": true,
         "schema": {
-          "pattern": "^usr_[0-9a-z]+$",
           "type": "string"
         }
       },
@@ -968,11 +966,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1107,7 +1103,6 @@
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "username": {
@@ -1401,15 +1396,12 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2470,7 +2462,6 @@
             "type": "string"
           },
           "grantedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "invitationId": {
@@ -2490,7 +2481,6 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantMembershipId": {
@@ -2501,7 +2491,6 @@
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2561,7 +2550,6 @@
             "type": "string"
           },
           "grantedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "invitationId": {
@@ -2581,18 +2569,15 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceMembershipId": {
@@ -2632,7 +2617,7 @@
     "description": "Cross-tenant platform governance, catalog, and operator discovery surfaces. Generated from the unified public API contract for v1.",
     "summary": "Cross-tenant platform governance, catalog, and operator discovery surfaces.",
     "title": "In Falcone Platform API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

@@ -67,10 +67,10 @@ test('US-EVT-03 public API publishes bridge, metadata, and observability routes 
   const kafkaTopicMetricsOperation = document.paths['/v1/metrics/workspaces/{workspaceId}/kafka-topics'].get;
   const eventDashboardOperation = document.paths['/v1/metrics/workspaces/{workspaceId}/event-dashboards'].get;
 
-  assert.equal(document.info.version, '1.22.0');
+  assert.equal(document.info.version, '1.23.0');
   assert.equal(document.components.parameters.XApiVersion.schema.const, '2026-03-26');
   assert.equal(taxonomy.release.header_version, '2026-03-26');
-  assert.equal(taxonomy.release.openapi_semver, '1.22.0');
+  assert.equal(taxonomy.release.openapi_semver, '1.23.0');
 
   assert.equal(getPublicRoute('createFunctionKafkaTrigger'), undefined);
   assert.equal(getPublicRoute('getFunctionKafkaTrigger'), undefined);

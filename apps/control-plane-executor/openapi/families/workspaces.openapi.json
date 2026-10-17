@@ -27,7 +27,6 @@
         "name": "filter[tenantId]",
         "required": true,
         "schema": {
-          "pattern": "^ten_[0-9a-z]+$",
           "type": "string"
         }
       },
@@ -185,7 +184,6 @@
         "required": true,
         "schema": {
           "minLength": 3,
-          "pattern": "^wrk_[0-9a-z]+$",
           "type": "string"
         }
       },
@@ -731,11 +729,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -788,7 +784,6 @@
             "$ref": "#/components/schemas/PermissionRecalculationStatus"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
@@ -809,11 +804,9 @@
             "type": "string"
           },
           "triggeredByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -846,7 +839,6 @@
             "$ref": "#/components/schemas/PermissionRecalculationStatus"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1072,7 +1064,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
@@ -1082,7 +1073,6 @@
             "$ref": "#/components/schemas/ExternalApplicationValidationSummary"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1467,11 +1457,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2026,7 +2014,6 @@
           },
           "consumerWorkspaceIds": {
             "items": {
-              "pattern": "^wrk_[0-9a-z]+$",
               "type": "string"
             },
             "type": "array"
@@ -2093,14 +2080,12 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2256,7 +2241,6 @@
             "type": "array"
           },
           "iamUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "realm": {
@@ -2415,11 +2399,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2521,15 +2503,12 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2960,7 +2939,6 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
@@ -2972,7 +2950,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -3251,7 +3228,6 @@
             "type": "string"
           },
           "requestedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "requestedTtl": {
@@ -3356,7 +3332,6 @@
             "type": "boolean"
           },
           "requestedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "revocationReason": {
@@ -3375,7 +3350,6 @@
         "additionalProperties": false,
         "properties": {
           "requestedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "requestedTtl": {
@@ -3560,14 +3534,12 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -3697,7 +3669,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceSlug": {
@@ -3764,11 +3735,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -3792,7 +3761,6 @@
                 "$ref": "#/components/schemas/WorkspaceClonePolicy"
               },
               "sourceWorkspaceId": {
-                "pattern": "^wrk_[0-9a-z]+$",
                 "type": "string"
               }
             },
@@ -3896,7 +3864,6 @@
             "type": "string"
           },
           "sourceWorkspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4011,11 +3978,9 @@
             "type": "object"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4368,7 +4333,6 @@
             "$ref": "#/components/schemas/ManagedResourceSharingScope"
           },
           "sourceWorkspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "specializationMode": {
@@ -4409,7 +4373,6 @@
             "type": "string"
           },
           "grantedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "invitationId": {
@@ -4442,18 +4405,15 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceMembershipId": {
@@ -4521,11 +4481,9 @@
             "type": "array"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4563,7 +4521,6 @@
             "type": "string"
           },
           "sourceWorkspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4622,7 +4579,6 @@
           },
           "tenantId": {
             "description": "Stable tenant identifier for the parent tenant that will own the workspace.",
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -4644,7 +4600,7 @@
     "description": "Workspace lifecycle, application inventory, workload identities, and managed-resource control surfaces. Generated from the unified public API contract for v1.",
     "summary": "Workspace lifecycle, application inventory, workload identities, and managed-resource control surfaces.",
     "title": "In Falcone Workspaces API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

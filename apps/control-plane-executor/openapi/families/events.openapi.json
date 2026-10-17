@@ -40,7 +40,6 @@
         "required": true,
         "schema": {
           "minLength": 3,
-          "pattern": "^wrk_[0-9a-z]+$",
           "type": "string"
         }
       },
@@ -406,7 +405,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
@@ -417,7 +415,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -613,7 +610,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "topicRef": {
@@ -621,7 +617,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -966,7 +961,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamp": {
@@ -974,7 +968,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1168,7 +1161,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
@@ -1183,7 +1175,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1254,7 +1245,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
@@ -1266,7 +1256,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1302,7 +1291,6 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "topicName": {
@@ -1311,7 +1299,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1534,14 +1521,12 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantIsolation": {
             "$ref": "#/components/schemas/EventTopicTenantIsolation"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1675,11 +1660,9 @@
             "type": "array"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2164,7 +2147,6 @@
             "type": "integer"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "topicName": {
@@ -2173,7 +2155,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2386,7 +2367,7 @@
     "description": "Workspace-scoped event topics with controlled HTTP publish, SSE delivery, replay windows, and audit-friendly gateway semantics. Generated from the unified public API contract for v1.",
     "summary": "Workspace-scoped event topics with controlled HTTP publish, SSE delivery, replay windows, and audit-friendly gateway semantics.",
     "title": "In Falcone Events API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

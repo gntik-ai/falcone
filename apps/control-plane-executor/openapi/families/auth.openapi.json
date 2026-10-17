@@ -154,11 +154,9 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -452,13 +450,11 @@
           },
           "tenantIds": {
             "items": {
-              "pattern": "^ten_[0-9a-z]+$",
               "type": "string"
             },
             "type": "array"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "username": {
@@ -467,7 +463,6 @@
           },
           "workspaceIds": {
             "items": {
-              "pattern": "^wrk_[0-9a-z]+$",
               "type": "string"
             },
             "type": "array"
@@ -530,7 +525,6 @@
             "type": "string"
           },
           "actorUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "decision": {
@@ -557,7 +551,6 @@
             "$ref": "#/components/schemas/TenantMembershipRecord"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "workspace": {
@@ -682,15 +675,12 @@
             "$ref": "#/components/schemas/ConsoleStatusViewId"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -871,7 +861,6 @@
             "$ref": "#/components/schemas/PermissionRecalculationStatus"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1121,7 +1110,6 @@
             "type": "array"
           },
           "iamUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "realm": {
@@ -1424,15 +1412,12 @@
             "type": "string"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -1735,7 +1720,6 @@
             "$ref": "#/components/schemas/TenantLifecycleState"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
@@ -1878,7 +1862,6 @@
             "type": "string"
           },
           "lastChangedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "lifecycleEventId": {
@@ -1994,7 +1977,6 @@
             "type": "integer"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceCount": {
@@ -2059,7 +2041,6 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceSlug": {
@@ -2140,7 +2121,6 @@
             "type": "string"
           },
           "grantedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "invitationId": {
@@ -2173,7 +2153,6 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "tenantMembershipId": {
@@ -2184,7 +2163,6 @@
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2366,7 +2344,6 @@
             "type": "integer"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceSlug": {
@@ -2443,14 +2420,12 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2540,7 +2515,6 @@
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceSlug": {
@@ -2635,7 +2609,6 @@
             "type": "string"
           },
           "sourceWorkspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2767,7 +2740,6 @@
             "$ref": "#/components/schemas/ManagedResourceSharingScope"
           },
           "sourceWorkspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "specializationMode": {
@@ -2808,7 +2780,6 @@
             "type": "string"
           },
           "grantedByUserId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "invitationId": {
@@ -2841,18 +2812,15 @@
             "$ref": "#/components/schemas/EntityState"
           },
           "tenantId": {
-            "pattern": "^ten_[0-9a-z]+$",
             "type": "string"
           },
           "timestamps": {
             "$ref": "#/components/schemas/LifecycleTimestamps"
           },
           "userId": {
-            "pattern": "^usr_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           },
           "workspaceMembershipId": {
@@ -2898,7 +2866,6 @@
             "type": "string"
           },
           "sourceWorkspaceId": {
-            "pattern": "^wrk_[0-9a-z]+$",
             "type": "string"
           }
         },
@@ -2926,7 +2893,7 @@
     "description": "Console login, signup, activation, password recovery, and contextual authorization decisions. Generated from the unified public API contract for v1.",
     "summary": "Console login, signup, activation, password recovery, and contextual authorization decisions.",
     "title": "In Falcone Auth API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

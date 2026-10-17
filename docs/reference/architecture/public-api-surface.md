@@ -1,6 +1,6 @@
 # Public API Surface
 
-Version: v1 (header 2026-03-26, OpenAPI 1.22.0)
+Version: v1 (header 2026-03-26, OpenAPI 1.23.0)
 
 ## Product API vs native passthrough
 

@@ -413,7 +413,7 @@
     "description": "Async operation query control-plane discovery. Generated from the unified public API contract for v1.",
     "summary": "Async operation query control-plane discovery.",
     "title": "In Falcone Async operation query API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",

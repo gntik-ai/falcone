@@ -189,7 +189,7 @@
     "description": "Workspace-scoped document collection and PostgreSQL table change streams over Server-Sent Events. Generated from the unified public API contract for v1.",
     "summary": "Workspace-scoped document collection and PostgreSQL table change streams over Server-Sent Events.",
     "title": "In Falcone Realtime API",
-    "version": "1.22.0"
+    "version": "1.23.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "openapi": "3.1.0",
