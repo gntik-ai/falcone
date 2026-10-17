@@ -21,7 +21,7 @@ export function adapterError(code, retryAfterMs) {
   return new AdapterError(code, retryAfterMs);
 }
 
-export const REQUEST_FIELDS = Object.freeze(['model', 'messages', 'prompt', 'system', 'maxTokens', 'temperature', 'stream', 'responseFormat']);
+export const REQUEST_FIELDS = Object.freeze(['model', 'messages', 'prompt', 'system', 'maxTokens', 'temperature', 'stream', 'responseFormat', 'promptCache']);
 export const COMPLETION_FIELDS = Object.freeze(['content', 'model', 'usage', 'finishReason']);
 export const USAGE_FIELDS = Object.freeze(['promptTokens', 'completionTokens', 'totalTokens', 'cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens']);
 export const FINISH_REASONS = Object.freeze(['stop', 'length', 'content_filter', 'tool_calls', 'other']);

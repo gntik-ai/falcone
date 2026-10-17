@@ -22,7 +22,7 @@ import { resolveActivityWorkspaceId } from './workspace-binding.mjs';
 
 /**
  * @param {{ params: object, tenant: object, credential?: object }} input
- *   params: { model, messages?, prompt?, system?, maxTokens?, temperature? }
+ *   params: { model, messages?, prompt?, system?, maxTokens?, temperature?, promptCache? }
  * @param {{ executeLlmComplete?: Function }} deps
  */
 export async function llmComplete(input, deps = {}) {
@@ -51,6 +51,7 @@ export async function llmComplete(input, deps = {}) {
       maxTokens: params.maxTokens,
       temperature: params.temperature,
       responseFormat: params.responseFormat,
+      promptCache: params.promptCache,
     });
   } catch (err) {
     if (err?.name === 'ApplicationFailure') throw err;
@@ -85,6 +86,7 @@ export const llmCompleteInputSchema = Object.freeze({
     system: { type: 'string', 'x-falcone-expression': true },
     maxTokens: { type: 'integer', minimum: 1 },
     temperature: { type: 'number', minimum: 0, maximum: 2 },
+    promptCache: { type: 'string', enum: ['system'] },
     responseFormat: {
       type: 'object', required: ['type', 'name', 'schema'],
       properties: { type: { const: 'json_schema' }, name: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,64}$' }, schema: { type: 'object' } },

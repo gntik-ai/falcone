@@ -1,0 +1,43 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: {\"type\":\"message_start\",\"message\":{\"type\":\"message\",\"model\":\"fixture-model\",\"content\":[],\"stop_reason\":null}}",
+      "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}",
+      "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null}}",
+      "data: {\"type\":\"message_delta\",\"delta\":{},\"usage\":{\"input_tokens\":4,\"output_tokens\":6}}",
+      "data: {\"type\":\"message_stop\"}"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "Hello"
+    },
+    {
+      "type": "usage",
+      "model": "fixture-model",
+      "usage": {
+        "promptTokens": 4,
+        "completionTokens": 6,
+        "totalTokens": 10,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null,
+        "reasoningTokens": null
+      },
+      "finishReason": "stop"
+    }
+  ]
+}

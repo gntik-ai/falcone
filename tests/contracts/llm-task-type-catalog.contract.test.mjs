@@ -56,3 +56,17 @@ test('both llm.complete catalogs accept only a literal optional JSON-schema resp
     }
   }
 });
+
+test('both llm.complete catalogs accept only the optional literal system promptCache', () => {
+  const descriptor = buildTaskTypeCatalog().find(item => item.id === 'llm.complete').inputSchema;
+  for (const schema of [descriptor, llmCompleteInputSchema]) {
+    assert.equal(schema.additionalProperties, false);
+    assert.deepEqual(schema.properties.promptCache, { type: 'string', enum: ['system'] });
+    const validate = new Ajv({ strict: false }).compile(schema);
+    assert.equal(validate({ model: 'fixture-model' }), true);
+    assert.equal(validate({ model: 'fixture-model', promptCache: 'system' }), true);
+    for (const invalid of [null, false, 0, '', 'all', ['system'], {}, '${input.cache}']) {
+      assert.equal(validate({ model: 'fixture-model', promptCache: invalid }), false);
+    }
+  }
+});

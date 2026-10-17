@@ -135,7 +135,9 @@ test('all documented provider profiles conform and the manifest equals the passi
       for (const file of (await readdir(directory)).filter(file => file.endsWith('.json')).sort()) {
         const fixture = JSON.parse(await readFile(new URL(file, directory), 'utf8'));
         assert.equal(fixture.source, 'documented-wire-format');
+        let sent;
         const backend = httpLlmBackend({ providerType: profile, fetchImpl: async (_url, init) => {
+          sent = JSON.parse(init.body);
           assert.equal(JSON.parse(init.body).model, fixture.request.model);
           const upstream = fixture.upstream;
           if (upstream.sse) {
@@ -158,9 +160,10 @@ test('all documented provider profiles conform and the manifest equals the passi
           assertNormalizedCompletion(completion);
           assert.deepEqual(completion, fixture.expect, `${profile}/${file}`);
         }
+        if (fixture.expectRequest) assert.deepEqual(sent, fixture.expectRequest, `${profile}/${file} request`);
         cases.push(file.slice(0, -5));
       }
-      assert.equal(cases.length, entry.name === 'openai-responses' ? 20 : 13);
+      assert.equal(cases.length, entry.name === 'openai-compatible' ? 13 : 20);
       (recomputed[adapter.id] ??= {})[profile] = { cases, surface: adapter.surface };
     }
   }
@@ -168,6 +171,7 @@ test('all documented provider profiles conform and the manifest equals the passi
   assert.equal(resolveLlmAdapter(undefined).id, 'openai-compatible');
   assert.equal(resolveLlmAdapter('openai').id, 'openai-compatible');
   assert.equal(resolveLlmAdapter('openai-responses').id, 'openai-responses');
+  assert.equal(resolveLlmAdapter('anthropic').id, 'anthropic-messages');
   const manifest = JSON.parse(await readFile(new URL('../../apps/control-plane-executor/src/runtime/llm-adapters/conformance-manifest.json', import.meta.url), 'utf8'));
   assert.deepEqual(manifest, recomputed);
 });
