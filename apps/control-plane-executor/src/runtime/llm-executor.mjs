@@ -16,6 +16,8 @@
 // request time (fail-closed for any pre-existing malicious row). The DEFAULT secretResolver is
 // the confined resolver, so a non-allow-listed env var is NEVER read.
 import { clientError } from './errors.mjs';
+import modelCatalog from './llm-adapters/model-catalog.mjs';
+import { mergeModels, catalogEntries, validModelId, validModelMetadata } from './llm-adapters/connection-models.mjs';
 import { resolveLlmAdapter } from './llm-adapters/registry.mjs';
 import { createLlmTransport } from './llm-adapters/transport.mjs';
 import { normalizeUsage, normalizeFinishReason, adapterError } from './llm-adapters/contract.mjs';
@@ -141,12 +143,49 @@ function connectionRecord(workspaceId, config, connectionId, existing, isDefault
   };
 }
 
+function validateModels(connection, { models, selectable }, catalog) {
+  if (!Array.isArray(models) || models.length > 256 || !models.every(validModelMetadata)
+    || new Set(models.map(model => model.modelId)).size !== models.length
+    || !Array.isArray(selectable) || !selectable.every(validModelId)) {
+    throw clientError('Invalid model snapshot', 400, 'INVALID_MODEL_SNAPSHOT');
+  }
+  const submitted = new Set(models.map(model => model.modelId));
+  const entries = catalogEntries(catalog, connection.providerType);
+  if ((connection.defaultModel && !selectable.includes(connection.defaultModel))
+    || selectable.some(id => !submitted.has(id) && !Object.hasOwn(entries, id))) {
+    throw clientError('Default model and selectable models must be available', 409, 'LLM_DEFAULT_MODEL_NOT_SELECTABLE');
+  }
+  return models.map(({ modelId, displayName, capabilities, lifecycle }) => ({
+    modelId, displayName: displayName ?? null, capabilities: capabilities ?? null, lifecycle: lifecycle ?? null,
+    catalogVersion: catalog.catalogVersion,
+  }));
+}
+
 function createInMemoryProviderStore() {
   const workspaces = new Map();
+  const models = new Map();
+  const modelKey = (workspaceId, connectionId, tenantId) => JSON.stringify([tenantId ?? TENANT_SENTINEL, workspaceId, connectionId]);
   const records = (workspaceId, tenantId) => workspaces.get(providerKey(tenantId, workspaceId)) ?? [];
   const copy = value => structuredClone(value);
   const store = {
     async ensureSchema() {},
+    async listModels(workspaceId, connectionId, tenantId) { return copy(models.get(modelKey(workspaceId, connectionId, tenantId)) ?? []); },
+    async refreshModels(workspaceId, connectionId, tenantId, catalog = modelCatalog) {
+      await store.getConnection(workspaceId, connectionId, tenantId);
+      const rows = models.get(modelKey(workspaceId, connectionId, tenantId)) ?? [];
+      // Keep manual overrides intact; reads merge the current catalog field by field.
+      rows.forEach(row => { row.catalogVersion = catalog.catalogVersion; });
+      return copy(rows);
+    },
+    async replaceModels(workspaceId, connectionId, config, catalog = modelCatalog) {
+      const connection = records(workspaceId, config.tenantId).find(row => row.connectionId === connectionId);
+      if (!connection) throw clientError('LLM connection not found', 404, 'LLM_CONNECTION_NOT_FOUND');
+      const rows = validateModels(connection, config, catalog);
+      models.set(modelKey(workspaceId, connectionId, config.tenantId), copy(rows));
+      connection.allowedModels = copy([...new Set(config.selectable)]);
+      connection.updatedAt = new Date().toISOString();
+      return copy(rows);
+    },
     async listConnections(workspaceId, tenantId) { return copy(records(workspaceId, tenantId).slice().sort((a, b) => (a.connectionId < b.connectionId ? -1 : a.connectionId > b.connectionId ? 1 : 0))); },
     async getConnection(workspaceId, connectionId, tenantId) {
       const record = records(workspaceId, tenantId).find(r => r.connectionId === connectionId);
@@ -177,6 +216,7 @@ function createInMemoryProviderStore() {
     async deleteConnection(workspaceId, connectionId, tenantId) {
       const rows = records(workspaceId, tenantId);
       if (!rows.some(r => r.connectionId === connectionId)) throw clientError('LLM connection not found', 404, 'LLM_CONNECTION_NOT_FOUND');
+      models.delete(modelKey(workspaceId, connectionId, tenantId));
       workspaces.set(providerKey(tenantId, workspaceId), rows.filter(r => r.connectionId !== connectionId));
       return { removed: true };
     },
@@ -192,6 +232,7 @@ function createInMemoryProviderStore() {
     async getProvider(workspaceId, tenantId) { return copy(records(workspaceId, tenantId).find(r => r.isDefault) ?? null); },
     async removeProvider(workspaceId, tenantId) {
       const rows = records(workspaceId, tenantId);
+      rows.filter(r => r.isDefault).forEach(row => models.delete(modelKey(workspaceId, row.connectionId, tenantId)));
       const remaining = rows.filter(r => !r.isDefault);
       workspaces.set(providerKey(tenantId, workspaceId), remaining);
       return { removed: remaining.length !== rows.length };
@@ -235,6 +276,13 @@ function createPostgresProviderStore(pool) {
         is_default boolean NOT NULL DEFAULT false,
         created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
         PRIMARY KEY (tenant_id, workspace_id, connection_id)
+      )`);
+      await client.query(`CREATE TABLE IF NOT EXISTS workspace_llm_connection_models (
+        tenant_id text NOT NULL, workspace_id text NOT NULL, connection_id text NOT NULL, model_id text NOT NULL,
+        display_name text, capabilities jsonb, lifecycle jsonb, catalog_version text,
+        PRIMARY KEY (tenant_id, workspace_id, connection_id, model_id),
+        FOREIGN KEY (tenant_id, workspace_id, connection_id)
+          REFERENCES workspace_llm_connections (tenant_id, workspace_id, connection_id) ON DELETE CASCADE
       )`);
       await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_wlc_default ON workspace_llm_connections (tenant_id, workspace_id) WHERE is_default');
       await client.query('CREATE INDEX IF NOT EXISTS idx_wlc_workspace ON workspace_llm_connections (workspace_id)');
@@ -346,8 +394,47 @@ function createPostgresProviderStore(pool) {
     });
   }
 
+  const modelScope = (workspaceId, connectionId, tenantId) => [tenantId ?? TENANT_SENTINEL, workspaceId, connectionId];
+  async function listModels(workspaceId, connectionId, tenantId) {
+    try {
+      const { rows } = await pool.query(`SELECT model_id, display_name, capabilities, lifecycle, catalog_version
+        FROM workspace_llm_connection_models WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3 ORDER BY model_id COLLATE "C"`, modelScope(workspaceId, connectionId, tenantId));
+      return rows.map(row => ({ modelId: row.model_id, displayName: row.display_name,
+        capabilities: row.capabilities, lifecycle: row.lifecycle, catalogVersion: row.catalog_version }));
+    } catch (error) {
+      // Workers may precede executor schema setup during a rolling upgrade.
+      if (error.code === '42P01') return [];
+      throw error;
+    }
+  }
+
+  async function writeModels(workspaceId, connectionId, config, catalog, refresh = false) {
+    const scope = modelScope(workspaceId, connectionId, config.tenantId);
+    return transaction(async client => {
+      await lockWorkspace(client, scope[0], workspaceId);
+      const { rows } = await client.query('SELECT * FROM workspace_llm_connections WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3', scope);
+      if (!rows[0]) throw clientError('LLM connection not found', 404, 'LLM_CONNECTION_NOT_FOUND');
+      if (refresh) {
+        // Keep manual overrides intact; reads merge the current catalog field by field.
+        await client.query('UPDATE workspace_llm_connection_models SET catalog_version=$4 WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3', [...scope, catalog.catalogVersion]);
+        return;
+      }
+      const models = validateModels(rowToRecord(rows[0]), config, catalog);
+      await client.query('DELETE FROM workspace_llm_connection_models WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3', scope);
+      for (const model of models) {
+        await client.query(`INSERT INTO workspace_llm_connection_models
+          (tenant_id, workspace_id, connection_id, model_id, display_name, capabilities, lifecycle, catalog_version)
+          VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8)`,
+        [...scope, model.modelId, model.displayName, JSON.stringify(model.capabilities), JSON.stringify(model.lifecycle), catalog.catalogVersion]);
+      }
+      await client.query('UPDATE workspace_llm_connections SET allowed_models=$4::jsonb, updated_at=now() WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3', [...scope, JSON.stringify([...new Set(config.selectable)])]);
+    });
+  }
+
   return {
-    pool, ensureSchema,
+    pool, ensureSchema, listModels,
+    replaceModels: (workspaceId, connectionId, config, catalog = modelCatalog) => writeModels(workspaceId, connectionId, config, catalog),
+    refreshModels: (workspaceId, connectionId, tenantId, catalog = modelCatalog) => writeModels(workspaceId, connectionId, { tenantId }, catalog, true),
     async listConnections(workspaceId, tenantId) {
       const result = await pool.query('SELECT * FROM workspace_llm_connections WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY connection_id COLLATE "C"', [tenantId ?? TENANT_SENTINEL, workspaceId]);
       return result.rows.map(rowToRecord);
@@ -497,6 +584,7 @@ export function createLlmExecutor(options = {}) {
   const usageStore = options.usageStore ?? createLlmUsageStore();
   const backendFactory = options.backendFactory; // (config) -> backend (test seam)
   const fetchImpl = options.fetchImpl;
+  const catalog = options.modelCatalog ?? modelCatalog;
 
   // BYOK confinement config (#659). `prefixes` is the reserved secret-name allow-list; `guardEnv`
   // is the env consulted by the confined resolver / endpoint host allow-list (injectable in tests).
@@ -553,7 +641,7 @@ export function createLlmExecutor(options = {}) {
     return httpLlmBackend({ providerType: config.providerType, fetchImpl });
   }
 
-  async function prepare(workspaceId, { tenantId, model, responseFormat, promptCache } = {}) {
+  async function prepare(workspaceId, { tenantId, model, responseFormat, promptCache, stream, maxTokens } = {}) {
     if (promptCache !== undefined && promptCache !== 'system') throw clientError('Invalid promptCache', 400, 'INVALID_PROMPT_CACHE');
     assertResponseFormat(responseFormat);
     const config = await resolveProviderOrThrow(workspaceId, tenantId);
@@ -561,6 +649,15 @@ export function createLlmExecutor(options = {}) {
       throw clientError('Structured output is unsupported by this provider', 422, 'LLM_STRUCTURED_OUTPUT_UNSUPPORTED');
     }
     const chosen = resolveAllowedModel(config, model);
+    const rows = await providerStore.listModels(workspaceId, config.connectionId, config.tenantId);
+    const entry = mergeModels(config, rows, catalog).find(item => item.modelId === chosen);
+    if (entry?.lifecycle.effectiveState === 'retired') throw clientError('Model is retired', 422, 'MODEL_RETIRED');
+    const capabilities = entry?.capabilities;
+    const unavailable = capability => { throw clientError(`Model capability unavailable: ${capability}`, 422, 'MODEL_CAPABILITY_UNAVAILABLE'); };
+    if (stream && (capabilities?.streaming === false || resolveLlmAdapter(config.providerType).surface.streaming === false)) unavailable('streaming');
+    if (maxTokens != null && capabilities?.maxOutputTokens != null && maxTokens > capabilities.maxOutputTokens) unavailable('maxOutputTokens');
+    if (responseFormat !== undefined && capabilities?.structuredOutput === false) unavailable('structuredOutput');
+    if (promptCache !== undefined && capabilities?.promptCaching === false) unavailable('promptCaching');
     // Re-validate the endpoint just before the outbound call (DNS-rebinding defense + fail-closed
     // for any malicious row persisted before this guard shipped).
     await assertEndpoint(config.endpoint);
@@ -576,8 +673,8 @@ export function createLlmExecutor(options = {}) {
     return providerStore.deployProvider(workspaceId, config);
   }
 
-  async function complete(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache } = {}) {
-    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat, promptCache });
+  async function complete(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache, stream = false } = {}) {
+    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat, promptCache, stream, maxTokens });
     const built = normalizeMessages({ messages, prompt, system });
     const out = await backend.complete({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat, promptCache });
     if (responseFormat !== undefined && out.finishReason === 'stop') {
@@ -592,7 +689,7 @@ export function createLlmExecutor(options = {}) {
   // Streaming variant: yields `{ type:'delta', content }` frames, records usage when the terminal
   // usage frame arrives, then yields a final `{ type:'usage', usage }` frame.
   async function* completeStream(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache } = {}) {
-    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat, promptCache });
+    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat, promptCache, stream: true, maxTokens });
     const built = normalizeMessages({ messages, prompt, system });
     for await (const frame of backend.stream({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat, promptCache })) {
       if (frame?.type === 'error') {
@@ -608,6 +705,12 @@ export function createLlmExecutor(options = {}) {
       yield { type: 'delta', content: frame?.content ?? '' };
     }
     throw adapterError('LLM_PROVIDER_RESPONSE_INVALID');
+  }
+
+  async function listModels(workspaceId, connectionId, tenantId) {
+    const connection = await providerStore.getConnection(workspaceId, connectionId, tenantId);
+    const rows = await providerStore.listModels(workspaceId, connectionId, tenantId);
+    return { catalogVersion: catalog.catalogVersion, items: mergeModels(connection, rows, catalog) };
   }
 
   async function getUsage(workspaceId, { tenantId } = {}) {
@@ -635,6 +738,15 @@ export function createLlmExecutor(options = {}) {
       await assertEndpoint(config.endpoint);
       return providerStore.replaceConnection(workspaceId, connectionId, config);
     },
+    async refreshModels(workspaceId, connectionId, tenantId) {
+      await providerStore.refreshModels(workspaceId, connectionId, tenantId, catalog);
+      return listModels(workspaceId, connectionId, tenantId);
+    },
+    async replaceModels(workspaceId, connectionId, config = {}) {
+      await providerStore.replaceModels(workspaceId, connectionId, config, catalog);
+      return listModels(workspaceId, connectionId, config.tenantId);
+    },
+    listModels,
     deleteConnection: (workspaceId, connectionId, tenantId) => providerStore.deleteConnection(workspaceId, connectionId, tenantId),
     listConnections: (workspaceId, tenantId) => providerStore.listConnections(workspaceId, tenantId),
     getConnection: (workspaceId, connectionId, tenantId) => providerStore.getConnection(workspaceId, connectionId, tenantId),

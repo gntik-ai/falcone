@@ -389,7 +389,7 @@ function isStructuralWriteRequest(method, pathname) {
   if (/^\/v1\/workspaces\/[^/]+\/api-keys(?:\/|$)/.test(pathname)) {
     return method === 'POST' || method === 'DELETE';
   }
-  if (/^\/v1\/workspaces\/[^/]+\/llm-providers(?:\/[^/]+)?$/.test(pathname)) {
+  if (/^\/v1\/workspaces\/[^/]+\/llm-providers(?:\/[^/]+(?:\/models(?:\/refresh)?)?)?$/.test(pathname)) {
     return method === 'POST' || method === 'PUT' || method === 'DELETE';
   }
   if (/^\/v1\/workspaces\/[^/]+\/(?:embedding-provider|llm-provider)$/.test(pathname)) {
@@ -690,6 +690,12 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runLlmConnection(llmExecutor, 'replaceConnection', [w, id, { ...c.body, tenantId: c.identity.tenantId }])],
     ['DELETE', new RegExp(`${llmpr}/([^/]+)$`), `${templates.llmpr}/{connectionId}`, ([w, id], c) =>
       runLlmConnection(llmExecutor, 'deleteConnection', [w, id, c.identity.tenantId])],
+    ['POST', new RegExp(`${llmpr}/([^/]+)/models/refresh$`), `${templates.llmpr}/{connectionId}/models/refresh`, ([w, id], c) =>
+      runLlmConnection(llmExecutor, 'refreshModels', [w, id, c.identity.tenantId])],
+    ['PUT', new RegExp(`${llmpr}/([^/]+)/models$`), `${templates.llmpr}/{connectionId}/models`, ([w, id], c) =>
+      runLlmConnection(llmExecutor, 'replaceModels', [w, id, { ...c.body, tenantId: c.identity.tenantId }])],
+    ['GET', new RegExp(`${llmpr}/([^/]+)/models$`), `${templates.llmpr}/{connectionId}/models`, ([w, id], c) =>
+      runLlmConnection(llmExecutor, 'listModels', [w, id, c.identity.tenantId])],
     ['PUT', new RegExp(`${llmp}$`), templates.llmp, ([w], c) =>
       runLlmProvider(llmExecutor, 'set', { workspaceId: w, tenantId: c.identity.tenantId, config: c.body }, 200)],
     ['GET', new RegExp(`${llmp}$`), templates.llmp, ([w], c) =>

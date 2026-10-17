@@ -112,10 +112,44 @@ test('Postgres 17 registry: copy fidelity, idempotence, rollout fence and concur
     for (const id of ['Bad', '-bad', 'bad_id']) await assert.rejects(store.replaceConnection('race', id, config), { statusCode: 404, code: 'LLM_CONNECTION_NOT_FOUND' });
     assert.deepEqual(await store.listConnections('race', 'other-tenant'), []);
 
+    // Model snapshots use the same lock and cascade through every delete path.
+    const snapshot = { tenantId: config.tenantId, models: [{ modelId: 'model-a', capabilities: { streaming: false } }], selectable: ['model-a'] };
+    const foreignKey = await pool.query("SELECT confdeltype FROM pg_constraint WHERE conrelid='workspace_llm_connection_models'::regclass AND contype='f'");
+    assert.equal(foreignKey.rows[0].confdeltype, 'c');
+    for (const mode of ['delete', 'remove', 'legacy']) {
+      await oldWrite(`models-${mode}`);
+      await store.replaceModels(`models-${mode}`, 'default', snapshot);
+      assert.equal((await store.listModels(`models-${mode}`, 'default', config.tenantId)).length, 1);
+      if (mode === 'delete') await store.deleteConnection(`models-${mode}`, 'default', config.tenantId);
+      if (mode === 'remove') await store.removeProvider(`models-${mode}`, config.tenantId);
+      if (mode === 'legacy') await pool.query('DELETE FROM workspace_llm_providers WHERE tenant_id=$1 AND workspace_id=$2', [config.tenantId, `models-${mode}`]);
+      assert.deepEqual(await store.listModels(`models-${mode}`, 'default', config.tenantId), []);
+    }
+    await store.createConnection('model-race', { ...config, connectionId: 'main' });
+    await Promise.all(['one', 'two'].map(id => store.replaceModels('model-race', 'main', {
+      ...snapshot, models: [{ modelId: 'model-a' }, { modelId: id }], selectable: ['model-a', id],
+    })));
+    const finalModels = await store.listModels('model-race', 'main', config.tenantId);
+    const finalConnection = await store.getConnection('model-race', 'main', config.tenantId);
+    assert.deepEqual(finalModels.map(row => row.modelId).sort(), finalConnection.allowedModels.slice().sort());
+    assert.equal(finalModels.length, 2);
+    const beforeModels = await store.listModels('model-race', 'main', config.tenantId);
+    await assert.rejects(store.replaceModels('model-race', 'main', { ...snapshot, selectable: [] }), { code: 'LLM_DEFAULT_MODEL_NOT_SELECTABLE' });
+    await assert.rejects(store.replaceModels('model-race', 'main', { ...snapshot, models: [{ modelId: '-bad' }] }), { statusCode: 400 });
+    assert.deepEqual(await store.listModels('model-race', 'main', config.tenantId), beforeModels);
+    assert.deepEqual(await store.getConnection('model-race', 'main', config.tenantId), finalConnection);
+    assert.deepEqual(await store.listModels('model-race', 'main', 'other-tenant'), []);
+    await store.refreshModels('model-race', 'main', config.tenantId, { catalogVersion: 'refreshed', entries: {} });
+    assert.ok((await store.listModels('model-race', 'main', config.tenantId)).every(row => row.catalogVersion === 'refreshed'));
+    await pool.query('ALTER TABLE workspace_llm_connection_models RENAME TO temporarily_unavailable_models');
+    assert.deepEqual(await store.listModels('model-race', 'main', config.tenantId), []);
+    await pool.query('ALTER TABLE temporarily_unavailable_models RENAME TO workspace_llm_connection_models');
+
     // Purge must remove API-only and non-default rows, beyond the legacy DELETE mirror.
     await oldWrite('purge');
     await store.createConnection('purge', { ...config, connectionId: 'non-default' });
     await store.createConnection('api-only', { ...config, connectionId: 'api-created' });
+    await store.replaceModels('purge', 'non-default', snapshot);
     const neighbor = await store.createConnection('purge', { ...config, tenantId: 'other-tenant', connectionId: 'non-default' });
     const purged = await purgeTenant(pool, config.tenantId);
     assert.deepEqual(purged.databaseResidual, []);
