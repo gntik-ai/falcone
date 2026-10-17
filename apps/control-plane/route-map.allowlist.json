@@ -1,11 +1,5 @@
 [
   {
-    "method": "GET",
-    "path": "/v1/scheduling/jobs",
-    "reason": "The scheduling wildcard matcher is owned by the separate compilePath fix.",
-    "issue": "#952"
-  },
-  {
     "method": "POST",
     "path": "/v1/admin/tenants",
     "reason": "No standalone tenant-create handler exists for this console endpoint.",
