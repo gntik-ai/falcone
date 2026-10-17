@@ -553,7 +553,8 @@ export function createLlmExecutor(options = {}) {
     return httpLlmBackend({ providerType: config.providerType, fetchImpl });
   }
 
-  async function prepare(workspaceId, { tenantId, model, responseFormat } = {}) {
+  async function prepare(workspaceId, { tenantId, model, responseFormat, promptCache } = {}) {
+    if (promptCache !== undefined && promptCache !== 'system') throw clientError('Invalid promptCache', 400, 'INVALID_PROMPT_CACHE');
     assertResponseFormat(responseFormat);
     const config = await resolveProviderOrThrow(workspaceId, tenantId);
     if (responseFormat !== undefined && !resolveLlmAdapter(config.providerType).surface.structuredOutput) {
@@ -575,10 +576,10 @@ export function createLlmExecutor(options = {}) {
     return providerStore.deployProvider(workspaceId, config);
   }
 
-  async function complete(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat } = {}) {
-    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat });
+  async function complete(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache } = {}) {
+    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat, promptCache });
     const built = normalizeMessages({ messages, prompt, system });
-    const out = await backend.complete({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat });
+    const out = await backend.complete({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat, promptCache });
     if (responseFormat !== undefined && out.finishReason === 'stop') {
       try { JSON.parse(out.content); }
       catch { throw adapterError('LLM_PROVIDER_RESPONSE_INVALID'); }
@@ -590,10 +591,10 @@ export function createLlmExecutor(options = {}) {
 
   // Streaming variant: yields `{ type:'delta', content }` frames, records usage when the terminal
   // usage frame arrives, then yields a final `{ type:'usage', usage }` frame.
-  async function* completeStream(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat } = {}) {
-    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat });
+  async function* completeStream(workspaceId, { tenantId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache } = {}) {
+    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, model, responseFormat, promptCache });
     const built = normalizeMessages({ messages, prompt, system });
-    for await (const frame of backend.stream({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat })) {
+    for await (const frame of backend.stream({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat, promptCache })) {
       if (frame?.type === 'error') {
         yield { type: 'error', code: frame.code };
         return;

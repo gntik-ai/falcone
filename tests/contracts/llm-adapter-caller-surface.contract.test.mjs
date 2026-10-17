@@ -160,3 +160,58 @@ test('llm.complete forwards responseFormat through HTTP to the Responses provide
   await assert.rejects(() => llmComplete({ tenant, params: { model: 'fixture-model', prompt: 'hi', responseFormat: { ...responseFormat, strict: true } } }, deps), { type: 'INVALID_RESPONSE_FORMAT', nonRetryable: true });
   assert.equal(calls, 0);
 });
+
+const anthropicUsage = { input_tokens: 2, cache_creation_input_tokens: 4, cache_read_input_tokens: 1, output_tokens: 3 };
+const anthropicBody = { type: 'message', model: 'fixture-model', content: [{ type: 'text', text: 'hello' }], stop_reason: 'end_turn', usage: anthropicUsage };
+const anthropicNormalizedUsage = { promptTokens: 7, completionTokens: 3, totalTokens: 10, cacheReadTokens: 1, cacheWriteTokens: 4, reasoningTokens: null };
+
+test('Anthropic HTTP and activity callers opt into system caching and expose cache usage', async () => {
+  const api = await configured(async (_url, init) => {
+    const sent = JSON.parse(init.body);
+    assert.deepEqual(sent.system, [{ type: 'text', text: 'Be brief', cache_control: { type: 'ephemeral' } }]);
+    assert.deepEqual(sent.messages, [{ role: 'user', content: 'hi' }]);
+    if (!sent.stream) return Response.json(anthropicBody);
+    return new Response([
+      { type: 'message_start', message: { model: 'fixture-model', usage: anthropicUsage } },
+      { type: 'content_block_delta', delta: { type: 'text_delta', text: 'hello' } },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' } },
+      { type: 'message_stop' },
+    ].map(event => `data: ${JSON.stringify(event)}\n\n`).join(''));
+  }, { ...provider, providerType: 'anthropic' });
+  const input = { model: 'fixture-model', prompt: 'hi', system: 'Be brief', promptCache: 'system' };
+  const expected = { content: 'hello', model: 'fixture-model', usage: anthropicNormalizedUsage, finishReason: 'stop' };
+  const completion = await api.request(`${base}/llm/completions`, input);
+  assert.equal(completion.status, 200);
+  assert.deepEqual(assertNormalizedCompletion(completion.json()), expected);
+  const stream = await api.request(`${base}/llm/completions`, { ...input, stream: true });
+  assert.equal(stream.status, 200);
+  assert.deepEqual(stream.frames().map(assertNormalizedFrame), [
+    { type: 'delta', content: 'hello' }, { type: 'usage', model: 'fixture-model', usage: anthropicNormalizedUsage, finishReason: 'stop' },
+  ]);
+  const output = await llmComplete({ tenant, params: input }, { executeLlmComplete: async request => {
+    const result = await api.request(`${base}/llm/completions`, request);
+    assert.equal(result.status, 200);
+    return result.json();
+  } });
+  assert.deepEqual(output, { status: 'success', ...expected });
+  assert.equal(new Ajv().compile(llmCompleteOutputSchema)(output), true);
+});
+
+test('invalid promptCache gives HTTP 400 and non-retryable activity failure without fetching', async () => {
+  let calls = 0;
+  const api = await configured(async () => { calls++; return Response.json(anthropicBody); }, { ...provider, providerType: 'anthropic' });
+  for (const promptCache of [null, false, 0, '', 'all', ['system'], {}, '${input.cache}']) {
+    const input = { model: 'fixture-model', prompt: 'hi', promptCache };
+    for (const stream of [false, true]) {
+      const result = await api.request(`${base}/llm/completions`, { ...input, stream });
+      assert.equal(result.status, 400);
+      assert.equal(result.json().code, 'INVALID_PROMPT_CACHE');
+    }
+    await assert.rejects(() => llmComplete({ tenant, params: input }, { executeLlmComplete: async request => {
+      const result = await api.request(`${base}/llm/completions`, request);
+      if (result.status !== 200) throw Object.assign(new Error('Completion rejected'), { statusCode: result.status, code: result.json().code });
+      return result.json();
+    } }), { type: 'INVALID_PROMPT_CACHE', nonRetryable: true });
+  }
+  assert.equal(calls, 0);
+});

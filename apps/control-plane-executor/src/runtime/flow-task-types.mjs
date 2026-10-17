@@ -169,6 +169,7 @@ const DESCRIPTORS = [
         system: { type: 'string', 'x-falcone-expression': true },
         maxTokens: { type: 'integer', minimum: 1 },
         temperature: { type: 'number', minimum: 0, maximum: 2 },
+        promptCache: { type: 'string', enum: ['system'] },
         responseFormat: {
           type: 'object', required: ['type', 'name', 'schema'],
           properties: { type: { const: 'json_schema' }, name: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,64}$' }, schema: { type: 'object' } },

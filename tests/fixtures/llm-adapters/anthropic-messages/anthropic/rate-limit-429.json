@@ -1,0 +1,29 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 429,
+    "headers": {
+      "retry-after": "2"
+    },
+    "body": {
+      "type": "error",
+      "error": {
+        "type": "api_error",
+        "message": "private upstream diagnostic"
+      }
+    }
+  },
+  "expect": {
+    "code": "LLM_PROVIDER_RATE_LIMITED",
+    "status": 429
+  }
+}

@@ -105,5 +105,38 @@
         "structuredOutput": true
       }
     }
+  },
+  "anthropic-messages": {
+    "anthropic": {
+      "cases": [
+        "auth-401",
+        "cache-read-and-write-usage",
+        "eof-after-deltas",
+        "eof-after-usage",
+        "length-finish-reason",
+        "malformed-data-line",
+        "malformed-json-body",
+        "max-tokens-default",
+        "non-streaming-success",
+        "overloaded-529",
+        "rate-limit-429",
+        "separate-finish-usage",
+        "split-utf8",
+        "stream-overloaded-error",
+        "stream-unknown-event-interleaved",
+        "stream-usage-updated-by-message-delta",
+        "stream-without-usage",
+        "streaming-success",
+        "system-lifted",
+        "unavailable-500"
+      ],
+      "surface": {
+        "streaming": true,
+        "usageInStream": true,
+        "systemRole": true,
+        "toolCalls": false,
+        "structuredOutput": false
+      }
+    }
   }
 }

@@ -1301,6 +1301,7 @@ async function runLlmComplete(llmExecutor, { workspaceId, tenantId }, c) {
     maxTokens: body.maxTokens,
     temperature: body.temperature,
     responseFormat: body.responseFormat,
+    promptCache: body.promptCache,
   };
 
   if (!body.stream) {
