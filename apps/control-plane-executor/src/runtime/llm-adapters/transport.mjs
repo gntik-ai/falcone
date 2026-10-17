@@ -1,6 +1,6 @@
 // Provider I/O boundary (#940). Pure adapters own translation and protocol semantics.
 import { clientError } from '../errors.mjs';
-import { adapterError, assertNormalizedCompletion, assertNormalizedFrame, normalizeUsage } from './contract.mjs';
+import { AdapterError, adapterError, assertNormalizedCompletion, assertNormalizedFrame, normalizeUsage } from './contract.mjs';
 
 export function createLlmTransport({ adapter, fetchImpl = globalThis.fetch }) {
   if (typeof fetchImpl !== 'function') throw clientError('httpLlmBackend requires a fetch implementation', 500, 'LLM_CONFIG');
@@ -47,7 +47,7 @@ export function createLlmTransport({ adapter, fetchImpl = globalThis.fetch }) {
         for await (const data of dataLines(response.body)) {
           let parsed;
           try { parsed = adapter.parseStreamData(data, state); }
-          catch { throw adapterError('LLM_PROVIDER_RESPONSE_INVALID'); }
+          catch (cause) { throw cause instanceof AdapterError ? cause : adapterError('LLM_PROVIDER_RESPONSE_INVALID'); }
           for (const frame of parsed.frames) {
             if (frame.type !== 'delta') throw adapterError('LLM_PROVIDER_RESPONSE_INVALID');
             yield assertNormalizedFrame(frame);

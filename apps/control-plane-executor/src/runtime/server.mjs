@@ -1300,6 +1300,7 @@ async function runLlmComplete(llmExecutor, { workspaceId, tenantId }, c) {
     system: body.system,
     maxTokens: body.maxTokens,
     temperature: body.temperature,
+    responseFormat: body.responseFormat,
   };
 
   if (!body.stream) {

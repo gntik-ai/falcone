@@ -1,0 +1,44 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "body": {
+      "status": "completed",
+      "model": "fixture-model",
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "refusal",
+              "refusal": "Cannot help"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "content": "",
+    "model": "fixture-model",
+    "usage": {
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "cacheReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null
+    },
+    "finishReason": "content_filter"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hello\"}",
+      "data: {\"type\":\"response.failed\",\"response\":{\"status\":\"failed\",\"error\":{\"code\":\"rate_limit_exceeded\",\"message\":\"private diagnostic\"}}}"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "Hello"
+    },
+    {
+      "type": "error",
+      "code": "LLM_PROVIDER_RATE_LIMITED"
+    }
+  ]
+}

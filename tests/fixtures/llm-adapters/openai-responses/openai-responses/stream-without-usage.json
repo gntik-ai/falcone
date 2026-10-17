@@ -1,0 +1,40 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hello\"}",
+      "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"model\":\"fixture-model\",\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello\"}]}]}}"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "Hello"
+    },
+    {
+      "type": "usage",
+      "usage": {
+        "promptTokens": 0,
+        "completionTokens": 0,
+        "totalTokens": 0,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null,
+        "reasoningTokens": null
+      },
+      "model": "fixture-model",
+      "finishReason": "stop"
+    }
+  ]
+}

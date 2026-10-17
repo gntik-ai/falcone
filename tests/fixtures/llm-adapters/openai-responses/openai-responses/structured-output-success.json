@@ -1,0 +1,60 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "responseFormat": {
+      "type": "json_schema",
+      "name": "answer",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "body": {
+      "status": "completed",
+      "model": "fixture-model",
+      "output": [
+        {
+          "type": "message",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "{\"answer\":42}"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "content": "{\"answer\":42}",
+    "model": "fixture-model",
+    "usage": {
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "cacheReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null
+    },
+    "finishReason": "stop"
+  }
+}
