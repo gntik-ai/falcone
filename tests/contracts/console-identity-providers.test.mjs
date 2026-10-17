@@ -75,7 +75,7 @@ test('identity-provider responses, logs and audit records redact synthetic secre
   ctx.kcAdmin.upsertIdentityProvider = async () => { throw new Error(`upstream echoed ${secret}`); };
   const failure = await LOCAL_HANDLERS.setSocialProvider(ctx);
   assert.equal(failure.statusCode, 502);
-  const audit = auditEventForRoute({ method: 'PUT', path, localHandler: 'setSocialProvider' }, ctx, success);
+  const audit = auditEventForRoute({ method: 'PUT', path, localHandler: 'setSocialProvider', audit: 'tenant.social-provider.upsert' }, ctx, success);
   assert.ok(audit);
   assert.ok(!JSON.stringify({ success, failure, audit, logs }).includes(secret));
   assert.equal(hasSecretKey(audit), false);

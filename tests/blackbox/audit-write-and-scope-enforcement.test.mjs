@@ -346,7 +346,7 @@ test('bbx-audit-write-04: the dispatch-level writer records a mutating local act
   // auditEventForRoute derives the audit descriptor a mutating route produces; null
   // for non-auditable (read) routes so the writer no-ops on GETs.
   const desc = auditEventForRoute(
-    { method: 'POST', path: '/v1/tenants/{tenantId}/users', localHandler: 'createTenantUser' },
+    { method: 'POST', path: '/v1/tenants/{tenantId}/users', localHandler: 'createTenantUser', audit: 'tenant.user.create' },
     { params: { tenantId: TENANT_A }, identity: IDENTITY_A, body: { username: 'bob' } },
     { statusCode: 201, body: { userId: 'u1', username: 'bob' } }
   );
@@ -366,7 +366,7 @@ test('bbx-audit-write-04: the dispatch-level writer records a mutating local act
 
   // a FAILED mutation (>=400) IS now recorded (#644), distinguished by outcome — not dropped.
   const failed = auditEventForRoute(
-    { method: 'POST', path: '/v1/tenants/{tenantId}/users', localHandler: 'createTenantUser' },
+    { method: 'POST', path: '/v1/tenants/{tenantId}/users', localHandler: 'createTenantUser', audit: 'tenant.user.create' },
     { params: { tenantId: TENANT_A }, identity: IDENTITY_A, body: {} },
     { statusCode: 400, body: { code: 'VALIDATION_ERROR' } }
   );

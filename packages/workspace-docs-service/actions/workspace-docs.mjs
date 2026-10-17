@@ -160,60 +160,63 @@ export async function main(params, overrides = {}) {
     actorId: authContext.actorId,
     roles: authContext.roles
   }
+  // Trusted authorization context accompanies note mutations for dispatch audit (#971).
+  const auditScope = { tenantId: ctx.tenantId, workspaceId: ctx.workspaceId }
+  const scopedResponse = (...args) => ({ ...response(...args), auditScope })
   const docsInternalClient = resolveInternalClient(resolvedInternalClient, headers)
 
   try {
     if (method === 'GET' && /\/docs$/.test(path)) {
       if (!hasRole(ctx.roles, VIEWER_ROLES)) {
-        return response(403, { code: 'FORBIDDEN', message: 'Insufficient workspace access' }, { 'X-Correlation-Id': correlationId })
+        return scopedResponse(403, { code: 'FORBIDDEN', message: 'Insufficient workspace access' }, { 'X-Correlation-Id': correlationId })
       }
 
       const docs = await assembleWorkspaceDocs(ctx, db, docsInternalClient)
       await recordAccess(db, kafkaProducer, ctx.workspaceId, ctx.actorId, correlationId, ctx.tenantId)
-      return response(200, docs, { 'X-Correlation-Id': correlationId })
+      return scopedResponse(200, docs, { 'X-Correlation-Id': correlationId })
     }
 
     if (method === 'POST' && /\/docs\/notes$/.test(path)) {
       if (!hasRole(ctx.roles, ADMIN_ROLES)) {
-        return response(403, { code: 'FORBIDDEN', message: 'Only workspace admins can manage notes' }, { 'X-Correlation-Id': correlationId })
+        return scopedResponse(403, { code: 'FORBIDDEN', message: 'Only workspace admins can manage notes' }, { 'X-Correlation-Id': correlationId })
       }
       const note = await insertNote(db, ctx.tenantId, ctx.workspaceId, ctx.actorId, sanitise(body.content))
-      return response(201, note, { 'X-Correlation-Id': correlationId })
+      return scopedResponse(201, note, { 'X-Correlation-Id': correlationId })
     }
 
     if (method === 'PUT' && /\/docs\/notes\//.test(path)) {
       if (!hasRole(ctx.roles, ADMIN_ROLES)) {
-        return response(403, { code: 'FORBIDDEN', message: 'Only workspace admins can manage notes' }, { 'X-Correlation-Id': correlationId })
+        return scopedResponse(403, { code: 'FORBIDDEN', message: 'Only workspace admins can manage notes' }, { 'X-Correlation-Id': correlationId })
       }
       const note = await updateNote(db, ctx.tenantId, ctx.workspaceId, noteIdFromPath(path), sanitise(body.content))
       if (!note) {
-        return response(404, { code: 'NOTE_NOT_FOUND', message: 'Note not found' }, { 'X-Correlation-Id': correlationId })
+        return scopedResponse(404, { code: 'NOTE_NOT_FOUND', message: 'Note not found' }, { 'X-Correlation-Id': correlationId })
       }
-      return response(200, note, { 'X-Correlation-Id': correlationId })
+      return scopedResponse(200, note, { 'X-Correlation-Id': correlationId })
     }
 
     if (method === 'DELETE' && /\/docs\/notes\//.test(path)) {
       if (!hasRole(ctx.roles, ADMIN_ROLES)) {
-        return response(403, { code: 'FORBIDDEN', message: 'Only workspace admins can manage notes' }, { 'X-Correlation-Id': correlationId })
+        return scopedResponse(403, { code: 'FORBIDDEN', message: 'Only workspace admins can manage notes' }, { 'X-Correlation-Id': correlationId })
       }
       const deleted = await softDeleteNote(db, ctx.tenantId, ctx.workspaceId, noteIdFromPath(path))
       if (!deleted) {
-        return response(404, { code: 'NOTE_NOT_FOUND', message: 'Note not found' }, { 'X-Correlation-Id': correlationId })
+        return scopedResponse(404, { code: 'NOTE_NOT_FOUND', message: 'Note not found' }, { 'X-Correlation-Id': correlationId })
       }
-      return { statusCode: 204, headers: { 'X-Correlation-Id': correlationId } }
+      return { statusCode: 204, headers: { 'X-Correlation-Id': correlationId }, auditScope }
     }
 
-    return response(501, { code: 'NOT_IMPLEMENTED', message: 'Route not implemented' }, { 'X-Correlation-Id': correlationId })
+    return scopedResponse(501, { code: 'NOT_IMPLEMENTED', message: 'Route not implemented' }, { 'X-Correlation-Id': correlationId })
   } catch (error) {
     if (error?.code === 'INVALID_NOTE_CONTENT') {
-      return response(422, { code: 'INVALID_NOTE_CONTENT', message: 'Content too long or empty' }, { 'X-Correlation-Id': correlationId })
+      return scopedResponse(422, { code: 'INVALID_NOTE_CONTENT', message: 'Content too long or empty' }, { 'X-Correlation-Id': correlationId })
     }
     if (error?.code === 'WORKSPACE_NOT_FOUND' || error?.statusCode === 404) {
-      return response(404, { code: 'WORKSPACE_NOT_FOUND', message: 'Workspace not found or inaccessible' }, { 'X-Correlation-Id': correlationId })
+      return scopedResponse(404, { code: 'WORKSPACE_NOT_FOUND', message: 'Workspace not found or inaccessible' }, { 'X-Correlation-Id': correlationId })
     }
     if (error?.code === 'UPSTREAM_UNAVAILABLE' || error?.statusCode === 503) {
-      return response(503, { code: 'UPSTREAM_UNAVAILABLE', message: 'Unable to resolve workspace configuration' }, { 'X-Correlation-Id': correlationId })
+      return scopedResponse(503, { code: 'UPSTREAM_UNAVAILABLE', message: 'Unable to resolve workspace configuration' }, { 'X-Correlation-Id': correlationId })
     }
-    return response(500, { code: 'INTERNAL_ERROR', message: 'Unexpected workspace docs error' }, { 'X-Correlation-Id': correlationId })
+    return scopedResponse(500, { code: 'INTERNAL_ERROR', message: 'Unexpected workspace docs error' }, { 'X-Correlation-Id': correlationId })
   }
 }

@@ -11,42 +11,26 @@
 // path scope (never from the request body), and the denial writer carries tenant_id +
 // workspace_id + actor_id, so a record can never land under another tenant.
 import { randomUUID } from 'node:crypto';
-import { recordAuditEvent } from './audit-store.mjs';
+import { recordAuditEvent, ACTION_CATEGORY_BY_TYPE } from './audit-store.mjs';
 
-// Local handlers whose effect is a STATE MUTATION worth auditing, mapped to a stable
-// action_type. Read handlers (list*/get*/iam list*/metrics*) are intentionally absent,
-// so a GET never produces an audit record.
-const AUDITABLE_LOCAL_HANDLERS = {
-  createTenant: 'tenant.create', deleteTenant: 'tenant.delete', purgeTenant: 'tenant.purge',
-  createTenantUser: 'tenant.user.create',
-  setAuthConfig: 'tenant.auth-config.update', setSocialProvider: 'tenant.social-provider.upsert',
-  deleteSocialProvider: 'tenant.social-provider.delete',
-  createWorkspace: 'workspace.create',
-  promoteWorkspace: 'workspace.promote',
-  createServiceAccount: 'workspace.service-account.create',
-  createWorkspaceIamClient: 'workspace.iam-client.create',
-  issueCredential: 'workspace.service-account.credential.issue',
-  rotateCredential: 'workspace.service-account.credential.rotate',
-  revokeCredential: 'workspace.service-account.credential.revoke',
-  provisionDatabase: 'workspace.database.provision',
-  provisionDatabaseGeneric: 'workspace.database.provision',
-  deleteDatabase: 'workspace.database.delete', // Independent database lifecycle (#967).
-  rotateDatabaseCredential: 'workspace.database.credential.rotate',
-  registerFunction: 'workspace.function.register',
-  iamCreateUser: 'iam.user.create', iamDeleteUser: 'iam.user.delete', iamSetUserStatus: 'iam.user.status',
-  iamCreateRole: 'iam.role.create', iamCreateGroup: 'iam.group.create',
-  iamAssignUserRoles: 'iam.user.role-assign', iamRemoveUserRoles: 'iam.user.role-remove',
-  iamAddUserToGroup: 'iam.user.group-add', iamRemoveUserFromGroup: 'iam.user.group-remove',
-  // Secret-access (#644): writes AND reads are security-relevant and audited (the
-  // handlers are authenticated and carry ctx.identity + ctx.params.workspaceId).
-  secretSet: 'workspace.secret.set', secretGet: 'workspace.secret.get',
-  secretList: 'workspace.secret.list', secretDelete: 'workspace.secret.delete',
-  fnDeploy: 'workspace.function.deploy',
-  fnDelete: 'workspace.function.delete',
-  fnInvoke: 'workspace.function.invoke',
-  fnRollback: 'workspace.function.rollback',
-  fnActivationRerun: 'workspace.function.activation.rerun'
-};
+// Pure seed-route contract: startup must fail closed on audit gaps (#971).
+export function validateRouteAuditCoverage(routes) {
+  const errors = [];
+  for (const route of routes) {
+    const audit = route.audit;
+    let reason = null;
+    if (typeof audit === 'string') {
+      if (audit.length > 64 || !/^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$/.test(audit)) reason = 'invalid audit type';
+      else if (!Object.hasOwn(ACTION_CATEGORY_BY_TYPE, audit)) reason = 'audit type has no explicit category';
+    } else if (audit != null) {
+      const keys = Object.keys(audit);
+      if (keys.length !== 1 || !['self', 'exempt'].includes(keys[0])
+        || typeof audit[keys[0]] !== 'string' || !audit[keys[0]].trim()) reason = 'invalid self/exempt audit reason';
+    } else if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method)) reason = 'missing audit';
+    if (reason) errors.push(`${route.method} ${route.path}: ${reason}`);
+  }
+  if (errors.length) throw new Error(`Route audit coverage (#971): ${errors.join('; ')}`);
+}
 
 // Map an HTTP status to the audited outcome (#644): the TRUE result of the action,
 // recorded at write time (was hardcoded 'succeeded' at read time).
@@ -68,7 +52,8 @@ function resolveScope(route, ctx, result) {
   const identity = ctx.identity ?? {};
   const body = result?.body ?? {};
   const trustedScope = result?.auditScope ?? {};
-  const tenantId = trustedScope.tenantId ?? params.tenantId
+  const tenantId = trustedScope.global === true && trustedScope.tenantId === null ? null
+    : trustedScope.tenantId ?? params.tenantId
     ?? body.tenantId ?? body.tenant?.tenantId ?? body.tenant?.id
     ?? identity.tenantId ?? null;
   const workspaceId = trustedScope.workspaceId ?? params.workspaceId
@@ -77,20 +62,19 @@ function resolveScope(route, ctx, result) {
   return { tenantId, workspaceId };
 }
 
-// Build the audit descriptor an auditable local route produces, or null when the
-// route is non-auditable (a read not in the auditable set) or cannot be attributed
+// Build the audit descriptor declared by a local or module route, or null when the
+// route is self-recorded, exempt, absent or cannot be attributed
 // to a tenant. The TRUE outcome (succeeded/denied/failed/error) is derived from the
 // status — failures and denials ARE recorded now (#644), distinguished by outcome.
 // Returned shape is the recordAuditEvent() input (sans correlationId, added by the caller).
 export function auditEventForRoute(route, ctx, result) {
-  if (!route?.localHandler) return null;
-  const actionType = AUDITABLE_LOCAL_HANDLERS[route.localHandler];
+  // Per-route metadata also covers module dispatch and shared handlers (#971).
+  const actionType = typeof route?.audit === 'string' ? route.audit : null;
   if (!actionType) return null;
   const status = result?.statusCode ?? 200;
   const { tenantId, workspaceId } = resolveScope(route, ctx, result);
-  // A platform database-delete attempt may target a missing workspace. Audit that
-  // attempt globally rather than inventing an owning tenant (#967).
-  if (!tenantId && actionType !== 'workspace.database.delete') return null;
+  // Only a handler may opt in to the platform-global chain (#971).
+  if (!tenantId && !(result?.auditScope?.global === true && result.auditScope.tenantId === null)) return null;
   const evidence = result?.knativeEvidence;
   const safeEvidence = evidence && typeof evidence === 'object' ? {
     capability: evidence.capability === 'mcp' ? 'mcp' : 'function',
@@ -243,5 +227,3 @@ export async function recordRouteDenial(db, route, ctx, result, correlationId, l
     return null;
   }
 }
-
-export { AUDITABLE_LOCAL_HANDLERS };

@@ -728,8 +728,10 @@ async function storageWorkspaceUsage(ctx) {
 async function storageProvisionBucket(ctx) {
   const { ws, error } = await requireOwnedWorkspace(ctx);
   if (error) return error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
   if (!can(ctx.identity, 'bucket.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
-    return err(403, 'FORBIDDEN', 'caller may not administer buckets in this workspace');
+    return scoped(err(403, 'FORBIDDEN', 'caller may not administer buckets in this workspace'));
   }
   // Per-workspace bucket-count quota admission (#674). Count THIS workspace's buckets (the
   // same tenant-scoped read the usage handler uses) and deny a provision that would exceed
@@ -739,8 +741,8 @@ async function storageProvisionBucket(ctx) {
   const existingBuckets = await store.listBucketsForWorkspace(ctx.pool, ws.id);
   const bucketDecision = checkBucketQuota(existingBuckets.length, {});
   if (!bucketDecision.allowed) {
-    return err(409, STORAGE_QUOTA_EXCEEDED,
-      `storage bucket quota reached for this workspace: ${existingBuckets.length}/${bucketDecision.limit}`);
+    return scoped(err(409, STORAGE_QUOTA_EXCEEDED,
+      `storage bucket quota reached for this workspace: ${existingBuckets.length}/${bucketDecision.limit}`));
   }
   // DNS-safe, workspace-id-scoped bucket name. deriveBucketName embeds a stable hash
   // of the globally-unique workspace id so two same-slug workspaces across tenants
@@ -750,7 +752,7 @@ async function storageProvisionBucket(ctx) {
   const bucket = deriveBucketName(ws.id, ctx.body?.name);
   // Reject before any backend call if the derived name still violates the contract.
   if (!/^[a-z0-9-]{3,63}$/.test(bucket)) {
-    return err(400, 'STORAGE_INVALID_BUCKET_NAME', `derived bucket name '${bucket}' is not DNS-safe ([a-z0-9-], 3..63)`);
+    return scoped(err(400, 'STORAGE_INVALID_BUCKET_NAME', `derived bucket name '${bucket}' is not DNS-safe ([a-z0-9-], 3..63)`));
   }
   try {
     await createBucket(bucket);
@@ -780,9 +782,9 @@ async function storageProvisionBucket(ctx) {
         console.error('[storage] per-bucket identity issuance failed (bucket provisioned without a scoped credential):', e?.message ?? e);
       }
     }
-    return ok(201, { bucket: { resourceId: bucket, bucketName: bucket, workspaceId: ws.id, tenantId: ws.tenant_id, region: REGION, status: 'active' }, record: rec, storageCredential });
+    return scoped(ok(201, { bucket: { resourceId: bucket, bucketName: bucket, workspaceId: ws.id, tenantId: ws.tenant_id, region: REGION, status: 'active' }, record: rec, storageCredential }));
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_PROVISION_FAILED', String(e.message ?? e));
+    return scoped(err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_PROVISION_FAILED', String(e.message ?? e)));
   }
 }
 
@@ -796,8 +798,10 @@ async function storageRotateCredential(ctx) {
   const bucket = ctx.params.bucketId;
   const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   const rec = gate.rec;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: rec.tenant_id, workspaceId: rec.workspace_id } });
   if (!tenantIdentitiesEnabled()) {
-    return err(409, 'STORAGE_IDENTITIES_DISABLED', 'per-bucket storage identities are disabled (STORAGE_TENANT_IDENTITIES=0)');
+    return scoped(err(409, 'STORAGE_IDENTITIES_DISABLED', 'per-bucket storage identities are disabled (STORAGE_TENANT_IDENTITIES=0)'));
   }
   try {
     // ctx.seaweedClient is an OPTIONAL test seam (the in-pod default is the real k8s
@@ -812,9 +816,9 @@ async function storageRotateCredential(ctx) {
     // — the per-bucket re-issue above is the primary action; a failure here must not fail the
     // rotate (and a missing legacy identity is a clean no-op).
     await revokeLegacyWorkspaceIdentity(rec.workspace_id, ctx.seaweedClient);
-    return ok(200, { storageCredential: { identityName: issued.identityName, accessKey: issued.accessKey, secretKey: issued.secretKey, bucket: issued.bucket, actions: issued.actions } });
+    return scoped(ok(200, { storageCredential: { identityName: issued.identityName, accessKey: issued.accessKey, secretKey: issued.secretKey, bucket: issued.bucket, actions: issued.actions } }));
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_CREDENTIAL_ROTATE_FAILED', String(e.message ?? e));
+    return scoped(err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_CREDENTIAL_ROTATE_FAILED', String(e.message ?? e)));
   }
 }
 
@@ -841,6 +845,8 @@ async function storageRevokeCredential(ctx) {
   const bucket = ctx.params.bucketId;
   const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   const rec = gate.rec;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: rec.tenant_id, workspaceId: rec.workspace_id } });
   try {
     // ctx.seaweedClient is an OPTIONAL test seam (see storageRotateCredential).
     await revokeBucketIdentity({ bucket, ...(ctx.seaweedClient ? { client: ctx.seaweedClient } : {}) });
@@ -850,9 +856,9 @@ async function storageRevokeCredential(ctx) {
     // able to reach the (deterministically-named, possibly re-created) bucket. Best-effort
     // — the per-bucket delete above is the primary; a missing legacy identity is a no-op.
     await revokeLegacyWorkspaceIdentity(rec.workspace_id, ctx.seaweedClient);
-    return ok(200, { bucket, revoked: true });
+    return scoped(ok(200, { bucket, revoked: true }));
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_CREDENTIAL_REVOKE_FAILED', String(e.message ?? e));
+    return scoped(err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_CREDENTIAL_REVOKE_FAILED', String(e.message ?? e)));
   }
 }
 
@@ -867,6 +873,8 @@ async function storageDeleteBucket(ctx) {
   const bucket = ctx.params.bucketId;
   const gate = await requireOwnedBucketForStructuralWrite(ctx, bucket); if (gate.error) return gate.error;
   const rec = gate.rec;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: rec.tenant_id, workspaceId: rec.workspace_id } });
   try {
     // 1) Physical bucket + objects (idempotent: a missing bucket is treated as success).
     await deleteBucket(bucket);
@@ -877,9 +885,9 @@ async function storageDeleteBucket(ctx) {
     try { await revokeBucketIdentity({ bucket, ...(ctx.seaweedClient ? { client: ctx.seaweedClient } : {}) }); }
     catch (e) { console.error('[storage] best-effort per-bucket identity delete failed on bucket delete:', e?.message ?? e); }
     await revokeLegacyWorkspaceIdentity(rec.workspace_id, ctx.seaweedClient);
-    return ok(200, { bucket, deleted: true });
+    return scoped(ok(200, { bucket, deleted: true }));
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_BUCKET_DELETE_FAILED', String(e.message ?? e));
+    return scoped(err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'STORAGE_BUCKET_DELETE_FAILED', String(e.message ?? e)));
   }
 }
 
@@ -1103,31 +1111,33 @@ async function storageBucketExport(ctx) {
   const bucket = ctx.params.bucketId;
   const { error, rec } = await ownedWorkspaceBucket(ctx, workspaceId, bucket);
   if (error) return error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: rec.tenant_id, workspaceId: rec.workspace_id } });
   const roleDeny = denyUnlessStructuralAdmin(ctx, rec.tenant_id);
-  if (roleDeny) return roleDeny;
+  if (roleDeny) return scoped(roleDeny);
   const prefix = typeof ctx.body?.prefix === 'string' && ctx.body.prefix ? ctx.body.prefix : null;
   // List (bounded) then download each object's bytes inline. Reserved keys are excluded.
   let listing;
   try { listing = await listObjects(bucket, { maxKeys: EXPORT_MAX_OBJECTS }); }
-  catch (e) { return storageFailure(e, 'STORAGE_LIST_FAILED'); }
+  catch (e) { return scoped(storageFailure(e, 'STORAGE_LIST_FAILED')); }
   const candidates = listing.objects
     .filter((o) => !isReservedKey(o.key))
     .filter((o) => (prefix ? String(o.key).startsWith(prefix) : true));
   if (candidates.length > EXPORT_MAX_OBJECTS) {
-    return err(413, 'STORAGE_EXPORT_TOO_LARGE', `export exceeds the ${EXPORT_MAX_OBJECTS}-object limit`);
+    return scoped(err(413, 'STORAGE_EXPORT_TOO_LARGE', `export exceeds the ${EXPORT_MAX_OBJECTS}-object limit`));
   }
   const entries = [];
   let totalBytes = 0;
   for (const obj of candidates) {
     let got;
     try { got = await getObject(bucket, obj.key); }
-    catch (e) { return storageFailure(e, 'STORAGE_GET_FAILED'); }
+    catch (e) { return scoped(storageFailure(e, 'STORAGE_GET_FAILED')); }
     if (got.bytes.length > EXPORT_MAX_OBJECT_BYTES) {
-      return err(413, 'STORAGE_EXPORT_TOO_LARGE', `object exceeds the ${EXPORT_MAX_OBJECT_BYTES}-byte per-object export limit`);
+      return scoped(err(413, 'STORAGE_EXPORT_TOO_LARGE', `object exceeds the ${EXPORT_MAX_OBJECT_BYTES}-byte per-object export limit`));
     }
     totalBytes += got.bytes.length;
     if (totalBytes > EXPORT_MAX_TOTAL_BYTES) {
-      return err(413, 'STORAGE_EXPORT_TOO_LARGE', `export exceeds the ${EXPORT_MAX_TOTAL_BYTES}-byte total limit`);
+      return scoped(err(413, 'STORAGE_EXPORT_TOO_LARGE', `export exceeds the ${EXPORT_MAX_TOTAL_BYTES}-byte total limit`));
     }
     entries.push({
       entityType: 'storage_export_manifest_entry',
@@ -1165,7 +1175,7 @@ async function storageBucketExport(ctx) {
   try {
     await putObject(bucket, `${EXPORT_MANIFEST_PREFIX}${manifestId}.json`, Buffer.from(JSON.stringify(manifest), 'utf8'), 'application/json');
   } catch (e) { console.error(`[storage] export manifest persist failed (non-fatal): ${String(e?.message ?? e)}`); }
-  return ok(200, manifest);
+  return scoped(ok(200, manifest));
 }
 
 // GET /v1/storage/workspaces/{workspaceId}/buckets/{bucketId}/exports/{manifestId}
@@ -1190,14 +1200,16 @@ async function storageBucketImport(ctx) {
   const bucket = ctx.params.bucketId;
   const { error, rec } = await ownedWorkspaceBucket(ctx, workspaceId, bucket);
   if (error) return error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: rec.tenant_id, workspaceId: rec.workspace_id } });
   const roleDeny = denyUnlessStructuralAdmin(ctx, rec.tenant_id);
-  if (roleDeny) return roleDeny;
+  if (roleDeny) return scoped(roleDeny);
   const manifest = ctx.body?.manifest ?? ctx.body;
   if (!manifest || typeof manifest !== 'object' || manifest.formatVersion !== 1 || !Array.isArray(manifest.entries)) {
-    return err(400, 'INVALID_IMPORT_MANIFEST', 'a formatVersion:1 manifest with an entries array is required');
+    return scoped(err(400, 'INVALID_IMPORT_MANIFEST', 'a formatVersion:1 manifest with an entries array is required'));
   }
   if (manifest.entries.length > EXPORT_MAX_OBJECTS) {
-    return err(413, 'STORAGE_IMPORT_TOO_LARGE', `import exceeds the ${EXPORT_MAX_OBJECTS}-object limit`);
+    return scoped(err(413, 'STORAGE_IMPORT_TOO_LARGE', `import exceeds the ${EXPORT_MAX_OBJECTS}-object limit`));
   }
   const conflictPolicy = ['overwrite', 'skip', 'fail'].includes(ctx.body?.conflictPolicy) ? ctx.body.conflictPolicy : 'overwrite';
   const targetTenantId = isSuperOrInternal(ctx.identity) ? rec.tenant_id : ctx.identity.tenantId;
@@ -1240,7 +1252,7 @@ async function storageBucketImport(ctx) {
     }
   }
   const importedAt = nowIso();
-  return ok(200, {
+  return scoped(ok(200, {
     entityType: 'storage_import_result_summary',
     importId: manifestHashId('sir', `${targetTenantId}:${bucket}:${importedAt}:${conflictPolicy}:${outcomes.length}`),
     targetBucketId: bucket,
@@ -1255,7 +1267,7 @@ async function storageBucketImport(ctx) {
     failedCount: outcomes.filter((o) => o.status === 'failed').length,
     totalBytesImported,
     outcomes
-  });
+  }));
 }
 
 export const STORAGE_HANDLERS = {

@@ -260,13 +260,15 @@ async function resolveTableColumns(c, schemaName, tableName) {
 
 // POST .../schemas/{schemaName}/tables/{tableName}/exports
 async function pgDataExport(ctx) {
-  const { error, database } = await ownedWorkspaceDb(ctx);
+  const { error, database, ws } = await ownedWorkspaceDb(ctx);
   if (error) return error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
   const schemaName = D(ctx.params.schemaName);
   const tableName = D(ctx.params.tableName);
   const limit = Math.min(Math.max(Number(ctx.body?.limit ?? PG_IO_MAX_ROWS) || PG_IO_MAX_ROWS, 1), PG_IO_MAX_ROWS);
   try {
-    return await withDb(database, async (c) => {
+    return scoped(await withDb(database, async (c) => {
       const resolved = await resolveTableColumns(c, schemaName, tableName);
       if (resolved.error) return resolved.error;
       // Identifiers validated against information_schema above; quote (never interpolate raw).
@@ -278,21 +280,23 @@ async function pgDataExport(ctx) {
         columns: resolved.columns, exportedAt: new Date().toISOString(),
         rowCount: rows.length, rows
       });
-    }, ctx.pgClient);
-  } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'PG_EXPORT_FAILED', String(e.message ?? e)); }
+    }, ctx.pgClient));
+  } catch (e) { return scoped(err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'PG_EXPORT_FAILED', String(e.message ?? e))); }
 }
 
 // POST .../schemas/{schemaName}/tables/{tableName}/imports
 async function pgDataImport(ctx) {
-  const { error, database } = await ownedWorkspaceDb(ctx);
+  const { error, database, ws } = await ownedWorkspaceDb(ctx);
   if (error) return error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
   const schemaName = D(ctx.params.schemaName);
   const tableName = D(ctx.params.tableName);
   const rows = Array.isArray(ctx.body?.rows) ? ctx.body.rows : null;
-  if (!rows) return err(400, 'VALIDATION_ERROR', 'rows (array) is required');
-  if (rows.length > PG_IO_MAX_ROWS) return err(413, 'PG_IMPORT_TOO_LARGE', `import exceeds the ${PG_IO_MAX_ROWS}-row limit`);
+  if (!rows) return scoped(err(400, 'VALIDATION_ERROR', 'rows (array) is required'));
+  if (rows.length > PG_IO_MAX_ROWS) return scoped(err(413, 'PG_IMPORT_TOO_LARGE', `import exceeds the ${PG_IO_MAX_ROWS}-row limit`));
   try {
-    return await withDb(database, async (c) => {
+    return scoped(await withDb(database, async (c) => {
       const resolved = await resolveTableColumns(c, schemaName, tableName);
       if (resolved.error) return resolved.error;
       const allowed = new Set(resolved.columns);
@@ -319,8 +323,8 @@ async function pgDataImport(ctx) {
         importedAt: new Date().toISOString(),
         totalEntries: rows.length, importedCount: imported, skippedCount: skipped.length, skipped
       });
-    }, ctx.pgClient);
-  } catch (e) { return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'PG_IMPORT_FAILED', String(e.message ?? e)); }
+    }, ctx.pgClient));
+  } catch (e) { return scoped(err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'PG_IMPORT_FAILED', String(e.message ?? e))); }
 }
 
 export const PG_HANDLERS = {

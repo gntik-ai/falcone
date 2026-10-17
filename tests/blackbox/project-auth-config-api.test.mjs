@@ -264,7 +264,7 @@ test('950: edits/toggles omit secret and never leak secret through reads, writes
       assert.equal(result.statusCode, 200);
       assert.equal(kc.storedProvider('google').config.clientSecret, secret);
       assert.equal(kc.storedProvider('google').enabled, false);
-      const audit = auditEventForRoute({ localHandler: 'setSocialProvider', method: 'PUT', path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}' }, context, result);
+      const audit = auditEventForRoute({ localHandler: 'setSocialProvider', audit: 'tenant.social-provider.upsert', method: 'PUT', path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}' }, context, result);
       assert.equal(audit.actionType, 'tenant.social-provider.upsert');
       assert.equal(audit.tenantId, ACME);
       assert.equal(audit.outcome, 'succeeded');
@@ -284,7 +284,7 @@ test('950: edits/toggles omit secret and never leak secret through reads, writes
   for (const [status, outcome] of [[400, 'failed'], [403, 'denied'], [502, 'error']]) {
     const context = ctx(acmeOwner, { kc: { ...fakeKc(), upsertIdentityProvider: async () => { throw Object.assign(new Error(secret), { statusCode: status }); } }, alias: 'google', body: { config: { clientId: 'test', clientSecret: secret } } });
     const result = await HANDLERS.setSocialProvider(context);
-    const audit = auditEventForRoute({ localHandler: 'setSocialProvider', method: 'PUT', path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}' }, context, result);
+    const audit = auditEventForRoute({ localHandler: 'setSocialProvider', audit: 'tenant.social-provider.upsert', method: 'PUT', path: '/v1/tenants/{tenantId}/auth-config/identity-providers/{alias}' }, context, result);
     assert.equal(audit.outcome, outcome);
     assert.ok(!JSON.stringify([result, audit]).includes(secret));
   }

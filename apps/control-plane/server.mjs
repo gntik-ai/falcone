@@ -35,7 +35,7 @@ import { setWebhookKeyContext } from './webhook-handlers.mjs';
 import { tenantIdentitiesEnabled } from './storage-handlers.mjs';
 import { cleanupLegacyWorkspaceIdentities } from './seaweedfs-identity.mjs';
 import { recordHttp, recordKnativeDependencyEvent, renderMetrics, setHttpRouteTemplates, METRICS_CONTENT_TYPE } from './metrics-registry.mjs';
-import { recordRouteAudit, recordRouteDenial } from './audit-writer.mjs';
+import { recordRouteAudit, recordRouteDenial, validateRouteAuditCoverage } from './audit-writer.mjs';
 import { recordAuditEvent } from './audit-store.mjs';
 import { withPostgresSsl } from './transport-security.mjs';
 import { isJsonBody, normalizeJsonBody } from './request-body.mjs';
@@ -155,8 +155,19 @@ const jwtVerifier = createMultiRealmVerifier({
 // `path` is an Express-ish template: `{param}` -> named capture, trailing `/*`
 // or `*` -> match-rest. Compiled to a RegExp with named groups once at load.
 let ROUTES = [];
-function loadRoutes(extra = []) {
+const warnedUnauditedRoutes = new Set();
+function loadRoutes(extra = [], { warnUnaudited = false } = {}) {
+  // Seed gaps fail startup; external-only route gaps remain warnings (#971).
+  validateRouteAuditCoverage(seedRoutes);
   ROUTES = compileRoutes(extra, seedRoutes);
+  for (const route of ROUTES) {
+    const key = `${route.method} ${route.path}`;
+    if (warnUnaudited && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method) && route.audit == null
+      && !warnedUnauditedRoutes.has(key)) {
+      warnedUnauditedRoutes.add(key);
+      console.warn(`[control-plane] unaudited ROUTE_MAP_FILE route: ${key}`);
+    }
+  }
   setHttpRouteTemplates(ROUTES.map(route => route.path));
 }
 function matchRoute(method, path) { return matchCompiledRoute(ROUTES, method, path); }
@@ -462,6 +473,8 @@ const server = http.createServer(async (req, res) => {
     } finally {
       if (client) client.release();
     }
+    // Module mutations use the same best-effort audit metadata as local routes (#971).
+    void recordRouteAudit(pool, route, { identity, params: routeParams }, result, correlationId);
     // Module results share the same best-effort denial recorder (#958).
     void recordRouteDenial(pool, route, { identity, params: routeParams, req }, result, correlationId);
     const respHeaders = {};
@@ -499,7 +512,8 @@ export async function bootstrapControlPlane() {
     loadRoutes();
     if (ROUTE_MAP_FILE) {
       const extra = JSON.parse(await readFile(ROUTE_MAP_FILE, 'utf8'));
-      loadRoutes(Array.isArray(extra) ? extra : []);
+      // Only process startup reports file coverage; embedded route loading stays quiet (#971).
+      loadRoutes(Array.isArray(extra) ? extra : [], { warnUnaudited: true });
       console.log(`[control-plane] loaded ${ROUTES.length} routes (seed + route map)`);
     }
     if (!webhookSchemaPool

@@ -529,16 +529,18 @@ export async function listExternalApplicationStarterTemplates(ctx) {
 export async function createExternalApplication(ctx) {
   const resolved = await resolveWorkspace(ctx, { write: true });
   if (resolved.error) return resolved.error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: resolved.ws.tenant_id, workspaceId: resolved.ws.id } });
   const applicationId = newId('app');
   const app = normalizeApplicationBody(ctx.body, { id: applicationId, workspace: resolved.ws });
   const unsupported = protocolNotProvisionable(app.protocol);
-  if (unsupported) return unsupported;
+  if (unsupported) return scoped(unsupported);
   const validation = await validateApplicationForWrite(app, { planId: ctx.body?.planId ?? app.metadata?.planId });
-  if (!validation.ok) return validationError(validation.validation.checks);
+  if (!validation.ok) return scoped(validationError(validation.validation.checks));
   app.validation = validation.validation;
 
   const tenant = await resolved.st.getTenant(ctx.pool, resolved.ws.tenant_id);
-  if (!tenant?.iam_realm) return err(409, 'NO_REALM', 'tenant has no IAM realm');
+  if (!tenant?.iam_realm) return scoped(err(409, 'NO_REALM', 'tenant has no IAM realm'));
   const realm = tenant.iam_realm;
   app.iamClient.realm = realm;
   const kc = ctx.kcAdmin ?? kcAdmin;
@@ -546,7 +548,7 @@ export async function createExternalApplication(ctx) {
   let clientUuid;
   try {
     if (await kc.findClient(realm, app.iamClient.clientId)) {
-      return err(409, 'APPLICATION_CLIENT_EXISTS', 'Application client already exists in the tenant realm.');
+      return scoped(err(409, 'APPLICATION_CLIENT_EXISTS', 'Application client already exists in the tenant realm.'));
     }
     clientUuid = await kc.createOidcAppClient(realm, {
       clientId: app.iamClient.clientId,
@@ -564,9 +566,9 @@ export async function createExternalApplication(ctx) {
       name: app.displayName,
       authenticationFlows: app.authenticationFlows,
     });
-    if (!clientUuid) return err(502, 'APPLICATION_PROVISIONING_FAILED', KEYCLOAK_ADMIN_SAFE_MESSAGE);
+    if (!clientUuid) return scoped(err(502, 'APPLICATION_PROVISIONING_FAILED', KEYCLOAK_ADMIN_SAFE_MESSAGE));
   } catch (error) {
-    return provisioningError(error);
+    return scoped(provisioningError(error));
   }
   app.state = 'active';
 
@@ -589,15 +591,15 @@ export async function createExternalApplication(ctx) {
   } catch (error) {
     // Only delete this attempt's client. Never delete a conflicting pre-existing client.
     try { await kc.deleteClient(realm, clientUuid); } catch { /* best-effort compensation */ }
-    return mapPersistenceError(error, app.slug);
+    return scoped(mapPersistenceError(error, app.slug));
   }
-  return ok(202, { ...mutationAccepted(ctx, {
+  return scoped(ok(202, { ...mutationAccepted(ctx, {
     entityId: row.id,
     tenantId: row.tenant_id,
     workspaceId: row.workspace_id,
     desiredState: row.state,
     eventType: 'external_application.create.accepted',
-  }), state: app.state });
+  }), state: app.state }));
 }
 
 // GET /v1/workspaces/{workspaceId}/applications/{applicationId}
@@ -611,37 +613,39 @@ export async function getExternalApplication(ctx) {
 export async function updateExternalApplication(ctx) {
   const resolved = await resolveApplication(ctx, { write: true });
   if (resolved.error) return resolved.error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: resolved.ws.tenant_id, workspaceId: resolved.ws.id } });
   const existing = resolved.application;
   const app = normalizeApplicationBody(ctx.body, { id: existing.applicationId, workspace: resolved.ws, existing });
   const unsupported = protocolNotProvisionable(app.protocol);
-  if (unsupported) return unsupported;
+  if (unsupported) return scoped(unsupported);
   const requestedState = ctx.body?.desiredState ?? ctx.body?.state;
   const retireClient = resolved.app.kc_client_uuid && ['suspended', 'soft_deleted'].includes(requestedState);
   if (resolved.app.kc_client_uuid && requestedState !== undefined
     && requestedState !== existing.state && !retireClient) {
-    return err(409, 'APPLICATION_STATE_UPDATE_UNSUPPORTED', 'Only suspension and soft deletion of a realized application are supported.');
+    return scoped(err(409, 'APPLICATION_STATE_UPDATE_UNSUPPORTED', 'Only suspension and soft deletion of a realized application are supported.'));
   }
   if (app.protocol !== existing.protocol
     || (ctx.body?.iamClient?.realm !== undefined && ctx.body.iamClient.realm !== resolved.app.iam_realm)
     || app.iamClient?.clientId !== (existing.iamClient?.clientId ?? existing.slug)) {
-    return err(409, 'APPLICATION_IAM_IMMUTABLE', 'Application protocol, IAM realm and clientId cannot be changed.');
+    return scoped(err(409, 'APPLICATION_IAM_IMMUTABLE', 'Application protocol, IAM realm and clientId cannot be changed.'));
   }
   // Fail closed until IAM configuration updates can be applied atomically to the existing client.
   const baseline = normalizeApplicationBody({}, { id: existing.applicationId, workspace: resolved.ws, existing });
   if (resolved.app.kc_client_uuid && ['iamClient', 'redirectUris', 'login', 'logout', 'authenticationFlows']
     .some((key) => !isDeepStrictEqual(app[key], baseline[key]))) {
-    return err(409, 'APPLICATION_IAM_UPDATE_UNSUPPORTED', 'Updating a realized application IAM configuration is not supported.');
+    return scoped(err(409, 'APPLICATION_IAM_UPDATE_UNSUPPORTED', 'Updating a realized application IAM configuration is not supported.'));
   }
   if (retireClient) app.state = requestedState;
   const validation = await validateApplicationForWrite(app, { planId: ctx.body?.planId ?? app.metadata?.planId });
-  if (!validation.ok) return validationError(validation.validation.checks);
+  if (!validation.ok) return scoped(validationError(validation.validation.checks));
   app.validation = validation.validation;
 
   if (retireClient) {
     try {
       await (ctx.kcAdmin ?? kcAdmin).setClientEnabled(resolved.app.iam_realm, resolved.app.kc_client_uuid, false);
     } catch {
-      return err(502, 'APPLICATION_STATE_UPDATE_FAILED', KEYCLOAK_ADMIN_SAFE_MESSAGE);
+      return scoped(err(502, 'APPLICATION_STATE_UPDATE_FAILED', KEYCLOAK_ADMIN_SAFE_MESSAGE));
     }
   }
 
@@ -662,15 +666,15 @@ export async function updateExternalApplication(ctx) {
   } catch (error) {
     // Retirement fails closed: do not re-enable the client if persistence fails.
     // Retrying the same request disables it again before completing the row update.
-    return mapPersistenceError(error, app.slug);
+    return scoped(mapPersistenceError(error, app.slug));
   }
-  return ok(202, mutationAccepted(ctx, {
+  return scoped(ok(202, mutationAccepted(ctx, {
     entityId: row.id,
     tenantId: row.tenant_id,
     workspaceId: row.workspace_id,
     desiredState: row.state,
     eventType: 'external_application.update.accepted',
-  }));
+  })));
 }
 
 function providersOf(application) {
@@ -752,14 +756,16 @@ export async function listExternalApplicationFederatedProviders(ctx) {
 export async function createExternalApplicationFederatedProvider(ctx) {
   const resolved = await resolveApplication(ctx, { write: true });
   if (resolved.error) return resolved.error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: resolved.ws.tenant_id, workspaceId: resolved.ws.id } });
   const provider = { ...(ctx.body ?? {}), enabled: ctx.body?.enabled !== false };
   const checks = providerChecks(provider, { application: resolved.application });
-  if (checks.length) return validationError(checks);
+  if (checks.length) return scoped(validationError(checks));
   const providers = [...providersOf(resolved.application), provider];
-  return persistProviders(ctx, resolved, providers, {
+  return scoped(await persistProviders(ctx, resolved, providers, {
     eventType: 'external_application.federated_provider.create.accepted',
     subresourceId: provider.providerId,
-  });
+  }));
 }
 
 // GET /v1/workspaces/{workspaceId}/applications/{applicationId}/federation/providers/{providerId}
@@ -775,21 +781,23 @@ export async function getExternalApplicationFederatedProvider(ctx) {
 export async function updateExternalApplicationFederatedProvider(ctx) {
   const resolved = await resolveApplication(ctx, { write: true });
   if (resolved.error) return resolved.error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: resolved.ws.tenant_id, workspaceId: resolved.ws.id } });
   const providers = providersOf(resolved.application);
   const index = providers.findIndex((item) => item.providerId === ctx.params?.providerId);
-  if (index < 0) return err(404, 'PROVIDER_NOT_FOUND', `provider ${ctx.params?.providerId} not found`);
+  if (index < 0) return scoped(err(404, 'PROVIDER_NOT_FOUND', `provider ${ctx.params?.providerId} not found`));
   if (ctx.body?.providerId && ctx.body.providerId !== ctx.params.providerId) {
-    return validationError([validationCheck('provider_id_mismatch', 'providerId cannot be changed in this route.', 'providerId')]);
+    return scoped(validationError([validationCheck('provider_id_mismatch', 'providerId cannot be changed in this route.', 'providerId')]));
   }
   const provider = { ...providers[index], ...(ctx.body ?? {}), providerId: ctx.params.providerId };
   const checks = providerChecks(provider, { application: resolved.application, replacingProviderId: ctx.params.providerId });
-  if (checks.length) return validationError(checks);
+  if (checks.length) return scoped(validationError(checks));
   const nextProviders = [...providers];
   nextProviders[index] = provider;
-  return persistProviders(ctx, resolved, nextProviders, {
+  return scoped(await persistProviders(ctx, resolved, nextProviders, {
     eventType: 'external_application.federated_provider.update.accepted',
     subresourceId: provider.providerId,
-  });
+  }));
 }
 
 export const APPLICATION_HANDLERS = {

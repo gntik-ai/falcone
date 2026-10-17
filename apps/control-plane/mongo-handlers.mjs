@@ -262,6 +262,8 @@ function importId(id) {
 async function mongoDataExport(ctx) {
   const { error, ws } = await ownedWorkspaceForData(ctx);
   if (error) return error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
   const db = D(ctx.params.databaseName ?? ctx.params.db);
   const col = C(ctx.params.collectionName ?? ctx.params.col);
   const limit = Math.min(Math.max(Number(ctx.body?.limit ?? MONGO_IO_MAX_DOCS) || MONGO_IO_MAX_DOCS, 1), MONGO_IO_MAX_DOCS);
@@ -270,16 +272,16 @@ async function mongoDataExport(ctx) {
     const docs = await c.db(db).collection(col)
       .find({ tenantId: ws.tenant_id, workspaceId: ws.id })
       .limit(limit).toArray();
-    return ok(200, {
+    return scoped(ok(200, {
       entityType: 'mongo_data_export',
       sourceWorkspaceId: ws.id, sourceTenantId: ws.tenant_id,
       databaseName: db, collectionName: col,
       exportedAt: new Date().toISOString(),
       documentCount: docs.length,
       documents: docs.map(exportDoc)
-    });
+    }));
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'MONGO_EXPORT_FAILED', String(e.message ?? e));
+    return scoped(err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'MONGO_EXPORT_FAILED', String(e.message ?? e)));
   }
 }
 
@@ -287,25 +289,27 @@ async function mongoDataExport(ctx) {
 async function mongoDataImport(ctx) {
   const { error, ws } = await ownedWorkspaceForData(ctx);
   if (error) return error;
+  // Trusted resource ownership for dispatch audit, never request bodies (#971).
+  const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
   const db = D(ctx.params.databaseName ?? ctx.params.db);
   const col = C(ctx.params.collectionName ?? ctx.params.col);
   const docs = Array.isArray(ctx.body?.documents) ? ctx.body.documents : null;
-  if (!docs) return err(400, 'VALIDATION_ERROR', 'documents (array) is required');
-  if (docs.length > MONGO_IO_MAX_DOCS) return err(413, 'MONGO_IMPORT_TOO_LARGE', `import exceeds the ${MONGO_IO_MAX_DOCS}-document limit`);
+  if (!docs) return scoped(err(400, 'VALIDATION_ERROR', 'documents (array) is required'));
+  if (docs.length > MONGO_IO_MAX_DOCS) return scoped(err(413, 'MONGO_IMPORT_TOO_LARGE', `import exceeds the ${MONGO_IO_MAX_DOCS}-document limit`));
   const { format, mode, ordered = true } = ctx.body;
-  if (format !== 'json') return err(400, 'VALIDATION_ERROR', 'format must be json');
-  if (!['insert', 'replace', 'upsert'].includes(mode)) return err(400, 'VALIDATION_ERROR', 'mode must be insert, replace or upsert');
-  if (typeof ordered !== 'boolean') return err(400, 'VALIDATION_ERROR', 'ordered must be a boolean');
+  if (format !== 'json') return scoped(err(400, 'VALIDATION_ERROR', 'format must be json'));
+  if (!['insert', 'replace', 'upsert'].includes(mode)) return scoped(err(400, 'VALIDATION_ERROR', 'mode must be insert, replace or upsert'));
+  if (typeof ordered !== 'boolean') return scoped(err(400, 'VALIDATION_ERROR', 'ordered must be a boolean'));
   if (mode !== 'insert' && docs.some((doc) => !doc || typeof doc !== 'object' || Array.isArray(doc)
     || doc._id === undefined || doc._id === null || doc._id === '')) {
-    return err(400, 'VALIDATION_ERROR', 'replace and upsert require every document to carry a stable _id');
+    return scoped(err(400, 'VALIDATION_ERROR', 'replace and upsert require every document to carry a stable _id'));
   }
   let normalized;
   try {
     normalized = docs.map((doc) => doc && typeof doc === 'object' && !Array.isArray(doc) && Object.hasOwn(doc, '_id')
       ? { ...doc, _id: importId(doc._id) } : doc);
   } catch {
-    return err(400, 'VALIDATION_ERROR', '_id must contain a valid ObjectId or no operator keys');
+    return scoped(err(400, 'VALIDATION_ERROR', '_id must contain a valid ObjectId or no operator keys'));
   }
   let imported = 0; let matched = 0; let replaced = 0; let upserted = 0;
   const skipped = [];
@@ -332,11 +336,11 @@ async function mongoDataImport(ctx) {
       } catch (e) {
         // Shared collections can collide across scopes; never expose driver details.
         if (e.code !== 11000) throw e;
-        if (ordered) return err(409, 'DUPLICATE_ID', 'document identity conflicts with an existing document');
+        if (ordered) return scoped(err(409, 'DUPLICATE_ID', 'document identity conflicts with an existing document'));
         skipped.push({ index, reason: 'DUPLICATE_ID' });
       }
     }
-    return ok(200, {
+    return scoped(ok(200, {
       entityType: 'mongo_data_import_result',
       targetWorkspaceId: ws.id, targetTenantId: ws.tenant_id,
       databaseName: db, collectionName: col,
@@ -344,9 +348,9 @@ async function mongoDataImport(ctx) {
       format, mode, ordered,
       totalEntries: docs.length, importedCount: imported, skippedCount: skipped.length, skipped,
       matchedCount: matched, upsertedCount: upserted, replacedCount: replaced
-    });
+    }));
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'MONGO_IMPORT_FAILED', String(e.message ?? e));
+    return scoped(err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'MONGO_IMPORT_FAILED', String(e.message ?? e)));
   }
 }
 

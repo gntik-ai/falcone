@@ -36,11 +36,12 @@ function declaration(source, name) {
   return source.slice(start, source.indexOf('\n}', start) + 2);
 }
 
-export async function startDenialServer({ insert = null, extraRoutes = [], workspaceRow = { id: WS_B, tenant_id: TEN_B } } = {}) {
+export async function startDenialServer({ insert = null, extraRoutes = [], seed = routes, auditDb = null, workspaceRow = { id: WS_B, tenant_id: TEN_B } } = {}) {
   const rows = [];
   const warnings = [];
   const pool = {
     async query(sql, values = []) {
+      if (auditDb && /plan_audit_events|pg_advisory_xact_lock|^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return auditDb.query(sql, values);
       if (sql.includes('INSERT INTO scope_enforcement_denials')) {
         if (insert) await insert();
         const columns = sql.match(/INSERT INTO scope_enforcement_denials\s*\(([^)]+)\)/)[1]
@@ -88,11 +89,11 @@ export async function startDenialServer({ insert = null, extraRoutes = [], works
     `return { getTenant, listTenantUsers, getWorkspace, listServiceAccounts: listServiceAccountsHandler };`
   ].join('\n'))(store, listTenantUsers, resolveWorkspaceForManage, can);
   const remap = (route) => ({ ...route,
-    ...(route.module ? { module: fileURLToPath(new URL(`../../../${route.module.replace('/repo/', '')}`, import.meta.url)) } : {})
+    ...(route.module?.startsWith('/repo/') ? { module: fileURLToPath(new URL(`../../../${route.module.replace('/repo/', '')}`, import.meta.url)) } : {})
   });
   const bindings = {
     http, pool, jwtVerifier, normalizeWorkspaceBinding, reserveHttpRequest, requestErrorForLog, compileRoutes, matchCompiledRoute, invokeRoute, PORT: 0,
-    seedRoutes: [...routes, ...extraRoutes].map(remap),
+    seedRoutes: [...seed, ...extraRoutes].map(remap),
     LOCAL_HANDLERS: locals,
     console: { error() {}, warn: (line) => warnings.push(line) },
     webhookRuntimePool: null, webhookWritePool: null, knativeRuntime: null, runtimeTeardownCoordinator: null,
@@ -104,9 +105,11 @@ export async function startDenialServer({ insert = null, extraRoutes = [], works
   const core = serverSource.slice(serverSource.indexOf('// ---- route table'),
     serverSource.indexOf('export async function bootstrapControlPlane'));
   bindings.runtimeRoutes = runtimeRoutes.map(remap);
-  const server = new Function(...Object.keys(bindings), `${core}\nloadRoutes(runtimeRoutes); return server;`)(...Object.values(bindings));
+  const { server, loadRoutes } = new Function(...Object.keys(bindings), `${core}\nloadRoutes(runtimeRoutes); return { server, loadRoutes };`)(...Object.values(bindings));
+  // Keep startup coverage warnings separate from per-request denial diagnostics (#971).
+  const startupWarnings = warnings.splice(0);
   return {
-    token, pool, warnings,
+    token, pool, warnings, startupWarnings, loadRoutes,
     async request(path, { correlationId = 'corr-fixture', bearer = token(), method = 'GET', body = null } = {}) {
       // Synthetic HTTP streams allow the same request boundary in sandboxes that
       // disallow listening sockets. The actual http.Server request listener runs.

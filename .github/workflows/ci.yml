@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '516e8ad1faececeadac951ecffd4859e6dc41d94'
+  FALCONE_CHARTS_REF: 'eb078f9f4624ea566a851e72b740b4176521bc64'
 
 jobs:
   quality:
@@ -136,7 +136,7 @@ jobs:
             tests/blackbox/structural-write-role-gates-executor.test.mjs
 
       - name: Authorization denial audit harness
-        run: node --test tests/blackbox/authorization-denial-audit.test.mjs
+        run: node --test tests/blackbox/authorization-denial-audit.test.mjs tests/blackbox/audit-write-and-scope-enforcement.test.mjs tests/blackbox/audit-trail-integrity.test.mjs
 
       - name: Self-tenant plan history authorization and projection
         run: node --test tests/blackbox/self-tenant-plan-history.test.mjs

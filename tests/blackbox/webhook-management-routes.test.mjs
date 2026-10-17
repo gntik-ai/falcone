@@ -424,6 +424,7 @@ test('bbx-c25-rotate-fence: stale lifecycle rotation returns bounded 503 without
       code: 'WEBHOOK_KEY_UNAVAILABLE',
       message: 'Webhook key lifecycle is not ready',
     },
+    auditScope: { tenantId: 'tenant-a', workspaceId: 'ws-a' },
   });
   assert.deepEqual(db._secrets, before);
   assert.doesNotMatch(

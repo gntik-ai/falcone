@@ -251,7 +251,10 @@ function guarded(handler) {
     if (spoofedPlatformRole || (!trustedPlatform && !canManageTenant(ctx.identity, scope.tenantId))) {
       return err(403, 'FORBIDDEN', 'cannot read another tenant’s metrics');
     }
-    return handler(ctx);
+    const result = await handler(ctx);
+    // The guard already resolved and authorized the owning tenant (#971).
+    return handler === auditExport ? { ...result, auditScope: { tenantId: scope.tenantId,
+      ...(ctx.params.workspaceId ? { workspaceId: ctx.params.workspaceId } : {}) } } : result;
   };
 }
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { routes } from '../../apps/control-plane/routes.mjs';
 import { loadRoutes, matchRoute } from '../../apps/control-plane/route-table.mjs';
 import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
-import { AUDITABLE_LOCAL_HANDLERS, auditEventForRoute, recordRouteAudit, recordRouteDenial } from '../../apps/control-plane/audit-writer.mjs';
+import { auditEventForRoute, recordRouteAudit, recordRouteDenial } from '../../apps/control-plane/audit-writer.mjs';
 
 const historyPath = '/v1/workspaces/{workspaceId}/database/history';
 const at = '2026-01-01T00:00:00.000Z';
@@ -302,7 +302,7 @@ test('a successful rotation with a skipped audit write stays successful and abse
 test('successful history is unaudited while a handler 403 still records a route denial', async () => {
   const h = fixture();
   const route = routes.find(route => route.path === historyPath);
-  assert.equal(Object.hasOwn(AUDITABLE_LOCAL_HANDLERS, 'getDatabaseHistory'), false);
+  assert.equal(route.audit, undefined);
   const result = await LOCAL_HANDLERS.getDatabaseHistory(h.ctx);
   assert.equal(auditEventForRoute(route, h.ctx, result), null);
   const noWrites = { query: () => assert.fail('a successful history read must not write') };
