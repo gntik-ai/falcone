@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { withLlmServer, config, collection } from './helpers/llm-connections.mjs';
+import { createLlmProviderStore } from '../../apps/control-plane-executor/src/runtime/llm-executor.mjs';
 
 test('two named connections coexist and are listed in connectionId order', async () => {
   await withLlmServer(async request => {
@@ -46,10 +47,12 @@ test('identifiers, duplicates, missing items, display names and the 32 connectio
     }
     const tooLong = await request('POST', collection, { ...config, connectionId: 'long', displayName: 'x'.repeat(129) });
     assert.equal(tooLong.status, 400);
-    for (const method of ['GET', 'PUT', 'DELETE']) {
-      const r = await request(method, `${collection}/missing`, method === 'PUT' ? config : undefined);
-      assert.equal(r.status, 404);
-      assert.equal(r.body.code, 'LLM_CONNECTION_NOT_FOUND');
+    for (const id of ['missing', 'Bad', '-bad', 'bad_id']) {
+      for (const method of ['GET', 'PUT', 'DELETE']) {
+        const r = await request(method, `${collection}/${id}`, method === 'PUT' ? config : undefined);
+        assert.equal(r.status, 404);
+        assert.equal(r.body.code, 'LLM_CONNECTION_NOT_FOUND');
+      }
     }
     for (let i = 0; i < 32; i++) assert.equal((await request('POST', collection, { ...config, connectionId: `conn-${i}` })).status, 201);
     const duplicate = await request('POST', collection, { ...config, connectionId: 'conn-0' });
@@ -62,6 +65,18 @@ test('identifiers, duplicates, missing items, display names and the 32 connectio
     assert.deepEqual((await request('GET')).body, before);
     assert.equal((await request('PUT', `${collection}/conn-1`, { ...config, isDefault: true })).status, 200);
   });
+});
+
+test('both stores return not found when replacing an unknown identifier, regardless of its format', async () => {
+  // Database boundary: the workspace SELECT returns no existing connections.
+  const pool = { async connect() { return { async query() { return { rows: [] }; }, release() {} }; } };
+  for (const store of [createLlmProviderStore(), createLlmProviderStore({ pool })]) {
+    for (const id of ['missing', 'Bad', '-bad', 'bad_id']) {
+      await assert.rejects(store.replaceConnection('shared', id, { ...config, tenantId: 'tenant-a' }), {
+        statusCode: 404, code: 'LLM_CONNECTION_NOT_FOUND',
+      });
+    }
+  }
 });
 
 test('rejected secret references and endpoints write nothing; plaintext keys are stripped', async () => {

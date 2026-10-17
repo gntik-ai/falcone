@@ -21,6 +21,9 @@ Only config and `secretRef` are persisted. Resolved secrets are never stored or
 returned. An empty model allow-list permits no model. Config writes run the
 existing secret-reference and endpoint guards before touching storage.
 
+Tenant purge deletes every registry connection before deleting legacy provider
+rows. It does not rely on the mirror trigger, which deletes only the default.
+
 ## Decision 2: copy and rolling-update fence
 
 Executor schema setup uses one transaction, first taking
@@ -72,6 +75,11 @@ capacity allows. Singular GET returns the legacy shape plus `connectionId`, or
 404 `LLM_PROVIDER_NOT_FOUND`. Singular DELETE retains `{ removed }` and removes
 only the default. Completion and streaming without a selector use the default;
 absence returns 422 `LLM_PROVIDER_MISSING` even if non-default connections exist.
+
+A singular PUT without `displayName` preserves the existing connection's name,
+including when promoting the `default` row. Named PUT still replaces mutable
+fields. An unknown named PUT returns 404 regardless of identifier syntax, as do
+GET and DELETE; identifier validation on POST still returns 400.
 
 Worker `getProvider` performs no DDL. It selects the registry default, falling
 back to the old single-row read only for SQLSTATE 42P01. Permission, connection

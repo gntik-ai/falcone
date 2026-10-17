@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createLlmProviderStore } from '../../apps/control-plane-executor/src/runtime/llm-executor.mjs';
 import { oldExecutorUpsert } from './fixtures/llm-old-executor-upsert.mjs';
+import { purgeTenant } from '../../apps/control-plane/tenant-store.mjs';
 
 const config = { tenantId: 'tenant', displayName: 'Named provider', providerType: 'openai', endpoint: 'https://example.test/chat', allowedModels: ['model-a', 'model-b'], defaultModel: 'model-a', secretRef: { name: 'BYOK_TEST', key: 'token' } };
 
@@ -51,6 +52,16 @@ test('Postgres 17 registry: copy fidelity, idempotence, rollout fence and concur
     await pool.query("DELETE FROM workspace_llm_providers WHERE workspace_id='mirror'");
     assert.equal(await store.getProvider('mirror', config.tenantId), null);
 
+    await store.createConnection('display-name', { ...config, connectionId: 'default', displayName: 'Original default' });
+    await store.createConnection('display-name', { ...config, connectionId: 'openai-main', displayName: 'OpenAI main', isDefault: true });
+    const { displayName, ...legacyConfig } = config;
+    await store.deployProvider('display-name', { ...legacyConfig, providerType: 'anthropic' });
+    assert.equal((await store.getConnection('display-name', 'openai-main', config.tenantId)).displayName, 'OpenAI main');
+    assert.equal((await store.getProvider('display-name', config.tenantId)).providerType, 'anthropic');
+    await store.removeProvider('display-name', config.tenantId);
+    await store.deployProvider('display-name', legacyConfig);
+    assert.equal((await store.getProvider('display-name', config.tenantId)).displayName, 'Original default');
+
     await oldWrite('promote');
     await store.createConnection('promote', { ...config, connectionId: 'moved', isDefault: true });
     await oldWrite('promote', 'mirrored-to-named');
@@ -98,7 +109,21 @@ test('Postgres 17 registry: copy fidelity, idempotence, rollout fence and concur
     await assert.rejects(store.createConnection('race', { ...config, connectionId: 'conn-0' }), { code: 'LLM_CONNECTION_EXISTS' });
     await assert.rejects(store.createConnection('race', { ...config, connectionId: 'Bad' }), { code: 'INVALID_CONNECTION_ID' });
     for (const action of [() => store.getConnection('race', 'missing', config.tenantId), () => store.replaceConnection('race', 'missing', config), () => store.deleteConnection('race', 'missing', config.tenantId)]) await assert.rejects(action(), { code: 'LLM_CONNECTION_NOT_FOUND' });
+    for (const id of ['Bad', '-bad', 'bad_id']) await assert.rejects(store.replaceConnection('race', id, config), { statusCode: 404, code: 'LLM_CONNECTION_NOT_FOUND' });
     assert.deepEqual(await store.listConnections('race', 'other-tenant'), []);
+
+    // Purge must remove API-only and non-default rows, beyond the legacy DELETE mirror.
+    await oldWrite('purge');
+    await store.createConnection('purge', { ...config, connectionId: 'non-default' });
+    await store.createConnection('api-only', { ...config, connectionId: 'api-created' });
+    const neighbor = await store.createConnection('purge', { ...config, tenantId: 'other-tenant', connectionId: 'non-default' });
+    const purged = await purgeTenant(pool, config.tenantId);
+    assert.deepEqual(purged.databaseResidual, []);
+    assert.deepEqual(await store.listConnections('purge', config.tenantId), []);
+    assert.deepEqual(await store.listConnections('api-only', config.tenantId), []);
+    await store.ensureSchema();
+    assert.deepEqual(await store.listConnections('purge', config.tenantId), []);
+    assert.deepEqual(await store.listConnections('purge', 'other-tenant'), [neighbor]);
   } finally {
     await pool.end();
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);

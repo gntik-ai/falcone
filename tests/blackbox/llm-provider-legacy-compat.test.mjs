@@ -24,6 +24,20 @@ test('singular routes retain their legacy shape and operate only on the current 
   });
 });
 
+test('singular PUT preserves display names on the current default and a promoted default row', async () => {
+  await withLlmServer(async request => {
+    assert.equal((await request('POST', collection, { ...config, connectionId: 'default', displayName: 'Original default' })).status, 201);
+    assert.equal((await request('POST', collection, { ...config, connectionId: 'openai-main', displayName: 'OpenAI main', isDefault: true })).status, 201);
+    assert.equal((await request('PUT', singular, { ...config, providerType: 'anthropic' })).status, 200);
+    const named = (await request('GET', `${collection}/openai-main`)).body;
+    assert.equal(named.providerType, 'anthropic');
+    assert.equal(named.displayName, 'OpenAI main');
+    await request('DELETE', singular);
+    assert.equal((await request('PUT', singular, config)).body.connectionId, 'default');
+    assert.equal((await request('GET', `${collection}/default`)).body.displayName, 'Original default');
+  });
+});
+
 test('unselected completions use the default, and no default fails closed with 422', async () => {
   await withLlmServer(async request => {
     await request('POST', collection, { ...config, connectionId: 'first' });
