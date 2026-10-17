@@ -7,9 +7,11 @@ const writes = [
   ['POST', '/v1/workspaces/{id}/llm-providers'],
   ['PUT', '/v1/workspaces/{id}/llm-providers/{connectionId}'],
   ['DELETE', '/v1/workspaces/{id}/llm-providers/{connectionId}'],
+  ['PUT', '/v1/workspaces/{id}/llm-providers/{connectionId}/models'],
+  ['POST', '/v1/workspaces/{id}/llm-providers/{connectionId}/models/refresh'],
 ];
 
-test('the three connection writes are catalogued as structural_admin', () => {
+test('connection and model writes are catalogued as structural_admin', () => {
   const catalog = JSON.parse(readFileSync(new URL('../../deploy/gateway-config/public-route-catalog.json', import.meta.url)));
   for (const [method, path] of writes) {
     const entries = catalog.filter(r => r.method === method && r.path === path);

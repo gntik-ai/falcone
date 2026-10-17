@@ -7,9 +7,9 @@ export const config = { providerType: 'openai', endpoint: 'https://example.test/
 export const collection = '/v1/workspaces/shared/llm-providers';
 export const singular = '/v1/workspaces/shared/llm-provider';
 export const headers = { 'content-type': 'application/json', 'x-tenant-id': 'tenant-a', 'x-auth-subject': 'test-admin', 'x-actor-roles': 'tenant_admin', 'x-workspace-id': 'shared' };
-export async function withLlmServer(fn) {
+export async function withLlmServer(fn, options = {}) {
   const registry = createConnectionRegistry({ resolveConnection: () => { throw new Error('Unexpected data-plane access'); } });
-  const llmExecutor = createLlmExecutor({ endpointResolver: async () => ['93.184.216.34'], secretResolver: () => 'test-placeholder', backendFactory: () => localMockLlmBackend() });
+  const llmExecutor = createLlmExecutor({ endpointResolver: async () => ['93.184.216.34'], secretResolver: () => 'test-placeholder', backendFactory: () => localMockLlmBackend(), ...options });
   const apiKeyStore = { async verifyKey() { return { tenantId: 'tenant-a', workspaceId: 'shared', actorId: 'apikey:test', dbRole: 'falcone_service', scopes: ['data:read', 'data:write', 'ddl:write'], roles: ['tenant_admin'] }; } };
   const server = createControlPlaneServer({ registry, llmExecutor, apiKeyStore, logger: { error() {} } });
   async function request(method, path = collection, body, identity = {}) {
