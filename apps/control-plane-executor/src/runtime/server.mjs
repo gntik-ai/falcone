@@ -1300,6 +1300,7 @@ async function runLlmComplete(llmExecutor, { workspaceId, tenantId }, c) {
   try { body = await readJsonBody(req); } catch { body = {}; }
   const request = {
     tenantId,
+    connectionId: body.connectionId,
     model: body.model,
     messages: body.messages,
     prompt: body.prompt,

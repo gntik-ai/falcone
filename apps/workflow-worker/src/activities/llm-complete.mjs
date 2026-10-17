@@ -22,7 +22,7 @@ import { resolveActivityWorkspaceId } from './workspace-binding.mjs';
 
 /**
  * @param {{ params: object, tenant: object, credential?: object }} input
- *   params: { model, messages?, prompt?, system?, maxTokens?, temperature?, promptCache? }
+ *   params: { model, connectionId?, messages?, prompt?, system?, maxTokens?, temperature?, promptCache? }
  * @param {{ executeLlmComplete?: Function }} deps
  */
 export async function llmComplete(input, deps = {}) {
@@ -44,6 +44,7 @@ export async function llmComplete(input, deps = {}) {
     result = await deps.executeLlmComplete({
       workspaceId,
       tenantId: tenant.tenantId,
+      connectionId: params.connectionId,
       model: params.model,
       messages: params.messages,
       prompt: params.prompt,
@@ -75,6 +76,7 @@ export const llmCompleteInputSchema = Object.freeze({
   required: ['model'],
   properties: {
     model: { type: 'string' },
+    connectionId: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]{0,62}$' },
     messages: {
       type: 'array',
       items: {

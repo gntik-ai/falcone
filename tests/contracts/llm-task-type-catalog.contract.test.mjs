@@ -70,3 +70,20 @@ test('both llm.complete catalogs accept only the optional literal system promptC
     }
   }
 });
+
+test('both llm.complete catalogs accept the same optional literal connectionId', () => {
+  const descriptor = buildTaskTypeCatalog().find(item => item.id === 'llm.complete').inputSchema;
+  assert.deepEqual(descriptor, llmCompleteInputSchema);
+  for (const schema of [descriptor, llmCompleteInputSchema]) {
+    assert.deepEqual(schema.required, ['model']);
+    assert.deepEqual(schema.properties.connectionId, { type: 'string', pattern: '^[a-z0-9][a-z0-9-]{0,62}$' });
+    const validate = new Ajv({ strict: false }).compile(schema);
+    assert.equal(validate({ model: 'fixture-model' }), true);
+    for (const connectionId of ['anthropic-main', 'a', 'a'.repeat(63)]) {
+      assert.equal(validate({ model: 'fixture-model', connectionId }), true);
+    }
+    for (const connectionId of [null, false, 1, {}, [], '', 'Bad', '-bad', 'bad_id', 'a'.repeat(64), '${input.connection}']) {
+      assert.equal(validate({ model: 'fixture-model', connectionId }), false);
+    }
+  }
+});
