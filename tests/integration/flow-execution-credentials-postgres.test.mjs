@@ -73,7 +73,9 @@ test('real Postgres credentials: schema, effective privileges, conditional claim
     assert.equal((await pool.query("SELECT count(*)::int AS n FROM public.flow_execution_credentials WHERE ref_hash LIKE 'old-%'")).rows[0].n, 1);
   } finally {
     await pool?.end();
-    await admin.query(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
+    // Pool.end() can resolve before every backend finishes disconnecting. A normal
+    // drop waits for those exits instead of terminating clients still closing.
+    await admin.query(`DROP DATABASE IF EXISTS ${database}`);
     await admin.query(`DROP ROLE IF EXISTS ${inheritedRole}`);
     for (const role of createdRoles) await admin.query(`DROP ROLE ${role}`);
     await admin.end();
