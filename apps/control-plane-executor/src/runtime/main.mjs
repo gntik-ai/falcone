@@ -277,6 +277,7 @@ const flowExecutor = process.env.TEMPORAL_ADDRESS
       temporalTaskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'flows-main',
       // Enforce FLW-E006: validate/publish reject any taskType not in the catalog.
       taskTypeCatalog: TASK_TYPE_NAMES,
+      // FLW-E004 is enforced through the executor's store-backed default resolver.
       quotaGate: flowQuotaGate,
       auditSink: publishFlowAudit,
     })

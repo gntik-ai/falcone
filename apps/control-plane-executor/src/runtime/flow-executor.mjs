@@ -564,18 +564,35 @@ function resolveParsedDefinition(record) {
   return {};
 }
 
-// Run the shared validators in the documented order: JSON Schema (structural) FIRST, then the
-// semantic validator (FLW-E001..009). The semantic layer assumes a structurally-valid document and
+// Run JSON Schema first, then resolve sub-flow references, then run the shared semantic
+// validator (FLW-E001..009). The semantic layer assumes a structurally-valid document and
 // explicitly skips structural rules (additionalProperties:false, required fields, enums), so a
 // definition that violates the schema — e.g. a task node using `params`/`parameters` instead of
 // `input` (#625) — must be caught here, not silently dropped and then failed at runtime.
-// `taskTypeCatalog` / `resolveSubFlow` are injectable seams; when a caller supplies neither,
-// FLW-E006/E004 are no-ops (the validator's documented contract). Returns
+// An injected `resolveSubFlow` takes precedence over the scoped store-backed default.
+// FLW-E006 remains optional through `taskTypeCatalog`. Returns
 // `{ ok, kind, errors }` where kind is 'schema' (→ 400) or 'semantic' (→ 422) on failure.
-function runValidation(definition, options = {}) {
+async function runValidation(definition, { taskTypeCatalog, resolveSubFlow, store, identity }) {
   const schema = validateFlowDefinitionSchema(definition);
   if (!schema.ok) return { ok: false, kind: 'schema', errors: schema.errors };
-  const semantic = validateFlowDefinition(definition, options);
+  if (!resolveSubFlow) {
+    const key = ({ flowId, flowVersion }) => JSON.stringify([flowId, flowVersion]);
+    const references = new Map(definition.nodes
+      .filter((node) => node.type === 'sub-flow')
+      .map((node) => [key(node), node]));
+    const resolved = new Set();
+    for (const [refKey, { flowId, flowVersion }] of references) {
+      // PostgreSQL versions are positive integers; invalid aliases/ranges must never be queried.
+      if (!/^[1-9][0-9]*$/.test(flowVersion) || Number(flowVersion) > 2147483647) continue;
+      const row = await store.getVersion({
+        tenantId: identity.tenantId, workspaceId: identity.workspaceId,
+        flowId, version: Number(flowVersion),
+      });
+      if (row) resolved.add(refKey);
+    }
+    resolveSubFlow = (ref) => resolved.has(key(ref));
+  }
+  const semantic = validateFlowDefinition(definition, { taskTypeCatalog, resolveSubFlow });
   if (!semantic.ok) return { ok: false, kind: 'semantic', errors: semantic.errors };
   return { ok: true, kind: null, errors: [] };
 }
@@ -1186,7 +1203,7 @@ export function createFlowExecutor({
   async function validateDraft({ identity, flowId }) {
     const def = await getDefinitionOr404({ identity, flowId });
     const parsed = resolveParsedDefinition(def);
-    const result = runValidation(parsed, { taskTypeCatalog, resolveSubFlow });
+    const result = await runValidation(parsed, { taskTypeCatalog, resolveSubFlow, store, identity });
     if (!result.ok) throw validationError(result);
     return { valid: true };
   }
@@ -1194,7 +1211,7 @@ export function createFlowExecutor({
   async function publishVersion({ identity, flowId, correlationId }) {
     const def = await getDefinitionOr404({ identity, flowId });
     const parsed = resolveParsedDefinition(def);
-    const result = runValidation(parsed, { taskTypeCatalog, resolveSubFlow });
+    const result = await runValidation(parsed, { taskTypeCatalog, resolveSubFlow, store, identity });
     if (!result.ok) throw validationError(result);
     // Published-version quota gate (per flow). Usage = current published versions of this flow.
     let currentUsage;
