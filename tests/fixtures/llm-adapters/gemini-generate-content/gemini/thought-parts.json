@@ -1,0 +1,63 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "endpoint": "https://provider.example/v1beta/models/?version=1",
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "body": {
+      "modelVersion": "fixture-model",
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "private thought",
+                "thought": true
+              },
+              {
+                "text": "Hello"
+              },
+              {
+                "inlineData": {
+                  "mimeType": "image/png",
+                  "data": "synthetic"
+                }
+              }
+            ]
+          },
+          "finishReason": "STOP"
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 4,
+        "candidatesTokenCount": 6,
+        "totalTokenCount": 13,
+        "thoughtsTokenCount": 3
+      }
+    }
+  },
+  "expect": {
+    "content": "Hello",
+    "model": "fixture-model",
+    "usage": {
+      "promptTokens": 4,
+      "completionTokens": 9,
+      "totalTokens": 13,
+      "cacheReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": 3
+    },
+    "finishReason": "stop"
+  },
+  "expectUrl": "https://provider.example/v1beta/models/fixture-model:generateContent?version=1"
+}

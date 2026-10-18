@@ -1,0 +1,52 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "endpoint": "https://provider.example/v1beta/models/?version=1",
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "body": {
+      "modelVersion": "fixture-model",
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Hello"
+              }
+            ]
+          },
+          "finishReason": "MAX_TOKENS"
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 4,
+        "candidatesTokenCount": 6,
+        "totalTokenCount": 10
+      }
+    }
+  },
+  "expect": {
+    "content": "Hello",
+    "model": "fixture-model",
+    "usage": {
+      "promptTokens": 4,
+      "completionTokens": 6,
+      "totalTokens": 10,
+      "cacheReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null
+    },
+    "finishReason": "length"
+  },
+  "expectUrl": "https://provider.example/v1beta/models/fixture-model:generateContent?version=1"
+}

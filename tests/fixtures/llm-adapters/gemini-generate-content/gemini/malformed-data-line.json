@@ -1,0 +1,28 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "endpoint": "https://provider.example/v1beta/models/?version=1",
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: not-json"
+    ]
+  },
+  "expect": [
+    {
+      "type": "error",
+      "code": "LLM_PROVIDER_RESPONSE_INVALID"
+    }
+  ],
+  "expectUrl": "https://provider.example/v1beta/models/fixture-model:streamGenerateContent?version=1&alt=sse"
+}
