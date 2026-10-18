@@ -13,7 +13,7 @@ export function createLlmBatchReconciler({ store, usageStore, call, driverResolv
   const timestamp = () => new Date(now()).toISOString();
   const schedule = (ms = interval) => ({ nextPollAt: new Date(now() + ms).toISOString(), updatedAt: timestamp(), leaseOwner: null, leaseExpiresAt: null });
 
-  async function reconcile(row) {
+  async function reconcile(row, cancelOnly = false) {
     const driver = driverResolver(row.providerType);
     if (row.status === 'submitting' || row.status === 'submit_uncertain') {
       const deadline = row.status === 'submitting' ? 300000 : 900000;
@@ -36,14 +36,17 @@ export function createLlmBatchReconciler({ store, usageStore, call, driverResolv
     if (row.endedAt && (row.resultsAttempts >= 10 || now() - Date.parse(row.endedAt) >= 86400000)) {
       await store.finish(row, { status: 'incomplete', ...schedule() }, true); return;
     }
-    let polled = await call(row, 'poll');
-    if (row.cancelRequestedAt && !row.cancelAcknowledgedAt && !polled.cancelAcknowledged && !polled.ended) {
+    if (cancelOnly && (!row.cancelRequestedAt || row.cancelAcknowledgedAt || row.endedAt)) {
+      await store.update(row, schedule()); return;
+    }
+    let polled = await call(row, cancelOnly ? 'cancel' : 'poll');
+    if (!cancelOnly && row.cancelRequestedAt && !row.cancelAcknowledgedAt && !polled.cancelAcknowledged && !polled.ended) {
       polled = await call(row, 'cancel');
     }
     row = await store.update(row, { providerCounts: polled.counts,
       cancelAcknowledgedAt: polled.cancelAcknowledged ? row.cancelAcknowledgedAt ?? timestamp() : row.cancelAcknowledgedAt, expiresAt: polled.expiresAt ?? row.expiresAt,
       endedAt: polled.ended ? polled.endedAt ?? row.endedAt ?? timestamp() : row.endedAt, updatedAt: timestamp() });
-    if (!polled.ended) { await store.update(row, schedule()); return; }
+    if (cancelOnly || !polled.ended) { await store.update(row, schedule()); return; }
     let ingestionError, attempted = false;
     try {
       const response = await call(row, 'results');
@@ -72,10 +75,10 @@ export function createLlmBatchReconciler({ store, usageStore, call, driverResolv
       await store.update(row, schedule());
     }
   }
-  async function runOnce(filter = {}) {
+  async function runOnce({ cancelOnly = false, ...filter } = {}) {
     const rows = await store.claim({ now: now(), owner, ...filter });
     for (const row of rows) {
-      try { await reconcile(row); }
+      try { await reconcile(row, cancelOnly); }
       catch (error) {
         if (error instanceof BatchLeaseLost) continue;
         const previous = Math.max(interval, Date.parse(row.nextPollAt) - Date.parse(row.updatedAt));

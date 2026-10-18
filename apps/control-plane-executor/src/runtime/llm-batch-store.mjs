@@ -45,6 +45,11 @@ export function createLlmBatchStore({ pool } = {}) {
     async requestCancel(w, id, t, now) {
       const row = lookup(w, id, t);
       if (TERMINAL_BATCH_STATUSES.includes(row.status) || row.cancelRequestedAt) return copy(row);
+      // An intent must not revoke the creating request's fence or accelerate recovery.
+      if (row.status === 'submitting' || row.status === 'submit_uncertain') {
+        Object.assign(row, { cancelRequestedAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() });
+        return copy(row);
+      }
       Object.assign(row, { cancelRequestedAt: new Date(now).toISOString(), status: row.providerBatchId ? 'canceling' : row.status,
         nextPollAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString(), leaseVersion: row.leaseVersion + 1, leaseOwner: null, leaseExpiresAt: null });
       return copy(row);
@@ -82,7 +87,11 @@ export function createLlmBatchStore({ pool } = {}) {
     async update(row, patch) {
       const live = lookup(row.workspaceId, row.batchId, row.tenantId);
       if (live.status !== row.status || live.leaseVersion !== row.leaseVersion) throw new BatchLeaseLost();
-      Object.assign(live, copy(patch)); return copy(live);
+      // Read the durable intent atomically with acceptance, rather than the caller's snapshot.
+      const status = patch.status === 'in_progress' && live.cancelRequestedAt ? 'canceling' : patch.status;
+      Object.assign(live, copy(patch));
+      if (status) live.status = status;
+      return copy(live);
     },
   };
   // Serialize the in-memory equivalent of database transactions, including usage recording.
@@ -125,7 +134,14 @@ function postgresStore(pool) {
     const entries = Object.entries(patch);
     if (!entries.length || entries.some(([name]) => !mutableFields.has(name))) throw new Error('Invalid batch update');
     const values = [...fenceValues(row), ...entries.map(([, value]) => value)];
-    const res = await client.query(`UPDATE workspace_llm_batches SET ${entries.map(([name], i) => `${snake(name)}=$${i + 6}`).join(',')}
+    const assignments = entries.map(([name, value], i) => {
+      const parameter = `$${i + 6}`;
+      // Acceptance and an earlier cancel intent must be merged under the same row lock.
+      const expression = name === 'status' && value === 'in_progress'
+        ? `CASE WHEN cancel_requested_at IS NOT NULL THEN 'canceling' ELSE ${parameter} END` : parameter;
+      return `${snake(name)}=${expression}`;
+    });
+    const res = await client.query(`UPDATE workspace_llm_batches SET ${assignments.join(',')}
       WHERE ${fence} RETURNING *`, values);
     if (!res.rowCount) throw new BatchLeaseLost();
     return rowFromDb(res.rows[0]);
@@ -236,6 +252,9 @@ function postgresStore(pool) {
         if (!res.rowCount) throw notFound();
         const row = rowFromDb(res.rows[0]);
         if (TERMINAL_BATCH_STATUSES.includes(row.status) || row.cancelRequestedAt) return row;
+        if (row.status === 'submitting' || row.status === 'submit_uncertain') {
+          return update(row, { cancelRequestedAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() }, client);
+        }
         return update(row, { cancelRequestedAt: new Date(now).toISOString(), status: row.providerBatchId ? 'canceling' : row.status,
           nextPollAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString(), leaseVersion: row.leaseVersion + 1, leaseOwner: null, leaseExpiresAt: null }, client);
       });

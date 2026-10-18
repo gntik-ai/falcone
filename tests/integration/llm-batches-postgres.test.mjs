@@ -65,6 +65,47 @@ test('Postgres batch schema, unique binding, lease race, atomic usage, submittin
     await assert.rejects(store.ingest(lease, { customId: 'one', status: 'succeeded', usage: { totalTokens: 99 } }, usageStore), { code: 'LLM_BATCH_LEASE_LOST' });
     assert.equal((await executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
 
+    await t.test('cancel from another executor during submission preserves acceptance and meters results once', async () => {
+      ended = false;
+      let enter, release, cancels = 0;
+      const entered = new Promise(resolve => { enter = resolve; });
+      const held = new Promise(resolve => { release = resolve; });
+      const cancelling = createLlmExecutor({ ...options, fetchImpl: async (url, init) => {
+        if (init.method === 'POST' && new URL(url).pathname.endsWith('/batches')) {
+          enter(); await held; return Response.json(accepted);
+        }
+        if (init.method === 'POST') {
+          cancels++;
+          return Response.json({ ...accepted, processing_status: 'canceling', cancel_initiated_at: new Date(time).toISOString() });
+        }
+        return options.fetchImpl(url, init);
+      } });
+      const pending = cancelling.submitBatch('ws', request, { ...identity, idempotencyKey: 'cancel-during-submit' })
+        .then(value => ({ value }), error => ({ error }));
+      await entered;
+      const submitting = (await executor.listBatches('ws', { tenantId: 'tenant' })).items.find(row => row.status === 'submitting');
+      try {
+        const intent = await other.cancelBatch('ws', submitting.batchId, { tenantId: 'tenant' });
+        assert.equal(intent.status, 'submitting'); assert.ok(intent.cancelRequestedAt);
+        assert.equal((await other.cancelBatch('ws', submitting.batchId, { tenantId: 'tenant' })).cancelRequestedAt, intent.cancelRequestedAt);
+        assert.equal(cancels, 0);
+      } finally { release(); }
+      const acceptedResult = await pending;
+      assert.ifError(acceptedResult.error);
+      const batch = acceptedResult.value.body;
+      assert.equal(acceptedResult.value.status, 202);
+      assert.equal(batch.status, 'canceling'); assert.equal(batch.providerBatchId, 'provider-id');
+      time += 60000; await cancelling.reconcileBatches();
+      assert.equal(cancels, 1);
+      assert.ok((await executor.getBatch('ws', batch.batchId, { tenantId: 'tenant' })).cancelAcknowledgedAt);
+      ended = true; time += 60000;
+      await Promise.all([cancelling.reconcileBatches(), other.reconcileBatches()]);
+      assert.equal((await executor.getBatch('ws', batch.batchId, { tenantId: 'tenant' })).status, 'cancelled');
+      assert.equal((await executor.listBatchItems('ws', batch.batchId, { tenantId: 'tenant' })).items[0].content, 'kept');
+      time += 60000; await cancelling.reconcileBatches();
+      assert.equal((await executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 20);
+    });
+
     // The usage INSERT must use the same transaction as the pending transition.
     ended = false;
     const rollbackId = (await executor.submitBatch('ws', request, { ...identity, idempotencyKey: 'rollback' })).body.batchId;

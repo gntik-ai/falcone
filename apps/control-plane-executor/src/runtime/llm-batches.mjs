@@ -41,7 +41,8 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
     const prior = await store.findBinding(workspaceId, tenantId, principal, hash);
     if (prior) return replay(prior, inputSha256);
     const invalid = () => { throw clientError('Invalid batch request', 400, 'INVALID_LLM_BATCH'); };
-    if (!input || typeof input !== 'object' || Object.hasOwn(input, 'stream') || !Array.isArray(input.items)
+    if (!input || typeof input !== 'object'
+      || ['stream', 'prompt', 'messages', 'system', 'maxTokens', 'temperature', 'responseFormat', 'promptCache'].some(field => Object.hasOwn(input, field)) || !Array.isArray(input.items)
       || input.items.length < 1 || input.items.length > 1000) invalid();
     const seen = new Set();
     for (const item of input.items) {
@@ -108,8 +109,9 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
   });
   return { submitBatch, batchReconciler, reconcileBatches: batchReconciler.runOnce,
     async cancelBatch(w, id, { tenantId } = {}) {
-      await store.requestCancel(w, id, tenantId, now());
-      await batchReconciler.runOnce({ batchId: id, workspaceId: w, tenantId, limit: 1 });
+      const row = await store.requestCancel(w, id, tenantId, now());
+      if (!row.providerBatchId) return publicBatch(row);
+      await batchReconciler.runOnce({ batchId: id, workspaceId: w, tenantId, limit: 1, cancelOnly: true });
       return publicBatch(await store.get(w, id, tenantId));
     },
     async getBatch(w, id, { tenantId } = {}) { return publicBatch(await store.get(w, id, tenantId)); },

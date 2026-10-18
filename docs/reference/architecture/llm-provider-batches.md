@@ -14,6 +14,8 @@ POST accepts a connection/model selection and 1–1,000 items, for example:
 Each item accepts the completion fields, except streaming. A batch selects one
 connection and model. Items have unique ASCII `customId` values of 1–64 letters,
 digits, underscores or hyphens. Anthropic structured output is unsupported.
+Completion fields such as `maxTokens`, `temperature` and `promptCache` belong on
+items; specifying them at the batch level returns 400. Streaming is unsupported.
 
 POST returns 202 for accepted and uncertain submissions. An `Idempotency-Key`
 binds the canonical input to the verified tenant, workspace and principal. Replay
@@ -21,12 +23,17 @@ returns the stored batch with 200, including after connection deletion. Differen
 input returns 422. Uncertain creating calls are never repeated; provider 429 and
 failures before creation release the binding. Provider authentication/rejection
 errors return the adapter status (424).
+The standard key format still applies: 8–128 ASCII letters, digits, periods,
+underscores, colons or hyphens. Invalid keys return 400 before submission.
 
 GET on the collection lists newest first. GET on `/{batchId}` returns metadata;
 GET on `/{batchId}/items` returns outcomes, content, usage and individual error
 codes. Collections accept `limit` (1–100, default 50) and opaque `cursor` values;
 items additionally accept a `status` filter. Results carry `nextCursor`, or null.
 POST on `/{batchId}/cancel` durably records intent and attempts cancellation.
+It makes at most one provider cancel call; polling and result ingestion run in
+the background. Intent recorded during submission survives acceptance without
+revoking the submitting request's fence.
 DELETE on `/{batchId}` requires a terminal batch and removes its items.
 Writes require `data:write` for API keys; reads require `data:read`.
 
@@ -51,6 +58,10 @@ The state machine and storage do not select behavior by provider name.
 - I/O uses the injected transport. Errors preserve `phase` (`network`, `body`,
   or `response` with the original `httpStatus`). Resolved keys stay in call
   context. Only secret references and non-secret provider state are durable.
+
+The shared transport rejects provider redirects (`redirect: 'error'`), including
+for existing synchronous and streaming completions. This prevents a redirect
+from bypassing the configured endpoint guard.
 
 ## Reconciliation and operations
 

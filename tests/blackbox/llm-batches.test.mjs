@@ -20,13 +20,15 @@ async function setup(driver, options = {}) {
   let time = Date.parse('2026-10-18T00:00:00Z');
   const calls = [];
   const controls = { response: () => Response.json(driver.accepted()), dns: ['93.184.216.34'], secret: 'synthetic-placeholder', secretReads: 0 };
-  const executor = createLlmExecutor({ now: () => time, fetchImpl: async (url, init) => {
+  const executorOptions = { now: () => time, fetchImpl: async (url, init) => {
     calls.push({ url, ...init }); return controls.response(url, init);
-  }, endpointResolver: async () => controls.dns, secretResolver: () => { controls.secretReads++; return controls.secret; }, ...options });
+  }, endpointResolver: async () => controls.dns, secretResolver: () => { controls.secretReads++; return controls.secret; }, ...options };
+  const executor = createLlmExecutor(executorOptions);
   await executor.setProvider('ws', { tenantId: 'tenant', providerType: driver.providerType, endpoint: 'https://provider.example/messages?version=1',
     allowedModels: ['fixture-model'], defaultModel: 'fixture-model', secretRef: { name: 'BYOK_FIXTURE' } });
   const submit = (body = input, key = 'test-key') => executor.submitBatch('ws', body, { tenantId: 'tenant', principal: 'subject:test', idempotencyKey: key });
-  return { executor, calls, controls, submit, advance: ms => { time += ms; }, now: () => time };
+  return { executor, calls, controls, submit, advance: ms => { time += ms; }, now: () => time,
+    restart: () => createLlmExecutor({ ...executorOptions, providerStore: executor.providerStore, usageStore: executor.usageStore, batchStore: executor.batchStore }) };
 }
 
 for (const driver of drivers) {
@@ -88,6 +90,8 @@ for (const driver of drivers) {
     for (const bad of [{ items: [] }, { items: Array.from({ length: 1001 }, (_, i) => ({ customId: `i${i}`, prompt: 'x' })) },
       { items: [{ customId: 'bad/id', prompt: 'x' }] }, { items: [input.items[0], input.items[0]] },
       { ...input, stream: true }, { ...input, responseFormat: { type: 'json_schema', name: 'x', schema: {} } }, { items: [{ ...input.items[0], stream: false }] },
+      ...Object.entries({ maxTokens: 128, temperature: 0.5, promptCache: 'system', prompt: 'ignored', system: 'ignored', messages: [{ role: 'user', content: 'ignored' }] })
+        .map(([name, value]) => ({ ...input, [name]: value })),
       { items: [{ customId: 'one', prompt: 'x', maxTokens: 0 }] },
       { items: [{ customId: 'one', prompt: 'x', responseFormat: { type: 'json_schema', name: 'x', schema: {} } }] }]) {
       await assert.rejects(submit(bad), { statusCode: 400 });
@@ -161,8 +165,51 @@ for (const driver of drivers) {
 }
 
 for (const driver of drivers) {
+  test(`${driver.name}: cancel during submission retains the accepted job and reconciles its results once`, async () => {
+    const { executor, submit, controls, calls, advance } = await setup(driver);
+    let enter, release;
+    const entered = new Promise(resolve => { enter = resolve; });
+    const held = new Promise(resolve => { release = resolve; });
+    controls.response = async () => { enter(); await held; return Response.json(driver.accepted()); };
+    const submitting = submit();
+    // Attach the rejection handler before releasing the creating call.
+    const outcome = submitting.then(value => ({ value }), error => ({ error }));
+    await entered;
+    const id = (await executor.listBatches('ws', { tenantId: 'tenant' })).items[0].batchId;
+    let intent;
+    try {
+      intent = await executor.cancelBatch('ws', id, { tenantId: 'tenant' });
+      const repeated = await executor.cancelBatch('ws', id, { tenantId: 'tenant' });
+      assert.equal(repeated.cancelRequestedAt, intent.cancelRequestedAt);
+      assert.equal(calls.length, 1);
+    } finally { release(); }
+    const accepted = await outcome;
+    assert.ifError(accepted.error);
+    assert.equal(accepted.value.status, 202);
+    assert.equal(accepted.value.body.providerBatchId, driver.accepted().id);
+    assert.equal(accepted.value.body.status, 'canceling');
+    assert.equal(accepted.value.body.cancelRequestedAt, intent.cancelRequestedAt);
+    let cancels = 0, ended = false;
+    controls.response = (url, init) => {
+      if (driver.resultsPath(url)) return new Response(`${driver.success('one')}\n${driver.failure('two', 'canceled')}\n`);
+      if (init.method === 'POST') {
+        cancels++;
+        return Response.json({ ...driver.accepted(), processing_status: 'canceling', cancel_initiated_at: '2026-10-18T00:00:00Z' });
+      }
+      return Response.json(ended ? driver.ended({ succeeded: 1, errored: 0, canceled: 1 }) : driver.accepted());
+    };
+    advance(60000); await executor.reconcileBatches();
+    assert.equal(cancels, 1);
+    assert.ok((await executor.getBatch('ws', id, { tenantId: 'tenant' })).cancelAcknowledgedAt);
+    ended = true; advance(60000); await executor.reconcileBatches();
+    assert.equal((await executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'cancelled');
+    const items = (await executor.listBatchItems('ws', id, { tenantId: 'tenant' })).items;
+    assert.equal(items[0].content, 'result one'); assert.equal(items[1].status, 'canceled');
+    advance(600000); await executor.reconcileBatches();
+    assert.equal((await executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
+  });
   test(`${driver.name}: durable cancel resends after errors and requires provider evidence`, async () => {
-    for (const cancelFailure of [429, 503, 'crash']) {
+    for (const cancelFailure of [429, 503, 'network']) {
       const { executor, submit, controls, advance } = await setup(driver);
       const id = (await submit()).body.batchId;
       let cancels = 0, acknowledge = false, ended = false;
@@ -171,7 +218,7 @@ for (const driver of drivers) {
         if (init.method === 'POST') {
           cancels++;
           if (!acknowledge) {
-            if (cancelFailure === 'crash') throw new Error('process lost after durable intent');
+            if (cancelFailure === 'network') throw new Error('cancel response lost');
             return new Response('', { status: cancelFailure });
           }
           return Response.json({ ...driver.accepted(), processing_status: 'canceling', cancel_initiated_at: '2026-10-18T00:00:00Z' });
@@ -189,18 +236,60 @@ for (const driver of drivers) {
       assert.deepEqual(await executor.getUsage('ws', { tenantId: 'tenant' }), { items: [] });
     }
   });
-  test(`${driver.name}: end before cancel evidence completes normally and keeps the intent`, async () => {
-    const { executor, submit, controls, calls } = await setup(driver);
+  test(`${driver.name}: restart after persisting cancel intent sends the cancel and retains usage`, async () => {
+    const { executor, submit, controls, calls, now, restart, advance } = await setup(driver);
+    const id = (await submit()).body.batchId;
+    // Commit the durable transaction, then abandon the request before any provider call.
+    await executor.batchStore.requestCancel('ws', id, 'tenant', now());
+    assert.equal(calls.length, 1);
+    const recovered = restart();
+    let ended = false, cancels = 0;
+    controls.response = (url, init) => {
+      if (driver.resultsPath(url)) return new Response(`${driver.success('one')}\n${driver.failure('two', 'canceled')}\n`);
+      if (init.method === 'POST') {
+        cancels++;
+        return Response.json({ ...driver.accepted(), processing_status: 'canceling', cancel_initiated_at: '2026-10-18T00:00:00Z' });
+      }
+      return Response.json(ended ? driver.ended({ succeeded: 1, errored: 0, canceled: 1 }) : driver.accepted());
+    };
+    await recovered.reconcileBatches();
+    assert.equal(cancels, 1);
+    assert.ok((await recovered.getBatch('ws', id, { tenantId: 'tenant' })).cancelAcknowledgedAt);
+    ended = true; advance(60000); await recovered.reconcileBatches();
+    assert.equal((await recovered.getBatch('ws', id, { tenantId: 'tenant' })).status, 'cancelled');
+    assert.equal((await recovered.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
+  });
+  test(`${driver.name}: cancel makes one attempt and leaves result ingestion to the reconciler`, async () => {
+    const { executor, submit, controls, calls, advance } = await setup(driver);
     const id = (await submit()).body.batchId;
     controls.response = url => driver.resultsPath(url) ? new Response(`${driver.success('one')}\n${driver.failure('two')}`) : Response.json(driver.ended());
     const result = await executor.cancelBatch('ws', id, { tenantId: 'tenant' });
+    assert.equal(result.status, 'canceling');
+    assert.equal(calls.length, 2); assert.equal(calls.at(-1).method, 'POST');
+    assert.deepEqual(await executor.getUsage('ws', { tenantId: 'tenant' }), { items: [] });
+    await executor.cancelBatch('ws', id, { tenantId: 'tenant' });
+    assert.equal(calls.length, 2);
+    advance(60000); await executor.reconcileBatches();
+    assert.equal((await executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'completed');
+    assert.equal((await executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
+  });
+  test(`${driver.name}: end before cancel evidence completes normally and keeps the intent`, async () => {
+    const { executor, submit, controls, advance } = await setup(driver);
+    const id = (await submit()).body.batchId;
+    controls.response = url => driver.resultsPath(url) ? new Response(`${driver.success('one')}\n${driver.failure('two')}`) : Response.json(driver.ended());
+    await executor.cancelBatch('ws', id, { tenantId: 'tenant' });
+    advance(60000); await executor.reconcileBatches();
+    const result = await executor.getBatch('ws', id, { tenantId: 'tenant' });
     assert.equal(result.status, 'completed'); assert.ok(result.cancelRequestedAt); assert.equal(result.cancelAcknowledgedAt, null);
-    assert.equal(calls.filter(c => c.method === 'POST').length, 1);
   });
   test(`${driver.name}: uncertain submissions never resubmit; stale submitting fails after five minutes`, async () => {
     const { submit, controls, executor, advance, calls } = await setup(driver);
     controls.response = () => new Response('', { status: 503 });
-    const id = (await submit()).body.batchId;
+    const uncertain = (await submit()).body;
+    const id = uncertain.batchId;
+    const cancelled = await executor.cancelBatch('ws', id, { tenantId: 'tenant' });
+    assert.equal(cancelled.status, 'submit_uncertain');
+    assert.equal(cancelled.nextPollAt, uncertain.nextPollAt); assert.equal(calls.length, 1);
     advance(14 * 60000); await executor.reconcileBatches();
     assert.equal((await executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'submit_uncertain');
     advance(60000); await executor.reconcileBatches();
@@ -272,7 +361,7 @@ import { readFileSync } from 'node:fs';
 
 for (const driver of drivers) {
   test(`${driver.name}: HTTP batch lifecycle, principal-scoped replay, pagination, tenant isolation and scopes`, async () => {
-    const { executor, controls, advance } = await setup(driver);
+    const { executor, controls, calls, advance } = await setup(driver);
     const registry = createConnectionRegistry({ resolveConnection() { throw new Error('unexpected data access'); } });
     const apiKeyStore = { async verifyKey(key) { return { keyId: key === 'flc_second' ? 'second' : 'first', tenantId: 'tenant', workspaceId: 'ws', dbRole: 'falcone_service', scopes: key === 'flc_read' ? ['data:read'] : ['data:read', 'data:write'] }; } };
     const server = createControlPlaneServer({ registry, llmExecutor: executor, apiKeyStore, logger: { error() {} } });
@@ -280,9 +369,15 @@ for (const driver of drivers) {
     const headers = { 'x-tenant-id': 'tenant', 'x-auth-subject': 'caller', 'x-workspace-id': 'ws' };
     const request = (method, path = base, body = {}, extra = {}) => httpRequest(server, { method, path, body: JSON.stringify(body), headers: { ...headers, ...extra } });
     try {
+      for (const key of ['', 'short', 'invalid key', 'x'.repeat(129)]) {
+        const rejected = await request('POST', base, input, { 'idempotency-key': key });
+        assert.equal(rejected.status, 400); assert.equal(rejected.body.code, 'INVALID_IDEMPOTENCY_KEY');
+      }
+      assert.equal(calls.length, 0); assert.equal(controls.secretReads, 0);
       const created = await request('POST', base, { ...input, tenantId: 'foreign' }, { 'idempotency-key': 'http-key' });
       assert.equal(created.status, 202); const id = created.body.batchId;
       assert.equal((await request('POST', base, { ...input, tenantId: 'foreign' }, { 'idempotency-key': 'http-key' })).status, 200);
+      assert.equal((await request('POST', base, input, { 'idempotency-key': 'x'.repeat(128) })).status, 202);
       assert.equal((await request('DELETE', `${base}/${id}`)).status, 409);
       for (const suffix of ['', '/items', '/cancel']) {
         const foreign = await request(suffix === '/cancel' ? 'POST' : 'GET', `${base}/${id}${suffix}`, {}, { 'x-tenant-id': 'foreign' });
@@ -306,8 +401,9 @@ for (const driver of drivers) {
       assert.equal((await request('GET', `${base}/${id}/items?status=succeeded`)).body.items.length, 0);
       assert.equal((await request('GET', `${base}?cursor=invalid`)).status, 400);
       controls.response = url => driver.resultsPath(url) ? new Response(`${driver.success('one')}\n${driver.failure('two')}`) : Response.json(driver.ended());
-      const cancelledTooLate = await request('POST', `${base}/${id}/cancel`);
-      assert.equal(cancelledTooLate.body.status, 'completed');
+      assert.equal((await request('POST', `${base}/${id}/cancel`)).body.status, 'canceling');
+      advance(60000); await executor.reconcileBatches();
+      assert.equal((await request('GET', `${base}/${id}`)).body.status, 'completed');
       assert.equal((await request('DELETE', `${base}/${id}`)).body.removed, true);
       assert.equal((await request('GET', `${base}/${id}`)).status, 404);
     } finally { server.close(); await registry.end(); }
