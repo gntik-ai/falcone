@@ -19,8 +19,8 @@ test('a configured verifier takes precedence over development opt-in', () => {
 
 test('exact development opt-in allows unverified identity and emits a startup warning', () => {
   assert.deepEqual(assertIdentityVerification({ jwtVerifier: undefined, env: { EXECUTOR_ALLOW_UNVERIFIED_IDENTITY: 'true' } }), { mode: 'unverified-dev' });
-  const main = readFileSync(mainUrl, 'utf8');
-  assert.match(main, /if \(identityVerification\.mode === 'unverified-dev'\)\s*\{\s*console\.warn\('\[control-plane\] bearer tokens are not verified: EXECUTOR_ALLOW_UNVERIFIED_IDENTITY'\);\s*\}/);
+  const main = readFileSync(mainUrl, 'utf8').replace(/\s+/g, ' ');
+  assert.ok(main.includes("if (identityVerification.mode === 'unverified-dev') { console.warn('[control-plane] bearer tokens are not verified: EXECUTOR_ALLOW_UNVERIFIED_IDENTITY'); }"));
 });
 
 for (const value of ['1', 'yes', 'TRUE', ' true ', '']) {
@@ -57,12 +57,15 @@ test('refusal names configuration variables without disclosing their values', ()
 });
 
 test('executor checks JWT verification before boot and reports construction or guard refusal', () => {
-  const main = readFileSync(mainUrl, 'utf8');
+  const main = readFileSync(mainUrl, 'utf8').replace(/\s+/g, ' ');
   const construction = main.indexOf('createJwtVerifier(');
   const guard = main.indexOf('assertIdentityVerification(');
   const boot = main.indexOf('void boot()');
   assert.ok(construction >= 0 && guard > construction && boot > guard);
   assert.ok(guard < main.indexOf('server.listen('));
-  // Both failures must reach the same code-only refusal, before schema DDL or listen.
-  assert.match(main, /try\s*\{\s*jwtVerifier = createJwtVerifier\([\s\S]*?assertIdentityVerification\(\{\s*jwtVerifier,\s*env: process\.env\s*\}\)[\s\S]*?\}\s*catch\s*\{\s*console\.error\('\[control-plane\] startup refused: EXECUTOR_JWT_VERIFIER_REQUIRED'\);\s*process\.exit\(1\);\s*\}/);
+  // Check the boundaries directly, without backtracking across the entire source file.
+  const tryStart = main.lastIndexOf('try { ', construction);
+  assert.ok(tryStart >= 0);
+  assert.ok(main.slice(tryStart).startsWith('try { jwtVerifier = createJwtVerifier('));
+  assert.ok(main.slice(guard).startsWith("assertIdentityVerification({ jwtVerifier, env: process.env }); } catch { console.error('[control-plane] startup refused: EXECUTOR_JWT_VERIFIER_REQUIRED'); process.exit(1); }"));
 });
