@@ -10,12 +10,32 @@ import assert from 'node:assert/strict';
 
 import {
   createEmbeddingMappingStore,
+  createEmbeddingProviderStore,
   REMAPPING_WARNING,
 } from '../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
 
 const WS = 'ws_unit';
 const TEN = 'ten_unit';
 const base = { tenantId: TEN, schemaName: 'public', tableName: 'docs', targetColumn: 'embedding' };
+
+test('in-memory mappings validate named connections from a Postgres provider store', async () => {
+  const connection = { tenant_id: TEN, workspace_id: WS, connection_id: 'named', provider_type: 'mock' };
+  const providerStore = createEmbeddingProviderStore({ pool: {
+    async query(_sql, [tenantId, workspaceId, connectionId]) {
+      const found = tenantId === connection.tenant_id && workspaceId === connection.workspace_id && connectionId === connection.connection_id;
+      return { rows: found ? [connection] : [], rowCount: found ? 1 : 0 };
+    },
+  } });
+  const store = createEmbeddingMappingStore();
+  store.bindProviderStore(providerStore);
+  const config = { ...base, sourceColumn: 'body', connectionId: 'named' };
+  for (const missing of [{ ...config, connectionId: 'missing' }, { ...config, tenantId: 'other' }]) {
+    await assert.rejects(store.deployMapping(WS, missing), { statusCode: 422, code: 'EMBEDDING_CONNECTION_NOT_FOUND' });
+    assert.equal(await store.getMapping(WS, missing), null);
+  }
+  await store.deployMapping(WS, config);
+  assert.equal((await store.getMapping(WS, base)).connectionId, 'named');
+});
 
 // unit-mapping-01: ensureSchema() is a no-op with no pool (does not throw, no DB).
 test('unit-mapping-01: ensureSchema() is a no-op for the in-memory store', async () => {

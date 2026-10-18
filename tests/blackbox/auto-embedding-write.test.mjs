@@ -11,9 +11,9 @@
 //
 // Tests: bbx-auto-emb-01 .. bbx-auto-emb-08
 import test from 'node:test';
-import { serverFetch, dataRegistry } from './helpers/embedding-connections.mjs';
 import assert from 'node:assert/strict';
 
+import { serverFetch, dataRegistry } from './helpers/embedding-connections.mjs';
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 import { executePostgresData } from '../../apps/control-plane-executor/src/runtime/postgres-data-executor.mjs';
 import {

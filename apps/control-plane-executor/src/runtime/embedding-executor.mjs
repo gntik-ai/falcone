@@ -494,9 +494,20 @@ function createInMemoryMappingStore() {
     async deployMapping(workspaceId, config = {}) {
       if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
       const norm = normalizeMappingConfig(workspaceId, config);
-      // Both stores are in memory: check and write synchronously to avoid a delete race.
-      if (norm.connectionId !== undefined && !providerStore?.hasConnection(workspaceId, norm.connectionId, norm.tenantId)) {
-        throw clientError('Embedding connection not found', 422, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      if (norm.connectionId !== undefined) {
+        let exists = false;
+        if (providerStore?.hasConnection) {
+          // Keep the in-memory check and write synchronous to avoid a delete race.
+          exists = providerStore.hasConnection(workspaceId, norm.connectionId, norm.tenantId);
+        } else if (providerStore) {
+          try {
+            await providerStore.getConnection(workspaceId, norm.connectionId, norm.tenantId);
+            exists = true;
+          } catch (error) {
+            if (error.code !== 'EMBEDDING_CONNECTION_NOT_FOUND') throw error;
+          }
+        }
+        if (!exists) throw clientError('Embedding connection not found', 422, 'EMBEDDING_CONNECTION_NOT_FOUND');
       }
       const key = mappingKey(norm);
       const existed = mappings.has(key);

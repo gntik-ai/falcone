@@ -17,9 +17,9 @@
 //
 // Tests: bbx-emb-persist-01 .. bbx-emb-persist-06
 import test from 'node:test';
-import { serverFetch } from './helpers/embedding-connections.mjs';
 import assert from 'node:assert/strict';
 
+import { serverFetch } from './helpers/embedding-connections.mjs';
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 import {

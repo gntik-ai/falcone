@@ -7,10 +7,10 @@
 // returns only a secretRef, never the plaintext key), and (2) the APISIX config forwards the
 // embedding-provider subpath to the executor. Pure: in-process server + a config-file assertion.
 import test from 'node:test';
-import { serverFetch } from './helpers/embedding-connections.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { serverFetch } from './helpers/embedding-connections.mjs';
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 import { createEmbeddingExecutor, createEmbeddingProviderStore } from '../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
