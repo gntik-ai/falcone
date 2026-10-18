@@ -11,7 +11,7 @@ export class BatchLeaseLost extends Error {
 }
 export function publicBatch(row) {
   const { providerType, endpoint, secretRef, providerState, inputSha256, idempotencyPrincipal, idempotencyKeySha256,
-    leaseOwner, leaseExpiresAt, leaseVersion, ...safe } = row;
+    leaseOwner, leaseExpiresAt, leaseVersion, cancelFence, ...safe } = row;
   return safe;
 }
 export function createLlmBatchStore({ pool } = {}) {
@@ -28,7 +28,7 @@ export function createLlmBatchStore({ pool } = {}) {
       const found = binding(row.workspaceId, row.tenantId, row.idempotencyPrincipal, row.idempotencyKeySha256);
       if (found) return { batch: copy(found), created: false };
       const k = key(row.workspaceId, row.batchId, row.tenantId);
-      batches.set(k, copy(row)); items.set(k, pending.map(customId => ({ customId, status: 'pending' })));
+      batches.set(k, copy({ cancelFence: false, ...row })); items.set(k, pending.map(customId => ({ customId, status: 'pending' })));
       return { batch: copy(row), created: true };
     },
     async list(w, t, { limit, cursor } = {}) {
@@ -66,7 +66,7 @@ export function createLlmBatchStore({ pool } = {}) {
     async claim({ now, owner, limit = 20, batchId, workspaceId, tenantId }) {
       const claimed = [];
       for (const row of batches.values()) {
-        if (TERMINAL_BATCH_STATUSES.includes(row.status) || Date.parse(row.nextPollAt) > now || Date.parse(row.leaseExpiresAt) > now
+        if (row.cancelFence || TERMINAL_BATCH_STATUSES.includes(row.status) || Date.parse(row.nextPollAt) > now || Date.parse(row.leaseExpiresAt) > now
           || (batchId && (row.batchId !== batchId || row.workspaceId !== workspaceId || row.tenantId !== (tenantId ?? '_')))) continue;
         Object.assign(row, { leaseOwner: owner, leaseExpiresAt: new Date(now + 300000).toISOString(), leaseVersion: row.leaseVersion + 1 });
         claimed.push(copy(row)); if (claimed.length >= limit) break;
@@ -110,7 +110,7 @@ export function createLlmBatchStore({ pool } = {}) {
 const snake = value => value.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
 const camel = value => value.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 const batchFields = ['tenantId', 'workspaceId', 'batchId', 'connectionId', 'providerType', 'endpoint', 'secretRef', 'model',
-  'providerBatchId', 'providerState', 'status', 'requestCount', 'providerCounts', 'missingCount', 'inputSha256', 'idempotencyPrincipal', 'idempotencyKeySha256',
+  'providerBatchId', 'providerState', 'status', 'cancelFence', 'requestCount', 'providerCounts', 'missingCount', 'inputSha256', 'idempotencyPrincipal', 'idempotencyKeySha256',
   'lastErrorCode', 'cancelRequestedAt', 'cancelAcknowledgedAt', 'expiresAt', 'endedAt', 'resultsAttempts', 'nextPollAt', 'createdAt', 'updatedAt', 'leaseOwner', 'leaseExpiresAt', 'leaseVersion'];
 const mutableFields = new Set(['providerBatchId', 'providerState', 'status', 'providerCounts', 'missingCount', 'idempotencyKeySha256',
   'lastErrorCode', 'cancelRequestedAt', 'cancelAcknowledgedAt', 'expiresAt', 'endedAt', 'resultsAttempts', 'nextPollAt', 'updatedAt', 'leaseOwner', 'leaseExpiresAt', 'leaseVersion']);
@@ -179,6 +179,15 @@ function postgresStore(pool) {
           lease_owner text, lease_expires_at timestamptz, lease_version bigint NOT NULL DEFAULT 0,
           PRIMARY KEY (tenant_id,workspace_id,batch_id),
           CHECK (idempotency_key_sha256 IS NULL OR idempotency_principal IS NOT NULL))`);
+        // Ordinary rows retain #945's input hash and request-count constraints. Fence
+        // metadata uses inert empty sentinels; it can never reach a provider or reconciler.
+        await client.query('ALTER TABLE workspace_llm_batches ADD COLUMN IF NOT EXISTS cancel_fence boolean NOT NULL DEFAULT false');
+        await client.query('ALTER TABLE workspace_llm_batches ALTER COLUMN input_sha256 DROP NOT NULL');
+        await client.query('ALTER TABLE workspace_llm_batches DROP CONSTRAINT IF EXISTS workspace_llm_batches_request_count_check');
+        await client.query('ALTER TABLE workspace_llm_batches DROP CONSTRAINT IF EXISTS wlb_fence_input_check');
+        await client.query(`ALTER TABLE workspace_llm_batches ADD CONSTRAINT wlb_fence_input_check CHECK (
+          (cancel_fence AND status='cancelled' AND input_sha256 IS NULL AND request_count=0) OR
+          (NOT cancel_fence AND input_sha256 IS NOT NULL AND request_count BETWEEN 1 AND 1000))`);
         await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_wlb_idempotency ON workspace_llm_batches
           (tenant_id,workspace_id,idempotency_principal,idempotency_key_sha256) WHERE idempotency_key_sha256 IS NOT NULL`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_wlb_due ON workspace_llm_batches(next_poll_at)
@@ -199,7 +208,7 @@ function postgresStore(pool) {
         for (let attempt = 0; attempt < 3; attempt++) {
           const res = await client.query(`INSERT INTO workspace_llm_batches (${batchFields.map(snake).join(',')})
             VALUES (${batchFields.map((_, i) => `$${i + 1}`).join(',')})
-            ON CONFLICT (tenant_id,workspace_id,idempotency_principal,idempotency_key_sha256) WHERE idempotency_key_sha256 IS NOT NULL DO NOTHING RETURNING *`, batchFields.map(name => row[name]));
+            ON CONFLICT (tenant_id,workspace_id,idempotency_principal,idempotency_key_sha256) WHERE idempotency_key_sha256 IS NOT NULL DO NOTHING RETURNING *`, batchFields.map(name => name === 'cancelFence' ? row[name] ?? false : row[name]));
           if (!res.rowCount) {
             const found = await findBinding(row.workspaceId, row.tenantId, row.idempotencyPrincipal, row.idempotencyKeySha256, client);
             if (found) return { batch: found, created: false };
@@ -233,7 +242,7 @@ function postgresStore(pool) {
       return transaction(async client => {
         const res = await client.query(`WITH due AS (
           SELECT tenant_id,workspace_id,batch_id FROM workspace_llm_batches
-          WHERE status IN ('submitting','submit_uncertain','in_progress','canceling') AND next_poll_at <= $1
+          WHERE NOT cancel_fence AND status IN ('submitting','submit_uncertain','in_progress','canceling') AND next_poll_at <= $1
             AND (lease_expires_at IS NULL OR lease_expires_at <= $1)
             AND ($4::text IS NULL OR (batch_id=$4 AND workspace_id=$5 AND tenant_id=$6))
           ORDER BY next_poll_at LIMIT $3 FOR UPDATE SKIP LOCKED

@@ -13,7 +13,7 @@ function canonical(value) {
   return JSON.stringify(value);
 }
 function replay(row, inputSha256) {
-  if (row.inputSha256 !== inputSha256) throw clientError('Idempotency key input mismatch', 422, 'IDEMPOTENCY_KEY_MISMATCH');
+  if (!row.cancelFence && row.inputSha256 !== inputSha256) throw clientError('Idempotency key input mismatch', 422, 'IDEMPOTENCY_KEY_MISMATCH');
   return { status: 200, body: publicBatch(row) };
 }
 
@@ -61,7 +61,7 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
     const timestamp = new Date(now()).toISOString();
     const inserted = await store.insert({ tenantId: tenantId ?? '_', workspaceId, batchId: randomUUID(),
       connectionId: config.connectionId, providerType: config.providerType, endpoint: config.endpoint, secretRef: config.secretRef,
-      model: chosen, providerBatchId: null, providerState: {}, status: 'submitting', requestCount: input.items.length,
+      model: chosen, providerBatchId: null, providerState: {}, status: 'submitting', cancelFence: false, requestCount: input.items.length,
       providerCounts: {}, missingCount: 0, inputSha256, idempotencyPrincipal: hash ? principal : null, idempotencyKeySha256: hash,
       lastErrorCode: null, cancelRequestedAt: null, cancelAcknowledgedAt: null, expiresAt: null, endedAt: null,
       resultsAttempts: 0, nextPollAt: new Date(now() + 300000).toISOString(), createdAt: timestamp, updatedAt: timestamp,
@@ -107,13 +107,28 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
       return operation === 'results' ? { lines: transport.jsonLines(result.body) } : result;
     },
   });
-  return { submitBatch, batchReconciler, reconcileBatches: batchReconciler.runOnce,
-    async cancelBatch(w, id, { tenantId } = {}) {
-      const { batch: row, requested } = await store.requestCancel(w, id, tenantId, now());
-      if (!requested || !row.providerBatchId) return publicBatch(row);
-      await batchReconciler.runOnce({ batchId: id, workspaceId: w, tenantId, limit: 1, cancelOnly: true });
-      return publicBatch(await store.get(w, id, tenantId));
-    },
+  async function cancelBatch(w, id, { tenantId } = {}) {
+    const { batch: row, requested } = await store.requestCancel(w, id, tenantId, now());
+    if (!requested || !row.providerBatchId) return publicBatch(row);
+    await batchReconciler.runOnce({ batchId: id, workspaceId: w, tenantId, limit: 1, cancelOnly: true });
+    return publicBatch(await store.get(w, id, tenantId));
+  }
+  async function cancelBatchByIdentity(workspaceId, { tenantId, principal, idempotencyKey } = {}) {
+    if (!principal || !idempotencyKey) throw clientError('Idempotency identity unavailable', 503, 'IDEMPOTENCY_UNAVAILABLE');
+    const timestamp = new Date(now()).toISOString();
+    // insert() owns the atomic unique binding lookup/insert transaction. If submission
+    // wins, cancel its durable row after releasing the connection, before provider I/O.
+    const { batch: row } = await store.insert({ tenantId: tenantId ?? '_', workspaceId, batchId: randomUUID(),
+      connectionId: '', providerType: '', endpoint: '', secretRef: {}, model: '',
+      providerBatchId: null, providerState: {}, status: 'cancelled', cancelFence: true, requestCount: 0,
+      providerCounts: {}, missingCount: 0, inputSha256: null, idempotencyPrincipal: principal, idempotencyKeySha256: sha256(idempotencyKey),
+      lastErrorCode: null, cancelRequestedAt: timestamp, cancelAcknowledgedAt: timestamp, expiresAt: null, endedAt: timestamp,
+      resultsAttempts: 0, nextPollAt: timestamp, createdAt: timestamp, updatedAt: timestamp,
+      leaseOwner: null, leaseExpiresAt: null, leaseVersion: 0,
+    }, []);
+    return cancelBatch(workspaceId, row.batchId, { tenantId });
+  }
+  return { submitBatch, cancelBatch, cancelBatchByIdentity, batchReconciler, reconcileBatches: batchReconciler.runOnce,
     async getBatch(w, id, { tenantId } = {}) { return publicBatch(await store.get(w, id, tenantId)); },
     deleteBatch: (w, id, { tenantId } = {}) => store.delete(w, id, tenantId),
     async listBatchItems(w, id, options = {}) {

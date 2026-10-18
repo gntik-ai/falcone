@@ -6,7 +6,7 @@
 // the control-plane validate endpoint (FLW-E006) and the console palette (#363) consume.
 //
 // Scenarios:
-//   bbx-flows-act-reg-01: the seven canonical task types are registered with schemas
+//   bbx-flows-act-reg-01: the nine canonical task types are registered with schemas
 //   bbx-flows-act-reg-02: taskTypeNames() === TASK_TYPE_NAMES (Temprl-free list parity)
 //   bbx-flows-act-reg-03: unknown task type → non-retryable UNKNOWN_TASK_TYPE
 //   bbx-flows-act-reg-04: listTaskTypes() exposes name + input/output schema (palette)
@@ -27,9 +27,9 @@ import { classifyExecutorError } from '../../apps/workflow-worker/src/activities
 import { MAX_INPUT_BYTES } from '../../apps/workflow-worker/src/activities/limits.mjs';
 import { mintExecutionToken } from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
 
-const EXPECTED = ['db.query', 'storage.put', 'storage.get', 'functions.invoke', 'events.publish', 'http.request', 'email.send', 'llm.complete'];
+const EXPECTED = ['db.query', 'storage.put', 'storage.get', 'functions.invoke', 'events.publish', 'http.request', 'email.send', 'llm.complete', 'llm.batch'];
 
-test('bbx-flows-act-reg-01: seven canonical task types registered with schemas', () => {
+test('bbx-flows-act-reg-01: nine canonical task types registered with schemas', () => {
   const names = taskTypeNames().sort();
   assert.deepEqual(names, [...EXPECTED].sort());
   for (const n of EXPECTED) {

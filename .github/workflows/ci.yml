@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '6257591a93464da5cd040d68ba5b5a83e49cb94b'
+  FALCONE_CHARTS_REF: '35ff4cd4c7d8433ad62ca9f53fcc0810a3ab2008'
 
 jobs:
   quality:
@@ -99,7 +99,9 @@ jobs:
             tests/blackbox/flows-execution-token-not-in-memo.test.mjs \
             tests/blackbox/flows-activities.test.mjs \
             tests/blackbox/flows-worker-db-activity-wiring.test.mjs \
-            tests/blackbox/llm-complete-activity.test.mjs
+            tests/blackbox/llm-complete-activity.test.mjs \
+            tests/blackbox/llm-batch-activity.test.mjs \
+            tests/blackbox/llm-batch-flow-workflow.test.mjs
 
       - name: Worker and control-plane image contracts
         run: |

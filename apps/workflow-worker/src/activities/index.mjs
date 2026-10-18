@@ -31,6 +31,7 @@ export { functionsInvoke, functionsInvokeInputSchema, functionsInvokeOutputSchem
 export { eventsPublish, eventsPublishInputSchema, eventsPublishOutputSchema } from './events-publish.mjs';
 export { httpRequest, httpRequestInputSchema, httpRequestOutputSchema } from './http-request.mjs';
 export { emailSend, emailSendInputSchema, emailSendOutputSchema } from './email-send.mjs';
+export { llmBatch, llmBatchInputSchema, llmBatchOutputSchema } from './llm-batch.mjs';
 export { llmComplete, llmCompleteInputSchema, llmCompleteOutputSchema } from './llm-complete.mjs';
 
 export { resolveActivityWorkspaceId } from './workspace-binding.mjs';
