@@ -1,0 +1,33 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "endpoint": "https://provider.example/v1beta/models/?version=1",
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "stream": true
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "sse": [
+      "data: {\"modelVersion\":\"fixture-model\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hello\"}]},\"finishReason\":null}]}",
+      "data: {\"error\":{\"code\":429,\"status\":\"RESOURCE_EXHAUSTED\",\"message\":\"synthetic diagnostic\"}}"
+    ]
+  },
+  "expect": [
+    {
+      "type": "delta",
+      "content": "Hello"
+    },
+    {
+      "type": "error",
+      "code": "LLM_PROVIDER_RATE_LIMITED"
+    }
+  ],
+  "expectUrl": "https://provider.example/v1beta/models/fixture-model:streamGenerateContent?version=1&alt=sse"
+}

@@ -1,0 +1,37 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "endpoint": "https://provider.example/v1beta/models/?version=1",
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 200,
+    "headers": {},
+    "body": {
+      "promptFeedback": {
+        "blockReason": "SAFETY"
+      },
+      "candidates": []
+    }
+  },
+  "expect": {
+    "content": "",
+    "model": "fixture-model",
+    "usage": {
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "cacheReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null
+    },
+    "finishReason": "content_filter"
+  },
+  "expectUrl": "https://provider.example/v1beta/models/fixture-model:generateContent?version=1"
+}

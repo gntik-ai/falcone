@@ -138,5 +138,42 @@
         "structuredOutput": false
       }
     }
+  },
+  "gemini-generate-content": {
+    "gemini": {
+      "cases": [
+        "assistant-to-model",
+        "auth-401",
+        "blocked-prompt-empty-candidates",
+        "blocked-prompt-no-candidates",
+        "cached-tokens",
+        "eof-after-deltas",
+        "eof-after-usage",
+        "length-finish-reason",
+        "malformed-data-line",
+        "malformed-json-body",
+        "non-streaming-success",
+        "rate-limit-429",
+        "request-rejected-400",
+        "safety-finish",
+        "separate-finish-usage",
+        "split-utf8",
+        "stream-resource-exhausted",
+        "stream-without-usage",
+        "streaming-success",
+        "structured-output-success",
+        "system-lifted",
+        "thought-parts",
+        "unavailable-500",
+        "unavailable-503"
+      ],
+      "surface": {
+        "streaming": true,
+        "usageInStream": true,
+        "systemRole": true,
+        "toolCalls": false,
+        "structuredOutput": true
+      }
+    }
   }
 }

@@ -66,6 +66,7 @@ export function createLlmTransport({ adapter, fetchImpl = globalThis.fetch }) {
       const state = adapter.createStreamState();
       let terminal;
       try {
+        let done = false;
         if (!response.body) throw adapterError('LLM_PROVIDER_RESPONSE_INVALID');
         for await (const data of dataLines(response.body)) {
           let parsed;
@@ -76,12 +77,13 @@ export function createLlmTransport({ adapter, fetchImpl = globalThis.fetch }) {
             yield assertNormalizedFrame(frame);
           }
           if (parsed.done) {
-            terminal = assertNormalizedFrame({ type: 'usage', usage: normalizeUsage(state.usage),
-              model: state.model ?? request.model, finishReason: state.finishReason ?? null });
+            done = true;
             break;
           }
         }
-        if (!terminal) throw adapterError('LLM_PROVIDER_RESPONSE_INVALID');
+        if (!done && adapter.completeAtEof?.(state) !== true) throw adapterError('LLM_PROVIDER_RESPONSE_INVALID');
+        terminal = assertNormalizedFrame({ type: 'usage', usage: normalizeUsage(state.usage),
+          model: state.model ?? request.model, finishReason: state.finishReason ?? null });
       } catch (cause) {
         const error = cause?.name === 'AdapterError' ? cause : adapter.mapError({ cause });
         yield { type: 'error', code: error.code };

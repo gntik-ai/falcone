@@ -668,10 +668,14 @@ export function createLlmExecutor(options = {}) {
       for (const item of batchItems) {
         if (item.responseFormat !== undefined && !resolveLlmAdapter(config.providerType).surface.structuredOutput) throw clientError('Structured output is unsupported by this provider', 400, 'LLM_STRUCTURED_OUTPUT_UNSUPPORTED');
         assertResponseFormat(item.responseFormat);
+        if (item.responseFormat !== undefined && resolveLlmAdapter(config.providerType).supportsResponseFormat?.(item.responseFormat) === false) throw clientError('Structured output is unsupported by this provider', 400, 'LLM_STRUCTURED_OUTPUT_UNSUPPORTED');
         if (item.promptCache !== undefined && item.promptCache !== 'system') throw clientError('Invalid promptCache', 400, 'INVALID_PROMPT_CACHE');
       }
     }
     if (responseFormat !== undefined && !resolveLlmAdapter(config.providerType).surface.structuredOutput) {
+      throw clientError('Structured output is unsupported by this provider', batchItems ? 400 : 422, 'LLM_STRUCTURED_OUTPUT_UNSUPPORTED');
+    }
+    if (responseFormat !== undefined && resolveLlmAdapter(config.providerType).supportsResponseFormat?.(responseFormat) === false) {
       throw clientError('Structured output is unsupported by this provider', batchItems ? 400 : 422, 'LLM_STRUCTURED_OUTPUT_UNSUPPORTED');
     }
     const chosen = resolveAllowedModel(config, model);

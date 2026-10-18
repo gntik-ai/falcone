@@ -1,5 +1,20 @@
 # API changelog
 
+## Native Gemini provider (#943)
+
+The existing `gemini` provider type now uses Gemini's native `generateContent`
+API with `x-goog-api-key` authentication, streaming and JSON structured output.
+Operators must configure its endpoint as the models collection, for example
+`https://generativelanguage.googleapis.com/v1beta/models`, rather than Google's
+OpenAI-compatible endpoint. The adapter appends the encoded model and method;
+existing compatible endpoints require this configuration change to avoid `424`
+provider errors. Coordinate endpoint changes with rollout. A rollback must revert
+both the adapter change and any endpoint changes together.
+
+Structured output accepts only the frozen documented `responseJsonSchema`
+keywords; unsupported keywords return `422 LLM_STRUCTURED_OUTPUT_UNSUPPORTED`
+before a provider call. Vertex AI authentication and Gemini batch are excluded.
+
 ## Storage object contract correction (#1005)
 
 Object uploads declare the existing `201` response with `objectKey`, `bucketName`,

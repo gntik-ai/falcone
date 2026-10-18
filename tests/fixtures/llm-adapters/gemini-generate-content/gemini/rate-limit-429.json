@@ -1,0 +1,28 @@
+{
+  "source": "documented-wire-format",
+  "request": {
+    "endpoint": "https://provider.example/v1beta/models/?version=1",
+    "model": "fixture-model",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "upstream": {
+    "status": 429,
+    "headers": {},
+    "body": {
+      "error": {
+        "code": 429,
+        "message": "synthetic diagnostic"
+      }
+    }
+  },
+  "expect": {
+    "code": "LLM_PROVIDER_RATE_LIMITED",
+    "status": 429
+  },
+  "expectUrl": "https://provider.example/v1beta/models/fixture-model:generateContent?version=1"
+}
