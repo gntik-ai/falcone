@@ -9,6 +9,7 @@ beforeEach(async () => {
   vi.stubGlobal('__APP_VERSION__', 'dev')
   vi.stubGlobal('__APP_COMMIT_SHA__', '')
   localStorage.clear()
+  sessionStorage.clear()
   document.documentElement.className = ''
 })
 

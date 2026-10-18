@@ -20,7 +20,7 @@ test('route namespaces are lazy local chunks outside the static entry graph', ()
     ['welcome', 'Bienvenida', 'Welcome'], ['login', 'Acceso', 'Sign in'],
     ['recovery', 'Recuperar contraseña', 'Recover password'], ['invitation', 'Aceptar invitación', 'Accept invitation'],
     ['signup', 'Solicitar acceso', 'Request access'], ['pendingActivation', 'Registro pendiente', 'Registration pending'],
-    ['dashboard', 'Consola', 'Console'], ['overview', 'Resumen', 'Overview'],
+    ['overview', 'Resumen', 'Overview'],
     ['pendingPage', 'Página pendiente', 'Page pending'], ['settings', 'Página pendiente', 'Page pending']
   ]) {
     const key = `src/pages/${namespace}.tsx`;

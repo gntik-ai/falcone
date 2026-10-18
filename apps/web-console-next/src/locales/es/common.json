@@ -2,7 +2,50 @@
   "shell": {
     "console": "Consola",
     "about": "Acerca de",
-    "userMenu": "Menú de usuario"
+    "userMenu": "Menú de usuario",
+    "navigation": "Navegación de consola",
+    "back": "Volver",
+    "retry": "Reintentar",
+    "context": "Contexto activo",
+    "tenant": "Organización activa",
+    "workspace": "Área de trabajo activa",
+    "selectTenant": "Selecciona una organización",
+    "selectWorkspace": "Selecciona un área de trabajo",
+    "groups": {
+      "main": "Principal",
+      "workspace": "Área de trabajo",
+      "functions": "Funciones",
+      "administration": "Administración",
+      "dataPlane": "Plano de datos",
+      "operations": "Operaciones",
+      "restricted": "Administración (requiere permisos)"
+    },
+    "signOut": "Cerrar sesión",
+    "operator": "Operador de consola",
+    "close": "Cerrar",
+    "version": "Versión",
+    "commit": "Commit",
+    "role": "Rol",
+    "readOnly": "Solo lectura",
+    "fixtures": {
+      "home": "Prueba de navegación",
+      "link": "Enlace diferido",
+      "navigate": "Navegar diferido",
+      "destination": "Destino diferido"
+    },
+    "breadcrumb": {
+      "flow": "Flujo {id}",
+      "runs": "Ejecuciones",
+      "execution": "Ejecución {id}",
+      "workspace": "Área {id}",
+      "realtime": "Tiempo real",
+      "docs": "Documentación",
+      "operation": "Operación {id}",
+      "newPlan": "Nuevo plan",
+      "planId": "Plan {id}",
+      "tenant": "Organización {id}",
+      "plan": "Plan"
+    }
   },
   "locale": {
     "label": "Idioma",
@@ -40,6 +83,10 @@
     "network": {
       "title": "Error de conexión",
       "body": "Comprueba tu conexión e inténtalo de nuevo."
+    },
+    "unknown": {
+      "title": "Sección de consola no encontrada",
+      "body": "Revisa la dirección o usa la navegación de la consola."
     }
   },
   "confirmations": {
@@ -70,8 +117,36 @@
   },
   "navigation": {
     "console": "Consola",
-    "overview": "Resumen",
+    "overview": "Vista general",
     "settings": "Configuración",
-    "profile": "Perfil"
+    "profile": "Perfil",
+    "runtime": "Runtime de funciones",
+    "my-plan": "Mi plan",
+    "my-plan-allocation": "Resumen de asignación",
+    "tenants": "Gestión de organizaciones",
+    "workspaces": "Gestión de áreas de trabajo",
+    "database": "DB del área de trabajo",
+    "flows": "Flujos / workflows",
+    "functions-registry": "Funciones: registro",
+    "functions": "Funciones: administrar",
+    "functions-data": "Funciones: despliegue rápido",
+    "iam-access": "Acceso IAM",
+    "members": "Miembros",
+    "plans": "Planes",
+    "auth": "Autenticación",
+    "auth-config": "Autenticación de la organización",
+    "postgres": "PostgreSQL",
+    "mongo": "MongoDB",
+    "kafka": "Kafka",
+    "postgres-data": "Datos: Postgres",
+    "mongo-data": "Datos: Mongo",
+    "events-data": "Datos: eventos",
+    "realtime-changes": "Datos: tiempo real",
+    "operations": "Operaciones",
+    "storage": "Almacenamiento",
+    "observability": "Observabilidad",
+    "service-accounts": "Cuentas de servicio",
+    "workspace-secrets": "Secretos del área de trabajo",
+    "quotas": "Cuotas"
   }
 }

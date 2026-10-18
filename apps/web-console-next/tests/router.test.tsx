@@ -1,6 +1,7 @@
+import { login, strictFetch } from './shell-support'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test } from 'vitest'
 
 import { App } from '../src/App'
 import { appRoutes, routerBasename } from '../src/router'
@@ -30,3 +31,7 @@ test.each([
   render(<MemoryRouter basename={basename} initialEntries={[location]}><App /></MemoryRouter>)
   expect(await screen.findByRole('heading', { name: 'Resumen' })).toBeVisible()
 })
+
+let requests: ReturnType<typeof strictFetch>
+beforeEach(() => { login(['tenant_owner']); requests = strictFetch({}) })
+afterEach(() => requests.verify())

@@ -475,6 +475,13 @@ jobs:
             VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next test:csp
           done
 
+      - name: Test authenticated next-console shell
+        run: |
+          SHELL_TEST_FIXTURES= VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next build
+          (cd apps/web-console-next && node --test tests/shell-release.test.mjs)
+          SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/next/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
+          VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
+
       - name: Build the legacy release SPA
         run: pnpm --filter @in-falcone/web-console exec vite build
 

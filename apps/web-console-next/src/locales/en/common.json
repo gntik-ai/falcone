@@ -2,7 +2,50 @@
   "shell": {
     "console": "Console",
     "about": "About",
-    "userMenu": "User menu"
+    "userMenu": "User menu",
+    "navigation": "Console navigation",
+    "back": "Go back",
+    "retry": "Retry",
+    "context": "Active context",
+    "tenant": "Active tenant",
+    "workspace": "Active workspace",
+    "selectTenant": "Select a tenant",
+    "selectWorkspace": "Select a workspace",
+    "groups": {
+      "main": "Main",
+      "workspace": "Workspace",
+      "functions": "Functions",
+      "administration": "Administration",
+      "dataPlane": "Data plane",
+      "operations": "Operations",
+      "restricted": "Administration (requires permissions)"
+    },
+    "signOut": "Sign out",
+    "operator": "Console operator",
+    "close": "Close",
+    "version": "Version",
+    "commit": "Commit",
+    "role": "Role",
+    "readOnly": "Read only",
+    "fixtures": {
+      "home": "Navigation fixture",
+      "link": "Lazy link",
+      "navigate": "Navigate lazy",
+      "destination": "Lazy destination"
+    },
+    "breadcrumb": {
+      "flow": "Flow {id}",
+      "runs": "Runs",
+      "execution": "Execution {id}",
+      "workspace": "Workspace {id}",
+      "realtime": "Realtime",
+      "docs": "Documentation",
+      "operation": "Operation {id}",
+      "newPlan": "New plan",
+      "planId": "Plan {id}",
+      "tenant": "Tenant {id}",
+      "plan": "Plan"
+    }
   },
   "locale": {
     "label": "Language",
@@ -40,6 +83,10 @@
     "network": {
       "title": "Connection error",
       "body": "Check your connection and try again."
+    },
+    "unknown": {
+      "title": "Console section not found",
+      "body": "Check the address or use the console navigation."
     }
   },
   "confirmations": {
@@ -72,6 +119,34 @@
     "console": "Console",
     "overview": "Overview",
     "settings": "Settings",
-    "profile": "Profile"
+    "profile": "Profile",
+    "runtime": "Functions runtime",
+    "my-plan": "My plan",
+    "my-plan-allocation": "Allocation summary",
+    "tenants": "Tenant management",
+    "workspaces": "Workspace management",
+    "database": "Workspace database",
+    "flows": "Flows / workflows",
+    "functions-registry": "Functions: registry",
+    "functions": "Functions: manage",
+    "functions-data": "Functions: quick deploy",
+    "iam-access": "IAM access",
+    "members": "Members",
+    "plans": "Plans",
+    "auth": "Authentication",
+    "auth-config": "Tenant authentication",
+    "postgres": "PostgreSQL",
+    "mongo": "MongoDB",
+    "kafka": "Kafka",
+    "postgres-data": "Data: Postgres",
+    "mongo-data": "Data: Mongo",
+    "events-data": "Data: events",
+    "realtime-changes": "Data: realtime",
+    "operations": "Operations",
+    "storage": "Storage",
+    "observability": "Observability",
+    "service-accounts": "Service accounts",
+    "workspace-secrets": "Workspace secrets",
+    "quotas": "Quotas"
   }
 }

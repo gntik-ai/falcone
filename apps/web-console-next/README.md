@@ -1,7 +1,9 @@
 # Falcone next console
 
-Wave u0 provides a separate React 19 and Tailwind 4 scaffold. All routes render
-placeholders; no page migrations, authentication wiring or deployment are included.
+Wave u0 provides a separate React 19 and Tailwind 4 console. Authenticated routes
+share the kit shell, legacy-equivalent guards and tenant/workspace selection. Page
+content remains placeholder content until its migration wave. Navigation links to
+unmigrated pages load the legacy console in the same tab.
 The router test reads the legacy exported `appRoutes` configuration with the
 TypeScript parser, comparing full paths without loading the legacy React app.
 
@@ -124,3 +126,27 @@ all seven statuses against explicit Spanish/English copy, including accessible
 labels and live regions. The existing CSP Playwright suite additionally checks
 switching and reload persistence with an English browser locale, corrupt storage,
 formatted samples and exclusively local requests at both base paths.
+
+## Authenticated shell
+
+The session provider delegates storage, refresh, retry and invalidation to
+`@in-falcone/console-api/session`; sign-out delegates revocation to `/auth`.
+Both consoles keep sharing the existing session keys and the active-context
+snapshot `{userId, tenantId, workspaceId, updatedAt}`. Only a workspace route
+parameter overrides the stored context. Platform-global routes hide context
+controls. The kit I18nProvider follows the app locale, including built-in labels.
+
+Run shell browser checks against a fixture build (synthetic sessions only):
+
+```sh
+SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/next/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
+VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
+```
+
+The spec checks each lazy navigation mechanism from a fresh document, render
+error containment, About, and axe at 375/768/1280 pixels and in the mobile drawer.
+`SHELL_TEST_FIXTURES` must be unset or empty in release builds. CI first checks a
+release build with `tests/shell-release.test.mjs`, then builds the fixture variant;
+the existing final release build also leaves fixtures disabled. For the focused
+Vitest fixture checks, set `SHELL_TEST_FIXTURES=true` and run
+`vitest run tests/shell-fixtures.test.tsx` from this package.

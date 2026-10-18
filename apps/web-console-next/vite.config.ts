@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
       }
     }],
     define: {
+      __SHELL_TEST_FIXTURES__: process.env.SHELL_TEST_FIXTURES === 'true',
       __APP_VERSION__: mode === 'test' ? 'globalThis.__APP_VERSION__' : JSON.stringify(version),
       __APP_COMMIT_SHA__: mode === 'test' ? 'globalThis.__APP_COMMIT_SHA__' : JSON.stringify(commitSha)
     },
