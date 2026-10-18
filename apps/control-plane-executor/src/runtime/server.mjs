@@ -1251,10 +1251,14 @@ async function runDdlAction(registry, resourceKind, action, payload, c, vectorSe
   return { status: 200, body: result };
 }
 
+async function runProviderConnection(executor, method, args, status) {
+  const result = await executor[method](...args);
+  return { status, body: method === 'listConnections' ? { items: result } : result };
+}
+
 async function runEmbeddingConnection(embeddingExecutor, method, args, status = 200) {
   if (!embeddingExecutor) throw Object.assign(new Error('Embedding provider is not enabled'), { statusCode: 501, code: 'EMBEDDING_DISABLED' });
-  const result = await embeddingExecutor[method](...args);
-  return { status, body: method === 'listConnections' ? { items: result } : result };
+  return runProviderConnection(embeddingExecutor, method, args, status);
 }
 
 async function runEmbeddingProvider(embeddingExecutor, action, params, successStatus) {
@@ -1298,8 +1302,7 @@ async function runLlmBatchSubmit(executor, workspaceId, c) {
 // LLM config/connection and batch JSON routes share the usual error envelope.
 async function runLlmConnection(llmExecutor, method, args, status = 200) {
   if (!llmExecutor) throw Object.assign(new Error('LLM provider is not enabled'), { statusCode: 501, code: 'LLM_DISABLED' });
-  const result = await llmExecutor[method](...args);
-  return { status, body: method === 'listConnections' ? { items: result } : result };
+  return runProviderConnection(llmExecutor, method, args, status);
 }
 
 function legacyProvider(record) {

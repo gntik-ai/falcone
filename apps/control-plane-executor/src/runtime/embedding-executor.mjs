@@ -143,8 +143,11 @@ function connectionRecord(workspaceId, config, connectionId, existing, isDefault
   validateConnection(config, connectionId);
   return {
     ...sanitizeProviderConfig(config),
-    tenantId: config.tenantId ?? TENANT_SENTINEL, workspaceId, connectionId,
-    displayName: config.displayName ?? null, isDefault,
+    tenantId: config.tenantId ?? TENANT_SENTINEL,
+    workspaceId,
+    connectionId,
+    displayName: config.displayName ?? null,
+    isDefault,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -156,21 +159,33 @@ function createInMemoryProviderStore() {
   const records = (workspaceId, tenantId) => workspaces.get(providerKey(tenantId, workspaceId)) ?? [];
   const copy = value => structuredClone(value);
   const store = {
-    hasConnection(workspaceId, connectionId, tenantId) { return records(workspaceId, tenantId).some(row => row.connectionId === connectionId); },
+    hasConnection(workspaceId, connectionId, tenantId) {
+      return records(workspaceId, tenantId).some(row => row.connectionId === connectionId);
+    },
     bindMappingStore(store) { mappingStore = store; },
     async ensureSchema() {},
-    async listConnections(workspaceId, tenantId) { return copy(records(workspaceId, tenantId).slice().sort((a, b) => (a.connectionId < b.connectionId ? -1 : a.connectionId > b.connectionId ? 1 : 0))); },
+    async listConnections(workspaceId, tenantId) {
+      return copy(records(workspaceId, tenantId).slice().sort((a, b) => (
+        a.connectionId < b.connectionId ? -1 : a.connectionId > b.connectionId ? 1 : 0
+      )));
+    },
     async getConnection(workspaceId, connectionId, tenantId) {
       const record = records(workspaceId, tenantId).find(r => r.connectionId === connectionId);
-      if (!record) throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      if (!record) {
+        throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      }
       return copy(record);
     },
     async createConnection(workspaceId, config = {}) {
       if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
       const rows = records(workspaceId, config.tenantId);
       validateConnection(config, config.connectionId);
-      if (rows.some(r => r.connectionId === config.connectionId)) throw clientError('Embedding connection exists', 409, 'EMBEDDING_CONNECTION_EXISTS');
-      if (rows.length >= 32) throw clientError('Embedding connection limit reached', 409, 'EMBEDDING_CONNECTION_LIMIT_REACHED');
+      if (rows.some(r => r.connectionId === config.connectionId)) {
+        throw clientError('Embedding connection exists', 409, 'EMBEDDING_CONNECTION_EXISTS');
+      }
+      if (rows.length >= 32) {
+        throw clientError('Embedding connection limit reached', 409, 'EMBEDDING_CONNECTION_LIMIT_REACHED');
+      }
       const record = connectionRecord(workspaceId, config, config.connectionId, null, rows.length === 0 || config.isDefault === true);
       if (record.isDefault) rows.forEach(r => { r.isDefault = false; });
       workspaces.set(providerKey(config.tenantId, workspaceId), [...rows, copy(record)]);
@@ -179,8 +194,12 @@ function createInMemoryProviderStore() {
     async replaceConnection(workspaceId, connectionId, config = {}) {
       const rows = records(workspaceId, config.tenantId);
       const existing = rows.find(r => r.connectionId === connectionId);
-      if (!existing) throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
-      if (existing.isDefault && config.isDefault === false) throw clientError('A default connection is required', 409, 'EMBEDDING_DEFAULT_REQUIRED');
+      if (!existing) {
+        throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      }
+      if (existing.isDefault && config.isDefault === false) {
+        throw clientError('A default connection is required', 409, 'EMBEDDING_DEFAULT_REQUIRED');
+      }
       const record = connectionRecord(workspaceId, config, connectionId, existing, existing.isDefault || config.isDefault === true);
       if (record.isDefault) rows.forEach(r => { r.isDefault = false; });
       rows[rows.indexOf(existing)] = copy(record);
@@ -188,8 +207,12 @@ function createInMemoryProviderStore() {
     },
     async deleteConnection(workspaceId, connectionId, tenantId) {
       const rows = records(workspaceId, tenantId);
-      if (!rows.some(r => r.connectionId === connectionId)) throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
-      if (mappingStore?.isConnectionInUse(workspaceId, connectionId, tenantId)) throw clientError('Embedding connection is in use', 409, 'EMBEDDING_CONNECTION_IN_USE');
+      if (!rows.some(r => r.connectionId === connectionId)) {
+        throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      }
+      if (mappingStore?.isConnectionInUse(workspaceId, connectionId, tenantId)) {
+        throw clientError('Embedding connection is in use', 409, 'EMBEDDING_CONNECTION_IN_USE');
+      }
       workspaces.set(providerKey(tenantId, workspaceId), rows.filter(r => r.connectionId !== connectionId));
       return { removed: true };
     },
@@ -202,10 +225,14 @@ function createInMemoryProviderStore() {
       rows[rows.indexOf(current)] = copy(record);
       return { ...copy(record), warning: REINDEX_WARNING };
     },
-    async getProvider(workspaceId, tenantId) { return copy(records(workspaceId, tenantId).find(r => r.isDefault) ?? null); },
+    async getProvider(workspaceId, tenantId) {
+      return copy(records(workspaceId, tenantId).find(r => r.isDefault) ?? null);
+    },
     async removeProvider(workspaceId, tenantId) {
       const rows = records(workspaceId, tenantId);
-      if (rows.some(row => row.isDefault && mappingStore?.isConnectionInUse(workspaceId, row.connectionId, tenantId))) throw clientError('Embedding connection is in use', 409, 'EMBEDDING_CONNECTION_IN_USE');
+      if (rows.some(row => row.isDefault && mappingStore?.isConnectionInUse(workspaceId, row.connectionId, tenantId))) {
+        throw clientError('Embedding connection is in use', 409, 'EMBEDDING_CONNECTION_IN_USE');
+      }
       const remaining = rows.filter(r => !r.isDefault);
       workspaces.set(providerKey(tenantId, workspaceId), remaining);
       return { removed: remaining.length !== rows.length };
@@ -255,7 +282,6 @@ function createPostgresProviderStore(pool) {
         created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
         PRIMARY KEY (tenant_id, workspace_id, connection_id)
       )`);
-      await ensureMappingSchema(client);
       await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_wec_default ON workspace_embedding_connections (tenant_id, workspace_id) WHERE is_default');
       await client.query('CREATE INDEX IF NOT EXISTS idx_wec_workspace ON workspace_embedding_connections (workspace_id)');
       await client.query(`INSERT INTO workspace_embedding_connections
@@ -323,6 +349,9 @@ function createPostgresProviderStore(pool) {
       END; $$`);
       await client.query(`CREATE OR REPLACE TRIGGER workspace_embedding_providers_mirror
         BEFORE INSERT OR UPDATE OR DELETE ON workspace_embedding_providers FOR EACH ROW EXECUTE FUNCTION mirror_legacy_embedding_provider()`);
+      // Lock connections before mappings, matching DELETE and its in-use trigger.
+      // Otherwise a rolling-upgrade boot can deadlock with an in-flight DELETE.
+      await ensureMappingSchema(client);
     });
   }
 

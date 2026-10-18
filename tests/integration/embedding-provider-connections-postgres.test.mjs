@@ -1,10 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import { createEmbeddingProviderStore, createEmbeddingMappingStore } from '../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
 import { oldExecutorUpsert } from './fixtures/embedding-old-executor-upsert.mjs';
 
 const config = { tenantId: 'tenant', displayName: 'Named provider', providerType: 'openai', endpoint: 'https://example.test/chat', model: 'model-a', dimension: 3, secretRef: { name: 'BYOK_TEST', key: 'token' } };
+
+async function waitForBlockedBy(pool, waitingPid, blockingPid) {
+  const deadline = Date.now() + 300_000;
+  while (Date.now() < deadline) {
+    const { rows } = await pool.query('SELECT $2::integer = ANY(pg_blocking_pids($1::integer)) AS blocked', [waitingPid, blockingPid]);
+    if (rows[0].blocked) return;
+    await delay(10);
+  }
+  assert.fail(`Backend ${waitingPid} did not block on ${blockingPid}`);
+}
 
 test('Postgres 17 registry: copy fidelity, idempotence, rollout fence and concurrent writes', async t => {
   const dsn = process.env.EMBEDDING_CONNECTIONS_TEST_DATABASE_URL;
@@ -116,6 +127,61 @@ test('Postgres 17 registry: copy fidelity, idempotence, rollout fence and concur
     await pool.query("DELETE FROM workspace_embedding_providers WHERE workspace_id='in-use'");
     assert.equal(await store.getProvider('in-use', config.tenantId), null);
     await assert.rejects(mappings.deployMapping('in-use', { ...selector, sourceColumn: 'body', connectionId: 'default' }), { statusCode: 422, code: 'EMBEDDING_CONNECTION_NOT_FOUND' });
+
+    // Hold DELETE inside a BEFORE trigger, after it owns the connections relation
+    // lock but before the in-use trigger reads mappings. Boot must wait without
+    // locking mappings, so releasing this barrier lets both operations finish.
+    await pool.query(`CREATE FUNCTION pause_embedding_delete() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        PERFORM pg_advisory_xact_lock(hashtext('embedding_registry_delete_barrier'));
+        RETURN OLD;
+      END; $$`);
+    await pool.query(`CREATE TRIGGER aa_pause_embedding_delete BEFORE DELETE ON workspace_embedding_connections
+      FOR EACH ROW EXECUTE FUNCTION pause_embedding_delete()`);
+    for (const action of ['plural', 'singular', 'legacy']) {
+      await t.test(`ensureSchema coexists with an in-flight ${action} DELETE`, async () => {
+        const workspaceId = `schema-delete-${action}`;
+        await oldWrite(workspaceId);
+        const deletingPool = new pg.Pool({ connectionString: dsn, options: `-c search_path=${schema}`, max: 1 });
+        const bootPool = new pg.Pool({ connectionString: dsn, options: `-c search_path=${schema}`, max: 1 });
+        const blocker = await pool.connect();
+        const deletePid = (await deletingPool.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        const bootPid = (await bootPool.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        const blockerPid = (await blocker.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        const deletingStore = createEmbeddingProviderStore({ pool: deletingPool });
+        let pending = [];
+        try {
+          await blocker.query("SELECT pg_advisory_lock(hashtext('embedding_registry_delete_barrier'))");
+          const deleting = action === 'plural'
+            ? deletingStore.deleteConnection(workspaceId, 'default', config.tenantId)
+            : action === 'singular'
+              ? deletingStore.removeProvider(workspaceId, config.tenantId)
+              : deletingPool.query('DELETE FROM workspace_embedding_providers WHERE tenant_id=$1 AND workspace_id=$2', [config.tenantId, workspaceId]);
+          // Attach rejection handlers immediately; a real deadlock may abort
+          // either backend, and the assertions below must report either victim.
+          pending = [Promise.allSettled([deleting])];
+          await waitForBlockedBy(pool, deletePid, blockerPid);
+          const booting = createEmbeddingProviderStore({ pool: bootPool }).ensureSchema();
+          pending.push(Promise.allSettled([booting]));
+          await waitForBlockedBy(pool, bootPid, deletePid);
+          await blocker.query("SELECT pg_advisory_unlock(hashtext('embedding_registry_delete_barrier'))");
+          const [deleted, booted] = (await Promise.all(pending)).flat();
+          assert.equal(deleted.status, 'fulfilled', deleted.reason?.stack);
+          assert.equal(booted.status, 'fulfilled', booted.reason?.stack);
+          if (action === 'legacy') assert.equal(deleted.value.rowCount, 1);
+          else assert.deepEqual(deleted.value, { removed: true });
+          assert.equal(await store.getProvider(workspaceId, config.tenantId), null);
+        } finally {
+          await blocker.query("SELECT pg_advisory_unlock(hashtext('embedding_registry_delete_barrier'))");
+          await pool.query('SELECT pg_cancel_backend(pid) FROM unnest($1::integer[]) AS pid', [[deletePid, bootPid]]);
+          await Promise.all(pending);
+          blocker.release();
+          await Promise.all([deletingPool.end(), bootPool.end()]);
+        }
+      });
+    }
+    await pool.query('DROP TRIGGER aa_pause_embedding_delete ON workspace_embedding_connections');
+    await pool.query('DROP FUNCTION pause_embedding_delete()');
 
     // Concurrent public store writes cannot overrun the cap or create two defaults.
     const results = await Promise.allSettled(Array.from({ length: 34 }, (_, i) => store.createConnection('race', { ...config, connectionId: `conn-${i}`, isDefault: true })));

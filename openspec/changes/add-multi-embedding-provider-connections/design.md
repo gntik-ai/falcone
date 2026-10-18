@@ -27,6 +27,9 @@ A legacy mirror trigger forwards old-executor inserts and updates to the default
 promoting or creating `default` when needed, and deletes only the default. Deletes
 fail with `EMBEDDING_CONNECTION_IN_USE` if an explicit mapping names it. The copy,
 mirror and current writes retain the LLM pattern's lock ordering.
+Schema setup acquires connection index and trigger locks before upgrading the
+mapping schema. This matches connection deletion's connections-then-mappings
+order, preventing a rolling-upgrade boot from deadlocking with an in-flight delete.
 
 Accepted rollout/rollback risk: old images read legacy data and cannot see edits
 made exclusively through the new registry. Old-image writes still mirror forward.
@@ -52,3 +55,7 @@ guards and mapping selection. PostgreSQL integration covers copy fidelity,
 idempotency, concurrency and the old executor's SQL. Persistence and purge tests
 exercise the new registry. CI requires the database suite and existing LLM and
 embedding regressions; database execution remains pending in the maker sandbox.
+The unit store seam models PostgreSQL relation-lock conflicts and reproduces
+overlapping schema setup and singular/plural deletion without a database. The
+real-Postgres suite pauses each current and legacy delete inside a trigger,
+waits for schema setup to block, and checks both operations finish after release.
