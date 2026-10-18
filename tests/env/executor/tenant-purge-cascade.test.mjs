@@ -4,6 +4,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
+import { createEmbeddingProviderStore } from '../../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
 import * as store from '../../../apps/control-plane/tenant-store.mjs';
 
 const { Pool } = pg;
@@ -68,6 +69,11 @@ const SCHEMA = `
 `;
 
 async function seed(ten, ws, dbname) {
+  const embeddings = createEmbeddingProviderStore({ pool });
+  await embeddings.createConnection(ws, { tenantId: ten, connectionId: 'temporary-default', model: 'mock' });
+  await embeddings.createConnection(ws, { tenantId: ten, connectionId: 'non-default', model: 'mock' });
+  await embeddings.deleteConnection(ws, 'temporary-default', ten);
+  assert.equal((await embeddings.getConnection(ws, 'non-default', ten)).isDefault, false);
   await pool.query("INSERT INTO tenants (id,slug,display_name,iam_realm) VALUES ($1,$1,$1,$1)", [ten]);
   await pool.query('INSERT INTO workspaces (id,tenant_id,slug,display_name) VALUES ($1,$2,$1,$1)', [ws, ten]);
   await pool.query('INSERT INTO workspace_databases (id,workspace_id,tenant_id,engine,database_name,mode,username,host,port) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [`db_${ws}`, ws, ten, 'postgresql', dbname, 'shared', 'falcone', 'h', 5432]);
@@ -113,6 +119,7 @@ before(async () => {
   await bootstrap.query(`CREATE DATABASE ${PROBE_DB}`);
   pool = new Pool({ connectionString: url(PROBE_DB), max: 2 });
   await pool.query(SCHEMA);
+  await createEmbeddingProviderStore({ pool }).ensureSchema();
   await seed(TEN, WS, 'wsdb_purge_me');
   await seed(OTHER, OWS, 'wsdb_keep_me');
   // Mirror the FORCE RLS table set from chart migration 20260612-004-flow-rls.sql
@@ -146,7 +153,7 @@ after(async () => {
   if (bootstrap) { await bootstrap.query(`DROP DATABASE IF EXISTS ${PROBE_DB}`).catch(() => {}); await bootstrap.query('DROP ROLE IF EXISTS cp_purge_app_probe').catch(() => {}); await bootstrap.query('DROP ROLE IF EXISTS cp_purge_metadata_probe').catch(() => {}); await bootstrap.end().catch(() => {}); }
 });
 
-const TABLES = ['workspaces', 'workspace_databases', 'workspace_buckets', 'workspace_topics', 'workspace_functions', 'fn_actions', 'service_accounts', 'workspace_api_keys', 'async_operations', 'async_operation_transitions', 'flow_definitions', 'flow_versions', 'flow_schedules', 'flow_trigger_secrets', 'flow_trigger_registrations', 'tenant_plan_assignments', 'tenant_plan_change_history', 'tenant_plan_quota_impacts', 'tenant_plan_capability_impacts', 'workspace_sub_quotas', 'saga_instances', 'service_account_rotation_states', 'service_account_rotation_history', 'tenant_rotation_policies', ...EXTRA_TABLES];
+const TABLES = ['workspace_embedding_connections', 'workspaces', 'workspace_databases', 'workspace_buckets', 'workspace_topics', 'workspace_functions', 'fn_actions', 'service_accounts', 'workspace_api_keys', 'async_operations', 'async_operation_transitions', 'flow_definitions', 'flow_versions', 'flow_schedules', 'flow_trigger_secrets', 'flow_trigger_registrations', 'tenant_plan_assignments', 'tenant_plan_change_history', 'tenant_plan_quota_impacts', 'tenant_plan_capability_impacts', 'workspace_sub_quotas', 'saga_instances', 'service_account_rotation_states', 'service_account_rotation_history', 'tenant_rotation_policies', ...EXTRA_TABLES];
 
 test('metadata owner without BYPASSRLS discloses all fifteen FORCE RLS tables and succeeds idempotently', async () => {
   const tenant = 'tenant_restricted'; const workspace = 'ws_restricted';

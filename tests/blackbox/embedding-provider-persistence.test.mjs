@@ -17,6 +17,7 @@
 //
 // Tests: bbx-emb-persist-01 .. bbx-emb-persist-06
 import test from 'node:test';
+import { serverFetch } from './helpers/embedding-connections.mjs';
 import assert from 'node:assert/strict';
 
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
@@ -37,6 +38,7 @@ const authHeaders = {
   'x-tenant-id': TEN,
   'x-workspace-id': WS,
   'x-auth-subject': 'admin-1',
+  'x-actor-roles': 'tenant_admin',
 };
 
 // A registry is required by createControlPlaneServer but the embedding-provider routes never
@@ -48,12 +50,11 @@ function makeRegistry() {
 async function withServer({ embeddingExecutor }, fn) {
   const registry = makeRegistry();
   const server = createControlPlaneServer({ registry, embeddingExecutor, logger: { error() {} } });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const fetch = serverFetch(server);
   try {
-    return await fn(baseUrl);
+    return await fn(fetch);
   } finally {
-    await new Promise((r) => server.close(r));
+    server.close();
     await registry.end().catch(() => {});
   }
 }
@@ -64,8 +65,8 @@ const embPath = (ws = WS) => `/v1/workspaces/${ws}/embedding-provider`;
 // and the response exposes only a secretRef (no plaintext key).
 test('bbx-emb-persist-01: PUT embedding-provider returns 200 and stores only a secretRef when wired', async () => {
   const embeddingExecutor = createEmbeddingExecutor({ store: createEmbeddingProviderStore() });
-  await withServer({ embeddingExecutor }, async (baseUrl) => {
-    const res = await fetch(`${baseUrl}${embPath()}`, {
+  await withServer({ embeddingExecutor }, async (fetch) => {
+    const res = await fetch(embPath(), {
       method: 'PUT',
       headers: authHeaders,
       body: JSON.stringify({
@@ -88,14 +89,14 @@ test('bbx-emb-persist-01: PUT embedding-provider returns 200 and stores only a s
 // bbx-emb-persist-02: replacing an existing provider (second PUT) returns the re-index warning.
 test('bbx-emb-persist-02: replacing a provider via the route returns the re-index warning', async () => {
   const embeddingExecutor = createEmbeddingExecutor({ store: createEmbeddingProviderStore() });
-  await withServer({ embeddingExecutor }, async (baseUrl) => {
-    const first = await fetch(`${baseUrl}${embPath()}`, {
+  await withServer({ embeddingExecutor }, async (fetch) => {
+    const first = await fetch(embPath(), {
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ providerType: 'openai', model: 'm', secretRef: { name: 'BYOK_K1' } }),
     });
     assert.equal((await first.json()).warning, undefined, 'first deploy has no warning');
 
-    const second = await fetch(`${baseUrl}${embPath()}`, {
+    const second = await fetch(embPath(), {
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ providerType: 'cohere', model: 'embed-english-v3', secretRef: { name: 'BYOK_K2' } }),
     });
@@ -109,12 +110,12 @@ test('bbx-emb-persist-02: replacing a provider via the route returns the re-inde
 // bbx-emb-persist-03: DELETE embedding-provider returns 200 { removed: true } when wired.
 test('bbx-emb-persist-03: DELETE embedding-provider returns 200 removed:true when wired', async () => {
   const embeddingExecutor = createEmbeddingExecutor({ store: createEmbeddingProviderStore() });
-  await withServer({ embeddingExecutor }, async (baseUrl) => {
-    await fetch(`${baseUrl}${embPath()}`, {
+  await withServer({ embeddingExecutor }, async (fetch) => {
+    await fetch(embPath(), {
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ providerType: 'openai', model: 'm', secretRef: { name: 'BYOK_K' } }),
     });
-    const del = await fetch(`${baseUrl}${embPath()}`, { method: 'DELETE', headers: authHeaders });
+    const del = await fetch(embPath(), { method: 'DELETE', headers: authHeaders });
     assert.equal(del.status, 200);
     assert.deepEqual(await del.json(), { removed: true });
   });
@@ -123,15 +124,15 @@ test('bbx-emb-persist-03: DELETE embedding-provider returns 200 removed:true whe
 // bbx-emb-persist-04: with NO embeddingExecutor wired, the routes return 501 EMBEDDING_DISABLED.
 // This is the bug the change fixes — the guard fires ONLY when the executor is absent.
 test('bbx-emb-persist-04: routes return 501 EMBEDDING_DISABLED when the executor is NOT wired', async () => {
-  await withServer({ embeddingExecutor: undefined }, async (baseUrl) => {
-    const put = await fetch(`${baseUrl}${embPath()}`, {
+  await withServer({ embeddingExecutor: undefined }, async (fetch) => {
+    const put = await fetch(embPath(), {
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ providerType: 'openai', model: 'm', secretRef: { name: 'BYOK_K' } }),
     });
     assert.equal(put.status, 501);
     assert.equal((await put.json()).code, 'EMBEDDING_DISABLED');
 
-    const del = await fetch(`${baseUrl}${embPath()}`, { method: 'DELETE', headers: authHeaders });
+    const del = await fetch(embPath(), { method: 'DELETE', headers: authHeaders });
     assert.equal(del.status, 501);
     assert.equal((await del.json()).code, 'EMBEDDING_DISABLED');
   });

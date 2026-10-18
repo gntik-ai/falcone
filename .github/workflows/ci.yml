@@ -58,7 +58,13 @@ jobs:
 
       - name: LLM provider tests
         run: |
-          node --test tests/blackbox/llm-stores.test.mjs \
+          node --test tests/blackbox/embedding-provider-connections.test.mjs \
+            tests/blackbox/embedding-provider-legacy-compat.test.mjs \
+            tests/blackbox/embedding-provider-persistence.test.mjs \
+            tests/blackbox/embedding-provider-get-roundtrip.test.mjs \
+            tests/blackbox/auto-embedding-write.test.mjs \
+            tests/blackbox/vector-search-embedding.test.mjs \
+            tests/blackbox/llm-stores.test.mjs \
             tests/blackbox/llm-completion-routes.test.mjs \
             tests/blackbox/llm-connection-selection.test.mjs \
             tests/blackbox/llm-provider-connections-registry.test.mjs \
@@ -332,6 +338,12 @@ jobs:
           LLM_CONNECTIONS_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
           LLM_CONNECTIONS_TEST_REQUIRED: '1'
         run: node --test tests/integration/llm-provider-connections-postgres.test.mjs
+
+      - name: Real Postgres embedding connection registry
+        env:
+          EMBEDDING_CONNECTIONS_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+          EMBEDDING_CONNECTIONS_TEST_REQUIRED: '1'
+        run: node --test tests/integration/embedding-provider-connections-postgres.test.mjs
 
       - name: Real Postgres LLM batches
         env:
