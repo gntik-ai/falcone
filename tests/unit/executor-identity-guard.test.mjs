@@ -48,10 +48,7 @@ test('refusal names configuration variables without disclosing their values', ()
   const sampleUrl = 'https://identity.example.test/realms/sample/protocol/openid-connect/certs';
   assert.throws(() => assertIdentityVerification({ jwtVerifier: undefined, env: { KEYCLOAK_JWKS_URL: sampleUrl, EXECUTOR_ALLOW_UNVERIFIED_IDENTITY: 'private-sample-value' } }), (error) => {
     assert.equal(error.code, 'EXECUTOR_JWT_VERIFIER_REQUIRED');
-    assert.match(error.message, /KEYCLOAK_JWKS_URL/);
-    assert.match(error.message, /EXECUTOR_ALLOW_UNVERIFIED_IDENTITY/);
-    assert.ok(!error.message.includes(sampleUrl));
-    assert.ok(!error.message.includes('private-sample-value'));
+    assert.equal(error.message, 'KEYCLOAK_JWKS_URL is required unless EXECUTOR_ALLOW_UNVERIFIED_IDENTITY is explicitly enabled for local development');
     return true;
   });
 });
