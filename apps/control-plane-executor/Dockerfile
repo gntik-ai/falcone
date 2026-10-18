@@ -46,6 +46,7 @@ COPY packages/internal-contracts/src /app/packages/internal-contracts/src
 # package.json) from /app/node_modules via the upward walk.
 COPY packages/mongo-cdc-bridge/src /app/packages/mongo-cdc-bridge/src
 COPY apps/workflow-worker/src/activities/catalog-names.mjs /app/apps/workflow-worker/src/activities/catalog-names.mjs
+COPY apps/workflow-worker/src/activities/llm-batch-schema.mjs /app/apps/workflow-worker/src/activities/llm-batch-schema.mjs
 COPY packages/provisioning-orchestrator/src /app/packages/provisioning-orchestrator/src
 COPY packages/audit/src /app/packages/audit/src
 COPY packages/webhook-engine/src /app/packages/webhook-engine/src

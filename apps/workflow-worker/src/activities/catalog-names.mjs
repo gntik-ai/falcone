@@ -15,4 +15,5 @@ export const TASK_TYPE_NAMES = Object.freeze([
   'http.request',
   'email.send',
   'llm.complete',
+  'llm.batch',
 ]);

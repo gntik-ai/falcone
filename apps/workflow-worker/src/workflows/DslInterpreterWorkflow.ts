@@ -6,7 +6,7 @@
  * EVERYTHING in this module runs inside the Temporal deterministic V8 isolate. It uses
  * ONLY Temporal SDK constructs (proxyActivities, sleep, condition, setHandler,
  * executeChild, CancellationScope) and pure helpers from ../shared. There is NO
- * Date.now / Math.random / fetch / I/O here — those would break replay determinism. CEL
+ * host clock / Math.random / fetch / I/O here. Date.now uses the SDK workflow clock. CEL
  * evaluation is delegated to the `evaluateExpression` ACTIVITY (design.md D4), never run
  * inline, so the expression engine's internals stay off the deterministic path.
  *
@@ -35,6 +35,11 @@ import {
   ApplicationFailure,
   workflowInfo,
   patched,
+  ActivityCancellationType,
+  CancelledFailure,
+  isCancellation,
+  log,
+  type ActivityOptions,
 } from '@temporalio/workflow';
 import type { Duration } from '@temporalio/common';
 import type * as activities from '../activities';
@@ -43,6 +48,7 @@ import { mapRetryPolicy, mapActivityTimeouts, isoDurationToMs } from '../shared/
 import {
   isReferenceInput,
   type WorkflowInput,
+  type ActivityInput,
   type WorkflowResult,
   type FlowDefinition,
   type FlowNode,
@@ -211,6 +217,7 @@ export async function DslInterpreterWorkflow(input: WorkflowInput): Promise<Work
    * per-task RetryPolicy / timeouts mapped VERBATIM from the DSL.
    */
   async function runTask(node: TaskNode): Promise<string | undefined> {
+    if (node.taskType === 'llm.batch' && patched('add-llm-batch-flow-task')) return runBatchTask(node);
     const retry = mapRetryPolicy(node.retryPolicy);
     const timeouts = mapActivityTimeouts(node.retryPolicy);
     // A fresh proxy per node carries this node's activityId + retry/timeout options. When
@@ -231,6 +238,79 @@ export async function DslInterpreterWorkflow(input: WorkflowInput): Promise<Work
     });
     state = { ...state, [node.id]: result.output };
     return node.next;
+  }
+
+  /** Provider batches wait in workflow timers; activities only submit/read/collect. */
+  async function runBatchTask(node: TaskNode): Promise<string | undefined> {
+    let counter = 0;
+    const compactNode: TaskNode = { id: node.id, type: 'task', taskType: 'llm.batch' };
+    const params = node.input ?? {};
+    const scope = CancellationScope.current();
+    let start: { deadline: number; credentialExpiresAt: number } | undefined;
+    let batchId: string | undefined;
+    type Phase = NonNullable<ActivityInput['batchPhase']>['phase'];
+    async function call(phase: Phase, options: ActivityOptions, phaseParams: Record<string, unknown> = {}) {
+      const proxy = proxyActivities<typeof activities>({
+        startToCloseTimeout: '1 minute', ...options, activityId: activityIdForNode(node.id, counter++),
+      });
+      const result = await proxy.executeTask({ nodeId: node.id, taskType: 'llm.batch', node: compactNode,
+        params: phaseParams, tenant, batchPhase: { phase, ...(batchId ? { batchId } : {}) } });
+      return result.output;
+    }
+    const exceeded = () => ApplicationFailure.nonRetryable('LLM batch wait exceeded', 'LLM_BATCH_WAIT_EXCEEDED', { batchId });
+    // Date.now is replaced by Temporal with its deterministic, replay-safe workflow clock.
+    const remaining = () => start!.deadline - Date.now();
+    const boundedOptions = (): ActivityOptions => {
+      if (remaining() <= 0) throw exceeded();
+      return { scheduleToCloseTimeout: remaining(), retry: { maximumAttempts: 5 } };
+    };
+    try {
+      start = await call('start', { scheduleToCloseTimeout: 60000 }, {
+        ...(params.pollSeconds !== undefined ? { pollSeconds: params.pollSeconds } : {}),
+        ...(params.maxWaitSeconds !== undefined ? { maxWaitSeconds: params.maxWaitSeconds } : {}),
+      }) as { deadline: number; credentialExpiresAt: number };
+      if (scope.consideredCancelled) throw new CancelledFailure('Flow run cancelled');
+      const submitted = await call('submit', {
+        startToCloseTimeout: Math.max(120000, Number(mapActivityTimeouts(node.retryPolicy).startToCloseTimeout ?? 0)),
+        scheduleToCloseTimeout: 600000, retry: mapRetryPolicy(node.retryPolicy),
+        cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+      }, { ...params }) as { batchId: string };
+      batchId = submitted.batchId;
+      if (scope.consideredCancelled) throw new CancelledFailure('Flow run cancelled');
+      let interval = Number(params.pollSeconds ?? 60) * 1000;
+      while (remaining() > 0) {
+        await sleep(Math.min(interval, remaining()));
+        const status = await call('status', boundedOptions()) as { status: string };
+        if (scope.consideredCancelled) throw new CancelledFailure('Flow run cancelled');
+        if (['completed', 'cancelled', 'expired', 'incomplete', 'failed'].includes(status.status)) {
+          const output = await call('collect', boundedOptions());
+          if (scope.consideredCancelled) throw new CancelledFailure('Flow run cancelled');
+          state = { ...state, [node.id]: output };
+          return node.next;
+        }
+        interval = Math.min(interval * 2, 600000);
+      }
+      throw exceeded();
+    } catch (error) {
+      // Submit may settle with an ordinary failure after the cancellation request. The
+      // scope, rather than the phase's final error class, decides whether cleanup is due.
+      if (scope.consideredCancelled || isCancellation(error)) {
+        if (start) {
+          await CancellationScope.nonCancellable(async () => {
+            const bound = Math.min(300000, start!.credentialExpiresAt - Date.now() - 60000);
+            try {
+              if (bound > 0) await call('cancel', { scheduleToCloseTimeout: bound, retry: { maximumAttempts: 3 } });
+              else log.warn('LLM batch cleanup credential window elapsed', { nodeId: node.id, batchId });
+            } catch {
+              log.warn('LLM batch cancellation cleanup failed', { nodeId: node.id, batchId });
+            }
+          });
+        }
+        throw new CancelledFailure('Flow run cancelled');
+      }
+      if (start && remaining() <= 0) throw exceeded();
+      throw error;
+    }
   }
 
   /**

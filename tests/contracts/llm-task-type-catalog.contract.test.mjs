@@ -5,6 +5,7 @@
 // well-formed llm.complete descriptor; and the APISIX gateway forwards the LLM subpaths to the
 // executor (else they 404 NO_ROUTE on the control-plane).
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -86,4 +87,31 @@ test('both llm.complete catalogs accept the same optional literal connectionId',
       assert.equal(validate({ model: 'fixture-model', connectionId }), false);
     }
   }
+});
+
+test('llm.batch has the same bounded literal input schema in the descriptor and worker registry', async () => {
+  assert.ok(TASK_TYPE_NAMES.includes('llm.batch'));
+  const { resolveActivity } = await import('../../apps/workflow-worker/src/activities/catalog.mjs');
+  const { llmBatchInputSchema } = await import('../../apps/workflow-worker/src/activities/llm-batch.mjs');
+  const descriptor = buildTaskTypeCatalog().find(d => d.id === 'llm.batch');
+  assert.equal(descriptor.category, 'ai');
+  assert.deepEqual(descriptor.inputSchema, llmBatchInputSchema);
+  assert.deepEqual(resolveActivity('llm.batch').inputSchema, llmBatchInputSchema);
+  const validate = new Ajv({ strict: false }).compile(llmBatchInputSchema);
+  const valid = { model: 'fixture-model', items: [{ customId: 'one', prompt: 'hello' }] };
+  assert.equal(validate(valid), true);
+  for (const invalid of [{ ...valid, workspaceId: 'foreign' }, { ...valid, items: [] },
+    { ...valid, items: Array(1001).fill(valid.items[0]) }, { ...valid, items: [{ customId: 'bad.id', prompt: 'x' }] },
+    { ...valid, items: [{ ...valid.items[0], extra: true }] }, { ...valid, pollSeconds: 29 },
+    { ...valid, pollSeconds: 601 }, { ...valid, maxWaitSeconds: 59 }, { ...valid, maxWaitSeconds: 82801 }]) {
+    assert.equal(validate(invalid), false);
+  }
+});
+
+// Pin the existing descriptor bytes from immutable base 4a93293 (#1185 replay contract).
+test('llm.complete descriptor remains byte-for-byte unchanged', () => {
+  const source = readFileSync(new URL('../../apps/control-plane-executor/src/runtime/flow-task-types.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf("  {\n    id: 'llm.complete'");
+  const end = source.indexOf('\n  },', start) + 6;
+  assert.equal(createHash('sha256').update(source.slice(start, end)).digest('hex'), '9c7f14588dcab3b96530d2c9067254e0b0a727cf55bb54c76ef2bfc037babffd');
 });

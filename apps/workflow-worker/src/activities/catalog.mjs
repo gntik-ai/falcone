@@ -19,6 +19,7 @@ import { functionsInvoke, functionsInvokeInputSchema, functionsInvokeOutputSchem
 import { eventsPublish, eventsPublishInputSchema, eventsPublishOutputSchema } from './events-publish.mjs';
 import { httpRequest, httpRequestInputSchema, httpRequestOutputSchema } from './http-request.mjs';
 import { emailSend, emailSendInputSchema, emailSendOutputSchema } from './email-send.mjs';
+import { llmBatch, llmBatchInputSchema, llmBatchOutputSchema } from './llm-batch.mjs';
 import { llmComplete, llmCompleteInputSchema, llmCompleteOutputSchema } from './llm-complete.mjs';
 
 // Register once at module load. Each entry carries the activity plus its input/output
@@ -31,6 +32,8 @@ registerActivity('events.publish', { activity: eventsPublish, inputSchema: event
 registerActivity('http.request', { activity: httpRequest, inputSchema: httpRequestInputSchema, outputSchema: httpRequestOutputSchema });
 registerActivity('email.send', { activity: emailSend, inputSchema: emailSendInputSchema, outputSchema: emailSendOutputSchema });
 registerActivity('llm.complete', { activity: llmComplete, inputSchema: llmCompleteInputSchema, outputSchema: llmCompleteOutputSchema });
+
+registerActivity('llm.batch', { activity: llmBatch, inputSchema: llmBatchInputSchema, outputSchema: llmBatchOutputSchema });
 
 // Self-check: the registered names MUST equal the Temporal-free canonical list the
 // control-plane validate endpoint consumes. A mismatch is a load-time bug.
@@ -76,8 +79,8 @@ export async function dispatchTask(input, deps = {}) {
   assertPayloadSize(input, 'input');
 
   const entry = _registry().get(input.taskType);
-  if (!entry) {
-    // Unregistered taskType → interpreter echo seam (graph-walk fixtures). Production
+  if (!entry || (input.taskType === 'llm.batch' && input.batchPhase === undefined)) {
+    // Unregistered types and pre-patch, phase-less llm.batch histories retain the echo. Production
     // definitions cannot reach here with an unknown type: FLW-E006 rejects them first. No
     // tenant data store is touched, so the per-execution token is not validated here.
     return {
@@ -95,9 +98,11 @@ export async function dispatchTask(input, deps = {}) {
   const token = input.tenant?.executionTokenRef !== undefined
     ? await resolveExecutionTokenRef(input.tenant, deps)
     : input.tenant?.executionToken;
-  assertExecutionToken(token, input.tenant?.tenantId, input.tenant?.workspaceId);
+  const credentialPayload = assertExecutionToken(token, input.tenant?.tenantId, input.tenant?.workspaceId);
   const output = await entry.activity(
-    { params: input.params ?? {}, tenant: input.tenant, credential: deps.credential },
+    { params: input.params ?? {}, tenant: input.tenant, credential: deps.credential,
+      ...(input.taskType === 'llm.batch' ? { batchPhase: input.batchPhase, credentialExpiresAt: credentialPayload.expiresAt } : {}),
+    },
     deps,
   );
   return { nodeId: input.nodeId, taskType: input.taskType, output };

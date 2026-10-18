@@ -49,7 +49,7 @@ test('Postgres batch schema, unique binding, lease race, atomic usage, submittin
     await assert.rejects(pool.query("UPDATE workspace_llm_batch_items SET status='bogus' WHERE batch_id=$1", [id]), { code: '23514' });
     await assert.rejects(pool.query(`INSERT INTO workspace_llm_batches SELECT tenant_id,workspace_id,'duplicate',connection_id,provider_type,endpoint,secret_ref,model,
       provider_batch_id,provider_state,status,request_count,provider_counts,missing_count,input_sha256,idempotency_principal,idempotency_key_sha256,last_error_code,
-      cancel_requested_at,cancel_acknowledged_at,expires_at,ended_at,results_attempts,next_poll_at,created_at,updated_at,lease_owner,lease_expires_at,lease_version
+      cancel_requested_at,cancel_acknowledged_at,expires_at,ended_at,results_attempts,next_poll_at,created_at,updated_at,lease_owner,lease_expires_at,lease_version,cancel_fence
       FROM workspace_llm_batches WHERE batch_id=$1`, [id]), { code: '23505' });
     await assert.rejects(store.get('ws', id, 'foreign'), { code: 'LLM_BATCH_NOT_FOUND' });
     time += 60000;
@@ -64,6 +64,29 @@ test('Postgres batch schema, unique binding, lease race, atomic usage, submittin
     assert.equal((await executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
     await assert.rejects(store.ingest(lease, { customId: 'one', status: 'succeeded', usage: { totalTokens: 99 } }, usageStore), { code: 'LLM_BATCH_LEASE_LOST' });
     assert.equal((await executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
+
+    await t.test('concurrent cancellation fence and submit share one binding, retaining ordinary row checks', async () => {
+      await assert.rejects(pool.query('UPDATE workspace_llm_batches SET input_sha256=NULL WHERE batch_id=$1', [id]), { code: '23514' });
+      await assert.rejects(pool.query('UPDATE workspace_llm_batches SET request_count=0 WHERE batch_id=$1', [id]), { code: '23514' });
+      for (let i = 0; i < 10; i++) {
+        const raceIdentity = { ...identity, principal: 'flow-run:workflow:run', idempotencyKey: `fence-race-${i}` };
+        const [cancel, submit] = await Promise.all([
+          other.cancelBatchByIdentity('ws', raceIdentity), executor.submitBatch('ws', request, raceIdentity),
+        ]);
+        assert.equal(cancel.batchId, submit.body.batchId);
+        const rows = (await pool.query('SELECT * FROM workspace_llm_batches WHERE tenant_id=$1 AND workspace_id=$2 AND idempotency_principal=$3',
+          ['tenant', 'ws', raceIdentity.principal])).rows;
+        assert.equal(rows.length, 1);
+        const row = rows[0];
+        if (row.cancel_fence) {
+          assert.equal(row.input_sha256, null); assert.equal(row.request_count, 0); assert.equal(row.status, 'cancelled');
+          assert.deepEqual((await executor.listBatchItems('ws', cancel.batchId, { tenantId: 'tenant' })).items, []);
+          assert.deepEqual(await store.claim({ now: time + 86400000, owner: 'fence', batchId: cancel.batchId, workspaceId: 'ws', tenantId: 'tenant' }), []);
+        } else assert.ok(row.cancel_requested_at);
+        await pool.query('DELETE FROM workspace_llm_batches WHERE batch_id=$1', [cancel.batchId]);
+      }
+      await store.ensureSchema(); // Re-enter the advisory-locked migration on an existing table.
+    });
 
     await t.test('item pages apply status, ASCII cursor order and limits', async () => {
       const pagingId = (await executor.submitBatch('ws', { items: ['a', 'Z', '_', '0'].map(customId => ({ customId, prompt: 'hello' })) },

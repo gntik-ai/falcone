@@ -137,6 +137,7 @@ export interface ActivityInput {
   node: TaskNode;
   params: Record<string, unknown>;
   tenant: TenantContext;
+  batchPhase?: { phase: 'start' | 'submit' | 'status' | 'collect' | 'cancel'; batchId?: string };
 }
 
 /** Generic activity result. The catalog refines this per task type. */

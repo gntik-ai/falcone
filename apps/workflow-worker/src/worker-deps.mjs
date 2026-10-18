@@ -130,6 +130,7 @@ export async function wireActivityDeps(opts = {}) {
   let registry = opts.registry;
   let keyPool;
   let executeLlmComplete;
+  let executeLlmBatch;
   let loadFlowDefinition;
   let executionCredentials;
 
@@ -142,6 +143,7 @@ export async function wireActivityDeps(opts = {}) {
       pgModule,
       { withPostgresSsl },
       { createExecutionCredentialStore },
+      { createLlmBatchStore },
     ] = await Promise.all([
       dynamicImport('../../../apps/control-plane-executor/src/runtime/connection-registry.mjs'),
       dynamicImport('../../../apps/control-plane-executor/src/runtime/workspace-dsn-resolver.mjs'),
@@ -150,6 +152,7 @@ export async function wireActivityDeps(opts = {}) {
       dynamicImport('pg'),
       dynamicImport('../../../packages/internal-contracts/src/transport-security.mjs'),
       dynamicImport('../../../packages/internal-contracts/src/flow-execution-credentials.mjs'),
+      dynamicImport('../../../apps/control-plane-executor/src/runtime/llm-batch-store.mjs'),
     ]);
 
     const dsn = buildDataDsn(process.env);
@@ -172,9 +175,14 @@ export async function wireActivityDeps(opts = {}) {
     const llmExecutor = createLlmExecutor({
       providerStore: createLlmProviderStore({ pool: keyPool }),
       usageStore: createLlmUsageStore({ pool: keyPool }),
+      batchStore: createLlmBatchStore({ pool: keyPool }),
       secretPrefixes: parseAllowedSecretPrefixes(process.env),
     });
     executeLlmComplete = (req = {}) => llmExecutor.complete(req.workspaceId, req);
+    executeLlmBatch = {
+      submit: llmExecutor.submitBatch, get: llmExecutor.getBatch, listItems: llmExecutor.listBatchItems,
+      cancel: llmExecutor.cancelBatch, cancelByIdentity: llmExecutor.cancelBatchByIdentity,
+    };
 
     // Load-by-reference resolver for the sub-flow node (#679). Bound to the same worker pool
     // (falcone_app on kind); the reader sets the RLS GUCs per transaction so the FORCE-RLS
@@ -189,6 +197,7 @@ export async function wireActivityDeps(opts = {}) {
     executePostgresData,
     pgRegistry: registry,
     ...(executeLlmComplete ? { executeLlmComplete } : {}),
+    ...(executeLlmBatch ? { executeLlmBatch } : {}),
     ...(loadFlowDefinition ? { loadFlowDefinition } : {}),
     ...(executionCredentials ? { executionCredentials } : {}),
   };

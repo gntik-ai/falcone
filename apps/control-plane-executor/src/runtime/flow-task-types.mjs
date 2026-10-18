@@ -18,6 +18,8 @@
 
 import { TASK_TYPE_NAMES } from '../../../../apps/workflow-worker/src/activities/catalog-names.mjs';
 
+import { llmBatchInputSchema } from '../../../../apps/workflow-worker/src/activities/llm-batch-schema.mjs';
+
 // One descriptor per first-party task type. Keep `id` aligned with TASK_TYPE_NAMES.
 const DESCRIPTORS = [
   {
@@ -180,6 +182,7 @@ const DESCRIPTORS = [
       additionalProperties: false,
     },
   },
+  { id: 'llm.batch', label: 'LLM Batch', category: 'ai', inputSchema: llmBatchInputSchema },
 ];
 
 /**
