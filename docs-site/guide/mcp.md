@@ -32,6 +32,39 @@ the platform's [not-production-ready](/) posture.
 Every source produces a **draft** tool set that must pass **curation** before it can serve traffic
 — Instant MCP never publishes a raw dump.
 
+## Before using the API examples
+
+Ask your operator for the console and identity hostnames, your tenant ID (also the realm),
+tenant slug, workspace ID, and a tenant account allowed to manage MCP servers. Replace the
+placeholders with those values. Use the console hostname for `/v1/...`; the operator must have
+configured issuer trust for the identity hostname (see [Installation](/guide/installation)).
+
+```bash
+export API="https://<console hostname>"
+export IAM="https://<identity hostname>"
+export TENANT_ID="<tenant ID and realm>"
+export TENANT_SLUG="<tenant slug>"
+export WS="<workspace ID>"
+export USERNAME="<tenant username>"
+export PASSWORD="<tenant user password>"
+```
+
+Get a tenant token with the tenant's public app client:
+
+```bash
+export TOKEN="$(curl -sS -X POST "$IAM/realms/${TENANT_ID}/protocol/openid-connect/token" \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -d grant_type=password -d client_id="${TENANT_SLUG}-app" \
+  -d username="$USERNAME" --data-urlencode "password=${PASSWORD}" \
+  -d scope=openid | jq -r .access_token)"
+```
+
+Prepare the authorization header:
+
+```bash
+export H="authorization: Bearer $TOKEN"
+```
+
 ## The management API
 
 The control-plane serves the MCP management API under
@@ -52,9 +85,14 @@ to `404`.
 End-to-end with Instant MCP (generates `query_<table>` / `insert_<table>` tools from a schema):
 
 ```bash
-# create → curate → publish → inspect → call → observe
+# create the draft server
 SID=$(curl -sX POST $API/v1/mcp/workspaces/$WS/servers -H "$H" \
   -d '{"name":"Acme","source":"instant"}' | jq -r .serverId)
+```
+
+Curate, publish, inspect, call and observe the new server:
+
+```bash
 curl -sX POST $API/v1/mcp/workspaces/$WS/servers/$SID/curations -H "$H" -d '{"decisions":{}}'
 curl -sX POST $API/v1/mcp/workspaces/$WS/servers/$SID/versions   -H "$H" -d '{"version":"v1"}'
 curl -s     $API/v1/mcp/workspaces/$WS/servers/$SID              -H "$H"   # → { endpoint, version, tools[] }

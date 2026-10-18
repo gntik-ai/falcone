@@ -18,6 +18,47 @@ Flows is functionally complete and runs end-to-end on the Temporal-backed engine
 under the platform's [not-production-ready](/) posture and requires Temporal to be deployed.
 :::
 
+## Before using the API examples
+
+Ask your operator for the console and identity hostnames, your tenant ID (also the realm),
+tenant slug, workspace ID, and a tenant account allowed to manage and run flows. Replace the
+placeholders with those values. Use the console hostname for `/v1/...`; the operator must have
+configured issuer trust for the identity hostname (see [Installation](/guide/installation)).
+
+```bash
+export API="https://<console hostname>"
+export IAM="https://<identity hostname>"
+export TENANT_ID="<tenant ID and realm>"
+export TENANT_SLUG="<tenant slug>"
+export WS="<workspace ID>"
+export USERNAME="<tenant username>"
+export PASSWORD="<tenant user password>"
+```
+
+Get a tenant token with the tenant's public app client:
+
+```bash
+export TOKEN="$(curl -sS -X POST "$IAM/realms/${TENANT_ID}/protocol/openid-connect/token" \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -d grant_type=password -d client_id="${TENANT_SLUG}-app" \
+  -d username="$USERNAME" --data-urlencode "password=${PASSWORD}" \
+  -d scope=openid | jq -r .access_token)"
+```
+
+Prepare the authorization header:
+
+```bash
+export H="authorization: Bearer $TOKEN"
+```
+
+The run and approval examples below use an existing published flow and a waiting execution.
+Copy their IDs from the console (or the create/run responses) before using those examples:
+
+```bash
+export FLOW="<flow ID>"
+export EXEC="<execution ID>"
+```
+
 ## Where flows live
 
 Everything is scoped to a **workspace** inside your tenant. The API family is rooted at
