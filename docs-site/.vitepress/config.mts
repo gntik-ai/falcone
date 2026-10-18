@@ -51,7 +51,6 @@ export default defineConfig({
             { text: 'Installation', link: '/guide/installation' },
             { text: 'Quickstart', link: '/guide/quickstart' },
             { text: 'Developer End-to-End', link: '/guide/developer-end-to-end' },
-            { text: 'Usage Examples', link: '/guide/examples' },
             { text: 'Flows (Workflows)', link: '/guide/flows' },
             { text: 'MCP Server Hosting', link: '/guide/mcp' },
           ],
