@@ -9,6 +9,7 @@ import { createConnectionRegistry } from '../../apps/control-plane-executor/src/
 // Each scenario takes a driver fixture. Follow-up drivers add fixtures to this matrix.
 export const drivers = [{
   name: 'anthropic', providerType: 'anthropic',
+  canceling() { return { ...this.accepted(), processing_status: 'canceling', cancel_initiated_at: '2026-10-18T00:00:00Z' }; },
   accepted: () => ({ type: 'message_batch', id: 'provider-batch', processing_status: 'in_progress',
     request_counts: { processing: 2, succeeded: 0, errored: 0, canceled: 0, expired: 0 },
     expires_at: '2026-10-19T00:00:00Z', ended_at: null, cancel_initiated_at: null }),
@@ -18,20 +19,38 @@ export const drivers = [{
     content: [{ type: 'text', text: `result ${id}` }], stop_reason: 'end_turn', usage: { input_tokens: 4, output_tokens: 6 } } } }),
   failure: (id, type = 'errored') => JSON.stringify({ custom_id: id, result: { type, ...(type === 'errored' ? { error: { type: 'invalid_request_error' } } : {}) } }),
   resultsPath: url => new URL(url).pathname.endsWith('/results'),
+}, {
+  name: 'openai-responses', providerType: 'openai-responses', endpoint: 'https://provider.example/v1/responses?version=1',
+  accepted: () => ({ object: 'batch', id: 'provider-batch', status: 'in_progress', request_counts: { total: 2, completed: 0, failed: 0 }, expires_at: 1792368000 }),
+  canceling() { return { ...this.accepted(), status: 'cancelling', cancelling_at: 1792281600 }; },
+  ended(counts = { succeeded: 1, errored: 1 }) { return { ...this.accepted(), status: counts.expired ? 'expired' : 'completed',
+    completed_at: 1792281600, expired_at: 1792281600, output_file_id: 'output',
+    request_counts: { total: Object.values(counts).reduce((a, b) => a + b, 0), completed: counts.succeeded ?? 0,
+      failed: (counts.errored ?? 0) + (counts.canceled ?? 0) + (counts.expired ?? 0) } }; },
+  success: id => JSON.stringify({ custom_id: id, response: { status_code: 200, body: { status: 'completed', model: 'fixture-model',
+    output: [{ type: 'message', content: [{ type: 'output_text', text: `result ${id}` }] }], usage: { input_tokens: 4, output_tokens: 6 } } } }),
+  failure: (id, type = 'errored') => JSON.stringify({ custom_id: id, ...(type === 'errored' ? { response: { status_code: 400 } }
+    : { error: { code: type === 'expired' ? 'batch_expired' : 'batch_cancelled' } }) }),
+  resultsPath: url => new URL(url).pathname.endsWith('/content'),
 }];
 const input = { items: [{ customId: 'one', prompt: 'hello' }, { customId: 'two', prompt: 'world' }] };
 async function setup(driver, options = {}) {
   let time = Date.parse('2026-10-18T00:00:00Z');
-  const calls = [];
+  const calls = [], fileCalls = [];
   const controls = { response: () => Response.json(driver.accepted()), dns: ['93.184.216.34'], secret: 'synthetic-placeholder', secretReads: 0 };
   const executorOptions = { now: () => time, fetchImpl: async (url, init) => {
+    if (driver.name === 'openai-responses' && !driver.resultsPath(url) && new URL(url).pathname.includes('/files')) {
+      fileCalls.push({ url, ...init });
+      if (controls.fileResponse) return controls.fileResponse(url, init);
+      return init.method === 'GET' ? new Response('', { status: 404 }) : Response.json({ id: 'input' });
+    }
     calls.push({ url, ...init }); return controls.response(url, init);
   }, endpointResolver: async () => controls.dns, secretResolver: () => { controls.secretReads++; return controls.secret; }, ...options };
   const executor = createLlmExecutor(executorOptions);
-  await executor.setProvider('ws', { tenantId: 'tenant', providerType: driver.providerType, endpoint: 'https://provider.example/messages?version=1',
+  await executor.setProvider('ws', { tenantId: 'tenant', providerType: driver.providerType, endpoint: driver.endpoint ?? 'https://provider.example/messages?version=1',
     allowedModels: ['fixture-model'], defaultModel: 'fixture-model', secretRef: { name: 'BYOK_FIXTURE' } });
   const submit = (body = input, key = 'test-key') => executor.submitBatch('ws', body, { tenantId: 'tenant', principal: 'subject:test', idempotencyKey: key });
-  return { executor, calls, controls, submit, advance: ms => { time += ms; }, now: () => time,
+  return { executor, calls, fileCalls, controls, submit, advance: ms => { time += ms; }, now: () => time,
     restart: () => createLlmExecutor({ ...executorOptions, providerStore: executor.providerStore, usageStore: executor.usageStore, batchStore: executor.batchStore }) };
 }
 
@@ -44,7 +63,7 @@ for (const driver of drivers) {
     await executor.removeProvider('ws', 'tenant');
     const replay = await submit({ items: input.items.map(({ customId, prompt }) => ({ prompt, customId })) });
     assert.equal(replay.status, 200); assert.equal(replay.body.batchId, id);
-    assert.equal(calls.length, 1); assert.equal(controls.secretReads, 1);
+    assert.equal(calls.length, 1); assert.equal(controls.secretReads, driver.name === 'openai-responses' ? 3 : 1);
     await assert.rejects(submit({ items: [{ customId: 'changed', prompt: 'different' }] }), { statusCode: 422, code: 'IDEMPOTENCY_KEY_MISMATCH' });
     const publicJson = JSON.stringify(result.body);
     for (const forbidden of ['synthetic-placeholder', 'BYOK_FIXTURE', 'leaseOwner', 'idempotencyKeySha256']) assert.equal(publicJson.includes(forbidden), false);
@@ -97,7 +116,7 @@ for (const driver of drivers) {
       ...Object.entries({ maxTokens: 128, temperature: 0.5, promptCache: 'system', prompt: 'ignored', system: 'ignored', messages: [{ role: 'user', content: 'ignored' }] })
         .map(([name, value]) => ({ ...input, [name]: value })),
       { items: [{ customId: 'one', prompt: 'x', maxTokens: 0 }] },
-      { items: [{ customId: 'one', prompt: 'x', responseFormat: { type: 'json_schema', name: 'x', schema: {} } }] }]) {
+      ...(driver.name === 'anthropic' ? [{ items: [{ customId: 'one', prompt: 'x', responseFormat: { type: 'json_schema', name: 'x', schema: {} } }] }] : [])]) {
       await assert.rejects(submit(bad), { statusCode: 400 });
     }
     await assert.rejects(submit({ ...input, model: 'forbidden' }), { statusCode: 422, code: 'MODEL_NOT_ALLOWED' });
@@ -211,7 +230,7 @@ for (const driver of drivers) {
       if (driver.resultsPath(url)) return new Response(`${driver.success('one')}\n${driver.failure('two', 'canceled')}\n`);
       if (init.method === 'POST') {
         cancels++;
-        return Response.json({ ...driver.accepted(), processing_status: 'canceling', cancel_initiated_at: '2026-10-18T00:00:00Z' });
+        return Response.json(driver.canceling());
       }
       return Response.json(ended ? driver.ended({ succeeded: 1, errored: 0, canceled: 1 }) : driver.accepted());
     };
@@ -238,7 +257,7 @@ for (const driver of drivers) {
             if (cancelFailure === 'network') throw new Error('cancel response lost');
             return new Response('', { status: cancelFailure });
           }
-          return Response.json({ ...driver.accepted(), processing_status: 'canceling', cancel_initiated_at: '2026-10-18T00:00:00Z' });
+          return Response.json(driver.canceling());
         }
         return Response.json(ended ? driver.ended({ succeeded: 0, errored: 0, canceled: 2 }) : driver.accepted());
       };
@@ -265,7 +284,7 @@ for (const driver of drivers) {
       if (driver.resultsPath(url)) return new Response(`${driver.success('one')}\n${driver.failure('two', 'canceled')}\n`);
       if (init.method === 'POST') {
         cancels++;
-        return Response.json({ ...driver.accepted(), processing_status: 'canceling', cancel_initiated_at: '2026-10-18T00:00:00Z' });
+        return Response.json(driver.canceling());
       }
       return Response.json(ended ? driver.ended({ succeeded: 1, errored: 0, canceled: 1 }) : driver.accepted());
     };
@@ -295,7 +314,7 @@ for (const driver of drivers) {
       const { executor, submit, controls, calls, advance } = await setup(driver);
       const id = (await submit()).body.batchId;
       controls.response = () => Response.json(acknowledged
-        ? { ...driver.accepted(), processing_status: 'canceling', cancel_initiated_at: '2026-10-18T00:00:00Z' }
+        ? driver.canceling()
         : driver.accepted());
       const first = await executor.cancelBatch('ws', id, { tenantId: 'tenant' });
       assert.equal(calls.length, 2);
@@ -325,11 +344,18 @@ for (const driver of drivers) {
     const cancelled = await executor.cancelBatch('ws', id, { tenantId: 'tenant' });
     assert.equal(cancelled.status, 'submit_uncertain');
     assert.equal(cancelled.nextPollAt, uncertain.nextPollAt); assert.equal(calls.length, 1);
+    if (driver.name === 'openai-responses') controls.response = () => Response.json({ object: 'list', data: [], has_more: false });
     advance(14 * 60000); await executor.reconcileBatches();
     assert.equal((await executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'submit_uncertain');
-    advance(60000); await executor.reconcileBatches();
+    if (driver.name === 'openai-responses') {
+      controls.response = () => Response.json({ object: 'list', data: [], has_more: false });
+      advance(10 * 60000); await executor.reconcileBatches();
+      assert.equal((await executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'submit_uncertain');
+      advance(25 * 3600000 - 24 * 60000);
+    } else advance(60000);
+    await executor.reconcileBatches();
     const failed = await executor.getBatch('ws', id, { tenantId: 'tenant' });
-    assert.equal(failed.status, 'failed'); assert.equal(failed.lastErrorCode, 'LLM_BATCH_SUBMIT_UNCERTAIN'); assert.equal(calls.length, 1);
+    assert.equal(failed.status, 'failed'); assert.equal(failed.lastErrorCode, 'LLM_BATCH_SUBMIT_UNCERTAIN'); assert.equal(calls.length, driver.name === 'openai-responses' ? 4 : 1);
     const { resolveBatchDriver } = await import('../../apps/control-plane-executor/src/runtime/llm-adapters/registry.mjs');
     const crashed = await setup(driver, { batchDriverResolver: () => ({ async submit(ctx) {
       await resolveBatchDriver(driver.providerType).submit(ctx); throw new Error('crash after creating call');
@@ -360,8 +386,8 @@ for (const driver of drivers) {
       if (mode === 'delete') await executor.removeProvider('ws', 'tenant');
       else await executor.setProvider('ws', { tenantId: 'tenant', providerType: driver.providerType, endpoint: 'https://replacement.example/other', allowedModels: ['fixture-model'], defaultModel: 'fixture-model', secretRef: { name: 'BYOK_OTHER' } });
       controls.secret = 'rotated-placeholder'; advance(60000); await executor.reconcileBatches();
-      assert.match(calls[1].url, /^https:\/\/provider.example\/messages\/batches\//);
-      assert.equal(calls[1].headers['x-api-key'], 'rotated-placeholder');
+      assert.match(calls[1].url, driver.name === 'openai-responses' ? /^https:\/\/provider.example\/v1\/batches\// : /^https:\/\/provider.example\/messages\/batches\//);
+      assert.equal(driver.name === 'openai-responses' ? calls[1].headers.Authorization : calls[1].headers['x-api-key'], driver.name === 'openai-responses' ? 'Bearer rotated-placeholder' : 'rotated-placeholder');
       controls.dns = ['127.0.0.1']; advance(60000); await executor.reconcileBatches();
       const blocked = await executor.getBatch('ws', id, { tenantId: 'tenant' });
       assert.equal(blocked.lastErrorCode, 'BYOK_ENDPOINT_BLOCKED'); assert.equal(Date.parse(blocked.nextPollAt) - now(), 600000);
@@ -508,3 +534,313 @@ for (const driver of drivers) {
     assert.equal(calls.length, 4); assert.equal((await executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
   });
 }
+
+const openai = drivers.find(driver => driver.name === 'openai-responses');
+const list = (data = [], has_more = false) => Response.json({ object: 'list', data, has_more });
+const listed = (id, extra = {}) => ({ ...openai.accepted(), id, created_at: 1792281600, input_file_id: 'other', metadata: {}, ...extra });
+async function uncertainOpenai() {
+  const fixture = await setup(openai);
+  fixture.controls.response = () => new Response('', { status: 502 });
+  const id = (await fixture.submit()).body.batchId;
+  fixture.controls.response = () => list();
+  return { ...fixture, id, row: () => fixture.executor.batchStore.get('ws', id, 'tenant') };
+}
+
+test('OpenAI uncertainty waits 25 hours and a post-deletion complete sweep; failed deletion and confirmation retry', async () => {
+  for (const failure of ['delete', 'confirmation']) {
+    const f = await uncertainOpenai();
+    let blocked = true;
+    f.controls.fileResponse = (url, init) => init.method === 'DELETE'
+      ? new Response('', { status: blocked && failure === 'delete' ? 503 : 200 })
+      : new Response('', { status: blocked && failure === 'confirmation' ? 200 : 404 });
+    f.advance(15 * 60000); await f.executor.reconcileBatches();
+    assert.equal((await f.row()).status, 'submit_uncertain');
+    assert.equal((await f.row()).providerState.inputFileDeletedAt, undefined);
+    f.advance(24 * 3600000); await f.executor.reconcileBatches();
+    assert.equal((await f.row()).status, 'submit_uncertain');
+    blocked = false; f.advance(600000); await f.executor.reconcileBatches();
+    assert.ok((await f.row()).providerState.inputFileDeletedAt);
+    assert.equal((await f.row()).status, 'submit_uncertain');
+    f.advance(35 * 60000 - 1); await f.executor.reconcileBatches();
+    assert.equal((await f.row()).status, 'submit_uncertain');
+    f.advance(1 + 600000); await f.executor.reconcileBatches();
+    assert.equal((await f.row()).status, 'failed');
+    assert.equal((await f.row()).lastErrorCode, 'LLM_BATCH_SUBMIT_UNCERTAIN');
+  }
+});
+
+test('OpenAI uncertainty finds page two and resumes beyond page five across restart', async () => {
+  for (const matchPage of [2, 7]) {
+    const f = await uncertainOpenai();
+    const pages = [];
+    f.controls.response = url => {
+      const after = new URL(url).searchParams.get('after');
+      const page = after ? Number(after.slice(1)) + 1 : 1;
+      pages.push(page);
+      assert.equal(new URL(url).searchParams.get('limit'), '100');
+      return page === matchPage ? list([listed('match', { input_file_id: 'input', metadata: { falcone_batch_id: f.id } })]) : list([listed(`p${page}`)], true);
+    };
+    f.advance(300000); await f.executor.reconcileBatches();
+    if (matchPage === 7) {
+      assert.deepEqual(pages, [1, 2, 3, 4, 5]);
+      assert.equal((await f.row()).providerState.sweepAfter, 'p5');
+      f.advance(600000); await f.restart().reconcileBatches();
+    }
+    assert.equal((await f.row()).status, 'in_progress'); assert.equal((await f.row()).providerBatchId, 'match');
+    assert.equal((await f.row()).providerState.sweepAfter, null);
+  }
+});
+
+test('OpenAI interrupted before persisted upload clears binding after five minutes; late fenced persist sends no create', async () => {
+  for (const crash of ['insert', 'upload']) {
+    let entered, release;
+    const waiting = new Promise(resolve => { entered = resolve; });
+    const held = new Promise(resolve => { release = resolve; });
+    const { createLlmBatchStore } = await import('../../apps/control-plane-executor/src/runtime/llm-batch-store.mjs');
+    const store = createLlmBatchStore();
+    const f = await setup(openai, { batchStore: { ...store, async update(row, patch) {
+      if ((crash === 'upload' && patch.providerState?.inputFileId) || (crash === 'insert' && row.status === 'submitting' && !row.leaseOwner && !patch.providerState)) {
+        entered(); await held;
+      }
+      return store.update(row, patch);
+    } } });
+    const submission = f.submit().then(value => ({ value }), error => ({ error }));
+    await waiting;
+    const id = (await f.executor.listBatches('ws', { tenantId: 'tenant' })).items[0].batchId;
+    f.controls.secret = null; // Interrupted-before-create recovery requires no provider access.
+    f.advance(300000); await f.executor.reconcileBatches();
+    const row = await store.get('ws', id, 'tenant');
+    assert.equal(row.status, 'failed'); assert.equal(row.lastErrorCode, 'LLM_BATCH_SUBMIT_INTERRUPTED');
+    assert.equal(row.idempotencyKeySha256, null);
+    release(); assert.equal((await submission).error.code, 'LLM_BATCH_LEASE_LOST');
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test('OpenAI reads output then errors, records usage once across retries, and deletes all three files after finish', async () => {
+  const f = await setup(openai), id = (await f.submit()).body.batchId;
+  let errorReady = false;
+  f.controls.response = url => {
+    const path = new URL(url).pathname;
+    if (path.endsWith('/output/content')) return new Response(openai.success('one'));
+    if (path.endsWith('/error/content')) return errorReady ? new Response(openai.failure('two')) : new Response('', { status: 503 });
+    return Response.json({ ...openai.ended(), error_file_id: 'error' });
+  };
+  f.advance(60000); await f.executor.reconcileBatches();
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'in_progress');
+  assert.equal(f.fileCalls.filter(c => c.method === 'DELETE').length, 0);
+  errorReady = true;
+  f.advance(600000); await f.restart().reconcileBatches();
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'completed');
+  const items = (await f.executor.listBatchItems('ws', id, { tenantId: 'tenant' })).items;
+  assert.deepEqual(items.map(item => item.providerDetail), [{ file: 'output', httpStatus: 200 }, { file: 'error', httpStatus: 400 }]);
+  assert.equal((await f.executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
+  assert.deepEqual(f.calls.filter(c => openai.resultsPath(c.url)).map(c => new URL(c.url).pathname), ['/v1/files/output/content', '/v1/files/error/content', '/v1/files/output/content', '/v1/files/error/content']);
+  assert.deepEqual(f.fileCalls.filter(c => c.method === 'DELETE').map(c => new URL(c.url).pathname), ['/v1/files/input', '/v1/files/output', '/v1/files/error']);
+  f.advance(600000); await f.executor.reconcileBatches();
+  assert.equal(f.fileCalls.filter(c => c.method === 'DELETE').length, 3);
+});
+
+test('OpenAI absent items require provider accounting; expiry keeps successes even with cancellation evidence', async () => {
+  for (const status of ['cancelled', 'expired']) {
+    const f = await setup(openai), id = (await f.submit()).body.batchId;
+    f.controls.response = url => openai.resultsPath(url) ? new Response(openai.success('one')) : Response.json({ ...openai.ended(), status,
+      request_counts: { total: 2, completed: 1, failed: 0 }, cancelled_at: 1792281600, cancelling_at: 1792281600 });
+    f.advance(60000); await f.executor.reconcileBatches();
+    assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, status);
+    assert.deepEqual((await f.executor.listBatchItems('ws', id, { tenantId: 'tenant' })).items.map(item => item.status), ['succeeded', status === 'expired' ? 'expired' : 'canceled']);
+    assert.equal((await f.executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
+  }
+});
+
+test('OpenAI invalid batch endpoint rejects before provider I/O and before binding a row', async () => {
+  const f = await setup(openai);
+  await f.executor.setProvider('ws', { tenantId: 'tenant', providerType: 'openai-responses', endpoint: 'https://provider.example/responses',
+    allowedModels: ['fixture-model'], defaultModel: 'fixture-model', secretRef: { name: 'BYOK_FIXTURE' } });
+  await assert.rejects(f.submit(), { statusCode: 422, code: 'LLM_BATCH_UNSUPPORTED' });
+  assert.equal(f.calls.length + f.fileCalls.length, 0);
+  assert.deepEqual((await f.executor.listBatches('ws', { tenantId: 'tenant' })).items, []);
+});
+
+test('OpenAI upload failures release binding without create; ambiguous creates retain input; definite rejects delete it', async () => {
+  const f = await setup(openai);
+  f.controls.fileResponse = () => new Response('', { status: 503 });
+  await assert.rejects(f.submit(), { code: 'LLM_PROVIDER_UNAVAILABLE' });
+  assert.equal(f.calls.length, 0);
+  const failed = (await f.executor.listBatches('ws', { tenantId: 'tenant' })).items[0];
+  assert.equal(failed.status, 'failed');
+  f.controls.fileResponse = null;
+  const accepted = await f.submit(); assert.equal(accepted.body.status, 'in_progress'); assert.notEqual(accepted.body.batchId, failed.batchId);
+  for (const status of [400, 429, 502, 503]) {
+    const f = await setup(openai);
+    f.controls.response = () => new Response('', { status });
+    const result = await f.submit().catch(error => error);
+    const row = (await f.executor.listBatches('ws', { tenantId: 'tenant' })).items[0];
+    assert.equal(row.status, status >= 500 ? 'submit_uncertain' : 'failed');
+    assert.equal(f.fileCalls.filter(c => c.method === 'DELETE').length, status >= 500 ? 0 : 1);
+    if (status >= 500) {
+      assert.equal((await f.executor.batchStore.get('ws', row.batchId, 'tenant')).providerState.inputFileId, 'input');
+      assert.equal(result.status, 202); assert.equal((await f.submit()).body.batchId, row.batchId);
+    }
+  }
+});
+
+test('OpenAI provider validation failure errors every item, records no usage and cleans files best effort', async () => {
+  const f = await setup(openai), id = (await f.submit()).body.batchId;
+  f.controls.response = () => Response.json({ ...openai.accepted(), status: 'failed', failed_at: 1792281600, errors: { data: [{ code: 'invalid_jsonl' }] } });
+  f.controls.fileResponse = () => new Response('', { status: 503 });
+  f.advance(60000); await f.executor.reconcileBatches();
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'failed');
+  for (const item of (await f.executor.listBatchItems('ws', id, { tenantId: 'tenant' })).items) {
+    assert.equal(item.status, 'errored'); assert.equal(item.errorCode, 'LLM_PROVIDER_REQUEST_REJECTED');
+  }
+  assert.deepEqual(await f.executor.getUsage('ws', { tenantId: 'tenant' }), { items: [] });
+  assert.equal(f.fileCalls.filter(c => c.method === 'DELETE').length, 1);
+});
+
+test('OpenAI counts HTTP-200 failed bodies as provider completed and continues to the following success', async () => {
+  const f = await setup(openai), id = (await f.submit()).body.batchId;
+  const failed = JSON.stringify({ custom_id: 'one', response: { status_code: 200, body: { status: 'failed', error: { code: 'server_error' } } } });
+  f.controls.response = url => openai.resultsPath(url) ? new Response(`${failed}\n${openai.success('two')}`) : Response.json(openai.ended({ succeeded: 2 }));
+  f.advance(60000); await f.executor.reconcileBatches();
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'completed');
+  const items = (await f.executor.listBatchItems('ws', id, { tenantId: 'tenant' })).items;
+  assert.deepEqual(items.map(item => item.status), ['errored', 'succeeded']);
+  assert.equal(items[0].errorCode, 'LLM_PROVIDER_UNAVAILABLE');
+  assert.equal((await f.executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
+});
+
+test('OpenAI clean early EOF never synthesizes expiry over an unobserved provider success', async () => {
+  const f = await setup(openai), id = (await f.submit()).body.batchId;
+  f.controls.response = url => openai.resultsPath(url) ? new Response(openai.success('one')) : Response.json({ ...openai.ended({ succeeded: 2 }), status: 'expired', expired_at: 1792281600 });
+  f.advance(60000); await f.executor.reconcileBatches();
+  assert.deepEqual((await f.executor.listBatchItems('ws', id, { tenantId: 'tenant' })).items.map(item => item.status), ['succeeded', 'pending']);
+  for (let i = 1; i < 10; i++) { f.advance(600000); await f.executor.reconcileBatches(); }
+  const row = await f.executor.getBatch('ws', id, { tenantId: 'tenant' });
+  assert.equal(row.status, 'incomplete'); assert.equal(row.missingCount, 1);
+  assert.equal((await f.executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
+});
+
+test('OpenAI next sweep finds a batch accepted behind the cursor during a resumed search', async () => {
+  const f = await uncertainOpenai();
+  let accepted = false;
+  f.controls.response = url => {
+    const after = new URL(url).searchParams.get('after');
+    if (!after && accepted) return list([listed('late-match', { input_file_id: 'input', metadata: { falcone_batch_id: f.id } })]);
+    const page = after ? Number(after.slice(1)) + 1 : 1;
+    return list([listed(`p${page}`)], page < 6);
+  };
+  f.advance(300000); await f.executor.reconcileBatches();
+  accepted = true;
+  f.advance(600000); await f.restart().reconcileBatches();
+  assert.equal((await f.row()).status, 'submit_uncertain');
+  assert.equal((await f.row()).providerState.sweepAfter, null);
+  f.advance(600000); await f.executor.reconcileBatches();
+  assert.equal((await f.row()).status, 'in_progress'); assert.equal((await f.row()).providerBatchId, 'late-match');
+});
+
+test('OpenAI search incomplete at 24 and 25 hours cannot terminate until a new complete post-mark sweep', async () => {
+  const f = await uncertainOpenai();
+  f.advance(15 * 60000); await f.executor.reconcileBatches();
+  assert.ok((await f.row()).providerState.inputFileDeletedAt);
+  let complete = false, page = 0;
+  f.controls.response = () => list([listed(`p${++page}`)], !complete);
+  f.advance(24 * 3600000 - 15 * 60000); await f.executor.reconcileBatches();
+  assert.equal((await f.row()).status, 'submit_uncertain');
+  f.advance(3600000); await f.restart().reconcileBatches();
+  assert.equal((await f.row()).status, 'submit_uncertain');
+  complete = true;
+  f.advance(600000); await f.executor.reconcileBatches();
+  assert.equal((await f.row()).status, 'submit_uncertain'); // Sweep started at 24h.
+  f.advance(600000); await f.executor.reconcileBatches();
+  assert.equal((await f.row()).status, 'failed');
+});
+
+test('OpenAI uncertainty uses createIssuedAt rather than batch creation time for its 25-hour horizon', async () => {
+  const f = await setup(openai);
+  f.controls.fileResponse = () => { f.advance(3600000); return Response.json({ id: 'input' }); };
+  f.controls.response = () => new Response('', { status: 503 });
+  const id = (await f.submit()).body.batchId;
+  f.controls.fileResponse = null; f.controls.response = () => list();
+  f.advance(15 * 60000); await f.executor.reconcileBatches();
+  f.advance(24 * 3600000 - 15 * 60000); await f.executor.reconcileBatches();
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'submit_uncertain'); // 25h since row creation.
+  f.advance(3600000); await f.executor.reconcileBatches();
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'failed');
+});
+
+test('OpenAI submitter paused after durable persist cannot create after recovery deletes its input', async () => {
+  const { createLlmBatchStore } = await import('../../apps/control-plane-executor/src/runtime/llm-batch-store.mjs');
+  const store = createLlmBatchStore();
+  let entered, release;
+  const waiting = new Promise(resolve => { entered = resolve; }), held = new Promise(resolve => { release = resolve; });
+  const f = await setup(openai, { batchStore: { ...store, async update(row, patch) {
+    const updated = await store.update(row, patch);
+    if (patch.providerState?.inputFileId && row.status === 'submitting' && !row.leaseOwner) { entered(); await held; }
+    return updated;
+  } } });
+  const pending = f.submit().then(value => ({ value }), error => ({ error }));
+  await waiting;
+  const id = (await f.executor.listBatches('ws', { tenantId: 'tenant' })).items[0].batchId;
+  f.controls.response = () => list();
+  f.advance(15 * 60000); await f.executor.reconcileBatches();
+  assert.ok((await store.get('ws', id, 'tenant')).providerState.inputFileDeletedAt);
+  release(); assert.equal((await pending).error.code, 'LLM_BATCH_LEASE_LOST');
+  assert.equal(f.calls.filter(c => c.method === 'POST').length, 0);
+  f.advance(25 * 3600000 - 15 * 60000); await f.executor.reconcileBatches();
+  assert.equal((await store.get('ws', id, 'tenant')).status, 'failed');
+});
+
+test('OpenAI create sent before deletion and accepted after the post-deletion sweep is still tracked', async () => {
+  const f = await setup(openai);
+  let entered, release, accepted = false;
+  const waiting = new Promise(resolve => { entered = resolve; }), held = new Promise(resolve => { release = resolve; });
+  f.controls.response = async () => { entered(); await held; accepted = true; return Response.json(openai.accepted()); };
+  const pending = f.submit().then(value => ({ value }), error => ({ error }));
+  await waiting;
+  const id = (await f.executor.listBatches('ws', { tenantId: 'tenant' })).items[0].batchId;
+  f.controls.response = () => accepted ? list([listed('provider-batch', { input_file_id: 'input', metadata: { falcone_batch_id: id }, status: 'failed', failed_at: 1792281600 })]) : list();
+  f.advance(15 * 60000); await f.executor.reconcileBatches();
+  assert.ok((await f.executor.batchStore.get('ws', id, 'tenant')).providerState.inputFileDeletedAt);
+  f.advance(600000); await f.executor.reconcileBatches(); // Complete no-match post-deletion sweep.
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'submitting');
+  release(); assert.equal((await pending).error.code, 'LLM_BATCH_LEASE_LOST');
+  f.advance(600000); await f.restart().reconcileBatches();
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'in_progress');
+  f.controls.response = () => Response.json({ ...openai.accepted(), status: 'failed', failed_at: 1792281600 });
+  f.advance(60000); await f.executor.reconcileBatches();
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'failed');
+  assert.ok((await f.executor.listBatchItems('ws', id, { tenantId: 'tenant' })).items.every(item => item.errorCode === 'LLM_PROVIDER_REQUEST_REJECTED'));
+});
+
+test('OpenAI revalidates BYOK endpoint between result files and cleanup attempts every file despite failure', async () => {
+  const f = await setup(openai), id = (await f.submit()).body.batchId;
+  f.controls.response = url => {
+    if (new URL(url).pathname.endsWith('/output/content')) { f.controls.dns = ['127.0.0.1']; return new Response(openai.success('one')); }
+    if (openai.resultsPath(url)) return new Response(openai.failure('two'));
+    return Response.json({ ...openai.ended(), error_file_id: 'error' });
+  };
+  f.advance(60000); await f.executor.reconcileBatches();
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).lastErrorCode, 'BYOK_ENDPOINT_BLOCKED');
+  assert.equal(f.calls.filter(c => new URL(c.url).pathname.endsWith('/error/content')).length, 0);
+  f.controls.dns = ['93.184.216.34'];
+  f.controls.response = url => openai.resultsPath(url) ? new Response(url.includes('/output/') ? openai.success('one') : openai.failure('two')) : Response.json({ ...openai.ended(), error_file_id: 'error' });
+  f.controls.fileResponse = () => new Response('', { status: 503 });
+  f.advance(600000); await f.executor.reconcileBatches();
+  assert.equal((await f.executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'completed');
+  assert.equal(f.fileCalls.filter(c => c.method === 'DELETE').length, 3);
+  assert.equal((await f.executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
+});
+
+test('OpenAI list lookback stops only beyond ten minutes and still checks both match identifiers', async () => {
+  const f = await uncertainOpenai(), pages = [];
+  f.controls.response = url => {
+    const after = new URL(url).searchParams.get('after'); pages.push(after);
+    if (!after) return list([listed('boundary', { created_at: 1792281000, input_file_id: 'input', metadata: { falcone_batch_id: 'another-batch' } })], true);
+    return list([listed('older', { created_at: 1792280999 })], true);
+  };
+  f.advance(15 * 60000); await f.executor.reconcileBatches();
+  assert.deepEqual(pages, [null, 'boundary']);
+  const row = await f.row();
+  assert.equal(row.status, 'submit_uncertain'); assert.equal(row.providerState.sweepAfter, null); assert.ok(row.providerState.inputFileDeletedAt);
+});
