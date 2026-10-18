@@ -26,6 +26,7 @@ const authHeaders = {
   'x-tenant-id': TEN,
   'x-workspace-id': WS,
   'x-auth-subject': 'admin-trig',
+  'x-actor-roles': 'tenant_owner',
 };
 
 const CRON_DEF = {
@@ -87,7 +88,9 @@ function makeFakeTemporal() {
         started.push({ type, workflowId: opts.workflowId, opts });
         return h;
       },
-      getHandle(id) { return handles.get(id) ?? handleFor(id, { flowVersion: ['1'] }); },
+      getHandle(id) {
+        return handles.get(id) ?? { async describe() { throw Object.assign(new Error('workflow not found'), { name: 'WorkflowNotFoundError' }); } };
+      },
       async *list({ query }) {
         const flowMatch = /flowId = '([^']+)'/.exec(query ?? '');
         const wantRunning = /ExecutionStatus = 'Running'/.test(query ?? '');

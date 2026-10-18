@@ -548,11 +548,27 @@ export function createFlowTriggerRegistry({
   // Starts a flow execution for a matched platform event. Supplied by flow-executor so all
   // StartWorkflowExecution calls (and triggerType stamping) stay in one place.
   startTriggeredExecution,
+  maxDeferMs = Number(process.env.FLOW_EVENT_TRIGGER_MAX_DEFER_MS ?? 86_400_000),
+  now = Date.now,
+  timers = { setTimeout, clearTimeout },
   logger = console,
 } = {}) {
   const schedules = createScheduleGateway({ temporalClient, getTemporalClient, logger });
   let consumer = null;
   let consumerSubscriptions = new Set();
+  const deferred = new Map();
+  const deferBound = Number.isFinite(maxDeferMs) && maxDeferMs >= 0 ? maxDeferMs : 86_400_000;
+
+  function clearResumeTimers() {
+    for (const state of deferred.values()) {
+      if (state.timer != null) timers.clearTimeout(state.timer);
+      state.timer = null;
+      // KafkaJS retains paused partitions across stop/run on the same consumer. Unpause after
+      // stopping so re-subscription can read the persisted denied offset again.
+      state.resume?.();
+      state.resume = null;
+    }
+  }
 
   // -- Cron -----------------------------------------------------------------------------------
 
@@ -643,6 +659,8 @@ export function createFlowTriggerRegistry({
       return;
     }
     if (wanted.size === 0) {
+      if (consumer) await consumer.stop?.();
+      clearResumeTimers();
       consumerSubscriptions = wanted;
       return;
     }
@@ -658,6 +676,7 @@ export function createFlowTriggerRegistry({
       await consumer.run({ eachMessage: onConsumerMessage });
     } else {
       if (typeof consumer.stop === 'function') await consumer.stop();
+      clearResumeTimers();
       await consumer.subscribe({ topics: [...wanted] });
       await consumer.run({ eachMessage: onConsumerMessage });
     }
@@ -668,29 +687,97 @@ export function createFlowTriggerRegistry({
   // physical topic and start the bound flow. The topic ALREADY embeds tenantId/workspaceId so the
   // lookup can never cross tenants (structural isolation). Dedup key from topic+partition+offset so
   // a redelivered offset starts at most one execution (Temporal workflow-id uniqueness).
-  async function onConsumerMessage({ topic, partition, message }) {
+  async function commitMessage(topic, partition, offset) {
+    try {
+      await consumer?.commitOffsets?.([{ topic, partition, offset }]);
+      return true;
+    } catch (err) {
+      logger?.error?.('[flow-trigger-registry] consumer commit failed:', err?.message ?? err);
+      return false; // A replay after a failed acknowledgement is deduplicated by workflow id.
+    }
+  }
+
+  async function onConsumerMessage({ topic, partition, message, pause }) {
+    const key = JSON.stringify([topic, partition, message.offset]);
+    const denials = [];
     try {
       const matches = await store.findRegistrationsByTopic({ topicRef: topic });
+      let payload;
+      try {
+        payload = message.value ? JSON.parse(message.value.toString()) : {};
+      } catch {
+        payload = { raw: message.value ? message.value.toString() : null };
+      }
       for (const reg of matches) {
-        const dedupKey = `pe:${reg.trigger_id}:${topic}:${partition}:${message.offset}`;
-        let payload;
         try {
-          payload = message.value ? JSON.parse(message.value.toString()) : {};
-        } catch {
-          payload = { raw: message.value ? message.value.toString() : null };
+          await startTriggeredExecution?.({
+            identity: { tenantId: reg.tenant_id, workspaceId: reg.workspace_id },
+            flowId: reg.flow_id,
+            version: reg.version,
+            input: payload,
+            triggerType: TRIGGER_TYPES.PLATFORM_EVENT,
+            workflowIdOverride: `pe:${reg.trigger_id}:${topic}:${partition}:${message.offset}`,
+          });
+        } catch (err) {
+          if (err?.code === 'QUOTA_EXCEEDED') denials.push({ reg, err });
+          else logger?.error?.('[flow-trigger-registry] consumer message failed:', err?.message ?? err);
         }
-        await startTriggeredExecution?.({
-          identity: { tenantId: reg.tenant_id, workspaceId: reg.workspace_id },
-          flowId: reg.flow_id,
-          version: reg.version,
-          input: payload,
-          triggerType: TRIGGER_TYPES.PLATFORM_EVENT,
-          workflowIdOverride: dedupKey,
-        });
       }
     } catch (err) {
       logger?.error?.('[flow-trigger-registry] consumer message failed:', err?.message ?? err);
     }
+    const state = deferred.get(key);
+    if (denials.length) {
+      const messageTime = Number(message.timestamp);
+      const pending = state ?? { firstSeen: Number.isFinite(messageTime) ? messageTime : now() };
+      if (now() - pending.firstSeen >= deferBound) {
+        if (pending.timer != null) timers.clearTimeout(pending.timer);
+        pending.resume?.();
+        pending.timer = null;
+        pending.resume = null;
+        if (!pending.abandoned) {
+          const { err } = denials[0];
+          logger?.error?.(JSON.stringify({
+            event: 'flow_event_trigger_quota_abandoned', topic, partition, offset: message.offset,
+            registrationIds: denials.map(({ reg }) => reg.trigger_id),
+            dimension: err.dimension, reason: err.quota?.reason ?? err.quota?.decision ?? err.code,
+          }));
+          pending.abandoned = true;
+        }
+        deferred.set(key, pending);
+        if (await commitMessage(topic, partition, (BigInt(message.offset) + 1n).toString())) deferred.delete(key);
+        return;
+      }
+      const delay = pending.nextDelay ?? 60_000;
+      pending.nextDelay = Math.min(delay * 2, 15 * 60_000);
+      deferred.set(key, pending);
+      // Persist the denied offset as the NEXT read position, even on a partition with no prior
+      // commit. Never acknowledge offset+1 while any registration is quota-denied.
+      await commitMessage(topic, partition, message.offset);
+      try {
+        consumer.seek({ topic, partition, offset: message.offset });
+      } catch (err) {
+        logger?.error?.('[flow-trigger-registry] consumer seek failed:', err?.message ?? err);
+      }
+      // Never throw on deferral: KafkaJS would restart its runner. The returned resume function
+      // affects only this partition; later offsets remain held behind this message.
+      try {
+        if (pending.timer != null) timers.clearTimeout(pending.timer);
+        pending.resume = pause();
+        pending.timer = timers.setTimeout(() => {
+          pending.timer = null;
+          pending.resume?.();
+          pending.resume = null;
+        }, delay);
+        pending.timer?.unref?.();
+      } catch (err) {
+        logger?.error?.('[flow-trigger-registry] consumer pause failed:', err?.message ?? err);
+      }
+      return;
+    }
+    if (state?.timer != null) timers.clearTimeout(state.timer);
+    deferred.delete(key);
+    await commitMessage(topic, partition, (BigInt(message.offset) + 1n).toString());
   }
 
   // -- Public lifecycle -----------------------------------------------------------------------
@@ -749,6 +836,8 @@ export function createFlowTriggerRegistry({
 
   async function close() {
     try { await consumer?.stop?.(); } catch { /* best-effort */ }
+    clearResumeTimers();
+    deferred.clear();
     try { await consumer?.disconnect?.(); } catch { /* best-effort */ }
     consumer = null;
     consumerSubscriptions = new Set();
