@@ -106,7 +106,7 @@ const TENANT_SENTINEL = '_';
 // Replacing a provider returns a re-index warning (v1 does not re-embed stored data).
 //
 // With no `pool` the store is an in-memory Map (the test seam / single-process fallback).
-// With a `pool` it persists to a `workspace_embedding_providers` table on the metadata DB —
+// With a `pool` it persists to a `workspace_embedding_connections` table on the metadata DB —
 // mirroring api-keys.mjs::createApiKeyStore — so provider config survives a restart and is
 // visible to every replica sharing the same Postgres.
 export function createEmbeddingProviderStore({ pool } = {}) {
@@ -114,138 +114,342 @@ export function createEmbeddingProviderStore({ pool } = {}) {
   return createPostgresProviderStore(pool);
 }
 
-function createInMemoryProviderStore() {
-  const providers = new Map(); // workspaceId -> { providerType, model, secretRef, dimension }
+function providerKey(tenantId, workspaceId) {
+  return JSON.stringify([tenantId ?? TENANT_SENTINEL, workspaceId]);
+}
+
+// Strip any plaintext secret a caller may have (mis)passed; persist only secretRef + config.
+function sanitizeProviderConfig(config = {}) {
+  const { apiKey, secret, key, tenantId, ...safe } = config;
   return {
-    async deployProvider(workspaceId, config = {}) {
-      if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
-      const existing = providers.get(workspaceId);
-      // Strip any plaintext secret a caller may have (mis)passed; persist only secretRef.
-      // `tenantId` is accepted for parity with the Postgres path but is not part of the
-      // in-memory key (single-process callers/tests are already workspace-isolated).
-      const { apiKey, secret, tenantId, ...safe } = config;
-      const record = {
-        providerType: safe.providerType,
-        model: safe.model,
-        endpoint: safe.endpoint,
-        dimension: safe.dimension !== undefined ? Number(safe.dimension) : undefined,
-        secretRef: safe.secretRef,
-        updatedAt: new Date().toISOString()
-      };
-      providers.set(workspaceId, record);
-      const result = { ...record };
-      if (existing) {
-        result.warning = REINDEX_WARNING;
-      }
-      return result;
-    },
-    async getProvider(workspaceId) {
-      return providers.get(workspaceId) ?? null;
-    },
-    async removeProvider(workspaceId) {
-      const had = providers.delete(workspaceId);
-      return { removed: had };
-    }
+    providerType: safe.providerType,
+    endpoint: safe.endpoint,
+    model: safe.model,
+    dimension: safe.dimension === undefined ? undefined : Number(safe.dimension),
+    secretRef: safe.secretRef,
   };
 }
 
+function validateConnection(config, connectionId) {
+  if (typeof connectionId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(connectionId)) {
+    throw clientError('Invalid connection identifier', 400, 'INVALID_CONNECTION_ID');
+  }
+  if (config.displayName != null && (typeof config.displayName !== 'string' || config.displayName.length > 128)) {
+    throw clientError('displayName must be at most 128 characters', 400, 'INVALID_DISPLAY_NAME');
+  }
+}
+
+function connectionRecord(workspaceId, config, connectionId, existing, isDefault) {
+  validateConnection(config, connectionId);
+  return {
+    ...sanitizeProviderConfig(config),
+    tenantId: config.tenantId ?? TENANT_SENTINEL,
+    workspaceId,
+    connectionId,
+    displayName: config.displayName ?? null,
+    isDefault,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function createInMemoryProviderStore() {
+  let mappingStore;
+  const workspaces = new Map();
+  const records = (workspaceId, tenantId) => workspaces.get(providerKey(tenantId, workspaceId)) ?? [];
+  const copy = value => structuredClone(value);
+  const store = {
+    hasConnection(workspaceId, connectionId, tenantId) {
+      return records(workspaceId, tenantId).some(row => row.connectionId === connectionId);
+    },
+    bindMappingStore(store) { mappingStore = store; },
+    async ensureSchema() {},
+    async listConnections(workspaceId, tenantId) {
+      return copy(records(workspaceId, tenantId).slice().sort((a, b) => (
+        a.connectionId < b.connectionId ? -1 : a.connectionId > b.connectionId ? 1 : 0
+      )));
+    },
+    async getConnection(workspaceId, connectionId, tenantId) {
+      const record = records(workspaceId, tenantId).find(r => r.connectionId === connectionId);
+      if (!record) {
+        throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      }
+      return copy(record);
+    },
+    async createConnection(workspaceId, config = {}) {
+      if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
+      const rows = records(workspaceId, config.tenantId);
+      validateConnection(config, config.connectionId);
+      if (rows.some(r => r.connectionId === config.connectionId)) {
+        throw clientError('Embedding connection exists', 409, 'EMBEDDING_CONNECTION_EXISTS');
+      }
+      if (rows.length >= 32) {
+        throw clientError('Embedding connection limit reached', 409, 'EMBEDDING_CONNECTION_LIMIT_REACHED');
+      }
+      const record = connectionRecord(workspaceId, config, config.connectionId, null, rows.length === 0 || config.isDefault === true);
+      if (record.isDefault) rows.forEach(r => { r.isDefault = false; });
+      workspaces.set(providerKey(config.tenantId, workspaceId), [...rows, copy(record)]);
+      return copy(record);
+    },
+    async replaceConnection(workspaceId, connectionId, config = {}) {
+      const rows = records(workspaceId, config.tenantId);
+      const existing = rows.find(r => r.connectionId === connectionId);
+      if (!existing) {
+        throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      }
+      if (existing.isDefault && config.isDefault === false) {
+        throw clientError('A default connection is required', 409, 'EMBEDDING_DEFAULT_REQUIRED');
+      }
+      const record = connectionRecord(workspaceId, config, connectionId, existing, existing.isDefault || config.isDefault === true);
+      if (record.isDefault) rows.forEach(r => { r.isDefault = false; });
+      rows[rows.indexOf(existing)] = copy(record);
+      return { ...copy(record), warning: REINDEX_WARNING };
+    },
+    async deleteConnection(workspaceId, connectionId, tenantId) {
+      const rows = records(workspaceId, tenantId);
+      if (!rows.some(r => r.connectionId === connectionId)) {
+        throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      }
+      if (mappingStore?.isConnectionInUse(workspaceId, connectionId, tenantId)) {
+        throw clientError('Embedding connection is in use', 409, 'EMBEDDING_CONNECTION_IN_USE');
+      }
+      workspaces.set(providerKey(tenantId, workspaceId), rows.filter(r => r.connectionId !== connectionId));
+      return { removed: true };
+    },
+    async deployProvider(workspaceId, config = {}) {
+      const rows = records(workspaceId, config.tenantId);
+      const current = rows.find(r => r.isDefault) ?? rows.find(r => r.connectionId === 'default');
+      if (!current) return store.createConnection(workspaceId, { ...config, connectionId: 'default', isDefault: true });
+      const displayName = config.displayName === undefined ? current.displayName : config.displayName;
+      const record = connectionRecord(workspaceId, { ...config, displayName }, current.connectionId, current, true);
+      rows[rows.indexOf(current)] = copy(record);
+      return { ...copy(record), warning: REINDEX_WARNING };
+    },
+    async getProvider(workspaceId, tenantId) {
+      return copy(records(workspaceId, tenantId).find(r => r.isDefault) ?? null);
+    },
+    async removeProvider(workspaceId, tenantId) {
+      const rows = records(workspaceId, tenantId);
+      if (rows.some(row => row.isDefault && mappingStore?.isConnectionInUse(workspaceId, row.connectionId, tenantId))) {
+        throw clientError('Embedding connection is in use', 409, 'EMBEDDING_CONNECTION_IN_USE');
+      }
+      const remaining = rows.filter(r => !r.isDefault);
+      workspaces.set(providerKey(tenantId, workspaceId), remaining);
+      return { removed: remaining.length !== rows.length };
+    },
+  };
+  return store;
+}
+
+async function lockWorkspace(client, tenant, workspaceId) {
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('workspace_embedding_connections'), hashtext(json_build_array($1::text, $2::text)::text))", [tenant, workspaceId]);
+}
+
 function createPostgresProviderStore(pool) {
+  async function transaction(fn) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      if (error.message === 'EMBEDDING_CONNECTION_IN_USE') throw clientError('Embedding connection is in use', 409, 'EMBEDDING_CONNECTION_IN_USE');
+      if (error.message === 'EMBEDDING_CONNECTION_LIMIT_REACHED') throw clientError('Embedding connection limit reached', 409, 'EMBEDDING_CONNECTION_LIMIT_REACHED');
+      throw error;
+    } finally { client.release(); }
+  }
+
   async function ensureSchema() {
-    await pool.query(`CREATE TABLE IF NOT EXISTS workspace_embedding_providers (
-      tenant_id      text NOT NULL,
-      workspace_id   text NOT NULL,
-      provider_type  text,
-      model          text,
-      endpoint       text,
-      dimension      integer,
-      secret_ref     jsonb,
-      updated_at     timestamptz NOT NULL DEFAULT now(),
-      UNIQUE (tenant_id, workspace_id)
-    )`);
-    await pool.query(
-      'CREATE INDEX IF NOT EXISTS idx_wep_workspace ON workspace_embedding_providers (workspace_id)'
-    );
+    await transaction(async client => {
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('workspace_embedding_connections'))");
+      // Keep the old table and its unique key for rolling updates and rollbacks.
+      await client.query(`CREATE TABLE IF NOT EXISTS workspace_embedding_providers (
+        tenant_id text NOT NULL, workspace_id text NOT NULL, provider_type text, endpoint text,
+        model text, dimension integer, secret_ref jsonb,
+        updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE (tenant_id, workspace_id)
+      )`);
+      await client.query('LOCK TABLE workspace_embedding_providers IN SHARE ROW EXCLUSIVE MODE');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_wep_workspace ON workspace_embedding_providers (workspace_id)');
+      await client.query('ALTER TABLE workspace_embedding_providers ADD COLUMN IF NOT EXISTS migrated_at timestamptz');
+      await client.query(`CREATE TABLE IF NOT EXISTS workspace_embedding_connections (
+        tenant_id text NOT NULL, workspace_id text NOT NULL,
+        connection_id text NOT NULL CHECK (connection_id ~ '^[a-z0-9][a-z0-9-]{0,62}$'),
+        display_name text, provider_type text, endpoint text,
+        model text, dimension integer, secret_ref jsonb,
+        is_default boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (tenant_id, workspace_id, connection_id)
+      )`);
+      await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_wec_default ON workspace_embedding_connections (tenant_id, workspace_id) WHERE is_default');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_wec_workspace ON workspace_embedding_connections (workspace_id)');
+      await client.query(`INSERT INTO workspace_embedding_connections
+        (tenant_id, workspace_id, connection_id, provider_type, model, endpoint, dimension, secret_ref, is_default, created_at, updated_at)
+        SELECT tenant_id, workspace_id, 'default', provider_type, model, endpoint, dimension, secret_ref, true, updated_at, updated_at
+        FROM workspace_embedding_providers WHERE migrated_at IS NULL ON CONFLICT DO NOTHING`);
+      await client.query('UPDATE workspace_embedding_providers SET migrated_at = now() WHERE migrated_at IS NULL');
+      // All writers share the same workspace lock. Updates at capacity remain legal.
+      await client.query(`CREATE OR REPLACE FUNCTION enforce_embedding_connection_limit() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        PERFORM pg_advisory_xact_lock(hashtext('workspace_embedding_connections'), hashtext(json_build_array(NEW.tenant_id, NEW.workspace_id)::text));
+        IF NOT EXISTS (SELECT 1 FROM workspace_embedding_connections WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id AND connection_id=NEW.connection_id)
+          AND (SELECT count(*) FROM workspace_embedding_connections WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id) >= 32 THEN
+          RAISE EXCEPTION 'EMBEDDING_CONNECTION_LIMIT_REACHED';
+        END IF;
+        RETURN NEW;
+      END; $$`);
+      await client.query(`CREATE OR REPLACE TRIGGER workspace_embedding_connections_limit
+        BEFORE INSERT ON workspace_embedding_connections FOR EACH ROW EXECUTE FUNCTION enforce_embedding_connection_limit()`);
+      await client.query(`CREATE OR REPLACE FUNCTION prevent_embedding_connection_in_use_delete() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        PERFORM pg_advisory_xact_lock(hashtext('workspace_embedding_connections'), hashtext(json_build_array(OLD.tenant_id, OLD.workspace_id)::text));
+        IF EXISTS (SELECT 1 FROM workspace_embedding_mappings
+          WHERE tenant_id=OLD.tenant_id AND workspace_id=OLD.workspace_id AND connection_id=OLD.connection_id) THEN
+          RAISE EXCEPTION 'EMBEDDING_CONNECTION_IN_USE';
+        END IF;
+        RETURN OLD;
+      END; $$`);
+      await client.query(`CREATE OR REPLACE TRIGGER workspace_embedding_connections_in_use
+        BEFORE DELETE ON workspace_embedding_connections FOR EACH ROW EXECUTE FUNCTION prevent_embedding_connection_in_use_delete()`);
+      await client.query(`CREATE OR REPLACE FUNCTION mirror_legacy_embedding_provider() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF TG_OP = 'DELETE' THEN
+          PERFORM pg_advisory_xact_lock(hashtext('workspace_embedding_connections'), hashtext(json_build_array(OLD.tenant_id, OLD.workspace_id)::text));
+          DELETE FROM workspace_embedding_connections WHERE tenant_id=OLD.tenant_id AND workspace_id=OLD.workspace_id AND is_default;
+          RETURN OLD;
+        END IF;
+        IF TG_OP = 'UPDATE' THEN
+          IF ROW(NEW.provider_type, NEW.model, NEW.endpoint, NEW.dimension, NEW.secret_ref)
+            IS NOT DISTINCT FROM ROW(OLD.provider_type, OLD.model, OLD.endpoint, OLD.dimension, OLD.secret_ref) THEN
+            RETURN NEW;
+          END IF;
+        END IF;
+        PERFORM pg_advisory_xact_lock(hashtext('workspace_embedding_connections'), hashtext(json_build_array(NEW.tenant_id, NEW.workspace_id)::text));
+        UPDATE workspace_embedding_connections SET
+          provider_type=NEW.provider_type, model=NEW.model, endpoint=NEW.endpoint, dimension=NEW.dimension,
+          secret_ref=NEW.secret_ref, updated_at=NEW.updated_at
+          WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id AND is_default;
+        IF NOT FOUND THEN
+          UPDATE workspace_embedding_connections SET
+            provider_type=NEW.provider_type, model=NEW.model, endpoint=NEW.endpoint, dimension=NEW.dimension,
+            secret_ref=NEW.secret_ref, updated_at=NEW.updated_at, is_default=true
+            WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id AND connection_id='default';
+          IF NOT FOUND THEN
+            IF (SELECT count(*) FROM workspace_embedding_connections WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id) >= 32 THEN
+              RAISE EXCEPTION 'EMBEDDING_CONNECTION_LIMIT_REACHED';
+            END IF;
+            INSERT INTO workspace_embedding_connections
+              (tenant_id, workspace_id, connection_id, provider_type, model, endpoint, dimension, secret_ref, is_default, created_at, updated_at)
+              VALUES (NEW.tenant_id, NEW.workspace_id, 'default', NEW.provider_type, NEW.model, NEW.endpoint, NEW.dimension, NEW.secret_ref, true, NEW.updated_at, NEW.updated_at);
+          END IF;
+        END IF;
+        NEW.migrated_at = now();
+        RETURN NEW;
+      END; $$`);
+      await client.query(`CREATE OR REPLACE TRIGGER workspace_embedding_providers_mirror
+        BEFORE INSERT OR UPDATE OR DELETE ON workspace_embedding_providers FOR EACH ROW EXECUTE FUNCTION mirror_legacy_embedding_provider()`);
+      // Lock connections before mappings, matching DELETE and its in-use trigger.
+      // Otherwise a rolling-upgrade boot can deadlock with an in-flight DELETE.
+      await ensureMappingSchema(client);
+    });
   }
 
   function rowToRecord(row) {
     if (!row) return null;
+    const timestamp = value => value instanceof Date ? value.toISOString() : value;
     return {
-      tenantId: row.tenant_id,
-      workspaceId: row.workspace_id,
-      providerType: row.provider_type ?? undefined,
-      model: row.model ?? undefined,
-      endpoint: row.endpoint ?? undefined,
-      dimension: row.dimension !== null && row.dimension !== undefined ? Number(row.dimension) : undefined,
+      tenantId: row.tenant_id, workspaceId: row.workspace_id,
+      connectionId: row.connection_id ?? 'default', displayName: row.display_name ?? null,
+      isDefault: row.is_default ?? true, createdAt: timestamp(row.created_at), updatedAt: timestamp(row.updated_at),
+      providerType: row.provider_type ?? undefined, endpoint: row.endpoint ?? undefined,
+      model: row.model ?? undefined, dimension: row.dimension == null ? undefined : Number(row.dimension),
       secretRef: row.secret_ref ?? undefined,
-      updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at
     };
   }
 
-  return {
-    pool,
-    ensureSchema,
-    async deployProvider(workspaceId, config = {}) {
-      if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
-      // Strip any plaintext secret a caller may have (mis)passed; persist only secretRef.
-      const { apiKey, secret, tenantId, ...safe } = config;
-      const tenant = tenantId ?? TENANT_SENTINEL;
-      // Detect a replacement (re-index warning) by reading the existing row first; the read
-      // and the upsert are scoped to (tenant_id, workspace_id) so a different tenant's row
-      // for the same workspaceId is never touched.
-      const prior = await pool.query(
-        'SELECT 1 FROM workspace_embedding_providers WHERE tenant_id = $1 AND workspace_id = $2',
-        [tenant, workspaceId]
-      );
-      const existed = prior.rowCount > 0;
-      const dimension = safe.dimension !== undefined ? Number(safe.dimension) : null;
-      const secretRefJson = safe.secretRef !== undefined ? JSON.stringify(safe.secretRef) : null;
-      const res = await pool.query(
-        `INSERT INTO workspace_embedding_providers
-           (tenant_id, workspace_id, provider_type, model, endpoint, dimension, secret_ref, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb, now())
-         ON CONFLICT (tenant_id, workspace_id) DO UPDATE SET
-           provider_type = EXCLUDED.provider_type,
-           model         = EXCLUDED.model,
-           endpoint      = EXCLUDED.endpoint,
-           dimension     = EXCLUDED.dimension,
-           secret_ref    = EXCLUDED.secret_ref,
-           updated_at    = now()
-         RETURNING tenant_id, workspace_id, provider_type, model, endpoint, dimension, secret_ref, updated_at`,
-        [tenant, workspaceId, safe.providerType ?? null, safe.model ?? null, safe.endpoint ?? null, dimension, secretRefJson]
-      );
-      const result = rowToRecord(res.rows[0]);
-      if (existed) {
-        result.warning = REINDEX_WARNING;
+  async function writeConnection(workspaceId, connectionId, config, mode) {
+    if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
+    if (mode !== 'replace') validateConnection(config, connectionId);
+    const tenant = config.tenantId ?? TENANT_SENTINEL;
+    const safe = sanitizeProviderConfig(config);
+    return transaction(async client => {
+      await lockWorkspace(client, tenant, workspaceId);
+      const { rows } = await client.query('SELECT * FROM workspace_embedding_connections WHERE tenant_id=$1 AND workspace_id=$2', [tenant, workspaceId]);
+      let existing = rows.find(r => r.connection_id === connectionId);
+      if (mode === 'default') {
+        existing = rows.find(r => r.is_default) ?? existing;
+        connectionId = existing?.connection_id ?? 'default';
       }
-      return result;
+      if (mode === 'create' && existing) throw clientError('Embedding connection exists', 409, 'EMBEDDING_CONNECTION_EXISTS');
+      if (mode === 'replace' && !existing) throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      if (mode === 'replace') validateConnection(config, connectionId);
+      if (!existing && rows.length >= 32) throw clientError('Embedding connection limit reached', 409, 'EMBEDDING_CONNECTION_LIMIT_REACHED');
+      if (mode === 'replace' && existing.is_default && config.isDefault === false) throw clientError('A default connection is required', 409, 'EMBEDDING_DEFAULT_REQUIRED');
+      const isDefault = mode === 'default' || config.isDefault === true || (existing ? existing.is_default : rows.length === 0);
+      if (isDefault) await client.query('UPDATE workspace_embedding_connections SET is_default=false WHERE tenant_id=$1 AND workspace_id=$2 AND is_default AND connection_id<>$3', [tenant, workspaceId, connectionId]);
+      const displayName = mode === 'default' && config.displayName === undefined ? existing?.display_name : config.displayName;
+      const values = [tenant, workspaceId, connectionId, displayName ?? null, safe.providerType ?? null,
+        safe.model ?? null, safe.endpoint ?? null, safe.dimension ?? null,
+        safe.secretRef === undefined ? null : JSON.stringify(safe.secretRef), isDefault];
+      const result = existing
+        ? await client.query(`UPDATE workspace_embedding_connections SET display_name=$4, provider_type=$5, model=$6,
+            endpoint=$7, dimension=$8, secret_ref=$9::jsonb, is_default=$10, updated_at=now()
+            WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3 RETURNING *`, values)
+        : await client.query(`INSERT INTO workspace_embedding_connections
+            (tenant_id, workspace_id, connection_id, display_name, provider_type, model, endpoint, dimension, secret_ref, is_default)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) RETURNING *`, values);
+      const record = rowToRecord(result.rows[0]);
+      return existing ? { ...record, warning: REINDEX_WARNING } : record;
+    });
+  }
+
+  return {
+    pool, ensureSchema,
+    async listConnections(workspaceId, tenantId) {
+      const result = await pool.query('SELECT * FROM workspace_embedding_connections WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY connection_id COLLATE "C"', [tenantId ?? TENANT_SENTINEL, workspaceId]);
+      return result.rows.map(rowToRecord);
+    },
+    async getConnection(workspaceId, connectionId, tenantId) {
+      const result = await pool.query('SELECT * FROM workspace_embedding_connections WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3', [tenantId ?? TENANT_SENTINEL, workspaceId, connectionId]);
+      if (!result.rows[0]) throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      return rowToRecord(result.rows[0]);
+    },
+    createConnection: (workspaceId, config = {}) => writeConnection(workspaceId, config.connectionId, config, 'create'),
+    replaceConnection: (workspaceId, connectionId, config = {}) => writeConnection(workspaceId, connectionId, config, 'replace'),
+    deployProvider: (workspaceId, config = {}) => writeConnection(workspaceId, 'default', config, 'default'),
+    async deleteConnection(workspaceId, connectionId, tenantId) {
+      return transaction(async client => {
+        await lockWorkspace(client, tenantId ?? TENANT_SENTINEL, workspaceId);
+        const result = await client.query('DELETE FROM workspace_embedding_connections WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3 RETURNING connection_id', [tenantId ?? TENANT_SENTINEL, workspaceId, connectionId]);
+        if (!result.rowCount) throw clientError('Embedding connection not found', 404, 'EMBEDDING_CONNECTION_NOT_FOUND');
+        return { removed: true };
+      });
     },
     async getProvider(workspaceId, tenantId) {
-      // Lookup by workspace_id (covered by idx_wep_workspace). When a tenant is supplied the
-      // read is scoped to (tenant_id, workspace_id); otherwise the single provider for the
-      // workspace is returned.
-      const res = tenantId
-        ? await pool.query(
-            'SELECT * FROM workspace_embedding_providers WHERE tenant_id = $1 AND workspace_id = $2 LIMIT 1',
-            [tenantId, workspaceId]
-          )
-        : await pool.query(
-            'SELECT * FROM workspace_embedding_providers WHERE workspace_id = $1 LIMIT 1',
-            [workspaceId]
-          );
+      let res;
+      try {
+        res = tenantId
+          ? await pool.query('SELECT * FROM workspace_embedding_connections WHERE tenant_id = $1 AND workspace_id = $2 AND is_default', [tenantId, workspaceId])
+          : await pool.query('SELECT * FROM workspace_embedding_connections WHERE workspace_id = $1 AND is_default LIMIT 1', [workspaceId]);
+      } catch (error) {
+        // Workers do not own schema setup. Only a missing registry permits the pre-upgrade read.
+        if (error.code !== '42P01') throw error;
+        res = tenantId
+          ? await pool.query('SELECT * FROM workspace_embedding_providers WHERE tenant_id = $1 AND workspace_id = $2 LIMIT 1', [tenantId, workspaceId])
+          : await pool.query('SELECT * FROM workspace_embedding_providers WHERE workspace_id = $1 LIMIT 1', [workspaceId]);
+      }
       return rowToRecord(res.rows[0]);
     },
     async removeProvider(workspaceId, tenantId) {
-      const res = tenantId
-        ? await pool.query(
-            'DELETE FROM workspace_embedding_providers WHERE tenant_id = $1 AND workspace_id = $2 RETURNING workspace_id',
-            [tenantId, workspaceId]
-          )
-        : await pool.query(
-            'DELETE FROM workspace_embedding_providers WHERE workspace_id = $1 RETURNING workspace_id',
-            [workspaceId]
-          );
-      return { removed: res.rowCount > 0 };
-    }
+      return transaction(async client => {
+        if (tenantId) await lockWorkspace(client, tenantId, workspaceId);
+        const res = tenantId
+          ? await client.query('DELETE FROM workspace_embedding_connections WHERE tenant_id = $1 AND workspace_id = $2 AND is_default RETURNING workspace_id', [tenantId, workspaceId])
+          : await client.query('DELETE FROM workspace_embedding_connections WHERE workspace_id = $1 AND is_default RETURNING workspace_id', [workspaceId]);
+        return { removed: res.rowCount > 0 };
+      });
+    },
   };
 }
 
@@ -263,9 +467,10 @@ export const REMAPPING_WARNING =
 // (the test seam / single-process fallback); with a `pool` it persists to a
 // `workspace_embedding_mappings` table on the metadata DB so mapping config survives a restart
 // and is visible to every replica sharing the same Postgres. Reads/writes are tenant-scoped.
-export function createEmbeddingMappingStore({ pool } = {}) {
-  if (!pool) return createInMemoryMappingStore();
-  return createPostgresMappingStore(pool);
+export function createEmbeddingMappingStore({ pool, providerStore } = {}) {
+  const store = pool ? createPostgresMappingStore(pool) : createInMemoryMappingStore();
+  if (providerStore) store.bindProviderStore?.(providerStore);
+  return store;
 }
 
 // Identity for a single mapping record (a table can have several vector columns, each its own
@@ -288,10 +493,12 @@ function normalizeMappingConfig(workspaceId, config = {}) {
     tableName: config.tableName,
     targetColumn: config.targetColumn,
     sourceColumn: config.sourceColumn,
+    connectionId: config.connectionId ?? undefined,
   };
 }
 
 function createInMemoryMappingStore() {
+  let providerStore;
   const mappings = new Map(); // key -> record
   function toRecord(rec) {
     return {
@@ -301,16 +508,36 @@ function createInMemoryMappingStore() {
       tableName: rec.tableName,
       targetColumn: rec.targetColumn,
       sourceColumn: rec.sourceColumn,
+      connectionId: rec.connectionId,
       updatedAt: rec.updatedAt,
     };
   }
   return {
+    bindProviderStore(store) { providerStore = store; store.bindMappingStore?.(this); },
+    isConnectionInUse(workspaceId, connectionId, tenantId) {
+      return [...mappings.values()].some(row => row.workspaceId === workspaceId && row.tenantId === (tenantId ?? TENANT_SENTINEL) && row.connectionId === connectionId);
+    },
     async ensureSchema() {
       /* no-op: the in-memory store needs no DB schema */
     },
     async deployMapping(workspaceId, config = {}) {
       if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
       const norm = normalizeMappingConfig(workspaceId, config);
+      if (norm.connectionId !== undefined) {
+        let exists = false;
+        if (providerStore?.hasConnection) {
+          // Keep the in-memory check and write synchronous to avoid a delete race.
+          exists = providerStore.hasConnection(workspaceId, norm.connectionId, norm.tenantId);
+        } else if (providerStore) {
+          try {
+            await providerStore.getConnection(workspaceId, norm.connectionId, norm.tenantId);
+            exists = true;
+          } catch (error) {
+            if (error.code !== 'EMBEDDING_CONNECTION_NOT_FOUND') throw error;
+          }
+        }
+        if (!exists) throw clientError('Embedding connection not found', 422, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      }
       const key = mappingKey(norm);
       const existed = mappings.has(key);
       const record = { ...norm, updatedAt: new Date().toISOString() };
@@ -345,22 +572,36 @@ function createInMemoryMappingStore() {
   };
 }
 
+async function ensureMappingSchema(client) {
+  await client.query(`CREATE TABLE IF NOT EXISTS workspace_embedding_mappings (
+    tenant_id      text NOT NULL,
+    workspace_id   text NOT NULL,
+    schema_name    text NOT NULL,
+    table_name     text NOT NULL,
+    target_column  text NOT NULL,
+    source_column  text NOT NULL,
+    updated_at     timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (tenant_id, workspace_id, schema_name, table_name, target_column)
+  )`);
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS idx_wem_lookup
+       ON workspace_embedding_mappings (tenant_id, workspace_id, schema_name, table_name)`
+  );
+  await client.query('ALTER TABLE workspace_embedding_mappings ADD COLUMN IF NOT EXISTS connection_id text');
+}
+
 function createPostgresMappingStore(pool) {
   async function ensureSchema() {
-    await pool.query(`CREATE TABLE IF NOT EXISTS workspace_embedding_mappings (
-      tenant_id      text NOT NULL,
-      workspace_id   text NOT NULL,
-      schema_name    text NOT NULL,
-      table_name     text NOT NULL,
-      target_column  text NOT NULL,
-      source_column  text NOT NULL,
-      updated_at     timestamptz NOT NULL DEFAULT now(),
-      UNIQUE (tenant_id, workspace_id, schema_name, table_name, target_column)
-    )`);
-    await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_wem_lookup
-         ON workspace_embedding_mappings (tenant_id, workspace_id, schema_name, table_name)`
-    );
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('workspace_embedding_connections'))");
+      await ensureMappingSchema(client);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally { client.release(); }
   }
 
   function rowToRecord(row) {
@@ -372,6 +613,7 @@ function createPostgresMappingStore(pool) {
       tableName: row.table_name,
       targetColumn: row.target_column,
       sourceColumn: row.source_column,
+      connectionId: row.connection_id ?? undefined,
       updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
     };
   }
@@ -382,28 +624,42 @@ function createPostgresMappingStore(pool) {
     async deployMapping(workspaceId, config = {}) {
       if (!workspaceId) throw clientError('Missing workspace', 400, 'WORKSPACE_MISSING');
       const norm = normalizeMappingConfig(workspaceId, config);
-      // Detect a replacement (re-map warning) by reading the existing row first; both the read
-      // and the upsert are scoped to the full key so a different tenant's row for the same
-      // workspaceId/table is never touched.
-      const prior = await pool.query(
-        `SELECT 1 FROM workspace_embedding_mappings
-          WHERE tenant_id = $1 AND workspace_id = $2 AND schema_name = $3 AND table_name = $4 AND target_column = $5`,
-        [norm.tenantId, workspaceId, norm.schemaName, norm.tableName, norm.targetColumn]
-      );
-      const existed = prior.rowCount > 0;
-      const res = await pool.query(
-        `INSERT INTO workspace_embedding_mappings
-           (tenant_id, workspace_id, schema_name, table_name, target_column, source_column, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6, now())
-         ON CONFLICT (tenant_id, workspace_id, schema_name, table_name, target_column) DO UPDATE SET
-           source_column = EXCLUDED.source_column,
-           updated_at    = now()
-         RETURNING tenant_id, workspace_id, schema_name, table_name, target_column, source_column, updated_at`,
-        [norm.tenantId, workspaceId, norm.schemaName, norm.tableName, norm.targetColumn, norm.sourceColumn]
-      );
-      const result = rowToRecord(res.rows[0]);
-      if (existed) result.warning = REMAPPING_WARNING;
-      return result;
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await lockWorkspace(client, norm.tenantId, workspaceId);
+        if (norm.connectionId !== undefined) {
+          const found = await client.query('SELECT 1 FROM workspace_embedding_connections WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3', [norm.tenantId, workspaceId, norm.connectionId]);
+          if (!found.rowCount) throw clientError('Embedding connection not found', 422, 'EMBEDDING_CONNECTION_NOT_FOUND');
+        }
+        // Detect a replacement (re-map warning) by reading the existing row first; both the read
+        // and the upsert are scoped to the full key so a different tenant's row for the same
+        // workspaceId/table is never touched.
+        const prior = await client.query(
+          `SELECT 1 FROM workspace_embedding_mappings
+            WHERE tenant_id = $1 AND workspace_id = $2 AND schema_name = $3 AND table_name = $4 AND target_column = $5`,
+          [norm.tenantId, workspaceId, norm.schemaName, norm.tableName, norm.targetColumn]
+        );
+        const existed = prior.rowCount > 0;
+        const res = await client.query(
+          `INSERT INTO workspace_embedding_mappings
+             (tenant_id, workspace_id, schema_name, table_name, target_column, source_column, connection_id, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7, now())
+           ON CONFLICT (tenant_id, workspace_id, schema_name, table_name, target_column) DO UPDATE SET
+             source_column = EXCLUDED.source_column,
+             connection_id = EXCLUDED.connection_id,
+             updated_at    = now()
+           RETURNING tenant_id, workspace_id, schema_name, table_name, target_column, source_column, connection_id, updated_at`,
+          [norm.tenantId, workspaceId, norm.schemaName, norm.tableName, norm.targetColumn, norm.sourceColumn, norm.connectionId ?? null]
+        );
+        const result = rowToRecord(res.rows[0]);
+        if (existed) result.warning = REMAPPING_WARNING;
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+      } finally { client.release(); }
     },
     async getMapping(workspaceId, selector = {}) {
       const norm = normalizeMappingConfig(workspaceId, selector);
@@ -478,12 +734,20 @@ export function createEmbeddingExecutor(options = {}) {
     return store.deployProvider(workspaceId, config);
   }
 
-  // tenantId is optional: the Postgres-backed store scopes the provider read to
-  // (tenant_id, workspace_id) when it is supplied, so two tenants that happen to share a
-  // workspaceId value each resolve THEIR OWN provider (no cross-tenant leakage). The
-  // in-memory store ignores tenantId (single-process callers are already workspace-isolated).
-  async function resolveBackend(workspaceId, { tenantId } = {}) {
-    const config = await store.getProvider(workspaceId, tenantId);
+  // Resolve an explicit connection within the caller's tenant and workspace, or the default.
+  // A removed explicit connection never falls back to a different provider.
+  async function resolveBackend(workspaceId, { tenantId, connectionId } = {}) {
+    let config;
+    if (connectionId !== undefined) {
+      try {
+        config = await store.getConnection(workspaceId, connectionId, tenantId);
+      } catch (error) {
+        if (error.statusCode !== 404 && error.code !== '42P01') throw error;
+        throw clientError('Embedding connection not found', 422, 'EMBEDDING_CONNECTION_NOT_FOUND');
+      }
+    } else {
+      config = await store.getProvider(workspaceId, tenantId);
+    }
     if (!config) {
       throw clientError('No embedding provider configured for this workspace', 422, 'EMBEDDING_PROVIDER_MISSING');
     }
@@ -498,14 +762,15 @@ export function createEmbeddingExecutor(options = {}) {
       providerType: config.providerType,
       model: config.model,
       endpoint,
+      fetchImpl: options.fetchImpl,
       resolveSecret: () => confinedResolveSecret(config.secretRef)
     });
   }
 
   // Embed `text` for a workspace and (optionally) assert the result dimension matches the
   // target column dimension — a mismatch is a 422 (no DB query is attempted).
-  async function embedForWorkspace(workspaceId, text, { expectedDimension, tenantId } = {}) {
-    const backend = await resolveBackend(workspaceId, { tenantId });
+  async function embedForWorkspace(workspaceId, text, { expectedDimension, tenantId, connectionId } = {}) {
+    const backend = await resolveBackend(workspaceId, { tenantId, connectionId });
     const vector = await backend.embed(text);
     if (!Array.isArray(vector)) {
       throw clientError('Embedding provider returned no vector', 502, 'EMBEDDING_PROVIDER_ERROR');
@@ -524,5 +789,19 @@ export function createEmbeddingExecutor(options = {}) {
   // secretRef + SSRF-validates the endpoint before persisting). `store` remains exposed for
   // read/remove and for the direct-store test seam, but writes via the route go through
   // deployProvider so the guard is always in force (#659).
-  return { store, deployProvider, resolveBackend, embedForWorkspace };
+  return { store, deployProvider, resolveBackend, embedForWorkspace,
+    async createConnection(workspaceId, config = {}) {
+      assertSecretRefAllowed(config.secretRef, prefixes);
+      await assertEndpoint(config.endpoint);
+      return store.createConnection(workspaceId, config);
+    },
+    async replaceConnection(workspaceId, connectionId, config = {}) {
+      assertSecretRefAllowed(config.secretRef, prefixes);
+      await assertEndpoint(config.endpoint);
+      return store.replaceConnection(workspaceId, connectionId, config);
+    },
+    deleteConnection: (workspaceId, connectionId, tenantId) => store.deleteConnection(workspaceId, connectionId, tenantId),
+    listConnections: (workspaceId, tenantId) => store.listConnections(workspaceId, tenantId),
+    getConnection: (workspaceId, connectionId, tenantId) => store.getConnection(workspaceId, connectionId, tenantId),
+  };
 }

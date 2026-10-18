@@ -151,7 +151,7 @@ async function autoEmbedOptions() {
     sourceColumn: 'body', targetColumn: 'embedding',
   });
   const embeddingExecutor = createEmbeddingExecutor({ backendFactory: () => localMockEmbeddingBackend({ dimension: 3 }) });
-  await embeddingExecutor.deployProvider('ws_vector', { providerType: 'mock', model: 'mock' });
+  await embeddingExecutor.deployProvider('ws_vector', { tenantId: 'ten_vector', providerType: 'mock', model: 'mock' });
   return { mappingStore, embeddingExecutor };
 }
 
@@ -232,7 +232,17 @@ test('qualified and descriptor vector column declarations, including table creat
 test('vector errors while persisting mappings use the same safe backstop', async () => {
   const db = database({ available: true });
   const mappingStore = createEmbeddingMappingStore({ pool: {
-    async query() { throw Object.assign(new Error('type "vector" does not exist'), { code: '42704' }); },
+    async connect() {
+      return {
+        async query(sql) {
+          if (sql.includes('INSERT INTO workspace_embedding_mappings')) {
+            throw Object.assign(new Error('type "vector" does not exist'), { code: '42704' });
+          }
+          return { rows: [], rowCount: 0 };
+        },
+        release() {},
+      };
+    },
   } });
   const response = await request(db, 'PUT', `${data}/embedding-mapping`, {
     sourceColumn: 'body', targetColumn: 'embedding',

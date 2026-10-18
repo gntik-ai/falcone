@@ -389,6 +389,9 @@ function isStructuralWriteRequest(method, pathname) {
   if (/^\/v1\/workspaces\/[^/]+\/api-keys(?:\/|$)/.test(pathname)) {
     return method === 'POST' || method === 'DELETE';
   }
+  if (/^\/v1\/workspaces\/[^/]+\/embedding-providers(?:\/[^/]+)?$/.test(pathname)) {
+    return method === 'POST' || method === 'PUT' || method === 'DELETE';
+  }
   if (/^\/v1\/workspaces\/[^/]+\/llm-providers(?:\/[^/]+(?:\/models(?:\/refresh)?)?)?$/.test(pathname)) {
     return method === 'POST' || method === 'PUT' || method === 'DELETE';
   }
@@ -496,6 +499,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
   const ddl = '^/v1/postgres/databases/([^/]+)/schemas';
   const keys = '^/v1/workspaces/([^/]+)/api-keys';
   const emb = '^/v1/workspaces/([^/]+)/embedding-provider';
+  const embr = '^/v1/workspaces/([^/]+)/embedding-providers';
   const wdocs = '^/v1/workspaces/([^/]+)/docs';
   // BYOK LLM completion plane (change: add-llm-agent-flow-task / #640) — sibling of the
   // embedding-provider config under the same workspace prefix. Served by THIS executor (the
@@ -533,6 +537,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
     ddl: '/v1/postgres/databases/{db}/schemas',
     keys: '/v1/workspaces/{workspaceId}/api-keys',
     emb: '/v1/workspaces/{workspaceId}/embedding-provider',
+    embr: '/v1/workspaces/{workspaceId}/embedding-providers',
     wdocs: '/v1/workspaces/{workspaceId}/docs',
     llmp: '/v1/workspaces/{workspaceId}/llm-provider',
     llmpr: '/v1/workspaces/{workspaceId}/llm-providers',
@@ -605,7 +610,7 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
         workspaceId: w, databaseName: db, schemaName: s, tableName: t, identity: c.identity, operation: 'knn_search',
         queryVector: c.body.queryVector, queryText: c.body.queryText, vectorColumn: c.body.vectorColumn,
         metric: c.body.metric, topK: c.body.topK, filter: c.body.filter ?? c.body.filters, select: c.body.select,
-        embeddingExecutor,
+        embeddingExecutor, mappingStore,
       }, 200)],
 
     // ---- Postgres DDL (schema/table/column/index) ----
@@ -666,6 +671,17 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'invoke', name, payload: c.body }, 200)],
     ['GET', new RegExp(`${fn}/([^/]+)/activations$`), `${templates.fn}/{actionId}/activations`, ([w, name], c) =>
       runFunctions(functionsExecutor, { workspaceId: w, identity: c.identity, operation: 'activations', name }, 200)],
+
+    ['GET', new RegExp(`${embr}$`), templates.embr, ([w], c) =>
+      runEmbeddingConnection(embeddingExecutor, 'listConnections', [w, c.identity.tenantId])],
+    ['POST', new RegExp(`${embr}$`), templates.embr, ([w], c) =>
+      runEmbeddingConnection(embeddingExecutor, 'createConnection', [w, { ...c.body, tenantId: c.identity.tenantId }], 201)],
+    ['GET', new RegExp(`${embr}/([^/]+)$`), `${templates.embr}/{connectionId}`, ([w, id], c) =>
+      runEmbeddingConnection(embeddingExecutor, 'getConnection', [w, id, c.identity.tenantId])],
+    ['PUT', new RegExp(`${embr}/([^/]+)$`), `${templates.embr}/{connectionId}`, ([w, id], c) =>
+      runEmbeddingConnection(embeddingExecutor, 'replaceConnection', [w, id, { ...c.body, tenantId: c.identity.tenantId }])],
+    ['DELETE', new RegExp(`${embr}/([^/]+)$`), `${templates.embr}/{connectionId}`, ([w, id], c) =>
+      runEmbeddingConnection(embeddingExecutor, 'deleteConnection', [w, id, c.identity.tenantId])],
 
     // ---- Embedding provider (workspace-scoped): set / remove (structural admin) ----
     // The verified identity's tenantId is injected so the Postgres-backed store keys the
@@ -1235,6 +1251,16 @@ async function runDdlAction(registry, resourceKind, action, payload, c, vectorSe
   return { status: 200, body: result };
 }
 
+async function runProviderConnection(executor, method, args, status) {
+  const result = await executor[method](...args);
+  return { status, body: method === 'listConnections' ? { items: result } : result };
+}
+
+async function runEmbeddingConnection(embeddingExecutor, method, args, status = 200) {
+  if (!embeddingExecutor) throw Object.assign(new Error('Embedding provider is not enabled'), { statusCode: 501, code: 'EMBEDDING_DISABLED' });
+  return runProviderConnection(embeddingExecutor, method, args, status);
+}
+
 async function runEmbeddingProvider(embeddingExecutor, action, params, successStatus) {
   if (!embeddingExecutor) throw Object.assign(new Error('Embedding provider is not enabled'), { statusCode: 501, code: 'EMBEDDING_DISABLED' });
   if (action === 'set') {
@@ -1247,7 +1273,7 @@ async function runEmbeddingProvider(embeddingExecutor, action, params, successSt
       ? embeddingExecutor.deployProvider.bind(embeddingExecutor)
       : embeddingExecutor.store.deployProvider.bind(embeddingExecutor.store);
     const result = await deploy(params.workspaceId, { ...(params.config ?? {}), tenantId: params.tenantId });
-    return { status: successStatus, body: result };
+    return { status: successStatus, body: legacyProvider(result) };
   }
   if (action === 'get') {
     // Read-back of the workspace's provider config, scoped to the verified identity's tenantId so
@@ -1255,7 +1281,7 @@ async function runEmbeddingProvider(embeddingExecutor, action, params, successSt
     // carries a `secretRef` ONLY — the plaintext key is never persisted, so GET cannot leak it (#635).
     const record = await embeddingExecutor.store.getProvider(params.workspaceId, params.tenantId);
     if (!record) throw Object.assign(new Error('No embedding provider configured for this workspace'), { statusCode: 404, code: 'EMBEDDING_PROVIDER_NOT_FOUND' });
-    return { status: successStatus, body: record };
+    return { status: successStatus, body: legacyProvider(record) };
   }
   const result = await embeddingExecutor.store.removeProvider(params.workspaceId, params.tenantId);
   return { status: successStatus, body: result };
@@ -1276,11 +1302,10 @@ async function runLlmBatchSubmit(executor, workspaceId, c) {
 // LLM config/connection and batch JSON routes share the usual error envelope.
 async function runLlmConnection(llmExecutor, method, args, status = 200) {
   if (!llmExecutor) throw Object.assign(new Error('LLM provider is not enabled'), { statusCode: 501, code: 'LLM_DISABLED' });
-  const result = await llmExecutor[method](...args);
-  return { status, body: method === 'listConnections' ? { items: result } : result };
+  return runProviderConnection(llmExecutor, method, args, status);
 }
 
-function legacyLlmProvider(record) {
+function legacyProvider(record) {
   const { displayName, isDefault, createdAt, ...legacy } = record;
   return legacy;
 }
@@ -1289,12 +1314,12 @@ async function runLlmProvider(llmExecutor, action, params, successStatus) {
   if (!llmExecutor) throw Object.assign(new Error('LLM provider is not enabled'), { statusCode: 501, code: 'LLM_DISABLED' });
   if (action === 'set') {
     const result = await llmExecutor.setProvider(params.workspaceId, { ...(params.config ?? {}), tenantId: params.tenantId });
-    return { status: successStatus, body: legacyLlmProvider(result) };
+    return { status: successStatus, body: legacyProvider(result) };
   }
   if (action === 'get') {
     const record = await llmExecutor.getProvider(params.workspaceId, params.tenantId);
     if (!record) throw Object.assign(new Error('No LLM provider configured for this workspace'), { statusCode: 404, code: 'LLM_PROVIDER_NOT_FOUND' });
-    return { status: successStatus, body: legacyLlmProvider(record) };
+    return { status: successStatus, body: legacyProvider(record) };
   }
   const result = await llmExecutor.removeProvider(params.workspaceId, params.tenantId);
   return { status: successStatus, body: result };
@@ -1403,6 +1428,7 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
       schemaName: params.schemaName,
       tableName: params.tableName,
       sourceColumn: cfg.sourceColumn,
+      connectionId: cfg.connectionId,
       targetColumn: cfg.targetColumn,
     });
     return { status: successStatus, body: result };
@@ -1428,6 +1454,7 @@ async function runEmbeddingMapping(mappingStore, action, params, successStatus) 
 
 export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor, eventsExecutor, functionsExecutor, realtimeExecutor, pgRealtimeExecutor, embeddingExecutor, llmExecutor, mappingStore, flowExecutor, flowMonitoringExecutor, mcpEngine, controlPlaneUpstream, mcpSelfBaseUrl, mcpConfig = mcpConfigStore, jwtVerifier, gatewaySharedSecret, resolveWorkspaceTenant, workspaceDocsDb, knativeRuntime, mcpRuntimeCleaner, idempotencyPool, logger = console } = {}) {
   if (!registry) throw new TypeError('createControlPlaneServer requires a connection registry');
+  if (embeddingExecutor?.store) mappingStore?.bindProviderStore?.(embeddingExecutor.store);
   // Parse + validate the upstream at startup (fail-fast). Host/port are fixed here so the
   // per-request proxy can never be steered to a different host (SSRF).
   const upstream = controlPlaneUpstream ? new URL(controlPlaneUpstream) : undefined;

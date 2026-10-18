@@ -10,6 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { serverFetch } from './helpers/embedding-connections.mjs';
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
 import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 import { createEmbeddingExecutor, createEmbeddingProviderStore } from '../../apps/control-plane-executor/src/runtime/embedding-executor.mjs';
@@ -32,10 +33,9 @@ function makeRegistry() {
 async function withServer(embeddingExecutor, fn) {
   const registry = makeRegistry();
   const server = createControlPlaneServer({ registry, embeddingExecutor, logger: { error() {} } });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
-  try { return await fn(baseUrl); } finally {
-    await new Promise((r) => server.close(r));
+  const fetch = serverFetch(server);
+  try { return await fn(fetch); } finally {
+    server.close();
     await registry.end().catch(() => {});
   }
 }
@@ -44,13 +44,13 @@ const path = (ws = WS) => `/v1/workspaces/${ws}/embedding-provider`;
 
 test('bbx-emb-get-01: GET round-trips a PUT and returns only a secretRef (never the plaintext key)', async () => {
   const embeddingExecutor = createEmbeddingExecutor({ store: createEmbeddingProviderStore() });
-  await withServer(embeddingExecutor, async (baseUrl) => {
-    const put = await fetch(`${baseUrl}${path()}`, {
+  await withServer(embeddingExecutor, async (fetch) => {
+    const put = await fetch(path(), {
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ providerType: 'openai', model: 'text-embedding-3-small', secretRef: { name: 'BYOK_K' }, apiKey: FAKE_KEY }),
     });
     assert.equal(put.status, 200, await put.text());
-    const get = await fetch(`${baseUrl}${path()}`, { method: 'GET', headers: authHeaders });
+    const get = await fetch(path(), { method: 'GET', headers: authHeaders });
     assert.equal(get.status, 200, 'GET reaches the handler (not 404 NO_ROUTE)');
     const body = await get.json();
     assert.equal(body.providerType, 'openai');
@@ -62,8 +62,8 @@ test('bbx-emb-get-01: GET round-trips a PUT and returns only a secretRef (never 
 
 test('bbx-emb-get-02: GET on an unconfigured workspace returns 404 (not 500)', async () => {
   const embeddingExecutor = createEmbeddingExecutor({ store: createEmbeddingProviderStore() });
-  await withServer(embeddingExecutor, async (baseUrl) => {
-    const get = await fetch(`${baseUrl}${path()}`, { method: 'GET', headers: authHeaders });
+  await withServer(embeddingExecutor, async (fetch) => {
+    const get = await fetch(path(), { method: 'GET', headers: authHeaders });
     assert.equal(get.status, 404);
     const body = await get.json();
     assert.equal(body.code, 'EMBEDDING_PROVIDER_NOT_FOUND');

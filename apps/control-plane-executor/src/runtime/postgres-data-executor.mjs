@@ -93,7 +93,7 @@ async function applyAutoEmbed(payload, mappings, { client, schemaName, tableName
     const sourceText = out[sourceColumn];
     if (sourceText === undefined || sourceText === null || String(sourceText).length === 0) continue;
     const expectedDimension = await columnVectorDimension(client, schemaName, tableName, targetColumn);
-    const vector = await embeddingExecutor.embedForWorkspace(workspaceId, sourceText, { expectedDimension, tenantId });
+    const vector = await embeddingExecutor.embedForWorkspace(workspaceId, sourceText, { expectedDimension, tenantId, connectionId: mapping.connectionId });
     // Copy-on-first-write so the caller's params object is never mutated.
     if (out === payload) out = { ...payload };
     out[targetColumn] = vectorLiteral(vector);
@@ -216,7 +216,14 @@ export async function executePostgresData(registry, params) {
       }
       const vectorColumnName = params.vectorColumn ?? table.vectorColumns?.[0];
       const expectedDimension = vectorColumnName ? await columnVectorDimension(client, params.schemaName, params.tableName, vectorColumnName) : undefined;
-      knnParams.queryVector = await params.embeddingExecutor.embedForWorkspace(workspaceId, params.queryText, { expectedDimension, tenantId });
+      const mapping = vectorColumnName && params.mappingStore
+        ? await params.mappingStore.getMapping(workspaceId, {
+            tenantId, schemaName: params.schemaName, tableName: params.tableName, targetColumn: vectorColumnName,
+          })
+        : null;
+      knnParams.queryVector = await params.embeddingExecutor.embedForWorkspace(workspaceId, params.queryText, {
+        expectedDimension, tenantId, connectionId: mapping?.connectionId,
+      });
     }
 
     // Write-time auto-embedding (mirrors the KNN read hook above onto the write path):

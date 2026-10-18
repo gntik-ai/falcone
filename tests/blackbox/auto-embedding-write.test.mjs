@@ -13,8 +13,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { serverFetch, dataRegistry } from './helpers/embedding-connections.mjs';
 import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 import { executePostgresData } from '../../apps/control-plane-executor/src/runtime/postgres-data-executor.mjs';
 import {
   createEmbeddingMappingStore,
@@ -27,23 +27,23 @@ const authHeaders = {
   'x-tenant-id': TEN,
   'x-workspace-id': WS,
   'x-auth-subject': 'admin-1',
+  'x-actor-roles': 'tenant_admin',
 };
 
 // A registry is required by createControlPlaneServer but the mapping CRUD routes never touch
 // the data plane, so a no-op resolveConnection (never connected) is sufficient.
 function makeRegistry() {
-  return createConnectionRegistry({ resolveConnection: () => ({ dsn: 'postgres://unused/none' }) });
+  return dataRegistry();
 }
 
 async function withServer(opts, fn) {
   const registry = makeRegistry();
   const server = createControlPlaneServer({ registry, ...opts, logger: { error() {} } });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const fetch = serverFetch(server);
   try {
-    return await fn(baseUrl);
+    return await fn(fetch);
   } finally {
-    await new Promise((r) => server.close(r));
+    server.close();
     await registry.end().catch(() => {});
   }
 }
@@ -54,8 +54,8 @@ const mappingPath = (ws = WS, db = 'appdb', s = 'public', t = 'docs') =>
 // bbx-auto-emb-01: PUT mapping route returns 200 and the stored record.
 test('bbx-auto-emb-01: PUT embedding-mapping returns 200 and the stored record', async () => {
   const mappingStore = createEmbeddingMappingStore();
-  await withServer({ mappingStore }, async (baseUrl) => {
-    const res = await fetch(`${baseUrl}${mappingPath()}`, {
+  await withServer({ mappingStore }, async (fetch) => {
+    const res = await fetch(mappingPath(), {
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ sourceColumn: 'body', targetColumn: 'embedding' }),
     });
@@ -72,12 +72,12 @@ test('bbx-auto-emb-01: PUT embedding-mapping returns 200 and the stored record',
 // bbx-auto-emb-02: GET mapping route returns the configured mapping.
 test('bbx-auto-emb-02: GET embedding-mapping returns the configured mapping', async () => {
   const mappingStore = createEmbeddingMappingStore();
-  await withServer({ mappingStore }, async (baseUrl) => {
-    await fetch(`${baseUrl}${mappingPath()}`, {
+  await withServer({ mappingStore }, async (fetch) => {
+    await fetch(mappingPath(), {
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ sourceColumn: 'body', targetColumn: 'embedding' }),
     });
-    const res = await fetch(`${baseUrl}${mappingPath()}`, { method: 'GET', headers: authHeaders });
+    const res = await fetch(mappingPath(), { method: 'GET', headers: authHeaders });
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.sourceColumn, 'body');
@@ -88,31 +88,31 @@ test('bbx-auto-emb-02: GET embedding-mapping returns the configured mapping', as
 // bbx-auto-emb-03: DELETE mapping route returns 200 and a subsequent GET returns 404.
 test('bbx-auto-emb-03: DELETE embedding-mapping returns 200 and GET then 404', async () => {
   const mappingStore = createEmbeddingMappingStore();
-  await withServer({ mappingStore }, async (baseUrl) => {
-    await fetch(`${baseUrl}${mappingPath()}`, {
+  await withServer({ mappingStore }, async (fetch) => {
+    await fetch(mappingPath(), {
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ sourceColumn: 'body', targetColumn: 'embedding' }),
     });
-    const del = await fetch(`${baseUrl}${mappingPath()}`, { method: 'DELETE', headers: authHeaders });
+    const del = await fetch(mappingPath(), { method: 'DELETE', headers: authHeaders });
     assert.equal(del.status, 200);
     assert.deepEqual(await del.json(), { removed: true });
 
-    const get = await fetch(`${baseUrl}${mappingPath()}`, { method: 'GET', headers: authHeaders });
+    const get = await fetch(mappingPath(), { method: 'GET', headers: authHeaders });
     assert.equal(get.status, 404, 'mapping is gone after delete');
   });
 });
 
 // bbx-auto-emb-04: with NO mappingStore wired, the routes return 501 MAPPING_STORE_DISABLED.
 test('bbx-auto-emb-04: routes return 501 MAPPING_STORE_DISABLED when not wired', async () => {
-  await withServer({ mappingStore: undefined }, async (baseUrl) => {
-    const put = await fetch(`${baseUrl}${mappingPath()}`, {
+  await withServer({ mappingStore: undefined }, async (fetch) => {
+    const put = await fetch(mappingPath(), {
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ sourceColumn: 'body', targetColumn: 'embedding' }),
     });
     assert.equal(put.status, 501);
     assert.equal((await put.json()).code, 'MAPPING_STORE_DISABLED');
 
-    const get = await fetch(`${baseUrl}${mappingPath()}`, { method: 'GET', headers: authHeaders });
+    const get = await fetch(mappingPath(), { method: 'GET', headers: authHeaders });
     assert.equal(get.status, 501);
     assert.equal((await get.json()).code, 'MAPPING_STORE_DISABLED');
   });

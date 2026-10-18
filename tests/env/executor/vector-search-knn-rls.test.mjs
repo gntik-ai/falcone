@@ -193,7 +193,7 @@ test('KNN with queryText resolves an embedding and stays tenant-scoped', async (
   const embedding = createEmbeddingExecutor({
     backendFactory: () => localMockEmbeddingBackend({ dimension: 3 }),
   });
-  await embedding.store.deployProvider(WS_A, { providerType: 'mock', model: 'mock-3', secretRef: { vaultPath: 'secret/ws-a/mock' } });
+  await embedding.store.deployProvider(WS_A, { tenantId: TEN_A, providerType: 'mock', model: 'mock-3', secretRef: { vaultPath: 'secret/ws-a/mock' } });
 
   const res = await executePostgresData(registry, {
     ...knnBase(TEN_A, WS_A),

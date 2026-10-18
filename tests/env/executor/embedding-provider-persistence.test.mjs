@@ -4,7 +4,7 @@
 // configuration survives a control-plane restart and is visible to all replicas that
 // share the metadata DB. This test proves DURABILITY ACROSS A FRESH STORE INSTANCE on
 // the SAME Postgres (restart / second-replica simulation):
-//   - store S1 {pool} deployProvider → row in workspace_embedding_providers
+//   - store S1 {pool} deployProvider → row in workspace_embedding_connections
 //   - store S2 {pool} on the SAME pool reads the SAME row (no shared in-memory state)
 //   - removeProvider on S1 deletes the row; S2 then reads null
 //   - replacing a provider returns the re-index warning
@@ -61,7 +61,7 @@ after(async () => {
   }
 });
 
-// emb-persist-01: deployProvider on S1 inserts a row into workspace_embedding_providers.
+// emb-persist-01: deployProvider on S1 inserts a row into workspace_embedding_connections.
 test('emb-persist-01: deployProvider on S1 inserts a persisted row', async () => {
   const s1 = createEmbeddingProviderStore({ pool });
   await s1.ensureSchema();
@@ -74,7 +74,7 @@ test('emb-persist-01: deployProvider on S1 inserts a persisted row', async () =>
     secretRef: { name: 'BYOK_WS1_EMBEDDING_KEY' },
   });
   const res = await pool.query(
-    'SELECT tenant_id, workspace_id, provider_type, model, dimension FROM workspace_embedding_providers WHERE workspace_id = $1',
+    'SELECT tenant_id, workspace_id, provider_type, model, dimension FROM workspace_embedding_connections WHERE connection_id = \'default\' AND is_default AND workspace_id = $1',
     [WS_1],
   );
   assert.equal(res.rowCount, 1, 'one row persisted');
@@ -128,7 +128,7 @@ test('emb-persist-05: secret_ref persists only the secretRef — no plaintext ap
     secret: FAKE_KEY,
   });
   const res = await pool.query(
-    'SELECT secret_ref FROM workspace_embedding_providers WHERE workspace_id = $1',
+    'SELECT secret_ref FROM workspace_embedding_connections WHERE connection_id = \'default\' AND is_default AND workspace_id = $1',
     ['ws_emb_secret'],
   );
   const stored = res.rows[0].secret_ref;
@@ -151,7 +151,7 @@ test('emb-persist-06: rows are keyed by (tenant_id, workspace_id) — no cross-t
   await store.deployProvider(SHARED_WS, { tenantId: TEN_B, providerType: 'cohere', model: 'model-b', secretRef: { name: 'BYOK_B_KEY' } });
 
   const rows = await pool.query(
-    'SELECT tenant_id, model FROM workspace_embedding_providers WHERE workspace_id = $1 ORDER BY tenant_id',
+    'SELECT tenant_id, model FROM workspace_embedding_connections WHERE connection_id = \'default\' AND is_default AND workspace_id = $1 ORDER BY tenant_id',
     [SHARED_WS],
   );
   assert.equal(rows.rowCount, 2, 'both tenants have an independent row for the same workspaceId');
