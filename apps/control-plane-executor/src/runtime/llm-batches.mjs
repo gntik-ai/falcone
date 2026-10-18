@@ -6,6 +6,7 @@ import { publicBatch } from './llm-batch-store.mjs';
 import { resolveBatchDriver, resolveLlmAdapter } from './llm-adapters/registry.mjs';
 import { createLlmTransport } from './llm-adapters/transport.mjs';
 
+const SUBMISSION_RECOVERY_MS = 5 * 60_000;
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -58,13 +59,14 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
     const { config, chosen, apiKey } = await prepare(workspaceId, { ...input, tenantId, batchItems: input.items });
     const driver = driverResolver(config.providerType);
     if (!driver) throw clientError('Provider does not support batches', 422, 'LLM_BATCH_UNSUPPORTED');
+    driver.validateEndpoint?.(config.endpoint);
     const timestamp = new Date(now()).toISOString();
     const inserted = await store.insert({ tenantId: tenantId ?? '_', workspaceId, batchId: randomUUID(),
       connectionId: config.connectionId, providerType: config.providerType, endpoint: config.endpoint, secretRef: config.secretRef,
       model: chosen, providerBatchId: null, providerState: {}, status: 'submitting', cancelFence: false, requestCount: input.items.length,
       providerCounts: {}, missingCount: 0, inputSha256, idempotencyPrincipal: hash ? principal : null, idempotencyKeySha256: hash,
       lastErrorCode: null, cancelRequestedAt: null, cancelAcknowledgedAt: null, expiresAt: null, endedAt: null,
-      resultsAttempts: 0, nextPollAt: new Date(now() + 300000).toISOString(), createdAt: timestamp, updatedAt: timestamp,
+      resultsAttempts: 0, nextPollAt: new Date(now() + SUBMISSION_RECOVERY_MS).toISOString(), createdAt: timestamp, updatedAt: timestamp,
       leaseOwner: null, leaseExpiresAt: null, leaseVersion: 0,
     }, input.items.map(item => item.customId));
     if (!inserted.created) return replay(inserted.batch, inputSha256);
@@ -75,9 +77,9 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
     let outcome;
     row = await store.update(row, { updatedAt: new Date(now()).toISOString() });
     try {
-      outcome = await driver.submit({ endpoint: config.endpoint, apiKey, model: chosen,
+      outcome = await driver.submit({ batchId: row.batchId, now, endpoint: config.endpoint, apiKey, model: chosen,
         items: input.items.map(item => ({ ...item, model: chosen, messages: normalizeMessages(item) })), persist,
-        transport: createLlmTransport({ adapter: resolveLlmAdapter(config.providerType), fetchImpl }), providerState: row.providerState });
+        transport: batchTransport(config.providerType, () => row, driver.guardEachRequest), providerState: row.providerState });
     } catch (error) {
       const definite = error.phase === 'response' && error.httpStatus >= 400 && error.httpStatus < 500 && error.httpStatus !== 408;
       const ambiguous = ['network', 'body'].includes(error.phase) || error.httpStatus === 408 || error.httpStatus >= 500;
@@ -96,15 +98,35 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
       nextPollAt: new Date(now() + interval).toISOString(), updatedAt: new Date(now()).toISOString() });
     return { status: 202, body: publicBatch(row) };
   }
+  // Multi-request drivers recheck the lease, endpoint and secret before every I/O,
+  // including lazy result streams and cleanup after a terminal transition.
+  function batchTransport(providerType, getRow, guard) {
+    const transport = createLlmTransport({ adapter: resolveLlmAdapter(providerType), fetchImpl });
+    if (!guard) return transport;
+    const guarded = operation => async request => {
+      const row = getRow();
+      await store.assertLease(row);
+      const apiKey = await resolveSnapshot(row);
+      await store.assertLease(row);
+      return transport[operation]({ ...request, headers: { ...request.headers, Authorization: `Bearer ${apiKey}` } });
+    };
+    return { ...transport, fetchRaw: guarded('fetchRaw'), requestJson: guarded('requestJson') };
+  }
   const batchReconciler = createLlmBatchReconciler({ store, usageStore, driverResolver, now, intervalMs,
     async call(row, operation) {
       await store.assertLease(row);
       const apiKey = await resolveSnapshot(row);
       await store.assertLease(row);
-      const transport = createLlmTransport({ adapter: resolveLlmAdapter(row.providerType), fetchImpl });
-      const ctx = { endpoint: row.endpoint, apiKey, providerBatchId: row.providerBatchId, providerState: row.providerState, transport };
-      const result = await driverResolver(row.providerType)[operation](ctx);
-      return operation === 'results' ? { lines: transport.jsonLines(result.body) } : result;
+      const driver = driverResolver(row.providerType);
+      const transport = batchTransport(row.providerType, () => row, driver.guardEachRequest);
+      const ctx = { endpoint: row.endpoint, apiKey, batchId: row.batchId, createdAt: row.createdAt, now,
+        providerBatchId: row.providerBatchId, providerState: row.providerState, transport,
+        async persist(state) {
+          const updated = await store.update(row, { providerState: { ...row.providerState, ...state }, updatedAt: new Date(now()).toISOString() });
+          row.providerState = updated.providerState;
+        } };
+      const result = await driver[operation](ctx);
+      return operation === 'results' && !result.streams ? { lines: transport.jsonLines(result.body) } : result;
     },
   });
   async function cancelBatch(w, id, { tenantId } = {}) {
