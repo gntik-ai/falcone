@@ -15,10 +15,12 @@
 // against an SSRF guard — at config-deploy time (reject 400, no DB write) AND re-validated at
 // request time (fail-closed for any pre-existing malicious row). The DEFAULT secretResolver is
 // the confined resolver, so a non-allow-listed env var is NEVER read.
+import { createLlmBatchStore } from './llm-batch-store.mjs';
+import { createLlmBatches } from './llm-batches.mjs';
 import { clientError } from './errors.mjs';
 import modelCatalog from './llm-adapters/model-catalog.mjs';
 import { mergeModels, catalogEntries, validModelId, validModelMetadata } from './llm-adapters/connection-models.mjs';
-import { resolveLlmAdapter } from './llm-adapters/registry.mjs';
+import { resolveLlmAdapter, resolveBatchDriver } from './llm-adapters/registry.mjs';
 import { createLlmTransport } from './llm-adapters/transport.mjs';
 import { normalizeUsage, normalizeFinishReason, adapterError } from './llm-adapters/contract.mjs';
 import {
@@ -543,8 +545,8 @@ function createPostgresUsageStore(pool) {
   return {
     pool,
     ensureSchema,
-    async recordUsage(workspaceId, { tenantId, model, promptTokens, completionTokens, totalTokens } = {}) {
-      await pool.query(
+    async recordUsage(workspaceId, { tenantId, model, promptTokens, completionTokens, totalTokens } = {}, client = pool) {
+      await client.query(
         `INSERT INTO workspace_llm_usage (tenant_id, workspace_id, model, prompt_tokens, completion_tokens, total_tokens, created_at)
          VALUES ($1,$2,$3,$4,$5,$6, now())`,
         [tenantId ?? TENANT_SENTINEL, workspaceId, model ?? null, Number(promptTokens) || 0, Number(completionTokens) || 0, Number(totalTokens) || 0],
@@ -582,6 +584,7 @@ function createPostgresUsageStore(pool) {
 export function createLlmExecutor(options = {}) {
   const providerStore = options.providerStore ?? createLlmProviderStore();
   const usageStore = options.usageStore ?? createLlmUsageStore();
+  const batchStore = options.batchStore ?? createLlmBatchStore({ pool: providerStore.pool });
   const backendFactory = options.backendFactory; // (config) -> backend (test seam)
   const fetchImpl = options.fetchImpl;
   const catalog = options.modelCatalog ?? modelCatalog;
@@ -654,14 +657,22 @@ export function createLlmExecutor(options = {}) {
     return httpLlmBackend({ providerType: config.providerType, fetchImpl });
   }
 
-  async function prepare(workspaceId, { tenantId, connectionId, model, responseFormat, promptCache, stream, maxTokens } = {}) {
+  async function prepare(workspaceId, { tenantId, connectionId, model, responseFormat, promptCache, stream, maxTokens, batchItems } = {}) {
     if (promptCache !== undefined && promptCache !== 'system') throw clientError('Invalid promptCache', 400, 'INVALID_PROMPT_CACHE');
     assertResponseFormat(responseFormat);
     const config = connectionId === undefined
       ? await resolveProviderOrThrow(workspaceId, tenantId)
       : await resolveConnectionOrThrow(workspaceId, connectionId, tenantId);
+    if (batchItems) {
+      if (!(options.batchDriverResolver ?? resolveBatchDriver)(config.providerType)) throw clientError('Provider does not support batches', 422, 'LLM_BATCH_UNSUPPORTED');
+      for (const item of batchItems) {
+        if (item.responseFormat !== undefined && !resolveLlmAdapter(config.providerType).surface.structuredOutput) throw clientError('Structured output is unsupported by this provider', 400, 'LLM_STRUCTURED_OUTPUT_UNSUPPORTED');
+        assertResponseFormat(item.responseFormat);
+        if (item.promptCache !== undefined && item.promptCache !== 'system') throw clientError('Invalid promptCache', 400, 'INVALID_PROMPT_CACHE');
+      }
+    }
     if (responseFormat !== undefined && !resolveLlmAdapter(config.providerType).surface.structuredOutput) {
-      throw clientError('Structured output is unsupported by this provider', 422, 'LLM_STRUCTURED_OUTPUT_UNSUPPORTED');
+      throw clientError('Structured output is unsupported by this provider', batchItems ? 400 : 422, 'LLM_STRUCTURED_OUTPUT_UNSUPPORTED');
     }
     const chosen = resolveAllowedModel(config, model);
     const rows = await providerStore.listModels(workspaceId, config.connectionId, config.tenantId);
@@ -673,11 +684,19 @@ export function createLlmExecutor(options = {}) {
     if (maxTokens != null && capabilities?.maxOutputTokens != null && maxTokens > capabilities.maxOutputTokens) unavailable('maxOutputTokens');
     if (responseFormat !== undefined && capabilities?.structuredOutput === false) unavailable('structuredOutput');
     if (promptCache !== undefined && capabilities?.promptCaching === false) unavailable('promptCaching');
+    if (batchItems) {
+      if (capabilities?.batch === false) unavailable('batch');
+      for (const item of batchItems) {
+        if (item.maxTokens != null && capabilities?.maxOutputTokens != null && item.maxTokens > capabilities.maxOutputTokens) unavailable('maxOutputTokens');
+        if (item.responseFormat !== undefined && capabilities?.structuredOutput === false) unavailable('structuredOutput');
+        if (item.promptCache !== undefined && capabilities?.promptCaching === false) unavailable('promptCaching');
+      }
+    }
     // Re-validate the endpoint just before the outbound call (DNS-rebinding defense + fail-closed
     // for any malicious row persisted before this guard shipped).
     await assertEndpoint(config.endpoint);
     const apiKey = await resolveSecretOrThrow(config);
-    return { config, chosen, apiKey, backend: backendFor(config) };
+    return { config, chosen, apiKey, backend: batchItems ? undefined : backendFor(config) };
   }
 
   // Config-deploy: confine the secretRef + SSRF-validate the endpoint BEFORE persisting, so a
@@ -735,9 +754,16 @@ export function createLlmExecutor(options = {}) {
   async function ensureSchema() {
     await providerStore.ensureSchema?.();
     await usageStore.ensureSchema?.();
+    await batchStore.ensureSchema();
   }
 
+  const batches = createLlmBatches({ store: batchStore, prepare, normalizeMessages, fetchImpl, now: options.now,
+    driverResolver: options.batchDriverResolver, usageStore, intervalMs: options.batchPollIntervalMs,
+    async resolveSnapshot(row) { await assertEndpoint(row.endpoint); return resolveSecretOrThrow(row); },
+  });
   return {
+    ...batches,
+    batchStore,
     providerStore,
     usageStore,
     // Config-plane convenience wrappers (the HTTP routes call these). setProvider confines the

@@ -192,6 +192,36 @@
     "privilege_domain": "data_access"
   },
   {
+    "method": "POST",
+    "path": "/v1/workspaces/{id}/llm/completions/batches",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{id}/llm/completions/batches",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{id}/llm/completions/batches/{batchId}",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/workspaces/{id}/llm/completions/batches/{batchId}/items",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/workspaces/{id}/llm/completions/batches/{batchId}/cancel",
+    "privilege_domain": "data_access"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1/workspaces/{id}/llm/completions/batches/{batchId}",
+    "privilege_domain": "data_access"
+  },
+  {
     "method": "GET",
     "path": "/v1/workspaces/{id}/llm-usage",
     "privilege_domain": "data_access"

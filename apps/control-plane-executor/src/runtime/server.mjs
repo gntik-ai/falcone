@@ -335,7 +335,7 @@ const SCOPE_MONGO_DOC_RE = /^\/v1\/mongo\/workspaces\/[^/]+\/data\/[^/]+\/collec
 const SCOPE_LLM_COMPLETIONS_RE = /^\/v1\/workspaces\/[^/]+\/llm\/completions(?:\/|$)/;
 function requiredDataScope(method, pathname) {
   if (SCOPE_DDL_RE.test(pathname)) return 'ddl:write';
-  if (SCOPE_LLM_COMPLETIONS_RE.test(pathname)) return 'data:write'; // billable BYOK completion (#662)
+  if (SCOPE_LLM_COMPLETIONS_RE.test(pathname)) return method === 'GET' ? 'data:read' : 'data:write'; // billable BYOK completion (#662)
   if (SCOPE_PG_DATA_RE.test(pathname) || SCOPE_MONGO_DOC_RE.test(pathname)) {
     if (method === 'GET') return null; // reads are not scope-gated (every key carries data:read)
     if (method === 'POST' && /\/search$/.test(pathname)) return null; // vector search is a read
@@ -704,6 +704,18 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runLlmProvider(llmExecutor, 'remove', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
     ['GET', new RegExp(`${llmu}$`), templates.llmu, ([w], c) =>
       runLlmUsage(llmExecutor, { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
+    ['POST', new RegExp(`${llmc}/batches$`), `${templates.llmc}/batches`, ([w], c) =>
+      runLlmBatchSubmit(llmExecutor, w, c), { ownsIdempotency: true }],
+    ['GET', new RegExp(`${llmc}/batches$`), `${templates.llmc}/batches`, ([w], c) =>
+      runLlmConnection(llmExecutor, 'listBatches', [w, batchOptions(c)])],
+    ['GET', new RegExp(`${llmc}/batches/([^/]+)$`), `${templates.llmc}/batches/{batchId}`, ([w, id], c) =>
+      runLlmConnection(llmExecutor, 'getBatch', [w, id, batchOptions(c)])],
+    ['GET', new RegExp(`${llmc}/batches/([^/]+)/items$`), `${templates.llmc}/batches/{batchId}/items`, ([w, id], c) =>
+      runLlmConnection(llmExecutor, 'listBatchItems', [w, id, batchOptions(c)])],
+    ['POST', new RegExp(`${llmc}/batches/([^/]+)/cancel$`), `${templates.llmc}/batches/{batchId}/cancel`, ([w, id], c) =>
+      runLlmConnection(llmExecutor, 'cancelBatch', [w, id, { tenantId: c.identity.tenantId }])],
+    ['DELETE', new RegExp(`${llmc}/batches/([^/]+)$`), `${templates.llmc}/batches/{batchId}`, ([w, id], c) =>
+      runLlmConnection(llmExecutor, 'deleteBatch', [w, id, { tenantId: c.identity.tenantId }])],
     // The completion route OWNS the response so it can stream SSE when `stream:true` and otherwise
     // write a single JSON body. { sse: true } routes the dispatcher to pass (req,res) to the handler.
     ['POST', new RegExp(`${llmc}$`), templates.llmc, ([w], c) =>
@@ -1249,9 +1261,19 @@ async function runEmbeddingProvider(embeddingExecutor, action, params, successSt
   return { status: successStatus, body: result };
 }
 
-// BYOK LLM provider config plane (change: add-llm-agent-flow-task / #640). Mirrors
-// runEmbeddingProvider: tenantId from the verified identity (never the body), GET returns the
-// stored record (which carries a `secretRef` ONLY — the plaintext key is never persisted).
+// Batch identity is server-owned, including the generic idempotency principal namespace.
+function batchOptions(c) {
+  return { tenantId: c.identity.tenantId, ...Object.fromEntries(['limit', 'cursor', 'status'].filter(k => c.url.searchParams.has(k)).map(k => [k, c.url.searchParams.get(k)])) };
+}
+async function runLlmBatchSubmit(executor, workspaceId, c) {
+  if (!executor) throw Object.assign(new Error('LLM provider is not enabled'), { statusCode: 501, code: 'LLM_DISABLED' });
+  const subject = c.identity.sub ?? c.identity.actorId;
+  return executor.submitBatch(workspaceId, c.body, { tenantId: c.identity.tenantId,
+    principal: c.identity.keyId ? `apikey:${c.identity.keyId}` : subject ? `subject:${subject}` : undefined,
+    idempotencyKey: c.headers['idempotency-key'] });
+}
+
+// LLM config/connection and batch JSON routes share the usual error envelope.
 async function runLlmConnection(llmExecutor, method, args, status = 200) {
   if (!llmExecutor) throw Object.assign(new Error('LLM provider is not enabled'), { statusCode: 501, code: 'LLM_DISABLED' });
   const result = await llmExecutor[method](...args);
@@ -1580,7 +1602,7 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
         const { status, body: out } = await handler(groups, ctx);
         return sendJson(res, status, out);
       }
-      const keyedMutation = isMutationMethod(method) && req.headers['idempotency-key'] !== undefined;
+      const keyedMutation = !opts?.ownsIdempotency && isMutationMethod(method) && req.headers['idempotency-key'] !== undefined;
       let rawBody;
       if (keyedMutation) {
         rawBody = await readBodyBytes(req);

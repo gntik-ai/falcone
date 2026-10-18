@@ -438,6 +438,7 @@ async function boot() {
   // Kafka/Temporal trigger wiring is best effort; the durable outbox is already ready.
   await bootFlowTriggers().catch((error) => console.error('[control-plane] flow-trigger boot wiring failed:', error));
   flowAuditRelay?.start();
+  if (keyPool) llmExecutor.batchReconciler.start();
   server.listen(PORT, () => console.log(`[control-plane] listening on :${PORT}`));
   void recoverHostedMcpCleanup().catch((error) => console.error('[control-plane] hosted MCP cleanup failed:', error?.message ?? error));
   mcpCleanupTimer = setInterval(() => {
@@ -454,6 +455,7 @@ async function shutdown(signal) {
   console.log(`[control-plane] ${signal} received, shutting down`);
   if (mcpCleanupTimer) clearInterval(mcpCleanupTimer);
   flowAuditRelay?.stop();
+  await llmExecutor.batchReconciler.stop();
   await flowAuditProducerP?.then((producer) => producer.disconnect()).catch(() => {});
   server.close(() => {});
   await registry.end().catch(() => {});

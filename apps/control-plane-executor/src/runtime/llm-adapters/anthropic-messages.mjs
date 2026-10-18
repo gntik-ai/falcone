@@ -14,6 +14,51 @@ const usageFields = usage => {
 };
 
 export const anthropicMessagesAdapter = Object.freeze({
+  batch: Object.freeze({
+    async submit(ctx) {
+      const body = { requests: ctx.items.map(({ customId, ...item }) => ({ custom_id: customId,
+        params: anthropicMessagesAdapter.buildRequest({ ...item, stream: false }, ctx).body })) };
+      const json = await ctx.transport.requestJson({ method: 'POST', url: batchUrl(ctx.endpoint), headers: batchHeaders(ctx), body: JSON.stringify(body) });
+      try { this.parseBatch(json); } catch (error) { throw Object.assign(error, { phase: 'body' }); }
+      return { type: 'accepted', providerBatchId: json.id, expiresAt: json.expires_at ?? null };
+    },
+    async poll(ctx) {
+      return this.parseBatch(await ctx.transport.requestJson({ method: 'GET', url: batchUrl(ctx.endpoint, ctx.providerBatchId), headers: batchHeaders(ctx) }));
+    },
+    async cancel(ctx) {
+      return this.parseBatch(await ctx.transport.requestJson({ method: 'POST', url: batchUrl(ctx.endpoint, ctx.providerBatchId, 'cancel'), headers: batchHeaders(ctx) }));
+    },
+    results(ctx) {
+      return ctx.transport.fetchRaw({ method: 'GET', url: batchUrl(ctx.endpoint, ctx.providerBatchId, 'results'), headers: batchHeaders(ctx) });
+    },
+    parseBatch(json) {
+      const validDate = value => value == null || (typeof value === 'string' && Number.isFinite(Date.parse(value)));
+      if (!isObject(json) || json.type !== 'message_batch' || typeof json.id !== 'string' || !json.id
+        || !['in_progress', 'canceling', 'ended'].includes(json.processing_status)
+        || !isObject(json.request_counts)
+        || ['processing', 'succeeded', 'errored', 'canceled', 'expired'].some(key => !Number.isInteger(json.request_counts[key]) || json.request_counts[key] < 0)
+        || ![json.expires_at, json.ended_at, json.cancel_initiated_at].every(validDate)) throw adapterError('LLM_PROVIDER_RESPONSE_INVALID');
+      return { providerBatchId: json.id, ended: json.processing_status === 'ended', expired: false,
+        counts: { ...json.request_counts }, expiresAt: json.expires_at ?? null, endedAt: json.ended_at ?? null,
+        cancelAcknowledged: json.processing_status === 'canceling' || json.cancel_initiated_at != null };
+    },
+    parseResultLine(line, customIds) {
+      let json;
+      try { json = JSON.parse(line); } catch { throw adapterError('LLM_PROVIDER_RESPONSE_INVALID'); }
+      if (!isObject(json) || !customIds.has(json.custom_id) || !isObject(json.result)) throw adapterError('LLM_PROVIDER_RESPONSE_INVALID');
+      const { result } = json;
+      const item = { customId: json.custom_id, status: result.type };
+      if (result.type === 'succeeded') return { ...item,
+        ...anthropicMessagesAdapter.parseResponse({ status: 200, headers: new Headers(), json: result.message }) };
+      if (result.type === 'errored' && isObject(result.error) && typeof result.error.type === 'string') return { ...item,
+        errorCode: result.error.type === 'invalid_request_error' ? 'LLM_PROVIDER_REQUEST_REJECTED' : 'LLM_PROVIDER_ERROR' };
+      if (result.type === 'canceled' || result.type === 'expired') return item;
+      throw adapterError('LLM_PROVIDER_RESPONSE_INVALID');
+    },
+    countsMatch(provider, actual) {
+      return provider?.processing === 0 && ['succeeded', 'errored', 'canceled', 'expired'].every(key => provider[key] === (actual[key] ?? 0));
+    },
+  }),
   id: 'anthropic-messages',
   providerTypes: Object.freeze(['anthropic']),
   surface: Object.freeze({ streaming: true, usageInStream: true, systemRole: true, toolCalls: false, structuredOutput: false }),
@@ -86,3 +131,12 @@ export const anthropicMessagesAdapter = Object.freeze({
   },
   mapError: openaiCompatibleAdapter.mapError,
 });
+
+function batchUrl(endpoint, id, operation) {
+  const url = new URL(endpoint);
+  url.pathname = `${url.pathname.replace(/\/$/, '')}/batches${id == null ? '' : `/${encodeURIComponent(id)}`}${operation ? `/${operation}` : ''}`;
+  return url.href;
+}
+function batchHeaders(ctx) {
+  return { 'content-type': 'application/json', 'x-api-key': ctx.apiKey, 'anthropic-version': '2023-06-01' };
+}

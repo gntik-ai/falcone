@@ -7,3 +7,8 @@ export function resolveLlmAdapter(providerType) {
   if (providerType === 'anthropic') return anthropicMessagesAdapter;
   return providerType === 'openai-responses' ? openaiResponsesAdapter : openaiCompatibleAdapter;
 }
+
+// Optional provider-neutral batch protocol. Mapping stays in the provider adapter.
+export function resolveBatchDriver(providerType) {
+  return resolveLlmAdapter(providerType).batch;
+}

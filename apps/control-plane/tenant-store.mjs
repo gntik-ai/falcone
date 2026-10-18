@@ -1352,6 +1352,7 @@ export const TENANT_PURGE_TABLES = Object.freeze([
   'tenant_plan_quota_impacts', 'tenant_plan_capability_impacts', 'tenant_plan_change_history',
   'workspace_sub_quotas', 'quota_overrides', 'billing_usage_records',
   'workspace_embedding_mappings', 'workspace_embedding_providers', 'workspace_llm_usage',
+  'workspace_llm_batch_items', 'workspace_llm_batches',
   'workspace_llm_connection_models', 'workspace_llm_connections', 'workspace_llm_providers',
   'workspace_doc_notes', 'workspace_openapi_versions', 'workspace_sdk_packages',
   'webhook_delivery_attempts', 'webhook_deliveries', 'webhook_signing_secrets', 'webhook_subscriptions',

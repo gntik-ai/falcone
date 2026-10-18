@@ -74,6 +74,9 @@ COPY apps/control-plane-executor/src/runtime/connection-registry.mjs \
      apps/control-plane-executor/src/runtime/vector-capability.mjs \
      apps/control-plane-executor/src/runtime/workspace-dsn-resolver.mjs \
      apps/control-plane-executor/src/runtime/llm-executor.mjs \
+     apps/control-plane-executor/src/runtime/llm-batches.mjs \
+     apps/control-plane-executor/src/runtime/llm-batch-store.mjs \
+     apps/control-plane-executor/src/runtime/llm-batch-reconciler.mjs \
      apps/control-plane-executor/src/runtime/byok-provider-guard.mjs \
      apps/control-plane-executor/src/runtime/errors.mjs \
      /app/apps/control-plane-executor/src/runtime/
