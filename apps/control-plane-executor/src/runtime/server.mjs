@@ -335,7 +335,7 @@ const SCOPE_MONGO_DOC_RE = /^\/v1\/mongo\/workspaces\/[^/]+\/data\/[^/]+\/collec
 const SCOPE_LLM_COMPLETIONS_RE = /^\/v1\/workspaces\/[^/]+\/llm\/completions(?:\/|$)/;
 function requiredDataScope(method, pathname) {
   if (SCOPE_DDL_RE.test(pathname)) return 'ddl:write';
-  if (SCOPE_LLM_COMPLETIONS_RE.test(pathname)) return method === 'GET' ? 'data:read' : 'data:write'; // billable BYOK completion (#662)
+  if (SCOPE_LLM_COMPLETIONS_RE.test(pathname)) return 'data:write'; // BYOK completions and batches (#662, #945)
   if (SCOPE_PG_DATA_RE.test(pathname) || SCOPE_MONGO_DOC_RE.test(pathname)) {
     if (method === 'GET') return null; // reads are not scope-gated (every key carries data:read)
     if (method === 'POST' && /\/search$/.test(pathname)) return null; // vector search is a read

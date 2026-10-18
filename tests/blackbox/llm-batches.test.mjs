@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createLlmExecutor } from '../../apps/control-plane-executor/src/runtime/llm-executor.mjs';
+import { request as httpRequest } from '../helpers/http-request.mjs';
+import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
+import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
 
 // Each scenario takes a driver fixture. Follow-up drivers add fixtures to this matrix.
 export const drivers = [{
@@ -109,6 +113,17 @@ for (const driver of drivers) {
 }
 
 for (const driver of drivers) {
+  test(`${driver.name}: item pages preserve ASCII cursor order, limits and status filters`, async () => {
+    const { executor, submit } = await setup(driver);
+    const id = (await submit({ items: ['a', 'Z', '_', '0'].map(customId => ({ customId, prompt: 'hello' })) })).body.batchId;
+    const first = await executor.listBatchItems('ws', id, { tenantId: 'tenant', limit: 2, status: 'pending' });
+    assert.deepEqual(first.items.map(item => item.customId), ['0', 'Z']);
+    assert.ok(first.nextCursor);
+    const next = await executor.listBatchItems('ws', id, { tenantId: 'tenant', limit: 2, status: 'pending', cursor: first.nextCursor });
+    assert.deepEqual(next.items.map(item => item.customId), ['_', 'a']);
+    assert.equal(next.nextCursor, null);
+    assert.deepEqual(await executor.listBatchItems('ws', id, { tenantId: 'tenant', status: 'succeeded' }), { items: [], nextCursor: null });
+  });
   test(`${driver.name}: partial results keep content and per-item errors; repeated reconciliation records usage once`, async () => {
     const { executor, submit, controls, advance } = await setup(driver);
     const id = (await submit()).body.batchId;
@@ -119,6 +134,8 @@ for (const driver of drivers) {
     const items = (await executor.listBatchItems('ws', id, { tenantId: 'tenant' })).items;
     assert.equal(items[0].content, 'result one'); assert.equal(items[0].usage.totalTokens, 10);
     assert.equal(items[1].errorCode, 'LLM_PROVIDER_REQUEST_REJECTED');
+    assert.deepEqual((await executor.listBatchItems('ws', id, { tenantId: 'tenant', status: 'succeeded' })).items.map(item => item.customId), ['one']);
+    assert.deepEqual((await executor.listBatchItems('ws', id, { tenantId: 'tenant', status: 'errored' })).items.map(item => item.customId), ['two']);
     assert.deepEqual(await executor.getUsage('ws', { tenantId: 'tenant' }), { items: [{ model: 'fixture-model', promptTokens: 4, completionTokens: 6, totalTokens: 10 }] });
     advance(600000); await executor.reconcileBatches();
     assert.equal((await executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
@@ -273,6 +290,24 @@ for (const driver of drivers) {
     assert.equal((await executor.getBatch('ws', id, { tenantId: 'tenant' })).status, 'completed');
     assert.equal((await executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
   });
+  test(`${driver.name}: repeated cancel preserves the polling deadline and leaves retries to reconciliation`, async () => {
+    for (const acknowledged of [false, true]) {
+      const { executor, submit, controls, calls, advance } = await setup(driver);
+      const id = (await submit()).body.batchId;
+      controls.response = () => Response.json(acknowledged
+        ? { ...driver.accepted(), processing_status: 'canceling', cancel_initiated_at: '2026-10-18T00:00:00Z' }
+        : driver.accepted());
+      const first = await executor.cancelBatch('ws', id, { tenantId: 'tenant' });
+      assert.equal(calls.length, 2);
+      advance(60000);
+      const repeated = await executor.cancelBatch('ws', id, { tenantId: 'tenant' });
+      assert.deepEqual(repeated, first);
+      assert.equal(calls.length, 2);
+      await executor.reconcileBatches();
+      assert.equal(calls[2].method, 'GET');
+      assert.equal(calls.length, acknowledged ? 3 : 4);
+    }
+  });
   test(`${driver.name}: end before cancel evidence completes normally and keeps the intent`, async () => {
     const { executor, submit, controls, advance } = await setup(driver);
     const id = (await submit()).body.batchId;
@@ -354,11 +389,6 @@ for (const driver of drivers) {
   });
 }
 
-import { request as httpRequest } from '../helpers/http-request.mjs';
-import { createControlPlaneServer } from '../../apps/control-plane-executor/src/runtime/server.mjs';
-import { createConnectionRegistry } from '../../apps/control-plane-executor/src/runtime/connection-registry.mjs';
-import { readFileSync } from 'node:fs';
-
 for (const driver of drivers) {
   test(`${driver.name}: HTTP batch lifecycle, principal-scoped replay, pagination, tenant isolation and scopes`, async () => {
     const { executor, controls, calls, advance } = await setup(driver);
@@ -385,7 +415,9 @@ for (const driver of drivers) {
       }
       assert.equal((await request('GET', `${base}/unknown`)).body.code, 'LLM_BATCH_NOT_FOUND');
       assert.equal((await request('POST', base, input, { apikey: 'flc_read' })).status, 403);
-      assert.equal((await request('GET', base, {}, { apikey: 'flc_read' })).status, 200);
+      for (const path of [base, `${base}/${id}`, `${base}/${id}/items`]) {
+        assert.equal((await request('GET', path, {}, { apikey: 'flc_read' })).status, 403);
+      }
       const keyed = await request('POST', base, input, { apikey: 'flc_write', 'idempotency-key': 'same-principal-key' });
       assert.equal(keyed.status, 202);
       assert.equal((await request('POST', base, input, { apikey: 'flc_write', 'idempotency-key': 'same-principal-key' })).body.batchId, keyed.body.batchId);

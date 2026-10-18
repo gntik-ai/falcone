@@ -65,6 +65,21 @@ test('Postgres batch schema, unique binding, lease race, atomic usage, submittin
     await assert.rejects(store.ingest(lease, { customId: 'one', status: 'succeeded', usage: { totalTokens: 99 } }, usageStore), { code: 'LLM_BATCH_LEASE_LOST' });
     assert.equal((await executor.getUsage('ws', { tenantId: 'tenant' })).items[0].totalTokens, 10);
 
+    await t.test('item pages apply status, ASCII cursor order and limits', async () => {
+      const pagingId = (await executor.submitBatch('ws', { items: ['a', 'Z', '_', '0'].map(customId => ({ customId, prompt: 'hello' })) },
+        { ...identity, idempotencyKey: 'item-pages' })).body.batchId;
+      const first = await executor.listBatchItems('ws', pagingId, { tenantId: 'tenant', limit: 2, status: 'pending' });
+      assert.deepEqual(first.items.map(item => item.customId), ['0', 'Z']);
+      assert.ok(first.nextCursor);
+      const next = await executor.listBatchItems('ws', pagingId, { tenantId: 'tenant', limit: 2, status: 'pending', cursor: first.nextCursor });
+      assert.deepEqual(next.items.map(item => item.customId), ['_', 'a']);
+      assert.equal(next.nextCursor, null);
+      const empty = await executor.listBatchItems('ws', pagingId, { tenantId: 'tenant', limit: 2, status: 'succeeded' });
+      assert.deepEqual(empty, { items: [], nextCursor: null });
+      // Keep this fixture out of the following reconciler race scenarios.
+      await pool.query('DELETE FROM workspace_llm_batches WHERE batch_id=$1', [pagingId]);
+    });
+
     await t.test('cancel from another executor during submission preserves acceptance and meters results once', async () => {
       ended = false;
       let enter, release, cancels = 0;
@@ -97,8 +112,12 @@ test('Postgres batch schema, unique binding, lease race, atomic usage, submittin
       assert.equal(batch.status, 'canceling'); assert.equal(batch.providerBatchId, 'provider-id');
       time += 60000; await cancelling.reconcileBatches();
       assert.equal(cancels, 1);
-      assert.ok((await executor.getBatch('ws', batch.batchId, { tenantId: 'tenant' })).cancelAcknowledgedAt);
-      ended = true; time += 60000;
+      const acknowledged = await executor.getBatch('ws', batch.batchId, { tenantId: 'tenant' });
+      assert.ok(acknowledged.cancelAcknowledgedAt);
+      time += 60000;
+      assert.deepEqual(await other.cancelBatch('ws', batch.batchId, { tenantId: 'tenant' }), acknowledged);
+      assert.equal(cancels, 1);
+      ended = true;
       await Promise.all([cancelling.reconcileBatches(), other.reconcileBatches()]);
       assert.equal((await executor.getBatch('ws', batch.batchId, { tenantId: 'tenant' })).status, 'cancelled');
       assert.equal((await executor.listBatchItems('ws', batch.batchId, { tenantId: 'tenant' })).items[0].content, 'kept');

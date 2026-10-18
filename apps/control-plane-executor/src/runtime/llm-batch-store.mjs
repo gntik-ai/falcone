@@ -44,17 +44,21 @@ export function createLlmBatchStore({ pool } = {}) {
     },
     async requestCancel(w, id, t, now) {
       const row = lookup(w, id, t);
-      if (TERMINAL_BATCH_STATUSES.includes(row.status) || row.cancelRequestedAt) return copy(row);
+      if (TERMINAL_BATCH_STATUSES.includes(row.status) || row.cancelRequestedAt) return { batch: copy(row), requested: false };
       // An intent must not revoke the creating request's fence or accelerate recovery.
       if (row.status === 'submitting' || row.status === 'submit_uncertain') {
         Object.assign(row, { cancelRequestedAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() });
-        return copy(row);
+        return { batch: copy(row), requested: true };
       }
       Object.assign(row, { cancelRequestedAt: new Date(now).toISOString(), status: row.providerBatchId ? 'canceling' : row.status,
         nextPollAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString(), leaseVersion: row.leaseVersion + 1, leaseOwner: null, leaseExpiresAt: null });
-      return copy(row);
+      return { batch: copy(row), requested: true };
     },
-    async allItems(w, id, t) { lookup(w, id, t); return copy(items.get(key(w, id, t))); },
+    async allItems(w, id, t, { limit, cursor, status } = {}) {
+      lookup(w, id, t);
+      return copy(items.get(key(w, id, t)).filter(item => (!status || item.status === status) && (!cursor || item.customId > cursor))
+        .sort((a, b) => a.customId < b.customId ? -1 : a.customId > b.customId ? 1 : 0).slice(0, limit));
+    },
     async assertLease(row) {
       const live = lookup(row.workspaceId, row.batchId, row.tenantId);
       if (live.status !== row.status || live.leaseVersion !== row.leaseVersion) throw new BatchLeaseLost();
@@ -214,9 +218,11 @@ function postgresStore(pool) {
       [...scope(w, t), cursor?.[0] ?? null, cursor?.[1] ?? null, limit]);
       return res.rows.map(rowFromDb);
     },
-    async allItems(w, id, t) {
+    async allItems(w, id, t, { limit = null, cursor, status } = {}) {
       await get(w, id, t);
-      const res = await pool.query('SELECT * FROM workspace_llm_batch_items WHERE tenant_id=$1 AND workspace_id=$2 AND batch_id=$3 ORDER BY custom_id COLLATE "C"', [...scope(w, t), id]);
+      const res = await pool.query(`SELECT * FROM workspace_llm_batch_items WHERE tenant_id=$1 AND workspace_id=$2 AND batch_id=$3
+        AND ($4::text IS NULL OR status=$4) AND ($5::text IS NULL OR custom_id COLLATE "C" > $5)
+        ORDER BY custom_id COLLATE "C" LIMIT $6`, [...scope(w, t), id, status ?? null, cursor ?? null, limit]);
       return res.rows.map(itemFromDb);
     },
     async assertLease(row) {
@@ -251,12 +257,12 @@ function postgresStore(pool) {
         const res = await client.query('SELECT * FROM workspace_llm_batches WHERE tenant_id=$1 AND workspace_id=$2 AND batch_id=$3 FOR UPDATE', [...scope(w, t), id]);
         if (!res.rowCount) throw notFound();
         const row = rowFromDb(res.rows[0]);
-        if (TERMINAL_BATCH_STATUSES.includes(row.status) || row.cancelRequestedAt) return row;
+        if (TERMINAL_BATCH_STATUSES.includes(row.status) || row.cancelRequestedAt) return { batch: row, requested: false };
         if (row.status === 'submitting' || row.status === 'submit_uncertain') {
-          return update(row, { cancelRequestedAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() }, client);
+          return { batch: await update(row, { cancelRequestedAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() }, client), requested: true };
         }
-        return update(row, { cancelRequestedAt: new Date(now).toISOString(), status: row.providerBatchId ? 'canceling' : row.status,
-          nextPollAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString(), leaseVersion: row.leaseVersion + 1, leaseOwner: null, leaseExpiresAt: null }, client);
+        return { batch: await update(row, { cancelRequestedAt: new Date(now).toISOString(), status: row.providerBatchId ? 'canceling' : row.status,
+          nextPollAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString(), leaseVersion: row.leaseVersion + 1, leaseOwner: null, leaseExpiresAt: null }, client), requested: true };
       });
     },
     async ingest(row, item, usageStore) {

@@ -35,6 +35,7 @@ test('batch driver builds native requests and derives every URL from the configu
     ['GET', 'https://provider.example/x/batches/batch%2Fa%20b/results?version=1'],
   ]);
   assert.equal(calls[0].headers['x-api-key'], 'synthetic-placeholder');
+  for (const call of calls) assert.equal(call.redirect, 'error');
 });
 
 test('pure mapping validates batches, cancellation evidence, all item types and count agreement', () => {
@@ -80,8 +81,7 @@ test('raw transport preserves failure phases and JSONL decodes split UTF-8 and u
   const invalid = createLlmTransport({ adapter, fetchImpl: async () => new Response('{') });
   await assert.rejects(invalid.requestJson({ url: endpoint }), { phase: 'body', code: 'LLM_PROVIDER_RESPONSE_INVALID' });
   const bytes = new TextEncoder().encode(`${line('succeeded', { message })}\r\n\n${line('expired')}`);
-  const transport = createLlmTransport({ adapter, fetchImpl: async (_url, init) => {
-    assert.equal(init.redirect, 'error');
+  const transport = createLlmTransport({ adapter, fetchImpl: async () => {
     return new Response(new ReadableStream({ start(controller) {
       for (const byte of bytes) controller.enqueue(Uint8Array.of(byte)); controller.close();
     } }));

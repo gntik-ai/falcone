@@ -5,9 +5,9 @@ import { AdapterError, adapterError, assertNormalizedCompletion, assertNormalize
 export function createLlmTransport({ adapter, fetchImpl = globalThis.fetch }) {
   if (typeof fetchImpl !== 'function') throw clientError('httpLlmBackend requires a fetch implementation', 500, 'LLM_CONFIG');
 
-  async function fetchRaw({ method = 'POST', url, headers, body }) {
+  async function fetchRaw({ method = 'POST', url, headers, body, redirect }) {
     let response;
-    try { response = await fetchImpl(url, { method, headers, ...(body !== undefined ? { body } : {}), redirect: 'error' }); }
+    try { response = await fetchImpl(url, { method, headers, ...(body !== undefined ? { body } : {}), ...(redirect !== undefined ? { redirect } : {}) }); }
     catch (cause) { throw Object.assign(adapter.mapError({ cause }), { phase: 'network' }); }
     if (!response.ok) {
       const errorHeaders = new Headers(response.headers);

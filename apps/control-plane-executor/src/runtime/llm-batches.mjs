@@ -109,8 +109,8 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
   });
   return { submitBatch, batchReconciler, reconcileBatches: batchReconciler.runOnce,
     async cancelBatch(w, id, { tenantId } = {}) {
-      const row = await store.requestCancel(w, id, tenantId, now());
-      if (!row.providerBatchId) return publicBatch(row);
+      const { batch: row, requested } = await store.requestCancel(w, id, tenantId, now());
+      if (!requested || !row.providerBatchId) return publicBatch(row);
       await batchReconciler.runOnce({ batchId: id, workspaceId: w, tenantId, limit: 1, cancelOnly: true });
       return publicBatch(await store.get(w, id, tenantId));
     },
@@ -119,8 +119,7 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
     async listBatchItems(w, id, options = {}) {
       const { limit, cursor } = pageOptions(options, 'item');
       if (options.status && !['pending', 'succeeded', 'errored', 'canceled', 'expired', 'missing'].includes(options.status)) throw clientError('Invalid item status', 400, 'INVALID_LLM_BATCH_STATUS');
-      const found = (await store.allItems(w, id, options.tenantId)).filter(i => (!options.status || i.status === options.status) && (!cursor || i.customId > cursor))
-        .sort((a, b) => a.customId < b.customId ? -1 : a.customId > b.customId ? 1 : 0);
+      const found = await store.allItems(w, id, options.tenantId, { limit: limit + 1, cursor, status: options.status || undefined });
       const items = found.slice(0, limit);
       return { items, nextCursor: found.length > limit ? encodeCursor(items.at(-1).customId) : null };
     },

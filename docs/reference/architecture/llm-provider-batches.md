@@ -32,10 +32,12 @@ codes. Collections accept `limit` (1–100, default 50) and opaque `cursor` valu
 items additionally accept a `status` filter. Results carry `nextCursor`, or null.
 POST on `/{batchId}/cancel` durably records intent and attempts cancellation.
 It makes at most one provider cancel call; polling and result ingestion run in
-the background. Intent recorded during submission survives acceptance without
+the background. Repeated cancellation preserves the polling deadline and leaves
+retries to reconciliation. Intent recorded during submission survives acceptance without
 revoking the submitting request's fence.
 DELETE on `/{batchId}` requires a terminal batch and removes its items.
-Writes require `data:write` for API keys; reads require `data:read`.
+All batch routes require `data:write` for API keys, following the existing
+completion prefix's scope checks.
 
 ## Driver contract
 
@@ -59,9 +61,9 @@ The state machine and storage do not select behavior by provider name.
   or `response` with the original `httpStatus`). Resolved keys stay in call
   context. Only secret references and non-secret provider state are durable.
 
-The shared transport rejects provider redirects (`redirect: 'error'`), including
-for existing synchronous and streaming completions. This prevents a redirect
-from bypassing the configured endpoint guard.
+Batch driver calls reject provider redirects (`redirect: 'error'`). This prevents
+a redirect from bypassing the batch endpoint guard. Existing synchronous and
+streaming completions retain their default Fetch redirect behavior.
 
 ## Reconciliation and operations
 

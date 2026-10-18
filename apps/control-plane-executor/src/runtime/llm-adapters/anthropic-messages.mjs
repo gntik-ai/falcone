@@ -18,18 +18,18 @@ export const anthropicMessagesAdapter = Object.freeze({
     async submit(ctx) {
       const body = { requests: ctx.items.map(({ customId, ...item }) => ({ custom_id: customId,
         params: anthropicMessagesAdapter.buildRequest({ ...item, stream: false }, ctx).body })) };
-      const json = await ctx.transport.requestJson({ method: 'POST', url: batchUrl(ctx.endpoint), headers: batchHeaders(ctx), body: JSON.stringify(body) });
+      const json = await ctx.transport.requestJson({ method: 'POST', url: batchUrl(ctx.endpoint), headers: batchHeaders(ctx), body: JSON.stringify(body), redirect: 'error' });
       try { this.parseBatch(json); } catch (error) { throw Object.assign(error, { phase: 'body' }); }
       return { type: 'accepted', providerBatchId: json.id, expiresAt: json.expires_at ?? null };
     },
     async poll(ctx) {
-      return this.parseBatch(await ctx.transport.requestJson({ method: 'GET', url: batchUrl(ctx.endpoint, ctx.providerBatchId), headers: batchHeaders(ctx) }));
+      return this.parseBatch(await ctx.transport.requestJson({ method: 'GET', url: batchUrl(ctx.endpoint, ctx.providerBatchId), headers: batchHeaders(ctx), redirect: 'error' }));
     },
     async cancel(ctx) {
-      return this.parseBatch(await ctx.transport.requestJson({ method: 'POST', url: batchUrl(ctx.endpoint, ctx.providerBatchId, 'cancel'), headers: batchHeaders(ctx) }));
+      return this.parseBatch(await ctx.transport.requestJson({ method: 'POST', url: batchUrl(ctx.endpoint, ctx.providerBatchId, 'cancel'), headers: batchHeaders(ctx), redirect: 'error' }));
     },
     results(ctx) {
-      return ctx.transport.fetchRaw({ method: 'GET', url: batchUrl(ctx.endpoint, ctx.providerBatchId, 'results'), headers: batchHeaders(ctx) });
+      return ctx.transport.fetchRaw({ method: 'GET', url: batchUrl(ctx.endpoint, ctx.providerBatchId, 'results'), headers: batchHeaders(ctx), redirect: 'error' });
     },
     parseBatch(json) {
       const validDate = value => value == null || (typeof value === 'string' && Number.isFinite(Date.parse(value)));
