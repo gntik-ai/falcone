@@ -53,11 +53,11 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit
 
-      - name: Developer docs contract
-        run: node --test tests/docs/developer-docs-public-surface.test.mjs
-
       - name: Release images workflow tests
         run: node --test tests/blackbox/release-images-workflow.test.mjs
+
+      - name: Developer docs contract
+        run: node --test tests/docs/developer-docs-public-surface.test.mjs
 
       - name: LLM provider tests
         run: |
