@@ -25,6 +25,7 @@
     "@gntik-ai/templates": "0.7.0",
     "@gntik-ai/tokens": "0.2.1",
     "@gntik-ai/ui": "0.7.0",
+    "@in-falcone/console-api": "workspace:*",
     "@xyflow/react": "12.11.0",
     "i18next": "25.0.1",
     "i18next-icu": "2.3.0",
@@ -38,6 +39,7 @@
     "react-router-dom": "^6.30.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@playwright/test": "1.58.2",
     "@tailwindcss/vite": "^4.1.0",
     "@testing-library/jest-dom": "^6.6.3",
