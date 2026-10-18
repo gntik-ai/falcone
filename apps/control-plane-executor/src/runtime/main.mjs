@@ -24,6 +24,7 @@ import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './f
 import { wireFlowTriggers, createTriggerStore } from './flow-trigger-registry.mjs';
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
 import { createJwtVerifier, deriveRealmTopology, tenantAudienceOptionsFromEnv } from './jwt-verify.mjs';
+import { assertIdentityVerification } from './identity-guard.mjs';
 import { createSaRevocationCheck } from './sa-revocation.mjs';
 import { createMcpEngine } from './mcp-engine.mjs';
 import { createMcpPostgresStore } from './mcp-pg-store.mjs';
@@ -184,7 +185,8 @@ const functionsExecutor = process.env.FN_BACKEND === 'off' ? undefined : createF
 
 // Bearer-JWT verifier (Keycloak/OIDC). Enabled when KEYCLOAK_JWKS_URL is set; lets the
 // executor authenticate admin/user requests directly (e.g. API-key issuance) without the
-// gateway injecting x-tenant-id. Unset → the executor trusts gateway-injected identity headers.
+// gateway injecting x-tenant-id. Without a verifier, startup is refused unless local development
+// explicitly opts in with EXECUTOR_ALLOW_UNVERIFIED_IDENTITY=true.
 // Service-account revocation/rotation propagation (fix-sa-credential-revocation-invalidate-tokens,
 // #684), parity with the kind control-plane. After offline JWT validation, reject any service-account
 // access token whose credential was revoked or rotated. The check reads the `service_accounts` table
@@ -201,19 +203,30 @@ const saRevocationSkewSec = saNumEnv(process.env.SA_REVOCATION_SKEW_SEC, 1);
 // another tenant's row.
 const { realmsBase: saRealmsBase, platformRealm: saPlatformRealm } =
   deriveRealmTopology(process.env.KEYCLOAK_ISSUER, process.env.KEYCLOAK_JWKS_URL);
-const jwtVerifier = createJwtVerifier({
-  jwksUrl: process.env.KEYCLOAK_JWKS_URL,
-  issuer: process.env.KEYCLOAK_ISSUER,
-  audience: process.env.KEYCLOAK_AUDIENCE,
-  ...tenantAudienceOptionsFromEnv(),
-  revocationCheck: createSaRevocationCheck({
-    pool: keyPool,
-    realmsBase: saRealmsBase,
-    platformRealm: saPlatformRealm,
-    cacheMs: saRevocationCacheMs,
-    skewSec: saRevocationSkewSec,
-  }),
-});
+let jwtVerifier;
+let identityVerification;
+try {
+  jwtVerifier = createJwtVerifier({
+    jwksUrl: process.env.KEYCLOAK_JWKS_URL,
+    issuer: process.env.KEYCLOAK_ISSUER,
+    audience: process.env.KEYCLOAK_AUDIENCE,
+    ...tenantAudienceOptionsFromEnv(),
+    revocationCheck: createSaRevocationCheck({
+      pool: keyPool,
+      realmsBase: saRealmsBase,
+      platformRealm: saPlatformRealm,
+      cacheMs: saRevocationCacheMs,
+      skewSec: saRevocationSkewSec,
+    }),
+  });
+  identityVerification = assertIdentityVerification({ jwtVerifier, env: process.env });
+} catch {
+  console.error('[control-plane] startup refused: EXECUTOR_JWT_VERIFIER_REQUIRED');
+  process.exit(1);
+}
+if (identityVerification.mode === 'unverified-dev') {
+  console.warn('[control-plane] bearer tokens are not verified: EXECUTOR_ALLOW_UNVERIFIED_IDENTITY');
+}
 
 // Flow executor (Temporal-backed flows API). Enabled ONLY when TEMPORAL_ADDRESS is configured;
 // it is the SOLE holder of the Temporal client (lazy-connect). Definitions/versions persist on
