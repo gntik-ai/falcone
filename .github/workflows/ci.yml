@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: 'b670ac42a544ec0e7529aade8067838d3655105b'
+  FALCONE_CHARTS_REF: 'e28e59d82d38070024e09bd015c7c88b33824ce7'
 
 jobs:
   quality:
@@ -64,6 +64,7 @@ jobs:
             tests/blackbox/llm-provider-connections-registry.test.mjs \
             tests/blackbox/llm-connection-models.test.mjs \
             tests/blackbox/llm-model-admission.test.mjs \
+            tests/blackbox/llm-batches.test.mjs \
             tests/blackbox/llm-provider-legacy-compat.test.mjs \
             tests/blackbox/llm-provider-connections-route-catalog.test.mjs
 
@@ -331,6 +332,12 @@ jobs:
           LLM_CONNECTIONS_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
           LLM_CONNECTIONS_TEST_REQUIRED: '1'
         run: node --test tests/integration/llm-provider-connections-postgres.test.mjs
+
+      - name: Real Postgres LLM batches
+        env:
+          LLM_BATCHES_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+          LLM_BATCHES_TEST_REQUIRED: '1'
+        run: node --test tests/integration/llm-batches-postgres.test.mjs
 
       - name: Real Postgres flow execution credentials
         env:

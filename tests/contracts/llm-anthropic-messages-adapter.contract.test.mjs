@@ -12,6 +12,20 @@ const response = (extra = {}) => ({ type: 'message', model: 'resolved-model', co
 const backend = fetchImpl => httpLlmBackend({ providerType: 'anthropic', fetchImpl });
 async function collect(stream) { const frames = []; for await (const frame of stream) frames.push(frame); return frames; }
 const sse = (...events) => new Response(events.map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''));
+
+test('existing completions and streams retain Fetch default redirect behavior', async () => {
+  const redirectModes = [];
+  const value = backend(async (url, init) => {
+    // Request applies the Fetch defaults at the external I/O boundary.
+    redirectModes.push(new Request(url, init).redirect);
+    return JSON.parse(init.body).stream
+      ? sse({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'hello' } }, { type: 'message_stop' })
+      : Response.json(response());
+  });
+  assert.equal((await value.complete(request)).content, 'hello');
+  assert.deepEqual((await collect(value.stream(request))).map(frame => frame.type), ['delta', 'usage']);
+  assert.deepEqual(redirectModes, ['follow', 'follow']);
+});
 async function executor(fetchImpl, options = {}) {
   const value = createLlmExecutor({ fetchImpl, endpointResolver: async () => ['93.184.216.34'], secretResolver: () => request.apiKey, ...options });
   await value.setProvider('ws_anthropic', config);
