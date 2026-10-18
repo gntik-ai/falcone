@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: 'c321b33062d65593080cf29f2e7f1727654abc29'
+  FALCONE_CHARTS_REF: 'b670ac42a544ec0e7529aade8067838d3655105b'
 
 jobs:
   quality:
@@ -98,11 +98,14 @@ jobs:
         run: |
           node --test tests/blackbox/flows-worker-dockerfile.test.mjs \
             tests/blackbox/scheduling-handler-dockerfile.test.mjs \
-            tests/blackbox/flows-worker-pg-env-and-search-attrs.test.mjs
+            tests/blackbox/flows-worker-pg-env-and-search-attrs.test.mjs \
+            tests/blackbox/executor-quota-image-imports.test.mjs
 
       - name: Live catalog quota admission
         run: |
-          node --test tests/blackbox/live-resource-quota-enforcement.test.mjs \
+          node --test tests/blackbox/flows-quotas.test.mjs \
+            tests/blackbox/flows-quota-evaluator.test.mjs \
+            tests/blackbox/live-resource-quota-enforcement.test.mjs \
             tests/blackbox/live-storage-function-quotas.test.mjs \
             tests/blackbox/workspace-quota-enforcement.test.mjs \
             tests/blackbox/storage-quota-enforcement.test.mjs \

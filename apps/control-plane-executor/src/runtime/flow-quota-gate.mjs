@@ -12,7 +12,7 @@
 // src/models/quota-enforcement.mjs::evaluateQuotaDecision): a `hard_blocked` / `soft_grace_exhausted`
 // decision becomes HTTP 429 with `{ code: 'QUOTA_EXCEEDED', dimension }`. The seam is an injected
 // `evaluate({ dimensionKey, tenantId, workspaceId, currentUsage })` returning a decision object;
-// production wires it to the provisioning-orchestrator quota-enforce action over its metadata DB,
+// production evaluates it in-process against the metadata DB,
 // while black-box tests inject a deterministic fake. When NO gate is injected the flows API is
 // unmetered (the no-database black-box default), exactly like the in-memory store fallback.
 
@@ -53,7 +53,7 @@ export function quotaExceededError(dimensionKey, detail = {}) {
  */
 export function createFlowQuotaGate({ evaluate } = {}) {
   // No evaluator → unmetered (black-box / no-DB default).
-  async function enforce(dimensionKey, { tenantId, workspaceId, currentUsage } = {}) {
+  async function enforce(dimensionKey, { tenantId, workspaceId, currentUsage, attemptedAction } = {}) {
     if (!FLOW_QUOTA_DIMENSION_SET.has(dimensionKey)) {
       throw new Error(`createFlowQuotaGate: unknown flow quota dimension "${dimensionKey}"`);
     }
@@ -61,7 +61,7 @@ export function createFlowQuotaGate({ evaluate } = {}) {
 
     let decision;
     try {
-      decision = await evaluate({ dimensionKey, tenantId, workspaceId, currentUsage });
+      decision = await evaluate({ dimensionKey, tenantId, workspaceId, currentUsage, attemptedAction });
     } catch (err) {
       // Fail closed: an evaluator error denies the action rather than allowing unbounded use.
       throw quotaExceededError(dimensionKey, { reason: 'metering_unavailable', message: err?.message });

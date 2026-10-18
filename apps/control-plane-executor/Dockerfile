@@ -30,6 +30,7 @@ RUN npm install --omit=dev --no-package-lock
 #   - packages/workspace-docs-service/ (console workspace docs route)
 COPY apps/control-plane-executor/src /app/apps/control-plane-executor/src
 COPY apps/control-plane/knative-runtime.mjs /app/apps/control-plane/knative-runtime.mjs
+COPY apps/control-plane/audit-writer.mjs /app/apps/control-plane/audit-writer.mjs
 COPY apps/control-plane/audit-store.mjs /app/apps/control-plane/audit-store.mjs
 COPY apps/control-plane/audit-hash.mjs /app/apps/control-plane/audit-hash.mjs
 COPY apps/control-plane/runtime-cleanup-repository.mjs /app/apps/control-plane/runtime-cleanup-repository.mjs
@@ -45,6 +46,7 @@ COPY packages/internal-contracts/src /app/packages/internal-contracts/src
 # package.json) from /app/node_modules via the upward walk.
 COPY packages/mongo-cdc-bridge/src /app/packages/mongo-cdc-bridge/src
 COPY apps/workflow-worker/src/activities/catalog-names.mjs /app/apps/workflow-worker/src/activities/catalog-names.mjs
+COPY packages/provisioning-orchestrator/src /app/packages/provisioning-orchestrator/src
 COPY packages/audit/src /app/packages/audit/src
 COPY packages/webhook-engine/src /app/packages/webhook-engine/src
 COPY packages/workspace-docs-service/actions /app/packages/workspace-docs-service/actions

@@ -25,7 +25,7 @@ import { createFlowExecutor } from '../../apps/control-plane-executor/src/runtim
 import { createFlowQuotaGate, FLOW_QUOTA_DIMENSIONS } from '../../apps/control-plane-executor/src/runtime/flow-quota-gate.mjs';
 
 const DEF = { apiVersion: 'v1.0', name: 'f', nodes: [{ id: 'a', type: 'task', taskType: 't' }] };
-const headersFor = (t, w) => ({ 'content-type': 'application/json', 'x-tenant-id': t, 'x-workspace-id': w, 'x-auth-subject': `admin-${t}` });
+const headersFor = (t, w) => ({ 'content-type': 'application/json', 'x-actor-roles': 'tenant_owner', 'x-tenant-id': t, 'x-workspace-id': w, 'x-auth-subject': `admin-${t}` });
 const A = headersFor('tenant_A', 'ws_A');
 const B = headersFor('tenant_B', 'ws_B');
 
@@ -68,8 +68,11 @@ async function withServer(fn, { gate } = {}) {
 }
 
 async function seedPublishedFlow(baseUrl, headers, ws) {
-  const flowId = (await (await fetch(`${baseUrl}/v1/flows/workspaces/${ws}/flows`, { method: 'POST', headers, body: JSON.stringify({ name: 'f', definition: DEF }) })).json()).flowId;
-  await fetch(`${baseUrl}/v1/flows/workspaces/${ws}/flows/${flowId}/versions`, { method: 'POST', headers });
+  const created = await fetch(`${baseUrl}/v1/flows/workspaces/${ws}/flows`, { method: 'POST', headers, body: JSON.stringify({ name: 'f', definition: DEF }) });
+  assert.equal(created.status, 201, 'flow seeding must succeed before quota assertions');
+  const { flowId } = await created.json();
+  const published = await fetch(`${baseUrl}/v1/flows/workspaces/${ws}/flows/${flowId}/versions`, { method: 'POST', headers });
+  assert.equal(published.status, 201, 'version seeding must succeed before quota assertions');
   return flowId;
 }
 
@@ -111,7 +114,9 @@ test('bbx-flows-ten-quota-03: max_flows hard limit → flow-create 429', async (
 test('bbx-flows-ten-quota-04: max_flow_versions hard limit → publish 429', async () => {
   const gate = createFlowQuotaGate({ evaluate: denyingEvaluator({ denyTenant: 'tenant_A', denyDimension: 'max_flow_versions' }) });
   await withServer(async (baseUrl) => {
-    const flowId = (await (await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows`, { method: 'POST', headers: A, body: JSON.stringify({ name: 'f', definition: DEF }) })).json()).flowId;
+    const created = await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows`, { method: 'POST', headers: A, body: JSON.stringify({ name: 'f', definition: DEF }) });
+    assert.equal(created.status, 201);
+    const { flowId } = await created.json();
     const res = await fetch(`${baseUrl}/v1/flows/workspaces/ws_A/flows/${flowId}/versions`, { method: 'POST', headers: A });
     assert.equal(res.status, 429);
     assert.equal((await res.json()).dimension, 'max_flow_versions');

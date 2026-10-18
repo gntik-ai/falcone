@@ -26,6 +26,7 @@ const authHeaders = {
   'x-tenant-id': TEN,
   'x-workspace-id': WS,
   'x-auth-subject': 'admin-trig',
+  'x-actor-roles': 'tenant_owner',
 };
 
 const CRON_DEF = {
@@ -87,7 +88,9 @@ function makeFakeTemporal() {
         started.push({ type, workflowId: opts.workflowId, opts });
         return h;
       },
-      getHandle(id) { return handles.get(id) ?? handleFor(id, { flowVersion: ['1'] }); },
+      getHandle(id) {
+        return handles.get(id) ?? { async describe() { throw Object.assign(new Error('workflow not found'), { name: 'WorkflowNotFoundError' }); } };
+      },
       async *list({ query }) {
         const flowMatch = /flowId = '([^']+)'/.exec(query ?? '');
         const wantRunning = /ExecutionStatus = 'Running'/.test(query ?? '');
@@ -318,7 +321,7 @@ test('bbx-flows-trig-10: platform event on the subscribed topic starts the bound
     logger: { error() {} },
   });
   flowExecutor.setTriggerRegistry(triggerRegistry);
-  const identity = { tenantId: TEN, workspaceId: WS, actorId: 'svc' };
+  const identity = { tenantId: TEN, workspaceId: WS, actorId: 'svc', roles: ['tenant_owner'] };
   // Create + publish the event flow directly through the executor (no HTTP needed for this probe).
   await flowExecutor.executeFlows({ operation: 'create_definition', identity, flowId: 'evflow', body: { name: 'Ev', definition: EVENT_DEF } });
   await flowExecutor.executeFlows({ operation: 'publish_version', identity, flowId: 'evflow' });
@@ -344,7 +347,7 @@ test('bbx-flows-trig-11: an event on a foreign-tenant topic matches no registrat
   const flowExecutor = createFlowExecutor({ temporalClient: t, temporalAddress: 'fake:7233' });
   const triggerRegistry = createFlowTriggerRegistry({ temporalClient: t, startTriggeredExecution: (a) => flowExecutor.startTriggeredExecution(a), logger: { error() {} } });
   flowExecutor.setTriggerRegistry(triggerRegistry);
-  const identity = { tenantId: TEN, workspaceId: WS, actorId: 'svc' };
+  const identity = { tenantId: TEN, workspaceId: WS, actorId: 'svc', roles: ['tenant_owner'] };
   await flowExecutor.executeFlows({ operation: 'create_definition', identity, flowId: 'evflow', body: { name: 'Ev', definition: EVENT_DEF } });
   await flowExecutor.executeFlows({ operation: 'publish_version', identity, flowId: 'evflow' });
 
@@ -362,7 +365,7 @@ test('bbx-flows-trig-12: duplicate Kafka offset starts only one execution', asyn
   const flowExecutor = createFlowExecutor({ temporalClient: t, temporalAddress: 'fake:7233' });
   const triggerRegistry = createFlowTriggerRegistry({ temporalClient: t, startTriggeredExecution: (a) => flowExecutor.startTriggeredExecution(a), logger: { error() {} } });
   flowExecutor.setTriggerRegistry(triggerRegistry);
-  const identity = { tenantId: TEN, workspaceId: WS, actorId: 'svc' };
+  const identity = { tenantId: TEN, workspaceId: WS, actorId: 'svc', roles: ['tenant_owner'] };
   await flowExecutor.executeFlows({ operation: 'create_definition', identity, flowId: 'evflow', body: { name: 'Ev', definition: EVENT_DEF } });
   await flowExecutor.executeFlows({ operation: 'publish_version', identity, flowId: 'evflow' });
   const dedupKey = 'pe:evflow:platform-event:order-placed:t:0:5';

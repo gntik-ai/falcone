@@ -93,12 +93,15 @@ There is **no replica set** — FerretDB v2 has no change streams, so realtime/C
 
 The Flows API is registered **only when `TEMPORAL_ADDRESS` is set** (the executor is the sole Temporal client).
 
+When Flows is enabled, catalog quotas are always enforced in-process. Quota denials and
+evaluator failures return `429 QUOTA_EXCEEDED` with the affected dimension.
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `TEMPORAL_ADDRESS` | — | Temporal frontend `host:port`; **enables Flows** when set |
 | `TEMPORAL_NAMESPACE` | `falcone-flows` | Shared Temporal namespace |
 | `TEMPORAL_TASK_QUEUE` | `flows-main` | Worker task queue |
-| `FLOW_QUOTA_ENFORCE_URL` | — | Quota-evaluator endpoint; when set, hard-limit breaches → `429` |
+| `FLOW_EVENT_TRIGGER_MAX_DEFER_MS` | `86400000` (24 h) | Maximum age in milliseconds, measured from the Kafka message timestamp, for holding a quota-denied platform event for redelivery. Once the bound is reached, log a structured error and commit the event without another deferral. |
 | `FLOW_AUDIT_TOPIC` | `falcone.audit.flow-lifecycle` | Kafka topic for flow lifecycle audit (best-effort) |
 | `FLOW_TRIGGER_SECRET_KEY` | — | Master key for per-trigger webhook signing secrets |
 | `FLOWS_ENABLED` | — | Set to `false` to keep the Flows API but suppress the monitoring SSE endpoint |

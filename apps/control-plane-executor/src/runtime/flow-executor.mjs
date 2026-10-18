@@ -687,8 +687,9 @@ export function createFlowExecutor({
   resolveSubFlow,
   // Per-tenant/workspace quota gate (change: add-flows-tenancy-isolation-limits). When absent the
   // flows API is unmetered (no-DB black-box default); production injects a gate backed by the
-  // provisioning-orchestrator quota-enforce action. A breach raises 429 QUOTA_EXCEEDED.
+  // in-process catalog evaluator. A breach raises 429 QUOTA_EXCEEDED.
   quotaGate,
+  now = Date.now,
   // Execution-plane audit sink. Definition writes use the transactional store outbox when present.
   // The in-memory test fallback sends definition events to this injected sink too.
   auditSink,
@@ -706,6 +707,7 @@ export function createFlowExecutor({
   // Mutable so main.mjs can attach the registry AFTER constructing the executor (the registry's
   // platform-event consumer calls back into this executor's startTriggeredExecution — a cycle).
   let flowTriggerRegistry = injectedTriggerRegistry;
+  const signalWindows = new Map();
 
   function requireIdentity(identity) {
     if (!identity?.tenantId || !identity?.workspaceId) {
@@ -736,12 +738,13 @@ export function createFlowExecutor({
   }
 
   // Enforce a quota dimension; a no-op when no gate is wired. Throws 429 on breach.
-  async function enforceQuota(dimensionKey, { identity, currentUsage } = {}) {
+  async function enforceQuota(dimensionKey, { identity, currentUsage, attemptedAction } = {}) {
     if (!quotaGate) return;
     await quotaGate.enforce(dimensionKey, {
       tenantId: identity.tenantId,
       workspaceId: identity.workspaceId,
       currentUsage,
+      attemptedAction,
     });
   }
 
@@ -799,13 +802,42 @@ export function createFlowExecutor({
       if (err?.code === 'TEMPORAL_UNAVAILABLE') return 0;
       throw err;
     }
-    const query = `tenantId = '${identity.tenantId}' AND workspaceId = '${identity.workspaceId}' AND ExecutionStatus = 'Running'`;
+    const query = `tenantId = '${visibilityLiteral(identity.tenantId)}' AND workspaceId = '${visibilityLiteral(identity.workspaceId)}' AND ExecutionStatus = 'Running'`;
     let count = 0;
     for await (const exec of client.workflow.list({ query })) {
       const parsed = parseWorkflowId(exec.workflowId);
       if (parsed && parsed.tenantId === identity.tenantId) count += 1;
     }
     return count;
+  }
+
+  function visibilityLiteral(value) {
+    return String(value).replaceAll("\\", "\\\\").replaceAll("'", "''");
+  }
+
+  async function countRecentStarts({ identity }) {
+    let client;
+    try {
+      client = await temporal.getClient();
+    } catch (err) {
+      if (err?.code === 'TEMPORAL_UNAVAILABLE') return 0;
+      throw err;
+    }
+    const since = new Date(now() - 60_000).toISOString();
+    const query = `tenantId = '${visibilityLiteral(identity.tenantId)}' AND workspaceId = '${visibilityLiteral(identity.workspaceId)}' AND StartTime > '${since}'`;
+    let count = 0;
+    for await (const execution of client.workflow.list({ query })) {
+      const parsed = parseWorkflowId(execution.workflowId);
+      if (parsed?.tenantId === identity.tenantId && parsed.workspaceId === identity.workspaceId) count++;
+    }
+    return count;
+  }
+
+  async function enforceStartQuotas(identity, attemptedAction = 'flow.execution.start') {
+    // Count dimensions are checked before mutation; concurrent requests near the boundary can
+    // slightly overshoot. Temporal visibility shares start usage across executor replicas.
+    await enforceQuota('flow_starts_per_minute', { identity, currentUsage: await countRecentStarts({ identity }), attemptedAction });
+    await enforceQuota('max_concurrent_executions', { identity, currentUsage: await countRunningExecutions({ identity }), attemptedAction });
   }
 
   // Only the opaque reference enters Temporal history. The credential stays in Postgres.
@@ -875,24 +907,35 @@ export function createFlowExecutor({
   // -- Execution operations (Temporal-backed) -------------------------------------------------
 
   async function startExecution({ identity, flowId, version, input, triggerType = 'manual', workflowIdOverride }) {
-    const pinned = await resolvePinnedVersion({ identity, flowId, requestedVersion: version });
-    // Quota gates run BEFORE any Temporal call so a breach never starts a workflow (spec). Rate
-    // gate first (cheap), then concurrency (counts running executions tenant+workspace-scoped).
-    await enforceQuota('flow_starts_per_minute', { identity });
-    await enforceQuota('max_concurrent_executions', { identity, currentUsage: await countRunningExecutions({ identity }) });
-    const client = await temporal.getClient();
-    // Manual starts get a fresh server-generated workflow id; trigger starts (webhook/event) supply
-    // a DETERMINISTIC dedup key so a replayed delivery / redelivered offset reuses the same id and
-    // Temporal's workflow-id uniqueness makes the second start a no-op (idempotent, spec).
     const workflowId = workflowIdOverride
       ? buildWorkflowId(identity.tenantId, identity.workspaceId, flowId, workflowIdOverride)
       : buildWorkflowId(identity.tenantId, identity.workspaceId, flowId);
+    let client;
+    // A deterministic delivery is already handled in ANY state, even if current quotas are
+    // exhausted. Only NotFound proceeds to admission; infrastructure failures propagate.
+    if (workflowIdOverride) {
+      client = await temporal.getClient();
+      try {
+        const existing = await client.workflow.getHandle(workflowId).describe();
+        return {
+          executionId: workflowId, workflowId,
+          version: existing.searchAttributes?.flowVersion?.[0] ?? version,
+          status: existing.status?.name, deduplicated: true,
+        };
+      } catch (err) {
+        if (!isWorkflowNotFound(err)) throw err;
+      }
+    }
+    const pinned = await resolvePinnedVersion({ identity, flowId, requestedVersion: version });
+    await enforceStartQuotas(identity);
+    client ??= await temporal.getClient();
     // Mint the short-lived, tenant+workspace-scoped token; expiry never outlasts the run.
     const credential = await prepareCredential(identity, workflowId, client);
     let handle;
     try {
       handle = await client.workflow.start(WORKFLOW_TYPE, {
         workflowId,
+        ...(workflowIdOverride ? { workflowIdReusePolicy: 'REJECT_DUPLICATE' } : {}),
         taskQueue: temporal.taskQueue,
         args: [startInputFor({ identity, flowId, version: pinned.version, definition: pinned.definition, state: input, executionTokenRef: credential.ref })],
         searchAttributes: searchAttributesFor({ identity, flowId, version: pinned.version, triggerType }),
@@ -1075,6 +1118,7 @@ export function createFlowExecutor({
 
   async function retryExecution({ identity, flowId, executionId }) {
     assertOwnedWorkflowId(executionId, identity, { workspaceId: identity.workspaceId, flowId, forbid: true });
+    await enforceStartQuotas(identity, 'flow.execution.retry');
     const client = await temporal.getClient();
     // Recover the original pinned version + input from the source run, then start a fresh run
     // with the SAME version + input. The original run is unaffected.
@@ -1107,49 +1151,67 @@ export function createFlowExecutor({
 
   async function sendSignal({ identity, flowId, executionId, signalName, payload }) {
     assertOwnedWorkflowId(executionId, identity, { workspaceId: identity.workspaceId, flowId, forbid: true });
-    // Signal-rate quota gate runs before any Temporal call (spec: per workspace per minute).
-    await enforceQuota('flow_signal_rate_per_minute', { identity });
-    // Validate the signalName against the pinned published version's allowlist BEFORE any
-    // Temporal call. Fetch the run's pinned version from its search attribute.
-    const client = await temporal.getClient();
-    const source = client.workflow.getHandle(executionId);
-    let described;
+    // Reserve synchronously before the first await, so concurrent calls cannot all observe the
+    // same headroom. This window is per replica; start rates instead use shared visibility.
+    const key = JSON.stringify([identity.tenantId, identity.workspaceId]);
+    const window = signalWindows.get(key) ?? new Set();
+    const timestamp = now();
+    for (const slot of window) if (slot.timestamp <= timestamp - 60_000) window.delete(slot);
+    const currentUsage = window.size;
+    const reservation = { timestamp };
+    window.add(reservation);
+    signalWindows.set(key, window);
+    let delivered = false;
     try {
-      described = await source.describe();
-    } catch {
-      throw clientError('Execution not found', 404, 'EXECUTION_NOT_FOUND');
+      await enforceQuota('flow_signal_rate_per_minute', { identity, currentUsage, attemptedAction: 'flow.signal' });
+      // Validate against the pinned version's allowlist before delivering the signal.
+      // Fetch the run's pinned version from its search attribute.
+      const client = await temporal.getClient();
+      const source = client.workflow.getHandle(executionId);
+      let described;
+      try {
+        described = await source.describe();
+      } catch {
+        throw clientError('Execution not found', 404, 'EXECUTION_NOT_FOUND');
+      }
+      const version = described.searchAttributes?.flowVersion?.[0] ?? null;
+      let allow;
+      try {
+        const pinned = await resolvePinnedVersion({ identity, flowId, requestedVersion: version });
+        allow = signalAllowlist(pinned.definition);
+      } catch {
+        // Risk note: a malformed pinned definition rejects the signal rather than forwarding it.
+        throw clientError('Cannot resolve signal allowlist for this execution', 422, 'UNKNOWN_SIGNAL');
+      }
+      if (!allow.has(signalName)) {
+        throw clientError(`Unknown signal "${signalName}"`, 422, 'UNKNOWN_SIGNAL');
+      }
+      // The DSL approval channel is the single `flowApproval` Temporal signal; the public
+      // signalName (an approval node id or the human-approval alias) is carried in the payload's
+      // nodeId so the interpreter routes it to the right approval node.
+      const nodeId = signalName === HUMAN_APPROVAL_ALIAS ? (payload?.nodeId ?? undefined) : signalName;
+      try {
+        await source.signal(APPROVAL_SIGNAL, {
+          approved: payload?.approved ?? true,
+          actor: payload?.actor ?? identity.actorId,
+          ...(nodeId ? { nodeId } : {}),
+        });
+      } catch (err) {
+        // describe() above succeeds for a terminal run, but signalling a closed (or vanished) run
+        // raises WorkflowNotFoundError → that is a "not running" client error (409), not a 500. Any
+        // OTHER error is re-thrown unchanged so genuine infra failures still surface as 500.
+        if (isWorkflowNotFound(err)) throw clientError('Execution is not running', 409, 'EXECUTION_NOT_RUNNING');
+        throw err;
+      }
+      delivered = true;
+      await emitAudit(FLOW_AUDIT_EVENT_TYPES.SIGNAL_SENT, { identity, flowId, flowVersion: version, executionId });
+      return { executionId, workflowId: executionId, signal: signalName, delivered: true };
+    } finally {
+      if (!delivered) {
+        window.delete(reservation);
+        if (window.size === 0 && signalWindows.get(key) === window) signalWindows.delete(key);
+      }
     }
-    const version = described.searchAttributes?.flowVersion?.[0] ?? null;
-    let allow;
-    try {
-      const pinned = await resolvePinnedVersion({ identity, flowId, requestedVersion: version });
-      allow = signalAllowlist(pinned.definition);
-    } catch {
-      // Risk note: a malformed pinned definition rejects the signal rather than forwarding it.
-      throw clientError('Cannot resolve signal allowlist for this execution', 422, 'UNKNOWN_SIGNAL');
-    }
-    if (!allow.has(signalName)) {
-      throw clientError(`Unknown signal "${signalName}"`, 422, 'UNKNOWN_SIGNAL');
-    }
-    // The DSL approval channel is the single `flowApproval` Temporal signal; the public
-    // signalName (an approval node id or the human-approval alias) is carried in the payload's
-    // nodeId so the interpreter routes it to the right approval node.
-    const nodeId = signalName === HUMAN_APPROVAL_ALIAS ? (payload?.nodeId ?? undefined) : signalName;
-    try {
-      await source.signal(APPROVAL_SIGNAL, {
-        approved: payload?.approved ?? true,
-        actor: payload?.actor ?? identity.actorId,
-        ...(nodeId ? { nodeId } : {}),
-      });
-    } catch (err) {
-      // describe() above succeeds for a terminal run, but signalling a closed (or vanished) run
-      // raises WorkflowNotFoundError → that is a "not running" client error (409), not a 500. Any
-      // OTHER error is re-thrown unchanged so genuine infra failures still surface as 500.
-      if (isWorkflowNotFound(err)) throw clientError('Execution is not running', 409, 'EXECUTION_NOT_RUNNING');
-      throw err;
-    }
-    await emitAudit(FLOW_AUDIT_EVENT_TYPES.SIGNAL_SENT, { identity, flowId, flowVersion: version, executionId });
-    return { executionId, workflowId: executionId, signal: signalName, delivered: true };
   }
 
   // -- Definition / version operations (Postgres / in-memory store) ---------------------------
@@ -1172,13 +1234,14 @@ export function createFlowExecutor({
   async function createDefinition({ identity, flowId, body, correlationId }) {
     const name = body.name;
     if (!name) throw clientError('name is required', 400, 'NAME_REQUIRED');
-    // Stored-flow quota gate (per tenant). Usage = current stored definitions for this workspace.
+    // The tenant catalog limit is applied per workspace. Count checks precede mutation, so
+    // concurrent creates/publishes at the boundary can slightly overshoot.
     let currentUsage;
     if (quotaGate) {
       const existing = await store.listDefinitions({ tenantId: identity.tenantId, workspaceId: identity.workspaceId });
       currentUsage = existing.length;
     }
-    await enforceQuota('max_flows', { identity, currentUsage });
+    await enforceQuota('max_flows', { identity, currentUsage, attemptedAction: 'flow.create' });
     const id = flowId ?? body.flow_id ?? body.flowId ?? randomUUID();
     const { definitionYaml, definition } = parseDefinitionInput(body);
     // Reject a structurally-malformed definition at create time (#625) — e.g. a task node carrying
@@ -1219,7 +1282,7 @@ export function createFlowExecutor({
       const existing = await store.listVersions({ tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId });
       currentUsage = existing.length;
     }
-    await enforceQuota('max_flow_versions', { identity, currentUsage });
+    await enforceQuota('max_flow_versions', { identity, currentUsage, attemptedAction: 'flow.publish' });
     const created = await mutateWithAudit(FLOW_AUDIT_EVENT_TYPES.VERSION_PUBLISHED, identity, flowId, correlationId, (tx) => tx.insertVersion({
       tenantId: identity.tenantId, workspaceId: identity.workspaceId, flowId,
       definitionYaml: def.definitionYaml, definition: parsed,
@@ -1377,6 +1440,7 @@ export function createFlowExecutor({
   }
 
   async function triggerSchedule({ identity, flowId }) {
+    await enforceStartQuotas(identity);
     const gateway = requireScheduleGateway();
     const scheduleId = scheduleIdFor(identity.tenantId, identity.workspaceId, flowId);
     const triggered = await gateway.triggerSchedule({ scheduleId });

@@ -23,6 +23,7 @@ import { createFlowAuditRelay } from './flow-audit-relay.mjs';
 import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './flow-monitoring-executor.mjs';
 import { wireFlowTriggers, createTriggerStore } from './flow-trigger-registry.mjs';
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
+import { createFlowQuotaEvaluator } from './flow-quota-evaluator.mjs';
 import { createJwtVerifier, deriveRealmTopology, tenantAudienceOptionsFromEnv } from './jwt-verify.mjs';
 import { assertIdentityVerification } from './identity-guard.mjs';
 import { createSaRevocationCheck } from './sa-revocation.mjs';
@@ -232,25 +233,6 @@ if (identityVerification.mode === 'unverified-dev') {
 // it is the SOLE holder of the Temporal client (lazy-connect). Definitions/versions persist on
 // the SAME metadata pool as the API-key + embedding stores (design.md OQ1). When unset, no flows
 // routes are registered and a flows path falls through to 404 / upstream proxy unchanged.
-// Flow quota gate (change: add-flows-tenancy-isolation-limits). Wired only when a quota
-// evaluator endpoint is configured (FLOW_QUOTA_ENFORCE_URL); the evaluator calls the
-// provisioning-orchestrator quota-enforce action over HTTP and maps a hard-limit decision to a
-// 429. When unset the flows API is unmetered (dev/test) — a breach never silently allows in prod
-// because production always sets the URL.
-const flowQuotaGate = process.env.FLOW_QUOTA_ENFORCE_URL
-  ? createFlowQuotaGate({
-      evaluate: async ({ dimensionKey, tenantId, workspaceId, currentUsage }) => {
-        const res = await fetch(process.env.FLOW_QUOTA_ENFORCE_URL, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ dimensionKey, tenantId, workspaceId, currentUsage }),
-        });
-        if (!res.ok) throw Object.assign(new Error(`quota evaluator ${res.status}`), { status: res.status });
-        return res.json();
-      },
-    })
-  : undefined;
-
 // Dedicated platform producer. Tenant events APIs cannot address this physical topic.
 const flowAuditTopic = process.env.FLOW_AUDIT_TOPIC ?? 'falcone.audit.flow-lifecycle';
 if (flowAuditTopic.startsWith('evt.')) throw new Error('FLOW_AUDIT_TOPIC must be platform-scoped');
@@ -291,7 +273,7 @@ const flowExecutor = process.env.TEMPORAL_ADDRESS
       // Enforce FLW-E006: validate/publish reject any taskType not in the catalog.
       taskTypeCatalog: TASK_TYPE_NAMES,
       // FLW-E004 is enforced through the executor's store-backed default resolver.
-      quotaGate: flowQuotaGate,
+      quotaGate: createFlowQuotaGate({ evaluate: createFlowQuotaEvaluator({ pool: keyPool }).evaluate }),
       auditSink: publishFlowAudit,
     })
   : undefined;
@@ -337,7 +319,9 @@ async function bootFlowTriggers() {
           await consumer.connect();
           return {
             subscribe: ({ topics }) => Promise.all(topics.map((topic) => consumer.subscribe({ topic, fromBeginning: false }))),
-            run: ({ eachMessage }) => consumer.run({ eachMessage }),
+            run: ({ eachMessage }) => consumer.run({ autoCommit: false, eachMessage }),
+            seek: (position) => consumer.seek(position),
+            commitOffsets: (offsets) => consumer.commitOffsets(offsets),
             stop: () => consumer.stop().catch(() => {}),
             disconnect: () => consumer.disconnect().catch(() => {}),
           };
