@@ -15,12 +15,12 @@ const executorSource = 'apps/control-plane-executor/src/runtime/server.mjs';
 const exceptions = [
   {
     method: 'POST', path: '/v1/flows/workspaces/{workspaceId}/flows/{flowId}/executions',
-    source: executorSource, line: 787,
+    source: executorSource, line: 803,
     declaration: "['POST', new RegExp(`${fl}/([^/]+)/executions$`), `${templates.fl}/{flowId}/executions`, ([w, f], c) =>",
   },
   {
     method: 'DELETE', path: '/v1/flows/workspaces/{workspaceId}/flows/{flowId}',
-    source: executorSource, line: 775,
+    source: executorSource, line: 791,
     declaration: "['DELETE', new RegExp(`${fl}/([^/]+)$`), `${templates.fl}/{flowId}`, ([w, f], c) =>",
   },
 ];

@@ -19,8 +19,12 @@ Provider usage must also survive local structured-output JSON validation errors.
 
 ## Scope and risk
 
-R1, source repository only. Schema additions are nullable columns and new tables;
-old images can ignore them. Concurrent requests may exceed a budget because no
-reservation is taken. No deployment, Helm, APISIX or `/v1/platform` route changes.
+R1, source repository only. Schema additions include nullable dimensions, new
+tables and a `usage_id bigserial` column for stable ledger pagination. Adding
+that column to a populated usage table rewrites it under an ACCESS EXCLUSIVE
+lock during executor schema setup; upgrade time grows with the usage history.
+Old images can ignore the additions. Concurrent requests may exceed a budget
+because no reservation is taken. No deployment, Helm, APISIX or `/v1/platform`
+route changes.
 No embeddings, currency conversion, CSV, runtime platform-price writes, quotas,
 or per-user/per-tenant budgets. Dependencies #945 and #1171 are already present.
