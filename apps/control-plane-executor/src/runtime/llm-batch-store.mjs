@@ -78,7 +78,8 @@ export function createLlmBatchStore({ pool } = {}) {
       const live = items.get(key(row.workspaceId, row.batchId, row.tenantId)).find(i => i.customId === item.customId);
       if (!live) throw clientError('Invalid batch result', 502, 'LLM_PROVIDER_RESPONSE_INVALID');
       if (live.status !== 'pending') return false;
-      if (item.status === 'succeeded') await usageStore.recordUsage(row.workspaceId, { tenantId: row.tenantId, model: row.model, ...item.usage });
+      if (item.status === 'succeeded') await usageStore.recordUsage(row.workspaceId, { ...item.usage, tenantId: row.tenantId, model: row.model, connectionId: row.connectionId, providerType: row.providerType,
+          requestId: `batch:${row.batchId}:${item.customId}`, attempt: 1, mode: 'batch', batchId: row.batchId, batchItemId: item.customId });
       Object.assign(live, copy(item)); return true;
     },
     async finish(row, patch, markMissing = false) {
@@ -283,7 +284,8 @@ function postgresStore(pool) {
         [row.tenantId, row.workspaceId, row.batchId, item.customId, item.status, item.content ?? null, item.finishReason ?? null, item.model ?? row.model,
           ...['promptTokens', 'completionTokens', 'totalTokens', 'cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens'].map(k => item.usage?.[k] ?? null), item.errorCode ?? null, item.providerDetail ?? {}]);
         if (!res.rowCount) return false;
-        if (item.status === 'succeeded') await usageStore.recordUsage(row.workspaceId, { tenantId: row.tenantId, model: row.model, ...item.usage }, client);
+        if (item.status === 'succeeded') await usageStore.recordUsage(row.workspaceId, { ...item.usage, tenantId: row.tenantId, model: row.model, connectionId: row.connectionId, providerType: row.providerType,
+          requestId: `batch:${row.batchId}:${item.customId}`, attempt: 1, mode: 'batch', batchId: row.batchId, batchItemId: item.customId }, client);
         return true;
       });
     },

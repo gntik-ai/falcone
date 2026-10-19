@@ -5,6 +5,7 @@
 // is the single side effect that POPULATES the registry; it pulls in @temporalio/activity
 // (via the activity modules) and so must only be loaded inside the worker process — the
 // control-plane consumes ./catalog-names.mjs instead (Temporal-free).
+import { Context } from '@temporalio/activity';
 import { registerActivity, resolveActivity, taskTypeNames, listTaskTypes, hasTaskType, _registry } from './registry.mjs';
 import { TASK_TYPE_NAMES } from './catalog-names.mjs';
 import { toNonRetryable } from './errors.mjs';
@@ -102,8 +103,16 @@ export async function dispatchTask(input, deps = {}) {
     ? await resolveExecutionTokenRef(input.tenant, deps)
     : input.tenant?.executionToken;
   const credentialPayload = assertExecutionToken(token, input.tenant?.tenantId, input.tenant?.workspaceId);
+  let invocation;
+  if (input.taskType === 'llm.complete') {
+    // Programmatic catalog callers may run outside Temporal; they get a fresh request ID.
+    let info;
+    try { info = Context.current().info; } catch {}
+    if (info) invocation = { executionId: info.workflowExecution.workflowId, runId: info.workflowExecution.runId,
+      nodeId: input.nodeId, activityId: info.activityId, attempt: info.attempt };
+  }
   const output = await entry.activity(
-    { params: input.params ?? {}, tenant: input.tenant, credential: deps.credential,
+    { params: input.params ?? {}, tenant: input.tenant, credential: deps.credential, invocation,
       ...(input.taskType === 'llm.batch' ? { batchPhase: input.batchPhase, credentialExpiresAt: credentialPayload.expiresAt } : {}),
     },
     deps,

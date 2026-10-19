@@ -44,6 +44,7 @@ export async function llmComplete(input, deps = {}) {
     result = await deps.executeLlmComplete({
       workspaceId,
       tenantId: tenant.tenantId,
+      invocation: input.invocation,
       connectionId: params.connectionId,
       model: params.model,
       messages: params.messages,
