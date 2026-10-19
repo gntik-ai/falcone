@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCli } from '../../apps/web-console-next/tests/run-cli.mjs';
 import test from 'node:test';
+import ParityReporter from '../../apps/web-console-next/tests/parity/reporter.mjs';
 
 const run = (script, ...args) => runCli([`tests/parity/${script}`, ...args]);
 test('fixture scanner rejects credential material and real IDs through its CLI', async () => {
@@ -14,6 +15,8 @@ test('fixture scanner rejects credential material and real IDs through its CLI',
       ['bearer', 'Bearer xyz', 'Bearer'],
       ['key', '-----BEGIN PRIVATE KEY-----', 'PRIVATE KEY'],
       ...['tenantId', 'workspaceId', 'userId', 'sessionId'].map((field) => [field, `${field}: 'tenant_alpha'`, 'synthetic-id']),
+      ['yaml-id', 'tenantId: tenant_alpha', 'synthetic-id'],
+      ['template-id', 'tenantId: `tenant_alpha`', 'synthetic-id'],
     ];
     for (const [name, text, rule] of cases) {
       const file = join(dir, `${name}.txt`); writeFileSync(file, text);
@@ -22,7 +25,7 @@ test('fixture scanner rejects credential material and real IDs through its CLI',
       assert.ok(result.stderr.includes(file) && result.stderr.includes(rule), result.stderr);
     }
     const safe = join(dir, 'safe.txt');
-    writeFileSync(safe, "tokenType: 'Bearer', tenantId: 'synthetic-tenant', authorization: 'Bearer synthetic-token'");
+    writeFileSync(safe, "tokenType: 'Bearer', tenantId: 'synthetic-tenant', workspaceId: `synthetic-workspace`, userId: synthetic-user, authorization: 'Bearer synthetic-token'");
     assert.equal((await run('scan-fixtures.mjs', safe)).status, 0);
     const defaults = await run('scan-fixtures.mjs');
     assert.equal(defaults.status, 0, defaults.stderr);
@@ -66,4 +69,34 @@ test('a parity report certifies only complete all-passed eight-check groups', as
       assert.equal(result.stdout.includes('PARITY_PASS'), pass, result.stdout);
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the Playwright reporter never certifies skipped or unexpectedly passing checks', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'parity-reporter-'));
+  const previous = process.env.PARITY_REPORT_DIR;
+  process.env.PARITY_REPORT_DIR = dir;
+  try {
+    const names = ['data', 'action', 'error-empty', 'accessibility', 'runtime-health', 'responsive', 'visual-review', 'kit-conformance'];
+    for (const [expectedStatus, status, mapped, pass] of [
+      ['skipped', 'skipped', 'skipped', false],
+      ['failed', 'passed', 'unexpected', false],
+      ['passed', 'passed', 'passed', true],
+    ]) {
+      const cases = names.map((title, index) => ({
+        title, titlePath: () => ['overview | tenant_owner | es', title],
+        expectedStatus: index === 7 ? expectedStatus : 'passed',
+        results: [{ status: index === 7 ? status : 'passed', errors: [] }],
+      }));
+      const reporter = new ParityReporter();
+      reporter.onBegin({}, { allTests: () => cases });
+      reporter.onEnd({ status: 'passed' });
+      const report = JSON.parse(readFileSync(join(dir, 'overview-tenant_owner-es.json'), 'utf8'));
+      assert.equal(report.result === 'PARITY_PASS', pass);
+      assert.equal(report.checks.find((row) => row.check === 'kit-conformance').status, mapped);
+    }
+  } finally {
+    if (previous === undefined) delete process.env.PARITY_REPORT_DIR;
+    else process.env.PARITY_REPORT_DIR = previous;
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

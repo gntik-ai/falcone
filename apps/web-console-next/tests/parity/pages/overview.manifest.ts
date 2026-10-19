@@ -22,7 +22,8 @@ const manifest: ParityManifest = {
   }],
   // The placeholder has no data-state panel. These are the shell's actual context states.
   states: [
-    { fixture: 'workspaces', variant: 'empty', locator: { es: 'button[aria-label="Área de trabajo activa"]:has-text("Select workspace")', en: 'button[aria-label="Active workspace"]:has-text("Select workspace")' } },
+    // Known kit localisation gap: assert no selected workspace without requiring English in es.
+    { fixture: 'workspaces', variant: 'empty', locator: { es: 'button[aria-label="Área de trabajo activa"]:not(:has-text("Synthetic Workspace"))', en: 'button[aria-label="Active workspace"]:has-text("Select workspace")' } },
     ...(['401', '403', '404', '500', 'network'] as const).map((variant) => ({
       fixture: 'workspaces', variant,
       locator: { es: '[role="status"]:text-is("Comprueba tu conexión e inténtalo de nuevo.")', en: '[role="status"]:text-is("Check your connection and try again.")' },

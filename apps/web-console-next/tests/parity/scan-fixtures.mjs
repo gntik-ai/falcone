@@ -8,7 +8,7 @@ const rules = [
   ['JWT', /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g],
   ['Bearer', /\bBearer\s+(?!synthetic-)[A-Za-z0-9._~+\/-]+/g],
   ['PRIVATE KEY', /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/g],
-  ['synthetic-id', /["']?\b(?:tenantId|workspaceId|userId|sessionId)["']?\s*:\s*["'](?!synthetic-)[^"']+["']/g],
+  ['synthetic-id', /["']?\b(?:tenantId|workspaceId|userId|sessionId)["']?\s*:\s*(?:"(?!synthetic-)[^"\r\n]*"|'(?!synthetic-)[^'\r\n]*'|`(?!synthetic-)[^`\r\n]*`|(?!synthetic-)[A-Za-z0-9_$][^\s,;}\]#]*)/g],
 ];
 let failed = false;
 function scan(file) {

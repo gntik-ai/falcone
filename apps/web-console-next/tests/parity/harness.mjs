@@ -58,7 +58,8 @@ export const test = base.extend({
         await page.goto(server.url(route.replace(/^\//, '')));
         await expect(page.locator('main')).toBeVisible();
         await expect(page.locator('main h1')).toBeVisible();
-        const context = page.locator('section[aria-busy]');
+        await expect(page.locator('main section[aria-busy="true"]')).toHaveCount(0);
+        const context = page.getByRole('region', { name: locale === 'es' ? 'Contexto activo' : 'Active context', exact: true });
         if (await context.count()) await expect(context).toHaveAttribute('aria-busy', 'false');
         await page.evaluate(() => document.fonts.ready);
       },

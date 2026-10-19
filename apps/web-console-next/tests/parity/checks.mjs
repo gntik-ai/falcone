@@ -87,6 +87,8 @@ export async function visualReview(parity, manifest, info, betweenPasses = async
   const baseline = info.snapshotPath('shell.png');
   await mkdir(dirname(baseline), { recursive: true });
   await writeFile(baseline, await parity.page.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' }));
+  await parity.open(manifest.route);
+  await assertLocale(parity);
   await betweenPasses();
   await expect(parity.page).toHaveScreenshot('shell.png', { animations: 'disabled', caret: 'hide', scale: 'css', threshold: 0, maxDiffPixels: 0 });
 }

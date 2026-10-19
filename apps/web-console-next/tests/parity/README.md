@@ -7,7 +7,7 @@ all source files/directories used by the page for colour lint.
 
 Run from the workspace root:
 
-```
+```sh
 SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
 pnpm --filter @in-falcone/web-console-next parity:scan
 pnpm --filter @in-falcone/web-console-next parity:validate
@@ -21,7 +21,8 @@ rejects missing tests, infrastructure failures and missing traces. Inspect both
 positive and negative HTML/JSON reports and traces under `test-results/parity/`.
 Only complete all-passed groups get `PARITY_PASS` in per-page JSON. A filtered
 run cannot certify a page. Screenshots are recorded and compared within each
-visual check under the ignored output directory; no baseline is committed.
+visual check under the ignored output directory, with a fresh navigation before
+the comparison; no baseline is committed.
 The clock is fixed and randomness is seeded before any application script.
 
 The scanner accepts explicit file/directory paths, including temporary files.
@@ -33,6 +34,12 @@ unmatched request fails during automatic teardown even if a test never asserts
 a request list. Route misses still return the APISIX 404 body. Expected error
 variants are exercised by the state/endpoint checks; runtime-health examines
 the clean success path so those deliberate HTTP errors cannot mask real errors.
+
+Known localisation gap: the kit's empty workspace trigger displays English
+`Select workspace` in es. The empty-state assertion checks the absence of a
+selected workspace without requiring that English copy. Locale checks cover
+the success shell; extending them to all variants needs a kit localisation fix
+in a follow-up, outside this harness change.
 
 CI initially reports an optional check. Before removing this job after making
 it required, the operator must first remove its branch-protection requirement.
