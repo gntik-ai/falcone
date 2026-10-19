@@ -27,6 +27,8 @@ export const routes = [ // Every mutation declares dispatch, self-recorded or ex
   { method: 'GET',  path: '/v1/plans/change-history', module: `${PO}/plan-change-history-query.mjs`, export: 'main',
     invoke: 'callercontext-overrides', deps: ['db'], auth: 'superadmin', mergeQueryIntoParams: true },
 
+  { method: 'POST', path: '/v1/workspaces/{workspaceId}/quota-decisions', localHandler: 'productQuotaDecision', auth: 'authenticated', audit: { self: 'Denials recorded by recordQuotaEnforcement; allowed decisions do not mutate state' } },
+
   // quota dimension catalog (superadmin)
   { method: 'GET',  path: '/v1/quota-dimensions', module: `${PO}/quota-dimension-catalog-list.mjs`, export: 'main',
     invoke: 'callercontext-overrides', deps: ['db'], auth: 'superadmin' },

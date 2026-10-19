@@ -18,6 +18,7 @@ import { startSaga } from './saga.mjs';
 import { provisionWorkspaceDatabase, rotateWorkspaceDatabaseCredential, dropWorkspaceDatabase, isWorkspaceDatabaseEmpty, _ident as ident } from './dataplane.mjs';
 import { deleteBucket } from './storage-handlers.mjs';
 import { deleteTopics } from './kafka-handlers.mjs';
+import { PRODUCT_QUOTA_HANDLERS } from './product-quota.mjs';
 import { METRICS_HANDLERS } from './metrics-handlers.mjs';
 import { STORAGE_HANDLERS } from './storage-handlers.mjs';
 import { MONGO_HANDLERS, mongoTeardown, mongoClient, isWorkspaceMongoDatabaseEmpty } from './mongo-handlers.mjs';
@@ -1785,6 +1786,7 @@ export const LOCAL_HANDLERS = {
   iamListUserRoles, iamAssignUserRoles, iamRemoveUserRoles,
   iamListGroupMembers, iamListUserGroups, iamAddUserToGroup, iamRemoveUserFromGroup,
   ...METRICS_HANDLERS,
+  ...PRODUCT_QUOTA_HANDLERS,
   ...STORAGE_HANDLERS,
   ...MONGO_HANDLERS,
   ...PG_HANDLERS,

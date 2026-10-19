@@ -2447,6 +2447,121 @@
         ],
         "type": "string"
       },
+      "ProductQuotaDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "currentUsage": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "decision": {
+            "enum": [
+              "allowed",
+              "unlimited",
+              "hard_blocked",
+              "soft_grace_allowed",
+              "soft_grace_exhausted"
+            ],
+            "type": "string"
+          },
+          "dimensionKey": {
+            "type": "string"
+          },
+          "effectiveCeiling": {
+            "minimum": -1,
+            "type": "integer"
+          },
+          "effectiveLimit": {
+            "minimum": -1,
+            "type": "integer"
+          },
+          "projectedUsage": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "quotaType": {
+            "enum": [
+              "hard",
+              "soft"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "plan",
+              "default",
+              "override"
+            ],
+            "type": "string"
+          },
+          "warning": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "allowed",
+          "decision",
+          "dimensionKey",
+          "quotaType",
+          "effectiveLimit",
+          "effectiveCeiling",
+          "currentUsage",
+          "projectedUsage",
+          "source"
+        ],
+        "type": "object"
+      },
+      "ProductQuotaDecisionRequest": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "dimensionKey": {
+                  "const": "codewiki_max_repository_bytes"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "currentUsage": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "attemptedAction": {
+            "maxLength": 64,
+            "pattern": "^[a-z0-9._-]+$",
+            "type": "string"
+          },
+          "currentUsage": {
+            "description": "Tenant total reported by the product. Must be 0 for codewiki_max_repository_bytes.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "dimensionKey": {
+            "description": "A codewiki_ key present in the quota dimension catalog.",
+            "pattern": "^codewiki_",
+            "type": "string"
+          },
+          "requested": {
+            "default": 1,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dimensionKey",
+          "currentUsage"
+        ],
+        "type": "object"
+      },
       "ProviderCapabilityStatus": {
         "enum": [
           "available",
@@ -10192,6 +10307,170 @@
         "tags": [
           "Workspaces",
           "Authorization"
+        ],
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_team"
+        ],
+        "x-family": "workspaces",
+        "x-owning-service": "control_api",
+        "x-rate-limit-class": "control-write",
+        "x-resource-type": "workspace",
+        "x-scope": "workspace",
+        "x-visibility": "public"
+      }
+    },
+    "/v1/workspaces/{workspaceId}/quota-decisions": {
+      "post": {
+        "description": "Tenant managers or verified same-tenant workspace-bound callers may request decisions. A denial returns 200 with allowed:false and is audited. Catalog or resolver failure returns 503 QUOTA_UNAVAILABLE. This endpoint does not reserve or count usage.",
+        "operationId": "decideWorkspaceProductQuota",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductQuotaDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductQuotaDecision"
+                }
+              }
+            },
+            "description": "Quota decision; the caller must enforce allowed:false."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: invalid body, snapshot currentUsage, or INVALID_DIMENSION_KEY."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication required."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Caller cannot manage the tenant and has no same-tenant workspace binding."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "WORKSPACE_NOT_FOUND."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected the request because the body exceeded the configured size budget for this route family."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway QoS policy rejected the request rate for this route family."
+          },
+          "431": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway rejected one or more invalid or oversized request headers."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "QUOTA_UNAVAILABLE: the catalog or effective limit cannot be resolved."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway timed out while waiting for the downstream control-plane or adapter response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected control-plane error."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Decide a product quota against tenant plan limits and caller-reported usage",
+        "tags": [
+          "Workspaces"
         ],
         "x-audiences": [
           "tenant_owner",

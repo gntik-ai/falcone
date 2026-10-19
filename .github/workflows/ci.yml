@@ -116,7 +116,8 @@ jobs:
 
       - name: Live catalog quota admission
         run: |
-          node --test tests/blackbox/flows-quotas.test.mjs \
+          node --test tests/blackbox/product-quota-decisions.test.mjs \
+            tests/blackbox/flows-quotas.test.mjs \
             tests/blackbox/flows-quota-evaluator.test.mjs \
             tests/blackbox/live-resource-quota-enforcement.test.mjs \
             tests/blackbox/live-storage-function-quotas.test.mjs \

@@ -52,6 +52,7 @@ export default defineConfig({
             { text: 'Quickstart', link: '/guide/quickstart' },
             { text: 'Developer End-to-End', link: '/guide/developer-end-to-end' },
             { text: 'Flows (Workflows)', link: '/guide/flows' },
+            { text: 'Code Wiki Quotas', link: '/guide/code-wiki-quotas' },
             { text: 'MCP Server Hosting', link: '/guide/mcp' },
           ],
         },
