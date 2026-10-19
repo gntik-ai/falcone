@@ -24,6 +24,9 @@ Errors from Kubernetes are replaced with value-free messages before reaching dep
 Action and version `secret_refs` columns are additive, idempotent JSONB migrations with empty-array
 defaults. Only names and env mappings are persisted. A rollback resolves the current OpenBao values
 for its retained declaration. Consumer counts count Functions, rather than aliases or versions.
+Definition imports preserve the existing service name and declared refs when deployment metadata
+is absent or null, so importing code cannot detach a live projection from revocation or cleanup.
+An explicit empty refs array from deployment still removes the declaration.
 DELETE preserves 204 with affected Function IDs in headers; replace returns the same IDs in metadata.
 Revocation retains the deleted declaration for consumer counts/warnings and leaves its reference
 `optional: false`, even when the projection no longer exists. This intentional fail-closed state
@@ -66,6 +69,6 @@ Rolling back those permissions causes fail-closed errors; rolling back the sourc
 reintroduce inline injection and requires coordinated review. Live marker checks, RBAC rendering,
 and deployment are delivery-gate responsibilities and are not performed by this source maker.
 
-Deploy, rollback, Function deletion, secret replacement/revocation, and remediation serialize per
-workspace. PostgreSQL advisory locks coordinate control-plane replicas across resolution, runtime
+Deploy, definition import, rollback, Function deletion, secret replacement/revocation, and remediation
+serialize per workspace. PostgreSQL advisory locks coordinate control-plane replicas across resolution, runtime
 writes and registry persistence, so an in-flight deploy cannot republish a value after revocation.

@@ -5,6 +5,8 @@
 - [x] Propagate replacement/revocation and retain product API cleanup obligations.
 - [x] Reproduce failed existing-Function redeploy/Secret restore at the fnDeploy request seam.
 - [x] Preserve existing registry/version/lifecycle state and allow deployment retry after failure.
+- [x] Preserve deployed service/secret refs across definition and package imports, including concurrent deploys.
+- [x] Reproduce import consumer loss before fixing it; cover count, rotation, revocation and cleanup at the handler seam.
 - [x] Add read-only namespace discovery and explicit scoped remediation.
 - [x] Align OpenAPI declaration aliases and 204 impact headers with runtime behavior.
 - [x] Document fail-closed revocation, explicit GC retries, rollback and running-pod limitations.

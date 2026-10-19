@@ -1112,6 +1112,9 @@ async function fnPackageDefinitionExport(ctx) {
 async function importDefinitions(ctx, { expectPackage = false } = {}) {
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  if (!ctx.functionSecretLockHeld) {
+    return lockedSecretOperation(ctx, ws, (locked) => importDefinitions(locked, { expectPackage }));
+  }
   // Trusted resource ownership for dispatch audit, never request bodies (#971).
   const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
   const bundle = ctx.body ?? {};

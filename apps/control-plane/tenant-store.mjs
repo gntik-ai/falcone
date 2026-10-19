@@ -579,6 +579,11 @@ export async function upsertFnAction(pool, a) {
     }
   }
 
+  // Definition imports update registry code without redeploying the runtime. Missing/null
+  // deployment metadata must retain the live projection's identity and revocation refs.
+  // An explicit [] still clears refs when a deploy removes all secrets.
+  const ksvcName = a.ksvcName ?? existing?.ksvc_name ?? null;
+  const secretRefs = a.secretRefs ?? existing?.secret_refs ?? [];
   const { rows } = await pool.query(
     `INSERT INTO fn_actions (resource_id, workspace_id, tenant_id, action_name, runtime, entrypoint, source_code, parameters, memory_mb, timeout_ms, ksvc_name, created_by, secret_refs)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
@@ -588,7 +593,7 @@ export async function upsertFnAction(pool, a) {
        ksvc_name=EXCLUDED.ksvc_name, secret_refs=EXCLUDED.secret_refs, version=fn_actions.version+1, updated_at=NOW()
      RETURNING *`,
     [a.resourceId, a.workspaceId, a.tenantId, a.actionName, a.runtime, a.entrypoint, a.sourceCode,
-     a.parameters ? JSON.stringify(a.parameters) : null, a.memoryMb, a.timeoutMs, a.ksvcName, a.createdBy, JSON.stringify(normalizeFunctionSecretRefs(a.secretRefs ?? []))]);
+     a.parameters ? JSON.stringify(a.parameters) : null, a.memoryMb, a.timeoutMs, ksvcName, a.createdBy, JSON.stringify(normalizeFunctionSecretRefs(secretRefs))]);
   const row = rows[0];
   if (row) await snapshotFnActionVersion(pool, row, { createdBy: a.createdBy, originType: 'publish' });
   return row;
