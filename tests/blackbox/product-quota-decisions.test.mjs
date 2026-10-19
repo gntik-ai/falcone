@@ -115,15 +115,32 @@ test('catalog and resolver outages return 503, while audit outages cannot allow 
   assert.equal(denied.body.allowed, false);
 });
 
-test('snapshot bytes stay per request and soft limits carry warnings through HTTP', async t => {
+test('snapshot bytes stay per request through HTTP', async t => {
   const { request } = await fixture(t);
   const dimensionKey = 'codewiki_max_repository_bytes';
   for (let i = 0; i < 2; i++) assert.equal((await request({ dimensionKey, currentUsage: 0, requested: 419430400 })).body.allowed, true);
   assert.equal((await request({ dimensionKey, currentUsage: 0, requested: 629145600 })).body.allowed, false);
-  const soft = await fixture(t, { types: { [key]: { type: 'soft', graceMargin: 2 } } });
-  const warning = await soft.request({ dimensionKey: key, currentUsage: 3 });
-  assert.equal(warning.status, 200);
-  assert.equal(warning.body.allowed, true);
-  assert.match(warning.body.warning, /Soft quota exceeded/);
-  assert.equal((await soft.request({ dimensionKey: key, currentUsage: 4 })).body.allowed, false);
+});
+
+test('soft decisions report full requested usage in warnings and deny at the exclusive ceiling', async t => {
+  const { request, pool } = await fixture(t, {
+    plan: { [key]: 3 }, types: { [key]: { type: 'soft', graceMargin: 2 } },
+  });
+  assert.deepEqual(await request({ dimensionKey: key, currentUsage: 1, requested: 2 }), { status: 200, body: {
+    allowed: true, decision: 'allowed', dimensionKey: key, quotaType: 'soft', effectiveLimit: 3, effectiveCeiling: 5,
+    currentUsage: 1, projectedUsage: 3, source: 'plan',
+  } });
+  assert.deepEqual(await request({ dimensionKey: key, currentUsage: 1, requested: 3 }), { status: 200, body: {
+    allowed: true, decision: 'soft_grace_allowed', dimensionKey: key, quotaType: 'soft', effectiveLimit: 3, effectiveCeiling: 5,
+    currentUsage: 1, projectedUsage: 4, source: 'plan', warning: 'Soft quota exceeded. Usage 4/3 (grace ceiling: 5).',
+  } });
+  assert.equal(pool.logs.length, 0);
+  assert.deepEqual(await request({ dimensionKey: key, currentUsage: 1, requested: 4, attemptedAction: 'project.create' }), {
+    status: 200, body: {
+      allowed: false, decision: 'soft_grace_exhausted', dimensionKey: key, quotaType: 'soft', effectiveLimit: 3, effectiveCeiling: 5,
+      currentUsage: 1, projectedUsage: 5, source: 'plan',
+    },
+  });
+  assert.equal(pool.logs.length, 1);
+  assert.deepEqual(pool.logs[0].slice(1, 5), ['tenant-a', 'ws-a', key, 'project.create']);
 });
