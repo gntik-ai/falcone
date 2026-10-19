@@ -83,6 +83,7 @@ async function run(): Promise<void> {
     connection,
     namespace: NAMESPACE,
     taskQueue: TASK_QUEUE,
+    maxHeartbeatThrottleInterval: '10s',
     // The SDK bundles the workflow module (CJS) into the deterministic isolate at startup.
     workflowsPath: require.resolve('./workflows'),
     activities,

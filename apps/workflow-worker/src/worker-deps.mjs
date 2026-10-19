@@ -127,6 +127,8 @@ export async function wireActivityDeps(opts = {}) {
     '../../../apps/control-plane-executor/src/runtime/postgres-data-executor.mjs',
   );
 
+  const { createLargeTaskRuntime } = await dynamicImport('../../../apps/control-plane-executor/src/runtime/large-task-runtime.mjs');
+
   let registry = opts.registry;
   let keyPool;
   let executeLlmComplete;
@@ -195,6 +197,9 @@ export async function wireActivityDeps(opts = {}) {
 
   const deps = {
     executePostgresData,
+    createLargeTaskRuntime,
+    largeTaskConfig: opts.largeTaskConfig ?? process.env.LARGE_TASK_CONFIG,
+    ...(opts.largeTaskRequest ? { largeTaskRequest: opts.largeTaskRequest } : {}),
     pgRegistry: registry,
     ...(executeLlmComplete ? { executeLlmComplete } : {}),
     ...(executeLlmBatch ? { executeLlmBatch } : {}),

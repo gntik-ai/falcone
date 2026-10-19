@@ -183,6 +183,13 @@ const DESCRIPTORS = [
     },
   },
   { id: 'llm.batch', label: 'LLM Batch', category: 'ai', inputSchema: llmBatchInputSchema },
+  {
+    id: 'largeTask.run', label: 'Large Task', category: 'compute',
+    inputSchema: {
+      $id: 'flows/activity/largeTask.run/input', type: 'object', required: ['profile'],
+      properties: { profile: { type: 'string', minLength: 1 }, parameters: { 'x-falcone-expression': true } }, additionalProperties: false,
+    },
+  },
 ];
 
 /**
