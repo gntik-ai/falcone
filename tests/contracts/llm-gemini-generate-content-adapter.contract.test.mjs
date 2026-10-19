@@ -176,10 +176,10 @@ test('Gemini accepts the frozen documented schema vocabulary including named def
   assert.deepEqual(GEMINI_RESPONSE_JSON_SCHEMA_KEYWORDS, ['$id', '$defs', '$ref', '$anchor', 'type', 'format', 'title', 'description', 'enum', 'items', 'prefixItems', 'minItems', 'maxItems', 'minimum', 'maximum', 'anyOf', 'oneOf', 'properties', 'additionalProperties', 'required', 'propertyOrdering']);
 });
 
-test('Gemini structured non-JSON stop responses reject without recording usage', async () => {
+test('Gemini structured non-JSON stop responses reject after recording usage', async () => {
   const value = await executor(async () => Response.json(response('not JSON', { usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 6 } })));
   await assert.rejects(() => value.complete('ws_gemini', { prompt: 'hello', responseFormat }), { statusCode: 502, code: 'LLM_PROVIDER_RESPONSE_INVALID' });
-  assert.deepEqual(await value.getUsage('ws_gemini'), { items: [] });
+  assert.deepEqual(await value.getUsage('ws_gemini'), { items: [{ model: 'fixture-model', promptTokens: 4, completionTokens: 6, totalTokens: 10 }] });
 });
 
 test('Gemini activity returns six usage fields and metering persists the three totals', async () => {

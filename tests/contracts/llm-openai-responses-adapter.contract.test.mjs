@@ -73,11 +73,11 @@ test('compatible and mock connections reject structured output without HTTP and 
   assert.equal(calls, 0);
 });
 
-test('structured non-streaming stop requires JSON, including at the backendFactory seam', async () => {
-  for (const options of [{}, { backendFactory: () => ({ complete: async () => ({ content: 'not JSON', finishReason: 'stop' }) }) }]) {
-    const value = await executor(async () => Response.json(response('not JSON')), 'openai-responses', options);
+test('structured non-streaming stop rejects invalid JSON after recording usage, including at the backendFactory seam', async () => {
+  for (const options of [{}, { backendFactory: () => ({ complete: async () => ({ content: 'not JSON', finishReason: 'stop', usage: { promptTokens: 4, completionTokens: 6, totalTokens: 10 } }) }) }]) {
+    const value = await executor(async () => Response.json(response('not JSON', { usage: { input_tokens: 4, output_tokens: 6 } })), 'openai-responses', options);
     await assert.rejects(() => value.complete('ws_responses', { prompt: 'hello', responseFormat }), { statusCode: 502, code: 'LLM_PROVIDER_RESPONSE_INVALID' });
-    assert.deepEqual(await value.getUsage('ws_responses'), { items: [] });
+    assert.deepEqual(await value.getUsage('ws_responses'), { items: [{ model: 'fixture-model', promptTokens: 4, completionTokens: 6, totalTokens: 10 }] });
     assert.equal((await value.complete('ws_responses', { prompt: 'hello' })).content, 'not JSON');
   }
 });
