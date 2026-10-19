@@ -15,6 +15,8 @@
 // against an SSRF guard — at config-deploy time (reject 400, no DB write) AND re-validated at
 // request time (fail-closed for any pre-existing malicious row). The DEFAULT secretResolver is
 // the confined resolver, so a non-allow-listed env var is NEVER read.
+import { randomUUID } from 'node:crypto';
+import { createLlmLedgerStore } from './llm-usage-store.mjs';
 import { createLlmBatchStore } from './llm-batch-store.mjs';
 import { createLlmBatches } from './llm-batches.mjs';
 import { clientError } from './errors.mjs';
@@ -488,93 +490,8 @@ function createPostgresProviderStore(pool) {
 // Usage store — append-only token-usage log, tenant-scoped by (tenant_id, workspace_id). The
 // rollup is grouped by model and NEVER aggregates across tenants. In-memory with no `pool`.
 // ---------------------------------------------------------------------------
-export function createLlmUsageStore({ pool } = {}) {
-  if (!pool) return createInMemoryUsageStore();
-  return createPostgresUsageStore(pool);
-}
-
-function rollupRows(rows) {
-  const byModel = new Map();
-  for (const r of rows) {
-    const key = r.model ?? '';
-    const acc = byModel.get(key) ?? { model: r.model ?? null, promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-    acc.promptTokens += Number(r.promptTokens) || 0;
-    acc.completionTokens += Number(r.completionTokens) || 0;
-    acc.totalTokens += Number(r.totalTokens) || 0;
-    byModel.set(key, acc);
-  }
-  return [...byModel.values()].sort((a, b) => String(a.model).localeCompare(String(b.model)));
-}
-
-function createInMemoryUsageStore() {
-  const rows = [];
-  return {
-    async ensureSchema() {},
-    async recordUsage(workspaceId, { tenantId, model, promptTokens, completionTokens, totalTokens } = {}) {
-      rows.push({
-        tenantId: tenantId ?? TENANT_SENTINEL,
-        workspaceId,
-        model: model ?? null,
-        promptTokens: Number(promptTokens) || 0,
-        completionTokens: Number(completionTokens) || 0,
-        totalTokens: Number(totalTokens) || 0,
-        createdAt: new Date().toISOString(),
-      });
-    },
-    async getRollup(workspaceId, tenantId) {
-      const tenant = tenantId ?? TENANT_SENTINEL;
-      const scoped = rows.filter((r) => r.workspaceId === workspaceId && r.tenantId === tenant);
-      return { items: rollupRows(scoped) };
-    },
-  };
-}
-
-function createPostgresUsageStore(pool) {
-  async function ensureSchema() {
-    await pool.query(`CREATE TABLE IF NOT EXISTS workspace_llm_usage (
-      tenant_id         text NOT NULL,
-      workspace_id      text NOT NULL,
-      model             text,
-      prompt_tokens     integer NOT NULL DEFAULT 0,
-      completion_tokens integer NOT NULL DEFAULT 0,
-      total_tokens      integer NOT NULL DEFAULT 0,
-      created_at        timestamptz NOT NULL DEFAULT now()
-    )`);
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_wlu_scope ON workspace_llm_usage (tenant_id, workspace_id)');
-  }
-  return {
-    pool,
-    ensureSchema,
-    async recordUsage(workspaceId, { tenantId, model, promptTokens, completionTokens, totalTokens } = {}, client = pool) {
-      await client.query(
-        `INSERT INTO workspace_llm_usage (tenant_id, workspace_id, model, prompt_tokens, completion_tokens, total_tokens, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6, now())`,
-        [tenantId ?? TENANT_SENTINEL, workspaceId, model ?? null, Number(promptTokens) || 0, Number(completionTokens) || 0, Number(totalTokens) || 0],
-      );
-    },
-    async getRollup(workspaceId, tenantId) {
-      // Scoped to (tenant_id, workspace_id); SUM by model so usage NEVER aggregates across tenants.
-      const res = await pool.query(
-        `SELECT model,
-                SUM(prompt_tokens)::bigint     AS prompt_tokens,
-                SUM(completion_tokens)::bigint AS completion_tokens,
-                SUM(total_tokens)::bigint      AS total_tokens
-           FROM workspace_llm_usage
-          WHERE tenant_id = $1 AND workspace_id = $2
-          GROUP BY model
-          ORDER BY model`,
-        [tenantId ?? TENANT_SENTINEL, workspaceId],
-      );
-      return {
-        items: res.rows.map((r) => ({
-          model: r.model ?? null,
-          promptTokens: Number(r.prompt_tokens) || 0,
-          completionTokens: Number(r.completion_tokens) || 0,
-          totalTokens: Number(r.total_tokens) || 0,
-        })),
-      };
-    },
-  };
+export function createLlmUsageStore(options = {}) {
+  return createLlmLedgerStore(options);
 }
 
 // ---------------------------------------------------------------------------
@@ -583,7 +500,7 @@ function createPostgresUsageStore(pool) {
 // ---------------------------------------------------------------------------
 export function createLlmExecutor(options = {}) {
   const providerStore = options.providerStore ?? createLlmProviderStore();
-  const usageStore = options.usageStore ?? createLlmUsageStore();
+  const usageStore = options.usageStore ?? createLlmUsageStore({ priceCatalog: options.priceCatalog, now: options.now });
   const batchStore = options.batchStore ?? createLlmBatchStore({ pool: providerStore.pool });
   const backendFactory = options.backendFactory; // (config) -> backend (test seam)
   const fetchImpl = options.fetchImpl;
@@ -700,7 +617,7 @@ export function createLlmExecutor(options = {}) {
     // for any malicious row persisted before this guard shipped).
     await assertEndpoint(config.endpoint);
     const apiKey = await resolveSecretOrThrow(config);
-    return { config, chosen, apiKey, backend: batchItems ? undefined : backendFor(config) };
+    return { config, chosen, apiKey, maxOutputTokens: capabilities?.maxOutputTokens, backend: batchItems ? undefined : backendFor(config) };
   }
 
   // Config-deploy: confine the secretRef + SSRF-validate the endpoint BEFORE persisting, so a
@@ -711,24 +628,34 @@ export function createLlmExecutor(options = {}) {
     return providerStore.deployProvider(workspaceId, config);
   }
 
-  async function complete(workspaceId, { tenantId, connectionId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache, stream = false } = {}) {
-    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, connectionId, model, responseFormat, promptCache, stream, maxTokens });
+  function usageIdentity(config, model, tenantId, mode, invocation) {
+    return { tenantId, model, connectionId: config.connectionId, providerType: config.providerType, mode,
+      requestId: invocation ? `flow:${invocation.executionId}:${invocation.runId}:${invocation.nodeId}:${invocation.activityId}` : randomUUID(),
+      attempt: invocation?.attempt ?? 1, executionId: invocation?.executionId ?? null, nodeId: invocation?.nodeId ?? null };
+  }
+
+  async function complete(workspaceId, { tenantId, connectionId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache, stream = false, invocation } = {}) {
+    const { config, chosen, apiKey, backend, maxOutputTokens } = await prepare(workspaceId, { tenantId, connectionId, model, responseFormat, promptCache, stream, maxTokens });
     const built = normalizeMessages({ messages, prompt, system });
+    const identity = usageIdentity(config, chosen, tenantId, 'sync', invocation);
+    await usageStore.checkBudget(workspaceId, identity, [{ messages: built, maxTokens, maxOutputTokens }]);
     const out = await backend.complete({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat, promptCache });
+    const usage = normalizeUsage(out.usage);
+    await usageStore.recordUsage(workspaceId, { ...identity, ...usage });
     if (responseFormat !== undefined && out.finishReason === 'stop') {
       try { JSON.parse(out.content); }
       catch { throw adapterError('LLM_PROVIDER_RESPONSE_INVALID'); }
     }
-    const usage = normalizeUsage(out.usage);
-    await usageStore.recordUsage(workspaceId, { tenantId, model: chosen, ...usage });
     return { content: out.content ?? '', usage, model: out.model ?? chosen, finishReason: normalizeFinishReason(out.finishReason) };
   }
 
   // Streaming variant: yields `{ type:'delta', content }` frames, records usage when the terminal
   // usage frame arrives, then yields a final `{ type:'usage', usage }` frame.
-  async function* completeStream(workspaceId, { tenantId, connectionId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache } = {}) {
-    const { config, chosen, apiKey, backend } = await prepare(workspaceId, { tenantId, connectionId, model, responseFormat, promptCache, stream: true, maxTokens });
+  async function* completeStream(workspaceId, { tenantId, connectionId, model, messages, prompt, system, maxTokens, temperature, responseFormat, promptCache, invocation } = {}) {
+    const { config, chosen, apiKey, backend, maxOutputTokens } = await prepare(workspaceId, { tenantId, connectionId, model, responseFormat, promptCache, stream: true, maxTokens });
     const built = normalizeMessages({ messages, prompt, system });
+    const identity = usageIdentity(config, chosen, tenantId, 'stream', invocation);
+    await usageStore.checkBudget(workspaceId, identity, [{ messages: built, maxTokens, maxOutputTokens }]);
     for await (const frame of backend.stream({ endpoint: config.endpoint, apiKey, model: chosen, messages: built, maxTokens, temperature, responseFormat, promptCache })) {
       if (frame?.type === 'error') {
         yield { type: 'error', code: frame.code };
@@ -736,7 +663,7 @@ export function createLlmExecutor(options = {}) {
       }
       if (frame?.type === 'usage') {
         const usage = normalizeUsage(frame.usage);
-        await usageStore.recordUsage(workspaceId, { tenantId, model: chosen, ...usage });
+        await usageStore.recordUsage(workspaceId, { ...identity, ...usage });
         yield { type: 'usage', usage, model: frame.model ?? chosen, finishReason: normalizeFinishReason(frame.finishReason) };
         return;
       }
@@ -770,6 +697,13 @@ export function createLlmExecutor(options = {}) {
     batchStore,
     providerStore,
     usageStore,
+    getPrices: (w, options) => usageStore.getPrices(w, options),
+    putPrices: (w, options) => usageStore.putPrices(w, options),
+    getBudget: (w, options) => usageStore.getBudget(w, options),
+    putBudget: (w, options) => usageStore.putBudget(w, options),
+    deleteBudget: (w, options) => usageStore.deleteBudget(w, options),
+    getLedger: (w, options) => usageStore.getLedger(w, options),
+    getSummary: (w, options) => usageStore.getSummary(w, options),
     // Config-plane convenience wrappers (the HTTP routes call these). setProvider confines the
     // secretRef + SSRF-validates the endpoint before persisting (#659).
     setProvider,

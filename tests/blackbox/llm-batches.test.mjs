@@ -844,3 +844,27 @@ test('OpenAI list lookback stops only beyond ten minutes and still checks both m
   const row = await f.row();
   assert.equal(row.status, 'submit_uncertain'); assert.equal(row.providerState.sweepAfter, null); assert.ok(row.providerState.inputFileDeletedAt);
 });
+
+for (const driver of drivers) {
+  test(`${driver.name}: batch items carry stable ledger identity and batch prices; budget sums all items before fetch`, async () => {
+    const { executor, submit, calls, fileCalls, controls, advance } = await setup(driver);
+    await executor.putPrices('ws', { tenantId: 'tenant', currency: 'USD', entries: [{ providerType: driver.providerType, model: 'fixture-model', mode: 'batch', input_micros_per_mtok: 500000, output_micros_per_mtok: 500000 }] });
+    await executor.putBudget('ws', { tenantId: 'tenant', currency: 'USD', limitMicros: '4097' });
+    await assert.rejects(submit(), { statusCode: 422, code: 'LLM_BUDGET_EXCEEDED' });
+    assert.equal(calls.length, 0); assert.equal(fileCalls.length, 0);
+    const refusal = (await executor.getLedger('ws', { tenantId: 'tenant' })).items[0];
+    assert.equal(refusal.status, 'budget_refused'); assert.equal(refusal.mode, 'batch'); assert.equal(refusal.estimatedCostMicros, '4098');
+    await executor.deleteBudget('ws', { tenantId: 'tenant' });
+    const id = (await submit()).body.batchId;
+    controls.response = url => driver.resultsPath(url) ? new Response(`${driver.success('one')}\n${driver.failure('two')}\n`) : Response.json(driver.ended());
+    advance(60000); await executor.reconcileBatches();
+    const rows = (await executor.getLedger('ws', { tenantId: 'tenant' })).items.filter(r => r.status === 'recorded');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].requestId, `batch:${id}:one`); assert.equal(rows[0].attempt, 1);
+    assert.equal(rows[0].mode, 'batch'); assert.equal(rows[0].batchId, id); assert.equal(rows[0].batchItemId, 'one');
+    assert.equal(rows[0].providerType, driver.providerType); assert.equal(rows[0].connectionId, 'default');
+    assert.equal(rows[0].costMicros, '5');
+    advance(60000); await executor.reconcileBatches();
+    assert.equal((await executor.getSummary('ws', { tenantId: 'tenant', groupBy: 'batch' })).items[0].attempts, 1);
+  });
+}

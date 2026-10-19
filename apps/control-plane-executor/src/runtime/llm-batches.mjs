@@ -56,12 +56,15 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
       if (!messages.length || messages.some(m => !m || !['system', 'user', 'assistant'].includes(m.role) || typeof m.content !== 'string')) invalid();
       seen.add(item.customId);
     }
-    const { config, chosen, apiKey } = await prepare(workspaceId, { ...input, tenantId, batchItems: input.items });
+    const { config, chosen, apiKey, maxOutputTokens } = await prepare(workspaceId, { ...input, tenantId, batchItems: input.items });
     const driver = driverResolver(config.providerType);
     if (!driver) throw clientError('Provider does not support batches', 422, 'LLM_BATCH_UNSUPPORTED');
     driver.validateEndpoint?.(config.endpoint);
+    const batchId = randomUUID();
+    await usageStore.checkBudget(workspaceId, { tenantId, model: chosen, connectionId: config.connectionId, providerType: config.providerType,
+      mode: 'batch', batchId, requestId: `batch:${batchId}`, attempt: 1 }, input.items.map(item => ({ messages: normalizeMessages(item), maxTokens: item.maxTokens, maxOutputTokens })));
     const timestamp = new Date(now()).toISOString();
-    const inserted = await store.insert({ tenantId: tenantId ?? '_', workspaceId, batchId: randomUUID(),
+    const inserted = await store.insert({ tenantId: tenantId ?? '_', workspaceId, batchId,
       connectionId: config.connectionId, providerType: config.providerType, endpoint: config.endpoint, secretRef: config.secretRef,
       model: chosen, providerBatchId: null, providerState: {}, status: 'submitting', cancelFence: false, requestCount: input.items.length,
       providerCounts: {}, missingCount: 0, inputSha256, idempotencyPrincipal: hash ? principal : null, idempotencyKeySha256: hash,

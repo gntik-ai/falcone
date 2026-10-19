@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '9a9024240f89e7f1ff5b885dcd43c554a0732af4'
+  FALCONE_CHARTS_REF: '8f764d0b9426d56fb265c09b1c14ea06d6649c8a'
 
 jobs:
   quality:
@@ -67,6 +67,7 @@ jobs:
             tests/blackbox/embedding-provider-get-roundtrip.test.mjs \
             tests/blackbox/auto-embedding-write.test.mjs \
             tests/blackbox/vector-search-embedding.test.mjs \
+            tests/blackbox/llm-cost-ledger.test.mjs \
             tests/blackbox/llm-stores.test.mjs \
             tests/blackbox/llm-completion-routes.test.mjs \
             tests/blackbox/llm-connection-selection.test.mjs \
@@ -355,6 +356,12 @@ jobs:
           LLM_BATCHES_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
           LLM_BATCHES_TEST_REQUIRED: '1'
         run: node --test tests/integration/llm-batches-postgres.test.mjs
+
+      - name: LLM cost ledger Postgres tests
+        env:
+          LLM_COST_LEDGER_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+          LLM_COST_LEDGER_TEST_REQUIRED: '1'
+        run: node --test tests/integration/llm-cost-ledger-postgres.test.mjs
 
       - name: Real Postgres flow execution credentials
         env:

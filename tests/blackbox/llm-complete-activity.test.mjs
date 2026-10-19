@@ -7,13 +7,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Ajv from 'ajv';
+import { register } from 'node:module';
+register('../fixtures/flows-temporal-boundary-loader.mjs', import.meta.url);
+const { setRuntime } = await import('../fixtures/flows-temporal-boundary.mjs');
 
-import {
+const {
   dispatchTask,
   resolveActivity,
   taskTypeNames,
   llmComplete,
-} from '../../apps/workflow-worker/src/activities/index.mjs';
+} = await import('../../apps/workflow-worker/src/activities/index.mjs');
 import { mintExecutionToken } from '../../apps/control-plane-executor/src/runtime/execution-token.mjs';
 
 const TENANT = { tenantId: 'ten_a', workspaceId: 'ws_llm' };
@@ -100,5 +103,26 @@ test('activity schema accepts an optional literal connectionId and rejects non-s
   assert.equal(validate({ model: 'gpt-allowed', connectionId: 'anthropic-main' }), true);
   for (const connectionId of [null, false, 1, {}, []]) {
     assert.equal(validate({ model: 'gpt-allowed', connectionId }), false);
+  }
+});
+
+
+test('dispatch forwards Temporal run, activity and attempt identity and ignores params invocation', async () => {
+  const tenant = { ...TENANT, executionToken: await mintExecutionToken(TENANT.tenantId, TENANT.workspaceId) };
+  const requests = [];
+  for (const attempt of [1, 2]) {
+    setRuntime({ activityInfo: { workflowExecution: { workflowId: 'workflow', runId: 'run' }, activityId: 'activity', attempt } });
+    await dispatchTask({ ...base, tenant, invocation: { executionId: 'forged' }, params: { model: 'fixture', invocation: { runId: 'forged' } } }, {
+      executeLlmComplete: async request => { requests.push(request); return { content: 'done' }; },
+    });
+  }
+  assert.deepEqual(requests.map(r => r.invocation), [1, 2].map(attempt => ({ executionId: 'workflow', runId: 'run', nodeId: 'n1', activityId: 'activity', attempt })));
+});
+
+test('budget refusals are non-retryable activity errors', async () => {
+  for (const code of ['LLM_BUDGET_EXCEEDED', 'LLM_PRICE_MISSING']) {
+    await assert.rejects(llmComplete({ params: { model: 'fixture' }, tenant: TENANT }, {
+      executeLlmComplete: async () => { throw clientError('refused', 422, code); },
+    }), { type: code, nonRetryable: true });
   }
 });

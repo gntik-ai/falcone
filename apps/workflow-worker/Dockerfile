@@ -76,6 +76,8 @@ COPY apps/control-plane-executor/src/runtime/large-task-runtime.mjs \
      apps/control-plane-executor/src/runtime/vector-capability.mjs \
      apps/control-plane-executor/src/runtime/workspace-dsn-resolver.mjs \
      apps/control-plane-executor/src/runtime/llm-executor.mjs \
+     apps/control-plane-executor/src/runtime/llm-usage-store.mjs \
+     apps/control-plane-executor/src/runtime/llm-pricing-store.mjs \
      apps/control-plane-executor/src/runtime/llm-batches.mjs \
      apps/control-plane-executor/src/runtime/llm-batch-store.mjs \
      apps/control-plane-executor/src/runtime/llm-batch-reconciler.mjs \

@@ -335,6 +335,7 @@ const SCOPE_MONGO_DOC_RE = /^\/v1\/mongo\/workspaces\/[^/]+\/data\/[^/]+\/collec
 const SCOPE_LLM_COMPLETIONS_RE = /^\/v1\/workspaces\/[^/]+\/llm\/completions(?:\/|$)/;
 function requiredDataScope(method, pathname) {
   if (SCOPE_DDL_RE.test(pathname)) return 'ddl:write';
+  if (/^\/v1\/workspaces\/[^/]+\/llm-usage\/(?:prices|budget|ledger|summary)$/.test(pathname)) return method === 'GET' ? 'data:read' : 'data:write';
   if (SCOPE_LLM_COMPLETIONS_RE.test(pathname)) return 'data:write'; // BYOK completions and batches (#662, #945)
   if (SCOPE_PG_DATA_RE.test(pathname) || SCOPE_MONGO_DOC_RE.test(pathname)) {
     if (method === 'GET') return null; // reads are not scope-gated (every key carries data:read)
@@ -386,6 +387,7 @@ function isHostedMcpRpcRequest(pathname) {
 
 function isStructuralWriteRequest(method, pathname) {
   if (method === 'GET') return false;
+  if (/^\/v1\/workspaces\/[^/]+\/llm-usage\/(?:prices|budget)$/.test(pathname)) return method === 'PUT' || method === 'DELETE';
   if (/^\/v1\/workspaces\/[^/]+\/api-keys(?:\/|$)/.test(pathname)) {
     return method === 'POST' || method === 'DELETE';
   }
@@ -718,6 +720,20 @@ function buildRoutes(registry, apiKeyStore, mongoExecutor, eventsExecutor, funct
       runLlmProvider(llmExecutor, 'get', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
     ['DELETE', new RegExp(`${llmp}$`), templates.llmp, ([w], c) =>
       runLlmProvider(llmExecutor, 'remove', { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
+    ['GET', new RegExp(`${llmu}/prices$`), `${templates.llmu}/prices`, ([w], c) =>
+      runLlmConnection(llmExecutor, 'getPrices', [w, llmUsageOptions(c)])],
+    ['PUT', new RegExp(`${llmu}/prices$`), `${templates.llmu}/prices`, ([w], c) =>
+      runLlmConnection(llmExecutor, 'putPrices', [w, { ...c.body, tenantId: c.identity.tenantId }])],
+    ['GET', new RegExp(`${llmu}/budget$`), `${templates.llmu}/budget`, ([w], c) =>
+      runLlmConnection(llmExecutor, 'getBudget', [w, llmUsageOptions(c)])],
+    ['PUT', new RegExp(`${llmu}/budget$`), `${templates.llmu}/budget`, ([w], c) =>
+      runLlmConnection(llmExecutor, 'putBudget', [w, { ...c.body, tenantId: c.identity.tenantId }])],
+    ['DELETE', new RegExp(`${llmu}/budget$`), `${templates.llmu}/budget`, ([w], c) =>
+      runLlmConnection(llmExecutor, 'deleteBudget', [w, { tenantId: c.identity.tenantId }])],
+    ['GET', new RegExp(`${llmu}/ledger$`), `${templates.llmu}/ledger`, ([w], c) =>
+      runLlmConnection(llmExecutor, 'getLedger', [w, llmUsageOptions(c)])],
+    ['GET', new RegExp(`${llmu}/summary$`), `${templates.llmu}/summary`, ([w], c) =>
+      runLlmConnection(llmExecutor, 'getSummary', [w, llmUsageOptions(c)])],
     ['GET', new RegExp(`${llmu}$`), templates.llmu, ([w], c) =>
       runLlmUsage(llmExecutor, { workspaceId: w, tenantId: c.identity.tenantId }, 200)],
     ['POST', new RegExp(`${llmc}/batches$`), `${templates.llmc}/batches`, ([w], c) =>
@@ -1287,6 +1303,9 @@ async function runEmbeddingProvider(embeddingExecutor, action, params, successSt
   return { status: successStatus, body: result };
 }
 
+function llmUsageOptions(c) {
+  return { ...Object.fromEntries(['from', 'to', 'groupBy', 'cursor', 'limit'].filter(key => c.url.searchParams.has(key)).map(key => [key, c.url.searchParams.get(key)])), tenantId: c.identity.tenantId };
+}
 // Batch identity is server-owned, including the generic idempotency principal namespace.
 function batchOptions(c) {
   return { tenantId: c.identity.tenantId, ...Object.fromEntries(['limit', 'cursor', 'status'].filter(k => c.url.searchParams.has(k)).map(k => [k, c.url.searchParams.get(k)])) };
