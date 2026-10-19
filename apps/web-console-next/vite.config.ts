@@ -26,6 +26,9 @@ export default defineConfig(({ mode }) => {
     }],
     define: {
       __SHELL_TEST_FIXTURES__: process.env.SHELL_TEST_FIXTURES === 'true',
+      // Shared clients read the whole env object; keep raw build metadata out of it.
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(version),
+      'import.meta.env.VITE_APP_COMMIT_SHA': JSON.stringify(commitSha),
       __APP_VERSION__: mode === 'test' ? 'globalThis.__APP_VERSION__' : JSON.stringify(version),
       __APP_COMMIT_SHA__: mode === 'test' ? 'globalThis.__APP_COMMIT_SHA__' : JSON.stringify(commitSha)
     },
