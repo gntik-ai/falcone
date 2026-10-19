@@ -622,6 +622,7 @@ Workspace lifecycle, application inventory, workload identities, and managed-res
 | POST | `/v1/workspaces/{workspaceId}/memberships` | workspace | workspace_membership | Submit a workspace membership write request |
 | GET | `/v1/workspaces/{workspaceId}/memberships/{workspaceMembershipId}` | workspace | workspace_membership | Fetch one workspace membership record |
 | GET | `/v1/workspaces/{workspaceId}/permission-recalculations/{permissionRecalculationId}` | workspace | workspace | Fetch one workspace-scoped effective-permission recalculation record. |
+| POST | `/v1/workspaces/{workspaceId}/quota-decisions` | workspace | workspace | Decide a product quota against tenant plan limits and caller-reported usage |
 | GET | `/v1/workspaces/{workspaceId}/realtime` | workspace | workspaces | Read workspace realtime configuration |
 | GET | `/v1/workspaces/{workspaceId}/service-accounts` | workspace | service_account | List service accounts for one workspace |
 | POST | `/v1/workspaces/{workspaceId}/service-accounts` | workspace | service_account | Submit a canonical service account write request |

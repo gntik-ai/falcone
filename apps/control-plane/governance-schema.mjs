@@ -48,6 +48,7 @@ export const GOVERNANCE_MIGRATIONS = [
   'packages/provisioning-orchestrator/src/migrations/122-knative-runtime-cleanup.sql',
   'packages/provisioning-orchestrator/src/migrations/123-authorization-denial-audit.sql',
   'packages/provisioning-orchestrator/src/migrations/124-http-idempotency.sql',
+  'packages/provisioning-orchestrator/src/migrations/125-code-wiki-quota-dimensions.sql',
 ];
 
 // The control-plane action modules resolve under /repo in the image; allow override

@@ -107,13 +107,18 @@ test('#971: exemptions are exactly the 13 D1 routes', () => {
 
 test('#971: self-recorded routes name a recorder present in their source', () => {
   const self = routes.filter((route) => route.audit?.self);
-  assert.equal(self.length, 9);
+  assert.equal(self.length, 10);
   for (const route of self) {
     let file, recorder;
     if (route.module) {
       file = route.module.replace('/repo/', '../../');
       recorder = /appendPlanAudit\(/;
       assert.match(route.audit.self, /appendPlanAudit/);
+    } else if (route.localHandler === 'productQuotaDecision') {
+      file = '../../apps/control-plane/product-quota.mjs';
+      recorder = /await recordQuotaEnforcement\(/;
+      assert.match(route.audit.self, /recordQuotaEnforcement/);
+      assert.match(readFileSync(new URL('../../apps/control-plane/audit-writer.mjs', import.meta.url), 'utf8'), /INSERT INTO quota_enforcement_log/);
     } else if (route.localHandler === 'recordScopeEnforcementDenial') {
       file = '../../apps/control-plane/b-handlers.mjs';
       recorder = /await recordScopeDenial\(/;

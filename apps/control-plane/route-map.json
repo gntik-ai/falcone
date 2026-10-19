@@ -2058,5 +2058,21 @@
     "subroutes": "no",
     "notes": "975: single-use invitation lifecycle with tenant/workspace management authorization.",
     "consoleUsed": true
+  },
+  {
+    "operationId": "decideWorkspaceProductQuota",
+    "method": "POST",
+    "path": "/v1/workspaces/{workspaceId}/quota-decisions",
+    "family": "workspaces",
+    "module": "apps/control-plane/b-handlers.mjs",
+    "export": "LOCAL_HANDLERS.productQuotaDecision",
+    "invoke": "localHandler",
+    "deps": [
+      "pg"
+    ],
+    "auth": "authenticated",
+    "subroutes": "no",
+    "notes": "Tenant plan product quota decisions; same-tenant workspace binding or tenant management required; denials self-audited.",
+    "consoleUsed": false
   }
 ]

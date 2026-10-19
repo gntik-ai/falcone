@@ -383,5 +383,7 @@ export const routes = [ // Every mutation declares dispatch, self-recorded or ex
   { method: 'POST',   path: '/v1/auth/login-sessions/{sessionId}/refresh', localHandler: 'refresh', auth: 'public', audit: { exempt: 'Authentication session auditing is deferred' } },
   { method: 'DELETE', path: '/v1/auth/login-sessions/{sessionId}', localHandler: 'logout', auth: 'authenticated', audit: { exempt: 'Authentication session auditing is deferred' } },
   { method: 'GET',    path: '/v1/auth/status-views/{statusViewId}', localHandler: 'getConsoleAccountStatusView', auth: 'public' },
-  { method: 'GET',    path: '/v1/auth/signups/policy', localHandler: 'signupPolicy', auth: 'public' }
+  { method: 'GET',    path: '/v1/auth/signups/policy', localHandler: 'signupPolicy', auth: 'public' },
+
+  { method: 'POST', path: '/v1/workspaces/{workspaceId}/quota-decisions', localHandler: 'productQuotaDecision', auth: 'authenticated', audit: { self: 'Denials recorded by recordQuotaEnforcement; allowed decisions do not mutate state' } },
 ];

@@ -36,7 +36,7 @@ function declaration(source, name) {
   return source.slice(start, source.indexOf('\n}', start) + 2);
 }
 
-export async function startDenialServer({ insert = null, extraRoutes = [], seed = routes, auditDb = null, workspaceRow = { id: WS_B, tenant_id: TEN_B } } = {}) {
+export async function startDenialServer({ insert = null, extraRoutes = [], seed = routes, auditDb = null, workspaceRow = { id: WS_B, tenant_id: TEN_B }, database = null, verifier = null, localHandlers = {} } = {}) {
   const rows = [];
   const warnings = [];
   const pool = {
@@ -94,12 +94,14 @@ export async function startDenialServer({ insert = null, extraRoutes = [], seed 
   const bindings = {
     http, pool, jwtVerifier, normalizeWorkspaceBinding, reserveHttpRequest, requestErrorForLog, compileRoutes, matchCompiledRoute, invokeRoute, PORT: 0,
     seedRoutes: [...seed, ...extraRoutes].map(remap),
-    LOCAL_HANDLERS: locals,
+    LOCAL_HANDLERS: { ...locals, ...localHandlers },
     console: { error() {}, warn: (line) => warnings.push(line) },
     webhookRuntimePool: null, webhookWritePool: null, knativeRuntime: null, runtimeTeardownCoordinator: null,
     createRuntimeCleanupRepository,
     ...audit, ...metrics, ...requestBody, ...knative, ...sa
   };
+  if (database) bindings.pool = database;
+  if (verifier) bindings.jwtVerifier = verifier;
   // The full route table, helpers, verified identity, invocation and HTTP handler
   // are evaluated together. No dispatch or authorization function is replaced.
   const core = serverSource.slice(serverSource.indexOf('// ---- route table'),
