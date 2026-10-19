@@ -46884,7 +46884,23 @@
         ],
         "responses": {
           "204": {
-            "description": "Workspace function secret deleted."
+            "description": "Workspace function secret deleted.",
+            "headers": {
+              "x-falcone-affected-functions": {
+                "description": "JSON array of consuming Function resource IDs; the response has no body.",
+                "schema": {
+                  "type": "string",
+                  "example": "[\"fn-a\"]"
+                }
+              },
+              "x-falcone-resolved-ref-count": {
+                "description": "Number of Functions declaring this secret, including retained declarations after revocation.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
           },
           "400": {
             "description": "The request is malformed or contextually inconsistent.",
@@ -74251,10 +74267,19 @@
             "$ref": "#/components/schemas/FunctionHttpExposureWriteRequest"
           },
           "secretReferences": {
+            "type": "array",
+            "description": "Declared workspace-secret names and env mappings only; resolved values are never persisted.",
             "items": {
-              "$ref": "#/components/schemas/FunctionSecretReference"
+              "$ref": "#/components/schemas/FunctionSecretDeclaration"
+            }
+          },
+          "secrets": {
+            "type": "array",
+            "description": "Declared workspace-secret names and env mappings only; resolved values are never persisted.",
+            "items": {
+              "$ref": "#/components/schemas/FunctionSecretDeclaration"
             },
-            "type": "array"
+            "deprecated": true
           }
         }
       },
@@ -94885,32 +94910,10 @@
             "$ref": "#/components/schemas/FunctionWebActionConfiguration"
           },
           "secrets": {
-            "description": "Declared workspace-secret names and env mappings only; resolved values are never persisted.",
             "type": "array",
+            "description": "Declared workspace-secret names and env mappings only; resolved values are never persisted.",
             "items": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "pattern": "^[a-z][a-z0-9_-]{0,62}$"
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "name": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_-]{0,62}$"
-                    },
-                    "env": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-                    }
-                  },
-                  "required": [
-                    "name"
-                  ]
-                }
-              ]
+              "$ref": "#/components/schemas/FunctionSecretDeclaration"
             }
           }
         },
@@ -95851,8 +95854,8 @@
             "type": "string"
           },
           "mountAlias": {
-            "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
-            "type": "string"
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
           },
           "required": {
             "type": "boolean"
@@ -104476,6 +104479,55 @@
             "type": "string"
           }
         }
+      },
+      "FunctionSecretDeclaration": {
+        "description": "A workspace-secret name or value-free mapping. name/env and secretName/mountAlias are equivalent; workspaceId, if supplied, must match the Function workspace. All references fail closed when absent, regardless of the legacy required flag.",
+        "oneOf": [
+          {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,62}$"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,62}$"
+              },
+              "secretName": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,62}$"
+              },
+              "env": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "mountAlias": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "workspaceId": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "name"
+                ]
+              },
+              {
+                "required": [
+                  "secretName"
+                ]
+              }
+            ]
+          }
+        ]
       }
     }
   }

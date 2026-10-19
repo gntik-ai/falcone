@@ -103,6 +103,58 @@ test('legacy remediation defaults to a value-free dry run and apply prunes inlin
   assert.equal(JSON.stringify(api.objects.get(servicePath)).includes('marker'), false);
 });
 
+test('namespace remediation discovery finds inline Functions without enumerating resource IDs', async (t) => {
+  installInvocationFixture(t, invocationFixture());
+  const { runFunctionSecretRemediation } = await import('../../apps/control-plane/remediate-function-secrets.mjs');
+  const api = cluster({ knative: true });
+  for (const [name, tenantId, resourceId] of [
+    ['fn-first', 'tenant-a', 'fn-a'], ['fn-second', 'tenant-b', 'fn-b'],
+  ]) {
+    const manifest = buildFunctionKsvcManifest(name, 'return 1', { ...scope, tenantId, functionResourceId: resourceId });
+    manifest.spec.template.spec.containers[0].env.push({ name: 'API_KEY', value: 'discovery-marker' });
+    await api.request('POST', servicePath.slice(0, servicePath.lastIndexOf('/')), manifest);
+  }
+  await deployKnativeService('fn-clean', 'return 1', { ...scope, request: api.request });
+  // Unlabelled workloads are outside this Function ownership boundary.
+  const foreign = buildFunctionKsvcManifest('other-service', 'return 1', scope);
+  foreign.metadata.labels = {};
+  foreign.spec.template.spec.containers[0].env.push({ name: 'API_KEY', value: 'foreign-marker' });
+  await api.request('POST', servicePath.slice(0, servicePath.lastIndexOf('/')), foreign);
+  const before = structuredClone([...api.objects.entries()]);
+  const start = api.calls.length;
+  let pages = 0;
+  const request = async (method, path, body, options) => {
+    const result = await api.request(method, path, body, options);
+    if (path.split('?')[0].endsWith('/services')) {
+      const next = new URLSearchParams(path.split('?')[1]).get('continue');
+      pages++;
+      return next ? { items: result.items.slice(1) }
+        : { items: result.items.slice(0, 1), metadata: { continue: 'page-2' } };
+    }
+    return result;
+  };
+  const report = await runFunctionSecretRemediation({ discover: true, request,
+    pool: { query: () => assert.fail('discovery must not require database access') },
+    vault: { resolveEnv: () => assert.fail('discovery must not resolve values') } });
+  assert.equal(pages, 2);
+  assert.equal(report.dryRun, true);
+  assert.deepEqual(report.functions.map(({ tenantId, resourceId, name }) => ({ tenantId, resourceId, name })), [
+    { tenantId: 'tenant-a', resourceId: 'fn-a', name: 'fn-first' },
+    { tenantId: 'tenant-b', resourceId: 'fn-b', name: 'fn-second' },
+  ]);
+  for (const fn of report.functions) {
+    assert.deepEqual(fn.affected.map(({ kind }) => kind), ['Service', 'Configuration', 'Revision', 'Deployment', 'ReplicaSet']);
+    for (const item of fn.affected) assert.deepEqual(item.envNames, ['API_KEY']);
+  }
+  assert.equal(JSON.stringify(report).includes('marker'), false);
+  assert.equal(api.calls.slice(start).every(({ method }) => method === 'GET'), true);
+  assert.deepEqual([...api.objects.entries()], before);
+  for (const options of [{ apply: true }, { refs: [] }, { resourceId: 'fn-a' },
+    { tenantId: 'tenant-a' }, { workspaceId: 'ws-a' }]) {
+    assert.throws(() => runFunctionSecretRemediation({ discover: true, request, ...options }), /read-only/);
+  }
+});
+
 test('operator remediation distinguishes legacy user env from Knative-injected env', async (t) => {
   installInvocationFixture(t, invocationFixture());
   const { runFunctionSecretRemediation } = await import('../../apps/control-plane/remediate-function-secrets.mjs');

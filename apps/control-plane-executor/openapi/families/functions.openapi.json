@@ -482,8 +482,17 @@
             "type": "string"
           },
           "secretReferences": {
+            "description": "Declared workspace-secret names and env mappings only; resolved values are never persisted.",
             "items": {
-              "$ref": "#/components/schemas/FunctionSecretReference"
+              "$ref": "#/components/schemas/FunctionSecretDeclaration"
+            },
+            "type": "array"
+          },
+          "secrets": {
+            "deprecated": true,
+            "description": "Declared workspace-secret names and env mappings only; resolved values are never persisted.",
+            "items": {
+              "$ref": "#/components/schemas/FunctionSecretDeclaration"
             },
             "type": "array"
           },
@@ -1195,29 +1204,7 @@
           "secrets": {
             "description": "Declared workspace-secret names and env mappings only; resolved values are never persisted.",
             "items": {
-              "oneOf": [
-                {
-                  "pattern": "^[a-z][a-z0-9_-]{0,62}$",
-                  "type": "string"
-                },
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "env": {
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-                      "type": "string"
-                    },
-                    "name": {
-                      "pattern": "^[a-z][a-z0-9_-]{0,62}$",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "name"
-                  ],
-                  "type": "object"
-                }
-              ]
+              "$ref": "#/components/schemas/FunctionSecretDeclaration"
             },
             "type": "array"
           },
@@ -2259,11 +2246,60 @@
         ],
         "type": "object"
       },
+      "FunctionSecretDeclaration": {
+        "description": "A workspace-secret name or value-free mapping. name/env and secretName/mountAlias are equivalent; workspaceId, if supplied, must match the Function workspace. All references fail closed when absent, regardless of the legacy required flag.",
+        "oneOf": [
+          {
+            "pattern": "^[a-z][a-z0-9_-]{0,62}$",
+            "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": [
+                  "name"
+                ]
+              },
+              {
+                "required": [
+                  "secretName"
+                ]
+              }
+            ],
+            "properties": {
+              "env": {
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "mountAlias": {
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "name": {
+                "pattern": "^[a-z][a-z0-9_-]{0,62}$",
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "secretName": {
+                "pattern": "^[a-z][a-z0-9_-]{0,62}$",
+                "type": "string"
+              },
+              "workspaceId": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
       "FunctionSecretReference": {
         "additionalProperties": false,
         "properties": {
           "mountAlias": {
-            "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
             "type": "string"
           },
           "required": {
@@ -6360,7 +6396,23 @@
         ],
         "responses": {
           "204": {
-            "description": "Workspace function secret deleted."
+            "description": "Workspace function secret deleted.",
+            "headers": {
+              "x-falcone-affected-functions": {
+                "description": "JSON array of consuming Function resource IDs; the response has no body.",
+                "schema": {
+                  "example": "[\"fn-a\"]",
+                  "type": "string"
+                }
+              },
+              "x-falcone-resolved-ref-count": {
+                "description": "Number of Functions declaring this secret, including retained declarations after revocation.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              }
+            }
           },
           "400": {
             "content": {

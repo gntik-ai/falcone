@@ -143,11 +143,15 @@ export function buildFunctionKsvcManifest(
   // OpenBao values belong only in the owned Secret, never in workload specifications.
   if (typeof workspaceId !== 'string' || !workspaceId) throw new TypeError('workspaceId is required for Function invocation verification');
   // Workspace secrets cannot override verification configuration or import signing material.
-  if (!Array.isArray(secretEnv) || [...secretEnv, ...(secretRefs ?? []).map((ref) => ({ name: ref.env ?? ref.name }))].some((entry) => isReservedFunctionEnvName(entry?.name))) {
+  if (!Array.isArray(secretEnv) || [
+    ...secretEnv,
+    ...(secretRefs ?? []).map((ref) => ({ name: ref.env ?? ref.name })),
+  ].some((entry) => isReservedFunctionEnvName(entry?.name))) {
     throw Object.assign(new TypeError('Workspace secret env uses a reserved Function runtime name'), { statusCode: 400 });
   }
+  const secretEnvNames = (secretRefs ?? secretEnv).map(({ env, name: refName }) => env ?? refName);
   const env = [
-    ...(secretRefs ?? secretEnv).map(({ env, name: refName }) => ({ name: env ?? refName })).map(({ name: envName }) => ({
+    ...secretEnvNames.map((envName) => ({
       name: envName,
       valueFrom: { secretKeyRef: { name: functionSecretName(name), key: envName, optional: false } },
     })),
@@ -266,8 +270,11 @@ export async function deployKnativeService(name, source, opts = {}) {
     const metadata = verifiedMetadata(projected, labels);
     const serviceMetadata = verifiedMetadata(service, labels);
     const ownerReferences = buildFunctionSecretManifest(name, { ...manifestOptions, serviceUid: serviceMetadata.uid }).metadata.ownerReferences;
-    if (metadata.ownerReferences?.length === 1 && metadata.ownerReferences[0].blockOwnerDeletion !== true
-        && Object.entries(ownerReferences[0]).every(([key, value]) => metadata.ownerReferences[0][key] === value)) return;
+    if (metadata.ownerReferences?.length === 1
+        && metadata.ownerReferences[0].blockOwnerDeletion !== true
+        && Object.entries(ownerReferences[0]).every(([key, value]) => metadata.ownerReferences[0][key] === value)) {
+      return;
+    }
     projected = await request('PATCH', namedSecretPath, {
       metadata: { resourceVersion: metadata.resourceVersion, ownerReferences },
     }, { contentType: 'application/merge-patch+json' });
@@ -455,6 +462,33 @@ async function legacyFunctionObjects(name, opts) {
 }
 
 const legacyReport = (items) => items.map(({ kind, resource, envNames }) => ({ kind, name: resource.metadata.name, envNames }));
+
+// Namespace inventory is read-only and uses the existing Service list permission.
+// Secret values and user source never enter this operator report.
+export async function discoverInlineFunctionSecrets({ request = k8s } = {}) {
+  const functions = [];
+  let next = '';
+  do {
+    const params = new URLSearchParams({
+      labelSelector: Object.values(FUNCTION_OWNERSHIP_LABELS).join(','), limit: '200',
+      ...(next ? { continue: next } : {}),
+    });
+    const result = await request('GET', `/apis/serving.knative.dev/v1/namespaces/${encodeURIComponent(NS)}/services?${params}`);
+    for (const service of result.items ?? []) {
+      const labels = service.metadata?.labels ?? {};
+      const tenantId = labels[FUNCTION_OWNERSHIP_LABELS.tenant];
+      const resourceId = labels[FUNCTION_OWNERSHIP_LABELS.functionResource];
+      if (!tenantId || !resourceId) continue;
+      const name = service.metadata.name;
+      const report = await remediateFunctionSecrets(name, undefined, {
+        tenantId, functionResourceId: resourceId, request,
+      });
+      if (report.affected.length) functions.push({ tenantId, resourceId, name, affected: report.affected });
+    }
+    next = result.metadata?.continue ?? '';
+  } while (next);
+  return { dryRun: true, functions };
+}
 
 export async function pruneInlineFunctionRevisions(name, opts = {}) {
   const request = opts.request ?? k8s;

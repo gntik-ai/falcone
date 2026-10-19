@@ -200,28 +200,37 @@ Rollback resolves those names against the current OpenBao values, rather than re
 
 Secret writes precede Service writes and fail closed. A denied or failed Secret write prevents the
 Service mutation; there is no inline fallback. A failed Service creation rolls back a new Secret.
-Failure to complete rollback retains a Function record and cleanup obligation; the error identifies
-the Function that can be deleted through the normal product API. Redeploy replaces the entire data
-map, pruning dropped keys; an empty declaration deletes the projection.
+For a new Function, failure to complete rollback retains a Function record and cleanup obligation;
+the error identifies the Function that can be deleted through the normal product API. For an
+existing Function, a failed update or failed projection restore leaves its registry row, published
+versions and lifecycle unchanged. The 502 `FN_DEPLOY_FAILED` response asks the caller to retry
+deployment to reconcile the projection; it does not schedule Function deletion. Redeploy replaces
+the entire data map, pruning dropped keys; an empty declaration deletes the projection.
 
 Replace updates every consumer and rolls its Service template so new pods read the new value. It
 returns metadata plus `affectedFunctions` (Function resource IDs). DELETE first revokes every
 consumer projection, then removes the OpenBao entry. It retains the existing **204/no body** contract;
 `x-falcone-affected-functions` contains a JSON array of affected Function IDs and
 `x-falcone-resolved-ref-count` contains the number of consumers. Remaining declared refs are kept
-for inventory and revocation warnings. A Function with only the revoked secret references a missing
-projection and fails closed when starting new pods.
+for inventory and revocation warnings, including the deleted name in `fn_actions.secret_refs`.
+A Function with only the revoked secret references a missing projection using `optional: false`
+and fails closed when starting new pods. This is deliberate revocation behavior: ordinary deploy
+and rollback reject missing declared source secrets before any runtime write. To resume, recreate
+the source secret and redeploy, or redeploy with that declaration removed.
 
 Replace and DELETE prune owned immutable Revisions containing legacy inline env literals. Their
 foreground deletion removes their Deployment and ReplicaSet descendants. Both operations check all
 five workload kinds before reporting success. The scan distinguishes user-provided literals from
 Knative's injected user-container env and its queue-proxy container. Leaf projections use background
 deletion with an absence check; Service and Revision cleanup retains foreground garbage collection.
-Pending Knative reconciliation or garbage collection
-returns an error; retry the same replace/delete operation. Function deletion and tenant/workspace
+Pending Knative reconciliation or garbage collection returns 502 with `pendingResources`; retry
+the same replace/delete operation until it returns 200/204. Function deletion and tenant/workspace
 purge also delete the owned projection, including when the Service is already missing. Unverified
 cleanup retains logical ownership and a 202 deletion/cleanup obligation; retry Function DELETE or
-the tenant/workspace purge API. Ownership conflicts are retained and reported rather than adopted.
+the tenant/workspace purge API. A first Function DELETE can normally return 202 while foreground
+garbage collection runs. There is no automatic reconciler for these obligations: the caller must
+repeat the DELETE/purge request after GC completes. Ownership conflicts are retained and reported
+rather than adopted.
 
 An already-running process can retain the previous value in memory until its pod exits. Rotation
 starts a new Revision, but operators should verify the reported Functions finish rolling or scale
@@ -232,6 +241,20 @@ them to zero. Kubernetes object cleanup does not revoke credentials at an extern
 Remediation is explicitly operator-triggered, with **dry-run as the default**. Run the shipped
 `apps/control-plane/remediate-function-secrets.mjs` in the control-plane runtime with its normal
 scoped identity and database configuration. Do not supply secret values on the command line.
+
+Discover affected Functions across the configured Function namespace without enumerating their IDs:
+
+```sh
+node apps/control-plane/remediate-function-secrets.mjs --discover
+```
+
+Discovery paginates the labelled Function Services and checks each one's five owned object kinds.
+It reports tenant IDs, Function resource IDs, Service names and affected object/env names, never
+values or source code. It needs no database or OpenBao access and permits no apply or scope flags.
+Unlabelled workloads are excluded; objects without a surviving owned Service need separate
+operator investigation. Discovery does not automatically convert workloads.
+
+For conversion, select a reported Function and use its registry tenant/workspace scope:
 
 ```sh
 node apps/control-plane/remediate-function-secrets.mjs --tenant-id TENANT --workspace-id WORKSPACE --resource-id FUNCTION

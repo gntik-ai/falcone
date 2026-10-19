@@ -4,12 +4,18 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { withFunctionSecretLock } from './function-secret-lock.mjs';
 import { normalizeFunctionSecretRefs, functionSecretRefs } from './function-secret-refs.mjs';
-import { deployKnativeService, remediateFunctionSecrets, pruneInlineFunctionRevisions } from './function-executor.mjs';
+import { deployKnativeService, remediateFunctionSecrets, discoverInlineFunctionSecrets, pruneInlineFunctionRevisions } from './function-executor.mjs';
 import { getSharedVaultStore } from './vault-secrets.mjs';
 import { withPostgresSsl } from './transport-security.mjs';
 import * as store from './tenant-store.mjs';
 
 export function runFunctionSecretRemediation(options) {
+  if (options.discover) {
+    if (options.apply || options.refs || options.resourceId || options.tenantId || options.workspaceId) {
+      throw new Error('Namespace discovery is read-only and cannot be combined with Function scope or apply options');
+    }
+    return discoverInlineFunctionSecrets({ request: options.request });
+  }
   return withFunctionSecretLock(options.pool, options.tenantId, options.workspaceId,
     (pool) => remediate({ ...options, pool }));
 }
@@ -42,8 +48,14 @@ async function remediate({ pool, tenantId, workspaceId, resourceId, refs, apply 
 async function main() {
   const { values } = parseArgs({ options: {
     'tenant-id': { type: 'string' }, 'workspace-id': { type: 'string' }, 'resource-id': { type: 'string' },
-    refs: { type: 'string' }, apply: { type: 'boolean', default: false },
+    refs: { type: 'string' }, apply: { type: 'boolean', default: false }, discover: { type: 'boolean', default: false },
   } });
+  if (values.discover) {
+    const report = await runFunctionSecretRemediation({ discover: true, apply: values.apply, refs: values.refs,
+      tenantId: values['tenant-id'], workspaceId: values['workspace-id'], resourceId: values['resource-id'] });
+    process.stdout.write(`${JSON.stringify(report)}\n`);
+    return;
+  }
   if (!values['tenant-id'] || !values['workspace-id'] || !values['resource-id']) throw new Error('Explicit Function scope required');
   const { Pool } = await import('pg');
   const pool = new Pool(withPostgresSsl({ ...(process.env.DB_URL ? { connectionString: process.env.DB_URL } : {}), max: 1 }));

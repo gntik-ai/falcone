@@ -96,6 +96,10 @@ async function resolvedRefCount(ctx, ws, secretName) {
   return (await secretConsumers(ctx, ws, secretName)).length;
 }
 
+function normalizedSecretRefs(row) {
+  return normalizeFunctionSecretRefs(functionSecretRefs(row));
+}
+
 async function resolveDeclaredFunctionSecrets(ctx, tenantId, workspaceId, refs) {
   if (!refs.length) return { secretEnv: [] };
   const vault = ctx.vaultStore ?? vaultStore;
@@ -118,7 +122,7 @@ async function propagateSecret(ctx, ws, consumers, deletedName = null) {
           request: ctx.functionKubernetesRequest, verifyAbsence: true });
         continue;
       }
-      const refs = normalizeFunctionSecretRefs(functionSecretRefs(row));
+      const refs = normalizedSecretRefs(row);
       const retained = refs.filter((ref) => ref.name !== deletedName);
       const secretEnv = await vault.resolveEnv(ws.tenant_id, ws.id, retained);
       await deployKnativeService(row.ksvc_name, row.source_code, {
@@ -327,7 +331,7 @@ function actionExecutionOut(r) {
     entrypoint: r.entrypoint,
     runtime: r.runtime,
     parameters: jsonObject(r.parameters),
-    secrets: normalizeFunctionSecretRefs(functionSecretRefs(r)),
+    secrets: normalizedSecretRefs(r),
     limits: { timeoutMs: r.timeout_ms, memoryMb: r.memory_mb }
   };
 }
@@ -337,7 +341,7 @@ function versionExecutionOut(r) {
     entrypoint: r.entrypoint,
     runtime: r.runtime,
     parameters: jsonObject(r.parameters),
-    secrets: normalizeFunctionSecretRefs(functionSecretRefs(r)),
+    secrets: normalizedSecretRefs(r),
     environment: {},
     limits: { timeoutSeconds: Math.max(1, Math.ceil((Number(r.timeout_ms) || 60000) / 1000)), memoryMb: r.memory_mb },
     webAction: { enabled: false, requireAuthentication: true, rawHttpResponse: false }
@@ -409,7 +413,9 @@ function actionOut(r, latest, versionState = null, runtimeStatus = null) {
     execution: actionExecutionOut(r),
     source: sourceOut(r),
     activationPolicy: activationPolicyOut(),
-    secretReferences: normalizeFunctionSecretRefs(functionSecretRefs(r)).map(({ name, env }) => ({ secretName: name, mountAlias: env, required: true })),
+    secretReferences: normalizedSecretRefs(r).map(({ name, env }) => ({
+      secretName: name, mountAlias: env, required: true,
+    })),
     unresolvedSecretRefs: 0,
     provisioning: { state: publicState },
     ...(runtimeStatus ? {
@@ -528,6 +534,11 @@ async function fnDeploy(ctx) {
     });
   } catch (e) {
     if (e.code === 'FN_SECRET_CLEANUP_PENDING') {
+      // An unsuccessful update must not publish rejected code or turn a working
+      // Function into a deletion obligation. Its existing identity remains retryable.
+      if (existing) {
+        return err(502, 'FN_DEPLOY_FAILED', 'Function deployment failed; retry deployment to reconcile the owned secret projection.');
+      }
       const rec = await saveAction();
       const repository = ctx.runtimeCleanupRepository ?? createRuntimeCleanupRepository(ctx.pool);
       const obligation = await repository.deferFunctionDeletion({ tenantId: ws.tenant_id, workspaceId: ws.id,
@@ -840,7 +851,7 @@ async function fnRollback(ctx) {
     return err(409, 'VERSION_NOT_ELIGIBLE', 'rollback target must be a retained prior version');
   }
 
-  const refs = normalizeFunctionSecretRefs(functionSecretRefs(target));
+  const refs = normalizedSecretRefs(target);
   const { secretEnv, error: resolutionError } = await resolveDeclaredFunctionSecrets(ctx, r.tenant_id, r.workspace_id, refs);
   if (resolutionError) return resolutionError;
   const deployName = r.ksvc_name ?? target.ksvc_name;

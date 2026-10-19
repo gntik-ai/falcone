@@ -59,6 +59,12 @@ test('replace propagates to every consumer and delete revokes projections with a
   assert.equal(deleted.headers['x-falcone-resolved-ref-count'], '2');
   assert.equal([...api.objects.keys()].some((p) => p.includes('/secrets/')), false);
   assert.equal(JSON.stringify([...api.objects.values()]).includes('new-marker'), false);
+  for (const fn of await ctx.store.listFnActions()) {
+    const service = api.objects.get(`/apis/serving.knative.dev/v1/namespaces/${NS}/services/${fn.ksvc_name}`);
+    assert.deepEqual(service.spec.template.spec.containers[0].env.find(({ name }) => name === 'API_KEY'), {
+      name: 'API_KEY', valueFrom: { secretKeyRef: { name: `${fn.ksvc_name}-secrets`, key: 'API_KEY', optional: false } },
+    });
+  }
 });
 
 test('Function deletion retains a retryable obligation when Secret cleanup fails', async (t) => {
@@ -146,6 +152,69 @@ test('a failed deploy with failed rollback retains a Function record and a clean
   assert.equal(typeof result.body.resourceId, 'string');
   assert.equal((await ctx.store.listFnActions()).length, 1);
   assert.equal(result.body.obligations[0].obligationId, 'cleanup-a');
+});
+
+test('failed redeploy and Secret restoration preserve the existing Function and allow retry', async (t) => {
+  installInvocationFixture(t, invocationFixture());
+  for (const byName of [false, true]) {
+    const api = cluster();
+    const ctx = context();
+    delete ctx.deployKnativeService;
+    const original = { ...row, action_name: 'hello', lifecycle_status: 'active' };
+    let current = structuredClone(original);
+    const versions = [{ version_id: 'fnv_original', source_code: 'return 1', secret_refs: refs }];
+    ctx.store.getFnAction = async () => current;
+    ctx.store.getFnActionByName = async () => current;
+    ctx.store.listFnActions = async () => [current];
+    ctx.store.upsertFnAction = async (_pool, action) => {
+      current = { ...current, source_code: action.sourceCode, secret_refs: action.secretRefs };
+      versions.push({ source_code: action.sourceCode, secret_refs: action.secretRefs });
+      return current;
+    };
+    const obligations = [];
+    ctx.runtimeCleanupRepository = { deferFunctionDeletion: async (obligation) => {
+      obligations.push(obligation);
+      current.lifecycle_status = 'deletion_pending';
+      return obligation;
+    } };
+    if (!byName) ctx.params.actionId = row.resource_id;
+    ctx.body.source.inlineCode = 'return 2';
+    ctx.body.execution.secrets = [{ name: 'other-key', env: 'OTHER_KEY' }];
+    ctx.vaultStore.resolveEnv = async () => [{ name: 'OTHER_KEY', value: 'synthetic-marker' }];
+    const servicePath = `/apis/serving.knative.dev/v1/namespaces/${NS}/services/${row.ksvc_name}`;
+    await deployKnativeService(row.ksvc_name, row.source_code, { tenantId: ws.tenant_id,
+      workspaceId: ws.id, functionResourceId: row.resource_id, request: api.request,
+      secretEnv: [{ name: 'API_KEY', value: 'original-marker' }] });
+    const originalService = structuredClone(api.objects.get(servicePath));
+    let rejectedService = false;
+    let rejectedRestore = false;
+    ctx.functionKubernetesRequest = async (method, path, body, options) => {
+      if (method === 'PATCH' && path === servicePath) {
+        rejectedService = true;
+        throw Object.assign(new Error('synthetic-marker'), { statusCode: 503 });
+      }
+      if (rejectedService && method === 'GET' && path.includes('/secrets/')) {
+        rejectedRestore = true;
+        throw Object.assign(new Error('synthetic-marker'), { statusCode: 503 });
+      }
+      return api.request(method, path, body, options);
+    };
+    const result = await FN_HANDLERS.fnDeploy(ctx);
+    assert.equal(result.statusCode, 502);
+    assert.equal(rejectedService, true);
+    assert.equal(rejectedRestore, true);
+    assert.deepEqual(current, original);
+    assert.deepEqual(versions, [{ version_id: 'fnv_original', source_code: 'return 1', secret_refs: refs }]);
+    assert.deepEqual(obligations, []);
+    assert.deepEqual(api.objects.get(servicePath), originalService);
+    assert.equal(JSON.stringify(result).includes('synthetic-marker'), false);
+    assert.match(result.body.message, /retry.*deploy/i);
+    ctx.functionKubernetesRequest = api.request;
+    assert.equal((await FN_HANDLERS.fnDeploy(ctx)).statusCode, 202);
+    assert.equal(current.source_code, 'return 2');
+    assert.deepEqual(current.secret_refs, [{ name: 'other-key', env: 'OTHER_KEY' }]);
+    assert.equal(versions.length, 2);
+  }
 });
 
 test('metadata counts a Function once even when it maps a secret to several env vars', async () => {
