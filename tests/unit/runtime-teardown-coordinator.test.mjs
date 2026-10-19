@@ -227,6 +227,7 @@ test('runtime-teardown-01: accepted delete stays pending while the owned Service
     deleteService: (name, options) => deleteKnativeService(name, {
       ...options,
       request: async (method, path, body) => {
+        if (path.includes('/secrets/')) throw Object.assign(new Error('missing'), { statusCode: 404 });
         calls.push({ method, path, body });
         return method === 'GET' ? existing : {};
       },
@@ -263,4 +264,25 @@ test('runtime-teardown-04: missing normalized readiness never triggers a delete'
     assert.equal(result.ready, false);
   }
   assert.equal(deletes, 0);
+});
+
+import { cluster } from '../helpers/function-kubernetes-fixture.mjs';
+import { deployKnativeService } from '../../apps/control-plane/function-executor.mjs';
+import { invocationFixture, installInvocationFixture } from '../helpers/function-invocation-fixture.mjs';
+test('Secret deletion failure remains a 202 obligation and the same purge can retry cleanup', async (t) => {
+  installInvocationFixture(t, invocationFixture());
+  const api = cluster();
+  await deployKnativeService('ksvc-f1', 'return 1', { tenantId: 't1', workspaceId: 'w1', functionResourceId: 'f1', secretEnv: [{ name: 'KEY', value: 'synthetic-marker' }], request: api.request });
+  let denySecretDelete = true;
+  const request = (method, path, body, options) => {
+    if (denySecretDelete && method === 'DELETE' && path.includes('/secrets/')) throw Object.assign(new Error('forbidden'), { statusCode: 403 });
+    return api.request(method, path, body, options);
+  };
+  const adapter = createProductionRuntimeAdapter({ knativeRuntime: { status: () => ({ state: 'ready' }), canServeWorkloads: () => true }, deleteService: (name, opts) => deleteKnativeService(name, { ...opts, request }) });
+  const h = harness(adapter);
+  assert.equal((await h.coordinator.purgeTenant(h.pool, 't1', 'c1')).statusCode, 202);
+  assert.equal(h.calls[0].defer.resources[0].reason, 'runtime_delete_failed');
+  denySecretDelete = false;
+  assert.equal((await h.coordinator.purgeTenant(h.pool, 't1', 'c1')).finalize, true);
+  assert.equal(api.objects.size, 0);
 });

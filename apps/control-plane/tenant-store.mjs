@@ -1,3 +1,4 @@
+import { normalizeFunctionSecretRefs } from './function-secret-refs.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 
 // Tenant registry (domain B) — pg-backed CRUD over the `tenants` table.
@@ -244,6 +245,7 @@ export async function ensureSchema(pool) {
     )`);
   // Knative-backed functions: the ksvc name (added after the Job-era table).
   await pool.query('ALTER TABLE fn_actions ADD COLUMN IF NOT EXISTS ksvc_name TEXT');
+  await pool.query("ALTER TABLE fn_actions ADD COLUMN IF NOT EXISTS secret_refs JSONB NOT NULL DEFAULT '[]'::jsonb");
   await pool.query("ALTER TABLE fn_actions ADD COLUMN IF NOT EXISTS lifecycle_status TEXT NOT NULL DEFAULT 'active'");
   await pool.query('ALTER TABLE fn_actions ADD COLUMN IF NOT EXISTS deletion_requested_at TIMESTAMPTZ');
   await pool.query(`
@@ -270,6 +272,7 @@ export async function ensureSchema(pool) {
       created_by TEXT,
       UNIQUE (resource_id, version_number)
     )`);
+  await pool.query("ALTER TABLE fn_action_versions ADD COLUMN IF NOT EXISTS secret_refs JSONB NOT NULL DEFAULT '[]'::jsonb");
   await pool.query('CREATE INDEX IF NOT EXISTS fn_action_versions_resource_idx ON fn_action_versions (resource_id, version_number DESC)');
   await pool.query('CREATE INDEX IF NOT EXISTS fn_action_versions_scope_idx ON fn_action_versions (tenant_id, workspace_id, resource_id)');
   await pool.query(`
@@ -512,9 +515,9 @@ async function snapshotFnActionVersion(pool, row, { createdBy = null, originType
     `INSERT INTO fn_action_versions (
        version_id, resource_id, workspace_id, tenant_id, action_name, version_number,
        status, origin_type, origin_version_id, runtime, entrypoint, source_code,
-       parameters, memory_mb, timeout_ms, ksvc_name, created_by
+       parameters, memory_mb, timeout_ms, ksvc_name, created_by, secret_refs
      )
-     VALUES ($1,$2,$3,$4,$5,$6,'historical',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+     VALUES ($1,$2,$3,$4,$5,$6,'historical',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      ON CONFLICT (resource_id, version_number) DO UPDATE SET
        action_name=EXCLUDED.action_name,
        origin_type=EXCLUDED.origin_type,
@@ -525,7 +528,7 @@ async function snapshotFnActionVersion(pool, row, { createdBy = null, originType
        parameters=EXCLUDED.parameters,
        memory_mb=EXCLUDED.memory_mb,
        timeout_ms=EXCLUDED.timeout_ms,
-       ksvc_name=EXCLUDED.ksvc_name,
+       ksvc_name=EXCLUDED.ksvc_name, secret_refs=EXCLUDED.secret_refs,
        updated_at=NOW(),
        created_by=COALESCE(EXCLUDED.created_by, fn_action_versions.created_by)
      RETURNING *`,
@@ -545,7 +548,8 @@ async function snapshotFnActionVersion(pool, row, { createdBy = null, originType
       row.memory_mb,
       row.timeout_ms,
       row.ksvc_name ?? null,
-      createdBy
+      createdBy,
+      JSON.stringify(normalizeFunctionSecretRefs(row.secret_refs ?? []))
     ]);
   const version = rows[0];
   if (!version) return null;
@@ -576,15 +580,15 @@ export async function upsertFnAction(pool, a) {
   }
 
   const { rows } = await pool.query(
-    `INSERT INTO fn_actions (resource_id, workspace_id, tenant_id, action_name, runtime, entrypoint, source_code, parameters, memory_mb, timeout_ms, ksvc_name, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+    `INSERT INTO fn_actions (resource_id, workspace_id, tenant_id, action_name, runtime, entrypoint, source_code, parameters, memory_mb, timeout_ms, ksvc_name, created_by, secret_refs)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      ON CONFLICT (workspace_id, action_name) DO UPDATE SET
        source_code=EXCLUDED.source_code, runtime=EXCLUDED.runtime, entrypoint=EXCLUDED.entrypoint,
        parameters=EXCLUDED.parameters, memory_mb=EXCLUDED.memory_mb, timeout_ms=EXCLUDED.timeout_ms,
-       ksvc_name=EXCLUDED.ksvc_name, version=fn_actions.version+1, updated_at=NOW()
+       ksvc_name=EXCLUDED.ksvc_name, secret_refs=EXCLUDED.secret_refs, version=fn_actions.version+1, updated_at=NOW()
      RETURNING *`,
     [a.resourceId, a.workspaceId, a.tenantId, a.actionName, a.runtime, a.entrypoint, a.sourceCode,
-     a.parameters ? JSON.stringify(a.parameters) : null, a.memoryMb, a.timeoutMs, a.ksvcName, a.createdBy]);
+     a.parameters ? JSON.stringify(a.parameters) : null, a.memoryMb, a.timeoutMs, a.ksvcName, a.createdBy, JSON.stringify(normalizeFunctionSecretRefs(a.secretRefs ?? []))]);
   const row = rows[0];
   if (row) await snapshotFnActionVersion(pool, row, { createdBy: a.createdBy, originType: 'publish' });
   return row;
@@ -597,6 +601,12 @@ export async function getFnAction(pool, resourceId, tenantId = null) {
     return rows[0] ?? null;
   }
   const { rows } = await pool.query('SELECT * FROM fn_actions WHERE resource_id=$1 LIMIT 1', [resourceId]);
+  return rows[0] ?? null;
+}
+export async function getFnActionByName(pool, workspaceId, actionName, tenantId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM fn_actions WHERE workspace_id=$1 AND action_name=$2 AND tenant_id=$3 LIMIT 1',
+    [workspaceId, actionName, tenantId]);
   return rows[0] ?? null;
 }
 export async function listFnActions(pool, workspaceId, tenantId = null) {
@@ -678,6 +688,7 @@ export async function activateFnActionVersion(pool, action, version) {
        memory_mb=$7,
        timeout_ms=$8,
        ksvc_name=COALESCE($9, ksvc_name),
+       secret_refs=$10,
        updated_at=NOW()
      WHERE resource_id=$1 AND tenant_id=$2
      RETURNING *`,
@@ -690,7 +701,8 @@ export async function activateFnActionVersion(pool, action, version) {
       activeVersion.parameters ? JSON.stringify(activeVersion.parameters) : null,
       activeVersion.memory_mb,
       activeVersion.timeout_ms,
-      activeVersion.ksvc_name ?? null
+      activeVersion.ksvc_name ?? null,
+      JSON.stringify(normalizeFunctionSecretRefs(activeVersion.secret_refs ?? []))
     ]);
   return rows[0] ?? null;
 }

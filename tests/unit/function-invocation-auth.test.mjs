@@ -241,15 +241,16 @@ test('fn-prefixed workspace secrets retain their default env names and support e
     tenantId: target.tenantId, workspaceId: target.workspaceId, functionResourceId: 'fn-resource-a', secretEnv,
   });
   const entries = manifest.spec.template.spec.containers[0].env;
-  assert.ok(entries.some(({ name, value }) => name === 'APP_TOKEN' && value === 'test-placeholder'));
-  assert.ok(entries.some(({ name, value }) => name === 'FN_TOKEN' && value === 'test-placeholder'));
+  assert.ok(entries.some(({ name, valueFrom }) => name === 'APP_TOKEN' && valueFrom?.secretKeyRef.key === 'APP_TOKEN'));
+  assert.ok(entries.some(({ name, valueFrom }) => name === 'FN_TOKEN' && valueFrom?.secretKeyRef.key === 'FN_TOKEN'));
 });
 
 test('ownership-checked PATCH idempotently re-rolls labels/public key ring without renaming', async (t) => {
   installInvocationFixture(t, active);
   const opts = { tenantId: target.tenantId, workspaceId: target.workspaceId, functionResourceId: 'fn-resource-a' };
   const patches = [];
-  const request = async (method, _path, body, options) => {
+  const request = async (method, path, body, options) => {
+    if (path.includes('/secrets/')) throw Object.assign(new Error('not found'), { statusCode: 404 });
     if (method === 'POST') throw Object.assign(new Error('exists'), { statusCode: 409 });
     if (method === 'GET') return { metadata: { resourceVersion: '7', labels: buildFunctionOwnershipLabels(opts) } };
     assert.equal(method, 'PATCH');

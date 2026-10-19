@@ -94837,37 +94837,24 @@
         }
       },
       "FunctionExecutionConfiguration": {
-        "type": "object",
         "additionalProperties": false,
-        "required": [
-          "runtime",
-          "entrypoint",
-          "parameters",
-          "environment",
-          "limits",
-          "webAction"
-        ],
         "properties": {
-          "runtime": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 40,
-            "enum": [
-              "nodejs:20",
-              "python:3.11",
-              "php:8.2",
-              "go:1.22",
-              "java:21",
-              "container:image"
-            ]
-          },
           "entrypoint": {
-            "type": "string",
+            "maxLength": 120,
             "minLength": 1,
-            "maxLength": 120
+            "type": "string"
+          },
+          "environment": {
+            "additionalProperties": {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/FunctionExecutionLimits"
           },
           "parameters": {
-            "type": "object",
             "additionalProperties": {
               "type": [
                 "string",
@@ -94878,22 +94865,64 @@
                 "array",
                 "null"
               ]
-            }
+            },
+            "type": "object"
           },
-          "environment": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string",
-              "maxLength": 4096
-            }
-          },
-          "limits": {
-            "$ref": "#/components/schemas/FunctionExecutionLimits"
+          "runtime": {
+            "enum": [
+              "nodejs:20",
+              "python:3.11",
+              "php:8.2",
+              "go:1.22",
+              "java:21",
+              "container:image"
+            ],
+            "maxLength": 40,
+            "minLength": 3,
+            "type": "string"
           },
           "webAction": {
             "$ref": "#/components/schemas/FunctionWebActionConfiguration"
+          },
+          "secrets": {
+            "description": "Declared workspace-secret names and env mappings only; resolved values are never persisted.",
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_-]{0,62}$"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,62}$"
+                    },
+                    "env": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ]
+                }
+              ]
+            }
           }
-        }
+        },
+        "required": [
+          "runtime",
+          "entrypoint",
+          "parameters",
+          "environment",
+          "limits",
+          "webAction"
+        ],
+        "type": "object"
       },
       "FunctionActivationPolicy": {
         "type": "object",
@@ -95726,27 +95755,34 @@
       "FunctionWorkspaceSecret": {
         "additionalProperties": false,
         "properties": {
-          "secretName": {
-            "pattern": "^[a-z][a-z0-9_-]{0,62}$",
-            "type": "string"
-          },
-          "workspaceId": {
-            "type": "string"
-          },
-          "tenantId": {
-            "type": "string"
-          },
           "description": {
             "maxLength": 500,
             "type": "string"
           },
           "resolvedRefCount": {
-            "minimum": 0,
             "maximum": 10000,
+            "minimum": 0,
             "type": "integer"
+          },
+          "secretName": {
+            "pattern": "^[a-z][a-z0-9_-]{0,62}$",
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
           },
           "timestamps": {
             "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "affectedFunctions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Function resource IDs whose derived Secret projections were updated by this operation."
           }
         },
         "required": [

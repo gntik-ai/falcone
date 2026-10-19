@@ -1192,6 +1192,35 @@
             "minLength": 3,
             "type": "string"
           },
+          "secrets": {
+            "description": "Declared workspace-secret names and env mappings only; resolved values are never persisted.",
+            "items": {
+              "oneOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9_-]{0,62}$",
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "env": {
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                      "type": "string"
+                    },
+                    "name": {
+                      "pattern": "^[a-z][a-z0-9_-]{0,62}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "type": "array"
+          },
           "webAction": {
             "$ref": "#/components/schemas/FunctionWebActionConfiguration"
           }
@@ -2841,6 +2870,13 @@
       "FunctionWorkspaceSecret": {
         "additionalProperties": false,
         "properties": {
+          "affectedFunctions": {
+            "description": "Function resource IDs whose derived Secret projections were updated by this operation.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "maxLength": 500,
             "type": "string"

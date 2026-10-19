@@ -2,7 +2,8 @@
 
 Falcone stores **per-workspace function secrets** in the OpenBao KV v2 backend
 (`apps/control-plane/vault-secrets.mjs`): a tenant sets a secret for a workspace, and at
-function deploy the control-plane reads it server-side and injects it as an environment variable.
+function deploy the control-plane reads it server-side and projects it into an owned Kubernetes
+Secret. The workload receives environment variables through `valueFrom.secretKeyRef`.
 This page documents the **Workspace Secrets** console screen (`/console/workspace-secrets`,
 `apps/web-console/src/pages/ConsoleWorkspaceSecretsPage.tsx`) and the runtime convergence that backs
 it, where a tenant could previously manage these secrets only over the HTTP API / CLI.
@@ -52,9 +53,9 @@ Every read/write response returns exactly the `FunctionWorkspaceSecret` metadata
 - `timestamps` are the OpenBao KV-v2 metadata times (`created_time`/`updated_time`).
 - `description` is **non-secret** metadata accepted on write and returned on read (stored as a
   reserved key in the KV entry); it never causes the value to be returned.
-- `resolvedRefCount` is an **advisory, best-effort** count of the workspace's deployed functions that
-  reference the secret (used only for the pre-delete warning, never a delete gate). The kind runtime
-  returns `0` when the count is not cheaply computable.
+- `resolvedRefCount` counts distinct Functions with persisted declarations in this workspace,
+  including Functions whose declared secret was subsequently deleted. Registry failures are errors,
+  rather than a misleading zero. Declarations store names and env mappings, never values.
 - The list response is `{ "items": [ <metadata>, ... ], "page": { "size": <items.length> } }`.
 
 ## POST is create-only; PUT replaces
@@ -125,8 +126,8 @@ operator sees a clear degraded-state message instead of repeating error toasts.
 
 ## Pre-delete confirmation and reference-safety
 
-Function deploy **silently skips** a missing secret reference, so deleting a referenced secret can
-silently break a function's environment on its next deploy. Before deleting, the screen routes the
+Function deploy rejects missing declared secrets. References use `optional: false`, so revocation
+also prevents newly started pods from receiving an incomplete environment. Before deleting, the screen routes the
 operation through the shared `DestructiveConfirmationDialog`:
 
 - when `resolvedRefCount` is greater than zero, the dialog is **critical**, requires the operator
@@ -181,3 +182,75 @@ pipeline sanitized by `packages/secret-audit-handler/src/sanitizer.mjs`), captur
 workspace, operation, and secret name. The console surfaces success/failure and makes the
 `X-Correlation-Id` available for support, but emits **no secret value** to any client log or
 telemetry.
+
+## Function Secret projection and lifecycle
+
+Each Function owns one namespace-scoped Secret named `<ksvc-name>-secrets`. Its data contains only
+resolved declarations from the Function's verified tenant/workspace. The tenant and Function
+ownership labels match the Service; a controller owner reference binds the projection to its UID.
+The control plane verifies labels and uses resourceVersion guards before adopting or replacing an
+existing projection. It never adopts another Function's Secret. No secret value is included in
+Service, Configuration, Revision, Deployment or ReplicaSet environment literals.
+
+OpenBao remains the system of record. The Kubernetes Secret is derived runtime material, not a
+second store for user-managed secrets and not a bypass of the external-secrets/OpenBao boundary.
+The control plane does not persist resolved values in action rows, version snapshots, logs, audit
+records or API responses. Actions and versions retain only the declared names and env mappings.
+Rollback resolves those names against the current OpenBao values, rather than restoring old values.
+
+Secret writes precede Service writes and fail closed. A denied or failed Secret write prevents the
+Service mutation; there is no inline fallback. A failed Service creation rolls back a new Secret.
+Failure to complete rollback retains a Function record and cleanup obligation; the error identifies
+the Function that can be deleted through the normal product API. Redeploy replaces the entire data
+map, pruning dropped keys; an empty declaration deletes the projection.
+
+Replace updates every consumer and rolls its Service template so new pods read the new value. It
+returns metadata plus `affectedFunctions` (Function resource IDs). DELETE first revokes every
+consumer projection, then removes the OpenBao entry. It retains the existing **204/no body** contract;
+`x-falcone-affected-functions` contains a JSON array of affected Function IDs and
+`x-falcone-resolved-ref-count` contains the number of consumers. Remaining declared refs are kept
+for inventory and revocation warnings. A Function with only the revoked secret references a missing
+projection and fails closed when starting new pods.
+
+Replace and DELETE prune owned immutable Revisions containing legacy inline env literals. Their
+foreground deletion removes their Deployment and ReplicaSet descendants. Both operations check all
+five workload kinds before reporting success. Pending Knative reconciliation or garbage collection
+returns an error; retry the same replace/delete operation. Function deletion and tenant/workspace
+purge also delete the owned projection, including when the Service is already missing. Unverified
+cleanup retains logical ownership and a 202 deletion/cleanup obligation; retry Function DELETE or
+the tenant/workspace purge API. Ownership conflicts are retained and reported rather than adopted.
+
+An already-running process can retain the previous value in memory until its pod exits. Rotation
+starts a new Revision, but operators should verify the reported Functions finish rolling or scale
+them to zero. Kubernetes object cleanup does not revoke credentials at an external provider.
+
+## Remediating existing inline Functions
+
+Remediation is explicitly operator-triggered, with **dry-run as the default**. Run the shipped
+`apps/control-plane/remediate-function-secrets.mjs` in the control-plane runtime with its normal
+scoped identity and database configuration. Do not supply secret values on the command line.
+
+```sh
+node apps/control-plane/remediate-function-secrets.mjs --tenant-id TENANT --workspace-id WORKSPACE --resource-id FUNCTION
+```
+
+The report contains only object kinds/names and env names. It checks the owned Service and its
+Configuration, Revision, Deployment and ReplicaSet descendants using UID ancestry; a matching
+selector alone does not authorize deletion. Dry-run performs no writes and does not resolve values.
+
+Old action rows did not retain declarations. Supply a JSON file containing the original names and
+mappings, for example `[{"name":"api-key","env":"API_KEY"}]`, and add `--refs PATH --apply` to the
+same command to convert them. Values are resolved only from the verified workspace in OpenBao.
+Apply refuses unmapped legacy env names or missing secrets. It persists the declarations, replaces
+the workload literals with references, prunes old Revisions, and rechecks all five kinds. A nonempty
+`pending` report exits with status 2: rerun after controller reconciliation/foreground GC completes.
+Migrate legacy Functions before relying on their consumer inventory for rotation or revocation.
+
+The companion deployment change must grant namespace-scoped Secret create/get/update/patch/delete
+without Secret list/watch, plus the bounded workload inspection and Revision deletion used for
+legacy cleanup. Reverting that RBAC causes deploys to fail closed. Reverting to an older source
+image can reintroduce inline values on its next deploy; coordinate rollback and remediation.
+
+Deploy, rollback, Function deletion, secret replacement/revocation, and remediation serialize per
+workspace. PostgreSQL advisory locks coordinate control-plane replicas across resolution, runtime
+writes and registry persistence, so an in-flight deploy cannot republish a value after revocation.

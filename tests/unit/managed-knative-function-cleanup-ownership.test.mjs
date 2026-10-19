@@ -48,6 +48,7 @@ test('managed-function-ownership-02: matching cleanup verifies both labels and u
   const result = await deleteKnativeService('fn-app-hello-abc', {
     ...OWNERSHIP,
     request: async (method, path, body) => {
+      if (path.includes('/secrets/')) throw statusError(404);
       calls.push({ method, path, body });
       return method === 'GET' ? {
         metadata: { labels, uid: 'uid-a', resourceVersion: '7' },
@@ -72,7 +73,8 @@ test('managed-function-ownership-02b: deferred cleanup waits for observed absenc
     await assert.rejects(
       () => deleteKnativeService('fn-app-hello-abc', {
         ...OWNERSHIP, verifyAbsence: true,
-        request: async (method) => {
+        request: async (method, path) => {
+          if (path.includes('/secrets/')) throw statusError(404);
           calls.push(method);
           if (calls.length === 1) return existing;
           if (calls.length === 2) return {};
@@ -89,7 +91,8 @@ test('managed-function-ownership-02b: deferred cleanup waits for observed absenc
   const calls = [];
   const result = await deleteKnativeService('fn-app-hello-abc', {
     ...OWNERSHIP, verifyAbsence: true,
-    request: async (method) => {
+    request: async (method, path) => {
+          if (path.includes('/secrets/')) throw statusError(404);
       calls.push(method);
       if (calls.length === 1) return existing;
       if (method === 'DELETE') return {};
@@ -103,7 +106,8 @@ test('managed-function-ownership-02b: deferred cleanup waits for observed absenc
   await assert.rejects(
     () => deleteKnativeService('fn-app-hello-abc', {
       ...OWNERSHIP, verifyAbsence: true,
-      request: async (method) => {
+      request: async (method, path) => {
+          if (path.includes('/secrets/')) throw statusError(404);
         replacementCalls.push(method);
         if (replacementCalls.length === 1) return existing;
         if (method === 'DELETE') throw statusError(404);
@@ -133,6 +137,7 @@ test('managed-function-ownership-03: missing or mismatched ownership retains the
       () => deleteKnativeService('fn-app-hello-abc', {
         ...OWNERSHIP,
         request: async (method, path) => {
+      if (path.includes('/secrets/')) throw statusError(404);
           calls.push({ method, path });
           return { metadata: { labels } };
         },
@@ -151,6 +156,7 @@ test('managed-function-ownership-04: absent resources are idempotent and absent 
   const result = await deleteKnativeService('fn-app-hello-abc', {
     ...OWNERSHIP,
     request: async (method, path) => {
+      if (path.includes('/secrets/')) throw statusError(404);
       calls.push({ method, path });
       throw statusError(404);
     },
@@ -175,6 +181,7 @@ test('managed-function-ownership-05: deploy never patches a same-named mismatche
     () => deployKnativeService('fn-app-hello-abc', 'export function main() {}', {
       ...OWNERSHIP, workspaceId: 'workspace-a',
       request: async (method, path) => {
+      if (path.includes('/secrets/')) throw statusError(404);
         calls.push({ method, path });
         if (method === 'POST') throw statusError(409);
         if (method === 'GET') {
@@ -228,7 +235,7 @@ test('managed-function-ownership-06: immediate deletion forwards the stored tena
   assert.equal(result.statusCode, 202);
   assert.deepEqual(calls, [{
     name: action.ksvc_name,
-    ownership: OWNERSHIP,
+    ownership: { ...OWNERSHIP, verifyAbsence: true },
   }]);
 });
 
