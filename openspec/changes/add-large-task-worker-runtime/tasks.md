@@ -12,6 +12,10 @@
 - [x] Document lifecycle, result window, isolation limits and deployment handoff.
 - [x] Exercise public builder, fake Kubernetes API and Temporal activity seams.
 - [x] Reject a missing starting claim patch before unsuspend (regression observed red, then green).
+- [x] Refresh Job versions and retry bounded unsuspend conflicts for tasks and probes.
+- [x] Sweep abandoned suspended probes, accounting for server-defaulted pod templates.
+- [x] Reserve terminated events and audit failure details for non-retryable outcomes.
 - [x] Run scoped checks and prepare the local source commit; record sandbox limits.
-- [ ] Paired deployment maker: gated chart/RBAC/config/token mounts and staging values.
+- [x] Paired deployment: gated chart/RBAC/config/token mounts (commit e166b55).
+- [ ] Paired deployment follow-up: pin the staging probe/approved/profile image and review nodes; replace the disabled-render hash with an object comparison.
 - [ ] Operator: staging checks 1–7 before closing #1190 (not run by the source maker).

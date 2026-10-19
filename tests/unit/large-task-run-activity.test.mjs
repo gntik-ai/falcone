@@ -78,6 +78,29 @@ test('retryable node pressure is durably recorded and retired before the next at
   assert.equal(data.generations[1].n, 1);
 });
 
+test('retryable infrastructure failures omit terminal audit details and terminated events', async () => {
+  for (const code of ['LARGE_TASK_NODE_PRESSURE', 'LARGE_TASK_CAPACITY', 'LARGE_TASK_ISOLATION_NOT_READY', 'LARGE_TASK_RUNTIME_UNAVAILABLE']) {
+    const api = code === 'LARGE_TASK_NODE_PRESSURE' ? complete(fakeKube(), code)
+      : fakeKube(code === 'LARGE_TASK_ISOLATION_NOT_READY' ? { probeResults: { 'node-a': { allow: 1, deny: 1 } } } : {});
+    const request = api.request;
+    api.request = async (path, opts) => {
+      if (code === 'LARGE_TASK_RUNTIME_UNAVAILABLE') return { status: 503, body: {} };
+      if (code === 'LARGE_TASK_CAPACITY' && opts?.method === 'POST' && opts.body.kind === 'Job') {
+        return { status: 403, body: { message: 'exceeded quota: tasks' } };
+      }
+      return request(path, opts);
+    };
+    const start = logs.length;
+    await assert.rejects(env().run(largeTaskRun, input, deps(api)), e => {
+      assert.equal(e.type, code);
+      assert.equal(e.nonRetryable, false);
+      assert.equal(e.details?.some(d => d.largeTaskAuditRecord) ?? false, false);
+      return true;
+    });
+    assert.equal(logs.slice(start).some(([event]) => event === 'large_task.terminated'), false, code);
+  }
+});
+
 test('two executions of the same node in one workflow run have distinct bases', async () => {
   const api = complete(fakeKube());
   await env().run(largeTaskRun, input, deps(api));
@@ -102,7 +125,9 @@ test('expired successful claim beats a stale heartbeat and terminal failures inc
     return true;
   });
   const deadline = complete(fakeKube(), 'LARGE_TASK_DEADLINE_EXCEEDED');
+  const start = logs.length;
   await assert.rejects(env().run(largeTaskRun, input, deps(deadline)), e => e.type === 'LARGE_TASK_DEADLINE_EXCEEDED' && e.nonRetryable && e.details[0].largeTaskAuditRecord.tenantId === 'tenant-a');
+  assert.equal(logs.slice(start).filter(([event]) => event === 'large_task.terminated').length, 1);
 });
 
 test('only requested cancellation deletes a Job; shutdown, timeout and not found preserve it', async () => {
@@ -140,6 +165,7 @@ test('invalid runtime identity and approval settings fail before any Kubernetes 
 });
 
 test('five-second polling waits heartbeat and a vanished observed pod maps to retryable LOST', async () => {
+  const start = logs.length;
   const api = fakeKube();
   const request = api.request;
   let observed = false;
@@ -159,8 +185,10 @@ test('five-second polling waits heartbeat and a vanished observed pod maps to re
       api.objects.delete('/api/v1/namespaces/tasks/pods/running');
     }
   });
-  await assert.rejects(activity.run(largeTaskRun, input, deps(api)), e => e.type === 'LARGE_TASK_LOST' && !e.nonRetryable);
+  await assert.rejects(activity.run(largeTaskRun, input, deps(api)), e => e.type === 'LARGE_TASK_LOST' && !e.nonRetryable
+    && !(e.details ?? []).some(d => d.largeTaskAuditRecord));
   assert.ok(runningBeats > 0);
+  assert.equal(logs.slice(start).some(([event]) => event === 'large_task.terminated'), false);
 });
 
 test('a quota rejection records CAPACITY and cancellation during its retirement still audits requested cancellation', async () => {

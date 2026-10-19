@@ -112,6 +112,16 @@ export function createLargeTaskRuntime({ request = inClusterRequest, config: raw
   }
   const get = (kind, name, s = signal, cleanup = false) => call(`${paths[kind]}/${encodeURIComponent(name)}`, {}, s, cleanup);
   const post = (kind, body, s = signal, cleanup = false) => call(paths[kind], { method: 'POST', body }, s, cleanup);
+  async function createOrRead(kind, desired) {
+    try { return await post(kind, desired); }
+    catch (error) {
+      if (signal?.aborted) throw signal.reason;
+      const current = await get(kind, desired.metadata.name);
+      if (!current) throw error;
+      // Callers validate identity/content before adopting an ambiguous create.
+      return current;
+    }
+  }
   const patch = (kind, obj, changes, s = signal, cleanup = false) => call(`${paths[kind]}/${encodeURIComponent(obj.metadata.name)}`, {
     method: 'PATCH', headers: { 'content-type': 'application/merge-patch+json' },
     body: { ...changes, metadata: { ...changes.metadata, resourceVersion: obj.metadata.resourceVersion } },
@@ -121,6 +131,20 @@ export function createLargeTaskRuntime({ request = inClusterRequest, config: raw
     return call(`${paths[kind]}/${encodeURIComponent(obj.metadata.name)}`, {
       method: 'DELETE', body: { propagationPolicy: 'Background', preconditions: { uid: obj.metadata.uid } },
     }, s, cleanup);
+  }
+  async function unsuspend(job, validate) {
+    // Controller status writes advance resourceVersion too. Refresh immediately
+    // before each fenced patch, preserving the UID authorized by the caller.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const current = await get('jobs', job.metadata.name);
+      if (!current) throw largeTaskRuntimeError('LARGE_TASK_RUNTIME_UNAVAILABLE', true);
+      if (current.metadata.uid !== job.metadata.uid) conflict();
+      validate(current);
+      if (!current.spec.suspend) return current;
+      try { return await patch('jobs', current, { spec: { suspend: false } }); }
+      catch (error) { if (error.statusCode !== 409) throw error; }
+    }
+    throw largeTaskRuntimeError('LARGE_TASK_RUNTIME_UNAVAILABLE', true);
   }
   function context(spec) {
     for (const key of ['workflowId', 'runId', 'activityId', 'tenantId', 'workspaceId']) {
@@ -154,15 +178,9 @@ export function createLargeTaskRuntime({ request = inClusterRequest, config: raw
     const name = `${ctx.base}-claim`;
     let obj = await get('configmaps', name);
     if (!obj && create) {
-      try {
-        obj = await post('configmaps', { apiVersion: 'v1', kind: 'ConfigMap', metadata: {
-          name, namespace: config.namespace, labels: { [`${PREFIX}claim-expires`]: String(Math.floor(now() / 1000) + config.claimRetentionSeconds) },
-        }, data: { 'claim.json': JSON.stringify({ identity: ctx.identity, jobLabels: buildLargeTaskJob(ctx.input).manifest.metadata.labels, paramsSha256: ctx.paramsSha256, generations: [{ n: 0, phase: 'prepared' }] }) } });
-      } catch (error) {
-        if (signal?.aborted) throw signal.reason;
-        obj = await get('configmaps', name);
-        if (!obj) throw error;
-      }
+      obj = await createOrRead('configmaps', { apiVersion: 'v1', kind: 'ConfigMap', metadata: {
+        name, namespace: config.namespace, labels: { [`${PREFIX}claim-expires`]: String(Math.floor(now() / 1000) + config.claimRetentionSeconds) },
+      }, data: { 'claim.json': JSON.stringify({ identity: ctx.identity, jobLabels: buildLargeTaskJob(ctx.input).manifest.metadata.labels, paramsSha256: ctx.paramsSha256, generations: [{ n: 0, phase: 'prepared' }] }) } });
     }
     return obj ? { obj, data: readClaim(obj, ctx) } : null;
   }
@@ -184,13 +202,7 @@ export function createLargeTaskRuntime({ request = inClusterRequest, config: raw
     const content = contentOf(desired);
     desired.metadata.annotations = { ...desired.metadata.annotations, [`${PREFIX}content-sha256`]: hash(content) };
     let current = await get(kind, desired.metadata.name);
-    if (!current) {
-      try { current = await post(kind, desired); } catch (error) {
-        if (signal?.aborted) throw signal.reason;
-        current = await get(kind, desired.metadata.name);
-        if (!current) throw error;
-      }
-    }
+    if (!current) current = await createOrRead(kind, desired);
     if (current.metadata.ownerReferences?.length !== 1
         || Object.entries(desired.metadata.ownerReferences[0]).some(([k, v]) => current.metadata.ownerReferences[0][k] !== v)
         || current.metadata.annotations?.[`${PREFIX}content-sha256`] !== hash(content)
@@ -233,11 +245,7 @@ export function createLargeTaskRuntime({ request = inClusterRequest, config: raw
     if (!job) {
       const manifest = buildLargeTaskJob({ ...jobInput(ctx, g.n), nodeNames }).manifest;
       manifest.metadata.name = `${ctx.base}-g${g.n}`;
-      try { job = await post('jobs', manifest); } catch (error) {
-        if (signal?.aborted) throw signal.reason;
-        job = await get('jobs', manifest.metadata.name);
-        if (!job) throw error;
-      }
+      job = await createOrRead('jobs', manifest);
       validateJob(job, ctx, g.n);
     }
     if (g.jobUid && g.jobUid !== job.metadata.uid) conflict();
@@ -256,7 +264,7 @@ export function createLargeTaskRuntime({ request = inClusterRequest, config: raw
       Object.assign(g, { phase: 'starting', jobUid: job.metadata.uid });
       obj = await updateClaim(obj, data);
     }
-    if (job.spec.suspend) job = await patch('jobs', job, { spec: { suspend: false } });
+    job = await unsuspend(job, current => validateJob(current, ctx, g.n));
     if (g.phase !== 'started') {
       g.phase = 'started';
       await updateClaim(obj, data);
@@ -318,22 +326,19 @@ export function createLargeTaskRuntime({ request = inClusterRequest, config: raw
     const digest = hash(desired.spec.template);
     desired.metadata.annotations = { [`${PREFIX}content-sha256`]: digest };
     let job = await get('jobs', name);
-    if (!job) {
-      try { job = await post('jobs', desired); } catch (error) {
-        if (signal?.aborted) throw signal.reason;
-        job = await get('jobs', name);
-        if (!job) throw error;
-      }
-    }
-    if (job.metadata.annotations?.[`${PREFIX}content-sha256`] !== digest
-        || Object.entries(labels).some(([k, v]) => job.metadata.labels?.[k] !== v)) conflict();
+    if (!job) job = await createOrRead('jobs', desired);
+    const validateProbe = current => {
+      if (current.metadata.annotations?.[`${PREFIX}content-sha256`] !== digest
+          || Object.entries(labels).some(([k, v]) => current.metadata.labels?.[k] !== v)) conflict();
+    };
+    validateProbe(job);
     if (role === 'allow') {
       const policy = buildLargeTaskNetworkPolicy({ ...input, ownerJob: { name, uid: job.metadata.uid } }).manifest;
       policy.metadata.name = name;
       policy.spec.podSelector.matchLabels = labels;
       await ensureOwned('networkpolicies', policy);
     }
-    if (job.spec.suspend) job = await patch('jobs', job, { spec: { suspend: false } });
+    job = await unsuspend(job, validateProbe);
     for (let poll = 0; poll < 45; poll++) {
       job = await get('jobs', name);
       if (!job) return null;
@@ -427,6 +432,20 @@ export function createLargeTaskRuntime({ request = inClusterRequest, config: raw
     const jobs = (await call(paths.jobs))?.items ?? [];
     const protectedClaims = new Set();
     for (const job of jobs) {
+      if (/^lt-probe-[a-f0-9]{24}$/.test(job.metadata.name)) {
+        const createdAt = Date.parse(job.metadata.creationTimestamp);
+        if (['allow', 'deny'].includes(job.metadata.labels?.[`${PREFIX}isolation-probe`])
+            && job.metadata.labels?.[`${PREFIX}probe-id`] === job.metadata.name
+            && job.spec?.template?.metadata?.labels?.[`${PREFIX}probe-id`] === job.metadata.name
+            && job.spec.template.metadata.labels[`${PREFIX}isolation-probe`] === job.metadata.labels[`${PREFIX}isolation-probe`]
+            // Kubernetes defaults the pod template; its returned bytes cannot
+            // be compared to the original operator-template fingerprint.
+            && /^[a-f0-9]{64}$/.test(job.metadata.annotations?.[`${PREFIX}content-sha256`] ?? '')
+            && job.spec?.suspend && Number.isFinite(createdAt) && now() - createdAt > 600000) {
+          await remove('jobs', job);
+        }
+        continue;
+      }
       const match = /^(lt-[a-f0-9]{16})-g(\d+)$/.exec(job.metadata.name);
       if (!match || job.metadata.labels?.[`${PREFIX}component`] !== 'large-task-worker') continue;
       const claimName = `${match[1]}-claim`;

@@ -77,9 +77,10 @@ export async function largeTaskRun(input, deps = {}) {
     const code = typedCode?.startsWith('LARGE_TASK_') ? typedCode : 'LARGE_TASK_RUNTIME_UNAVAILABLE';
     const retryable = error?.name === 'ApplicationFailure' ? !error.nonRetryable
       : error.retryable ?? (code === 'LARGE_TASK_RUNTIME_UNAVAILABLE');
+    if (retryable) throw ApplicationFailure.create({ message: code, type: code, nonRetryable: false });
     const record = audit(code);
     ctx.log.info('large_task.terminated', { largeTaskAuditRecord: record });
-    throw ApplicationFailure.create({ message: code, type: code, nonRetryable: !retryable,
+    throw ApplicationFailure.create({ message: code, type: code, nonRetryable: true,
       details: [{ largeTaskAuditRecord: record }] });
   }
   function audit(code) {

@@ -1,8 +1,8 @@
 # Large-task worker runtime
 
-## MODIFIED Requirements
+## ADDED Requirements
 
-### Requirement: Closed operator profile with approved execution
+### Requirement: Additive operator profile extensions
 
 The profile SHALL additionally accept optional operator string `args` and positive
 `runAsUser` / `runAsGroup`, without default task identities. Explicit identities
@@ -15,7 +15,7 @@ env, args or command; command SHALL never be set.
 - **WHEN** no new profile or builder options are supplied
 - **THEN** serialized builder output SHALL be byte-identical to #948.
 
-### Requirement: Pure fail-closed manifests
+### Requirement: Pure runtime manifest extensions
 
 The builders SHALL remain pure and support optional suspended Jobs, TTL (default
 600), required node affinity using `metadata.name` matchFields, a read-only params
@@ -30,8 +30,6 @@ false. The params file SHALL contain only `params.json` with the JSON envelope
 - **WHEN** task parameters are supplied
 - **THEN** only the params ConfigMap SHALL contain their values.
 - **AND** a serialized envelope above 65,536 bytes SHALL fail validation.
-
-## ADDED Requirements
 
 ### Requirement: Durable crash-safe reconciliation
 
@@ -55,6 +53,9 @@ Every claim patch SHALL be resourceVersion-fenced.
   returned UID, starting with that UID before unsuspend, and started afterward.
 - **AND** Jobs SHALL be created suspended and unsuspended with a resourceVersion
   fence only after the starting claim patch succeeds.
+- **AND** each unsuspend SHALL fetch the latest Job, validate its identity and
+  authorized UID, and skip an already unsuspended Job; a 409 SHALL trigger a
+  fresh read with at most three fenced patch attempts per reconciliation.
 - **AND** a missing claim on that patch SHALL leave the Job suspended.
 
 #### Scenario: Ambiguous creation and conflicting identity
@@ -72,6 +73,8 @@ Every claim patch SHALL be resourceVersion-fenced.
 - **WHEN** activity startup sweeps namespace objects
 - **THEN** it SHALL delete expired claims and suspended task Jobs older than 600
   seconds whose claim is missing, cancelled or has not reached starting.
+- **AND** it SHALL delete recognized suspended isolation probe Jobs older than
+  600 seconds, including probes abandoned in an earlier naming cycle.
 - **AND** conflicting Jobs SHALL remain protected.
 - **WHEN** cancellation cleanup runs
 - **THEN** it SHALL record cancelled before deleting, validate ambiguous Jobs by

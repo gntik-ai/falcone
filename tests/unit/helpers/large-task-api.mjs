@@ -31,7 +31,7 @@ export function fakeKube({ afterWrite, probeResults = {}, now = () => Date.now()
         return { status: 200, body: { items: [...objects.entries()].filter(([k]) => k.startsWith(`${key}/`)).map(([, v]) => copy(v)) } };
       }
       const value = objects.get(key);
-      if (value?.kind === 'Job' && value.metadata.labels?.['in-falcone.io/isolation-probe']) {
+      if (value?.kind === 'Job' && !value.spec.suspend && value.metadata.labels?.['in-falcone.io/isolation-probe']) {
         const role = value.metadata.labels['in-falcone.io/isolation-probe'];
         const results = probeResults[value.spec.template.spec.nodeName] ?? { allow: 0, deny: 1 };
         value.status = { succeeded: 1 };
@@ -46,6 +46,11 @@ export function fakeKube({ afterWrite, probeResults = {}, now = () => Date.now()
       const target = `${key}/${opts.body.metadata.name}`;
       if (objects.has(target)) return { status: 409, body: {} };
       response = { status: 201, body: put(opts.body) };
+      // The Job controller records suspension after the POST response snapshot.
+      // Status writes share resourceVersion with spec writes in Kubernetes.
+      if (opts.body.kind === 'Job' && opts.body.spec.suspend) {
+        put({ ...response.body, status: { conditions: [{ type: 'Suspended', status: 'True' }] } });
+      }
     } else if (method === 'PATCH') {
       const value = objects.get(key);
       if (!value) return { status: 404, body: {} };

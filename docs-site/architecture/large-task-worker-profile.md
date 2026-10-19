@@ -185,11 +185,20 @@ Existing params and policies must have the correct Job owner and content hash.
 Conflicts raise non-retryable `LARGE_TASK_RUNTIME_CONFLICT` and never authorize
 deletion of the conflicting Job.
 
+After recording starting, the runtime fetches the Job again, validates the
+authorized UID and identity, and uses that fresh resourceVersion to unsuspend.
+Controller status updates can race this patch; a 409 triggers a fresh read,
+with at most three patch attempts per reconciliation. An already unsuspended
+Job with the matching UID needs no further patch.
+
 A 404 after POST cannot exclude a late commit. Such a Job remains suspended
 because only a matching durable starting claim authorizes unsuspend. Activity
 startup sweeps suspended task Jobs older than 600 seconds when their claim is
 missing, cancelled, or has not reached starting. Expired claims are swept too;
 claims protecting conflicting Jobs are retained for operator resolution.
+Recognized suspended isolation probes older than 600 seconds are also removed
+with UID preconditions; their finished-Job TTL cannot clean up an abandoned
+suspended probe after its five-minute naming cycle has passed.
 
 Prepared or created with no Job repeats the same generation. A running Job is
 reattached. `LARGE_TASK_NODE_PRESSURE`, `LARGE_TASK_CAPACITY` and
@@ -203,9 +212,11 @@ Terminal state is written before acting on it or heartbeating it. Success return
 `{ code, result, logTail }`; result is the termination message parsed as JSON
 when possible, capped at 4096 UTF-8 bytes. Log collection streams `tailLines=500`
 into a rolling buffer of at most 65,536 bytes with a ten-second read deadline.
-Missing logs never alter classification. Other terminal failures carry the
+Missing logs never alter classification. Non-retryable terminal failures carry the
 bounded `largeTaskAuditRecord` in their failure details and emit one
 `large_task.terminated` record without parameters, env or credentials.
+Retryable infrastructure failures carry no terminal audit record and do not emit
+`large_task.terminated`; requested cancellation still emits its cancellation audit.
 
 Finished Jobs expire after finishedTtlSeconds; their params ConfigMaps and
 policies are garbage-collected through Job ownerReferences with

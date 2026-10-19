@@ -5,6 +5,76 @@ import { fakeKube, config, spec, seedIsolation } from './helpers/large-task-api.
 const make = (api, extra = {}) => createLargeTaskRuntime({ request: api.request, config, dnsIp: '10.96.0.10', ...extra });
 const jobs = api => [...api.objects.values()].filter(o => o.kind === 'Job' && !o.metadata.labels?.['in-falcone.io/isolation-probe']);
 
+for (const probes of [false, true]) {
+  test(`${probes ? 'Probe and task' : 'Task'} unsuspend uses a fresh Job version after controller status writes in one ensure`, async () => {
+    const api = fakeKube();
+    if (!probes) seedIsolation(api);
+    const postedVersions = new Map();
+    const latestReads = new Map();
+    const patchedNames = [];
+    const request = async (path, opts) => {
+      if (opts?.method === 'PATCH' && opts.body.spec?.suspend === false) {
+        const job = api.objects.get(path);
+        assert.equal(opts.body.metadata.resourceVersion, job.metadata.resourceVersion);
+        assert.equal(opts.body.metadata.resourceVersion, latestReads.get(path));
+        assert.notEqual(opts.body.metadata.resourceVersion, postedVersions.get(path));
+        if (!job.metadata.labels?.['in-falcone.io/isolation-probe']) {
+          const claim = [...api.objects.values()].find(o => o.metadata.name.endsWith('-claim'));
+          const generation = JSON.parse(claim.data['claim.json']).generations.at(-1);
+          assert.equal(generation.phase, 'starting');
+          assert.equal(generation.jobUid, job.metadata.uid);
+        }
+        patchedNames.push(job.metadata.name);
+      }
+      const response = await api.request(path, opts);
+      if (opts?.method === 'POST' && opts.body.kind === 'Job') {
+        postedVersions.set(`${path}/${opts.body.metadata.name}`, response.body.metadata.resourceVersion);
+      } else if ((!opts?.method || opts.method === 'GET') && response.body?.kind === 'Job') {
+        latestReads.set(path, response.body.metadata.resourceVersion);
+      }
+      return response;
+    };
+    const ready = await make(api, { request }).ensure(spec);
+    assert.equal(ready.phase, 'started');
+    assert.equal(patchedNames.length, probes ? 3 : 1);
+  });
+}
+
+test('unsuspend rereads after a controller race, bounds conflicts and rejects a replaced UID', async () => {
+  for (const mode of ['race', 'persistent', 'replaced', 'already-started']) {
+    const api = fakeKube(); seedIsolation(api);
+    let patches = 0;
+    let raced = false;
+    const request = async (path, opts) => {
+      if (opts?.method === 'PATCH' && opts.body.spec?.suspend === false) {
+        patches++;
+        const job = api.objects.get(path);
+        if (!raced || mode === 'persistent') {
+          raced = true;
+          api.put({ ...job, ...(mode === 'already-started' ? { spec: { ...job.spec, suspend: false } } : {}),
+            metadata: { ...job.metadata, ...(mode === 'replaced' ? { uid: 'replacement' } : {}) } });
+        }
+      }
+      return api.request(path, opts);
+    };
+    const runtime = make(api, { request });
+    if (mode === 'persistent') {
+      await assert.rejects(runtime.ensure(spec), e => e.code === 'LARGE_TASK_RUNTIME_UNAVAILABLE' && e.retryable);
+      assert.equal(patches, 3);
+      assert.equal(jobs(api)[0].spec.suspend, true);
+    } else if (mode === 'replaced') {
+      await assert.rejects(runtime.ensure(spec), e => e.code === 'LARGE_TASK_RUNTIME_CONFLICT' && !e.retryable);
+      assert.equal(patches, 1);
+      assert.equal(jobs(api)[0].spec.suspend, true);
+      assert.equal(api.requests.some(r => r.method === 'DELETE'), false);
+    } else {
+      assert.equal((await runtime.ensure(spec)).phase, 'started');
+      assert.equal(patches, mode === 'race' ? 2 : 1);
+      assert.equal(jobs(api)[0].spec.suspend, false);
+    }
+  }
+});
+
 test('ensure recovers after every committed write and fences unsuspend after a durable starting claim', async () => {
   const baseline = fakeKube(); seedIsolation(baseline);
   const ready = await make(baseline).ensure(spec);
@@ -147,6 +217,37 @@ test('retire records retryable terminal state before UID-fenced deletion and exp
   claim.metadata.labels['in-falcone.io/claim-expires'] = '1';
   await runtime.sweep();
   assert.equal([...api.objects.values()].some(o => o.metadata.name === claim.metadata.name), false);
+});
+
+test('sweep retires old suspended probes by UID while preserving recent, running and unrecognized probes', async () => {
+  const timestamp = Date.parse('2026-10-19T10:00:00Z');
+  for (const mode of ['orphan', 'defaulted', 'recent', 'running', 'malformed', 'labels']) {
+    const controller = new AbortController();
+    const api = fakeKube({ now: () => timestamp, afterWrite: ({ method, body }) => {
+      if (method === 'POST' && body.kind === 'Job') controller.abort(new Error('interrupted probe create'));
+    } });
+    await assert.rejects(make(api, { signal: controller.signal, now: () => timestamp }).ensure(spec));
+    const probe = [...api.objects.values()].find(o => o.kind === 'Job');
+    assert.equal(probe.spec.suspend, true);
+    if (mode === 'running') probe.spec.suspend = false;
+    if (mode === 'defaulted') {
+      // The API server defaults pod fields and adds controller labels. They are
+      // absent from the operator template whose hash is stored in annotations.
+      probe.spec.template.spec.dnsPolicy = 'ClusterFirst';
+      probe.spec.template.metadata.labels['batch.kubernetes.io/controller-uid'] = probe.metadata.uid;
+    }
+    if (mode === 'malformed') probe.metadata.annotations['in-falcone.io/content-sha256'] = 'invalid';
+    if (mode === 'labels') probe.metadata.labels['in-falcone.io/probe-id'] = 'another-probe';
+    await make(api, { now: () => timestamp + (mode === 'recent' ? 600000 : 601000) }).sweep();
+    const deletes = api.requests.filter(r => r.method === 'DELETE');
+    const orphan = ['orphan', 'defaulted'].includes(mode);
+    assert.equal(deletes.length, orphan ? 1 : 0, mode);
+    if (orphan) {
+      assert.equal(deletes[0].path, `/apis/batch/v1/namespaces/tasks/jobs/${probe.metadata.name}`);
+      assert.deepEqual(deletes[0].body, { propagationPolicy: 'Background', preconditions: { uid: probe.metadata.uid } });
+      assert.equal([...api.objects.values()].some(o => o.kind === 'Job'), false);
+    }
+  }
 });
 
 test('matched probes verify only nodes with working allow routing and enforced deny; probes use IP literals', async () => {
