@@ -75,3 +75,36 @@ test('the shell step enforces release exclusion, fixture build and browser tests
   const release = job.steps.find((step) => step.name === 'Build the next release SPA');
   assert.ok(!release.env.SHELL_TEST_FIXTURES);
 });
+
+test('ui-parity is an unconditional isolated job with pinned actions and downloadable reports', () => {
+  const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
+  const job = ci.jobs['ui-parity'];
+  assert.ok(job, 'ui-parity must run on every PR and push');
+  assert.equal(job['runs-on'], 'ubuntu-latest');
+  assert.equal(ci.on.pull_request?.paths, undefined);
+  assert.equal(ci.on.push?.paths, undefined);
+  const original = ci.jobs['web-console-next'];
+  for (const prefix of ['actions/checkout@', 'pnpm/action-setup@', 'actions/setup-node@']) {
+    assert.equal(job.steps.find((s) => s.uses?.startsWith(prefix))?.uses, original.steps.find((s) => s.uses?.startsWith(prefix))?.uses);
+  }
+  const uploads = job.steps.filter((s) => s.uses?.startsWith('actions/upload-artifact@'));
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].if, 'always()');
+  assert.match(uploads[0].with.path, /test-results\/parity/);
+  function inspect(value, isUpload = false) {
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value)) {
+      assert.notEqual(key, 'continue-on-error');
+      if (key === 'if') assert.ok(isUpload && child === 'always()', 'only artifact upload may use if: always()');
+      inspect(child);
+    }
+  }
+  const { steps, ...properties } = job;
+  inspect(properties);
+  for (const step of steps) inspect(step, uploads.includes(step));
+  assert.doesNotMatch(JSON.stringify(job), /secrets\.|cache.*browser|4173/);
+  const commands = steps.filter((s) => s.run).map((s) => s.run).join('\n');
+  for (const command of ['pnpm install --frozen-lockfile', 'exec playwright install --with-deps chromium', 'parity:scan', 'parity:validate', 'test:parity', 'node --test tests/unit/web-console-next-ci.test.mjs', 'node --test tests/unit/parity-tools.test.mjs']) assert.ok(commands.includes(command), command);
+  assert.match(commands, /SHELL_TEST_FIXTURES=true.*web-console-next build/);
+  assert.ok(steps.every((s) => !s.uses || /^[^@]+@[a-f0-9]{40}$/.test(s.uses)), 'actions must be pinned');
+});
