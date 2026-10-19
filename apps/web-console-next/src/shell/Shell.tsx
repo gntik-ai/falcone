@@ -2,14 +2,14 @@ import { LayoutDashboard } from 'lucide-react'
 import { Suspense, useState, useEffect, type ComponentPropsWithRef } from 'react'
 import { AppSidebar, AppTopbar } from '@gntik-ai/blocks'
 import { SidebarLayout, Breadcrumbs, WorkspaceSwitcher, LinkProvider, MobileNav, type NavGroup } from '@gntik-ai/ui'
-import { Outlet, useLocation, matchRoutes } from 'react-router-dom'
+import { Outlet, useLocation, matchRoutes, type RouteObject } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
 import { PermissionsProvider, usePermissions } from './permissions'
 import { ShellErrorBoundary } from './RouteState'
 import { StatusPage } from '../StatusPage'
 import { ConsoleContextProvider, useConsoleContext } from './context'
-import { appRoutes } from '../router'
+import { pendingConsoleRoutes } from './routes'
 import { useSession } from './session'
 import { AccountMenu } from './AccountMenu'
 import { navigation, navigationGroups } from './navigation'
@@ -19,9 +19,11 @@ import { buildBreadcrumbs } from './breadcrumbs'
 // Their root-relative href must not inherit /next/ from the new router basename.
 function LegacyLink(props: ComponentPropsWithRef<'a'>) { return <a {...props} /> }
 
+const shellRoutes: RouteObject[] = [{ path: '/console', children: pendingConsoleRoutes }]
+
 export function Shell() {
   const location = useLocation()
-  const matches = matchRoutes(appRoutes, location) ?? []
+  const matches = matchRoutes(shellRoutes, location) ?? []
   const routeWorkspaceId = matches.at(-1)?.params.workspaceId
   const platformGlobal = matches.some((match) => match.route.handle?.platformGlobal)
   return <ConsoleContextProvider routeWorkspaceId={routeWorkspaceId}><PermissionsProvider><ShellContent platformGlobal={platformGlobal} /></PermissionsProvider></ConsoleContextProvider>
@@ -55,7 +57,7 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
           currentHref={pathname} navGroups={groups} onNavigate={closeDrawer} />
       </>}
       topbar={<><MobileNav className="lg:hidden" groups={groups} currentHref={pathname} label={t('shell.navigation')}
-        open={drawerOpen} onOpenChange={setDrawerOpen} footer={!platformGlobal && <ContextPanel />} /><LayoutDashboard role="img" aria-label={t('shell.console')} className="shrink-0" size={20} /><AppTopbar breadcrumb={<Breadcrumbs items={breadcrumbs} />} environment={null} search={<AccountMenu />} notifications={null} theme={null} user={null} /></>}>
+        open={drawerOpen} onOpenChange={setDrawerOpen} footer={!platformGlobal && <ContextPanel />} /><LayoutDashboard role="img" aria-label={t('shell.console')} className="shrink-0" size={20} /><AppTopbar breadcrumb={<Breadcrumbs items={breadcrumbs} />} environment={null} search={null} notifications={null} theme={null} user={null} /><AccountMenu /></>}>
       {!platformGlobal && <ContextPanel />}
       <div className="p-4 sm:p-6">
         <ShellErrorBoundary key={pathname}><Suspense fallback={<StatusPage state="loading" />}><Outlet /></Suspense></ShellErrorBoundary>

@@ -5,8 +5,9 @@ import { RouteState } from './RouteState'
 import { useConsoleContext } from './context'
 import { useSession } from './session'
 import { usePermissions } from './permissions'
+import type { GuardKind } from './routes'
 
-export function Guard({ kind, children }: { kind: 'superadmin' | 'observer' | 'secrets'; children: ReactNode }) {
+export function Guard({ kind, children }: { kind: GuardKind; children: ReactNode }) {
   const session = useSession()
   const { activeWorkspaceId } = useConsoleContext()
   const roles = session?.principal?.platformRoles ?? []

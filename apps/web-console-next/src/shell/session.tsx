@@ -13,6 +13,7 @@ export const useSession = () => useContext(SessionContext)
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const location = useLocation()
+  const routeIntent = location.pathname + location.search + location.hash
   const [session, setSession] = useState<ConsoleShellSession | null>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => {
@@ -22,12 +23,14 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     })
     void ensureConsoleSession().then((next) => {
       if (active) { setSession(next); setLoading(false) }
+    }).catch(() => {
+      if (active) { setSession(null); setLoading(false) }
     })
     return () => { active = false; unsubscribe() }
-  }, [])
+  }, [routeIntent])
   useEffect(() => {
-    if (!loading && !session) storeProtectedRouteIntent(location.pathname + location.search + location.hash)
-  }, [loading, session, location])
+    if (!loading && !session) storeProtectedRouteIntent(routeIntent)
+  }, [loading, session, routeIntent])
   if (loading) return <StatusPage state="loading" />
   if (!session) return <Navigate to={consoleAuthConfig.loginPath} replace />
   return <SessionContext.Provider value={session}>{children}</SessionContext.Provider>

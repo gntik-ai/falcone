@@ -5,6 +5,7 @@ import { ProtectedRoute } from './shell/session'
 import { Shell } from './shell/Shell'
 import { Guard, ConsoleIndexRedirect } from './shell/guards'
 import { RouteState } from './shell/RouteState'
+import { pendingConsoleRoutes } from './shell/routes'
 
 declare const __SHELL_TEST_FIXTURES__: boolean
 const FixtureRoutes = __SHELL_TEST_FIXTURES__ ? lazy(() => import('./shell/fixtures/FixtureRoutes')) : null
@@ -43,54 +44,9 @@ export const appRoutes: RouteObject[] = [
     children: [
       { index: true, element: <ConsoleIndexRedirect /> },
       { path: 'overview', element: lazyPage('overview', () => import('./pages/overview')) },
-      ...[
-        'tenants',
-        'workspaces',
-        'database',
-        'functions-registry',
-        'iam-access',
-        'members',
-        'plans',
-        'plans/new',
-        'plans/:planId',
-        'tenants/:tenantId/plan',
-        'my-plan',
-        'my-plan/allocation',
-        'workspaces/:workspaceId',
-        'auth',
-        'auth-config',
-        'postgres',
-        'postgres/data',
-        'mongo',
-        'mongo/data',
-        'kafka',
-        'events/data',
-        'functions',
-        'functions/data',
-        'realtime/changes',
-        'flows',
-        'flows/:flowId',
-        'flows/:flowId/runs',
-        'flows/:flowId/runs/:executionId',
-        'storage',
-        'observability',
-        'runtime',
-        'service-accounts',
-        'quotas',
-        'operations',
-        'operations/:operationId',
-        'mcp/servers/:mcpServerId',
-        'workspaces/:workspaceId/realtime',
-        'workspaces/:workspaceId/docs',
-        'secrets',
-        'secrets/:encodedSecretPath/rotate',
-        'workspace-secrets',
-        'profile'
-      ].map((path) => {
+      ...pendingConsoleRoutes.map(({ guard, ...route }) => {
         const page = lazyPage('pendingPage', () => import('./pages/pendingPage'))
-        const kind = ['iam-access', 'auth', 'plans', 'plans/new', 'plans/:planId', 'tenants/:tenantId/plan'].includes(path) ? 'superadmin'
-          : path === 'runtime' ? 'observer' : path === 'workspace-secrets' ? 'secrets' : null
-        return { path, handle: { platformGlobal: path.startsWith('plans') || path === 'runtime' }, element: kind ? <Guard kind={kind}>{page}</Guard> : page }
+        return { ...route, element: guard ? <Guard kind={guard}>{page}</Guard> : page }
       }),
       ...(__SHELL_TEST_FIXTURES__ && FixtureRoutes ? [{ path: '__fixture/*', element: <FixtureRoutes /> }] : []),
       { path: 'settings', element: lazyPage('settings', () => import('./pages/settings')) },

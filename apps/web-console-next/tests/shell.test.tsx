@@ -1,14 +1,18 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ensureConsoleSession, persistConsoleShellSession, readConsoleAuthStatusHint, readConsoleShellSession, readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
 import { App } from '../src/App'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
 import { changeLocale } from '../src/i18n'
 import { StrictMode } from 'react'
 function open(path: string) {
-  return render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>)
+  return render(<MemoryRouter initialEntries={[path]}><CurrentLocation /><App /></MemoryRouter>)
+}
+function CurrentLocation() {
+  const { pathname, search, hash } = useLocation()
+  return <output aria-label="Current location">{pathname}{search}{hash}</output>
 }
 
 test('a protected route preserves its query and requires login', async () => {
@@ -17,6 +21,37 @@ test('a protected route preserves its query and requires login', async () => {
   expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
   expect(readProtectedRouteIntent()).toBe('/console/quotas?x=1')
   expect(sessionStorage.getItem('in-falcone.console-shell-session')).toBeNull()
+})
+
+test('in-app navigation revalidates expired access and refresh tokens and preserves the new intent', async () => {
+  const session = login(['tenant_owner'])
+  requests = strictFetch({})
+  open('/console/zzz?x=1#section')
+  await screen.findByRole('heading', { name: 'Sección de consola no encontrada' })
+  session.expiresAt = session.tokenSet!.expiresAt = '2020-01-01T00:00:00Z'
+  session.refreshExpiresAt = session.tokenSet!.refreshExpiresAt = '2020-01-01T00:00:00Z'
+  persistConsoleShellSession(session)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Vista general' }))
+
+  expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
+  expect(readProtectedRouteIntent()).toBe('/console/overview')
+  expect(readConsoleShellSession()).toBeNull()
+  expect(requests.mock).not.toHaveBeenCalled()
+})
+
+test('a rejected session check denies access and preserves the protected intent', async () => {
+  login(['tenant_owner'])
+  requests = strictFetch({})
+  const getItem = Storage.prototype.getItem
+  vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key: string) {
+    if (this === sessionStorage && key === 'in-falcone.console-shell-session') throw new DOMException('Storage unavailable', 'SecurityError')
+    return getItem.call(this, key)
+  })
+  open('/console/quotas?x=1#section')
+  expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
+  expect(readProtectedRouteIntent()).toBe('/console/quotas?x=1#section')
+  expect(requests.mock).not.toHaveBeenCalled()
 })
 
 
@@ -41,6 +76,22 @@ test.each(['superadmin', 'platform_admin', 'platform_operator', 'platform_audito
   runtime.unmount()
   const allowed = canManageWorkspaceSecrets(readConsoleShellSession(), null)
   open('/console/workspace-secrets')
+  expect(await screen.findByRole('heading', { name: allowed ? 'Página pendiente' : 'Acceso denegado' })).toBeVisible()
+})
+
+test.each(['superadmin', 'platform_admin', 'platform_operator', 'platform_auditor', 'tenant_owner'].flatMap((role) =>
+  [true, false].map((member) => ({ role, member }))
+))('workspace secrets uses active workspace w1 for $role with membership $member', async ({ role, member }) => {
+  const session = login([role], ['t1'], member ? ['w1'] : [])
+  localStorage.setItem('in-falcone.console-active-context', JSON.stringify({ userId: 'synthetic-user', tenantId: 't1', workspaceId: 'w1', updatedAt: '2026-01-01' }))
+  requests = strictFetch({
+    [`GET ${tenantUrl}`]: { items: [{ tenantId: 't1', displayName: 'Tenant One' }] },
+    'GET /v1/tenants/t1': { tenantId: 't1', displayName: 'Tenant One' },
+    [`GET ${workspaceUrl('t1')}`]: { items: [{ workspaceId: 'w1', tenantId: 't1', displayName: 'Workspace One' }] }
+  })
+  open('/console/workspace-secrets')
+  await screen.findByRole('button', { name: /Workspace One/ })
+  const allowed = canManageWorkspaceSecrets(session, 'w1')
   expect(await screen.findByRole('heading', { name: allowed ? 'Página pendiente' : 'Acceso denegado' })).toBeVisible()
 })
 
@@ -76,11 +127,12 @@ test('route workspace overrides stored context, then tenant switching clears it 
   expect(snapshot).toEqual({ userId: 'synthetic-user', tenantId: 't2', workspaceId: null, updatedAt: expect.any(String) })
 })
 
-test.each([['superadmin', 'Resumen'], ['platform_auditor', 'Página pendiente']] as const)('index chooses the permission landing for %s', async (role, heading) => {
+test.each([['superadmin', 'Resumen', '/console/overview'], ['platform_auditor', 'Página pendiente', '/console/observability']] as const)('index chooses the permission landing for %s', async (role, heading, destination) => {
   login([role])
   requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
   open('/console')
   expect(await screen.findByRole('heading', { name: heading })).toBeVisible()
+  expect(screen.getByLabelText('Current location').textContent).toBe(destination)
 })
 
 test.each([['es', 'Acceso denegado', 'Saltar al contenido principal'], ['en', 'Access denied', 'Skip to main content']] as const)('shell and 403 use app and kit copy in %s', async (locale, heading, skip) => {
