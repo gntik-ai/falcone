@@ -69,7 +69,9 @@ COPY packages/webhook-engine/src /app/packages/webhook-engine/src
 #       transport-security.mjs  (#645 withPostgresSsl)                                 ← was missing → #660
 # A missing module here is a runtime ERR_MODULE_NOT_FOUND crash-loop (#660); the
 # resolution guard below turns any future omission into a build failure instead.
-COPY apps/control-plane-executor/src/runtime/connection-registry.mjs \
+COPY apps/control-plane-executor/src/runtime/large-task-runtime.mjs \
+     apps/control-plane-executor/src/runtime/mcp-runtime-namespace.mjs \
+     apps/control-plane-executor/src/runtime/connection-registry.mjs \
      apps/control-plane-executor/src/runtime/postgres-data-executor.mjs \
      apps/control-plane-executor/src/runtime/vector-capability.mjs \
      apps/control-plane-executor/src/runtime/workspace-dsn-resolver.mjs \
@@ -80,11 +82,13 @@ COPY apps/control-plane-executor/src/runtime/connection-registry.mjs \
      apps/control-plane-executor/src/runtime/byok-provider-guard.mjs \
      apps/control-plane-executor/src/runtime/errors.mjs \
      /app/apps/control-plane-executor/src/runtime/
+COPY apps/control-plane-executor/src/large-task-worker.mjs /app/apps/control-plane-executor/src/large-task-worker.mjs
 COPY apps/control-plane-executor/src/runtime/llm-adapters/ /app/apps/control-plane-executor/src/runtime/llm-adapters/
 COPY packages/adapters/src/postgresql-data-api.mjs \
      packages/adapters/src/postgresql-governance-admin.mjs \
      /app/packages/adapters/src/
-COPY packages/internal-contracts/src/transport-security.mjs \
+COPY packages/internal-contracts/src/large-task-worker-profile.mjs \
+     packages/internal-contracts/src/transport-security.mjs \
      packages/internal-contracts/src/flow-execution-credentials.mjs \
      packages/internal-contracts/src/postgres-extension-availability.mjs \
      /app/packages/internal-contracts/src/

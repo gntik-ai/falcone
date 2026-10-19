@@ -41,7 +41,13 @@ export function validateLargeTaskWorkerProfile(profile, config) {
   };
   let approvedImages = [];
   let approvedClasses = [];
-  if (object(config, ['approvedImages', 'approvedSandboxRuntimeClasses'], 'config')) {
+  if (object(config, ['approvedImages', 'approvedSandboxRuntimeClasses', 'platformNamespace', 'openshiftRestricted'], 'config')) {
+    if (config.platformNamespace !== undefined && (typeof config.platformNamespace !== 'string' || !DNS_LABEL.test(config.platformNamespace))) {
+      fail('config.platformNamespace', 'Expected a namespace DNS label.');
+    }
+    if (config.openshiftRestricted !== undefined && typeof config.openshiftRestricted !== 'boolean') {
+      fail('config.openshiftRestricted', 'Expected a boolean.');
+    }
     if (!Array.isArray(config.approvedImages)) {
       fail('config.approvedImages', 'Expected approved image entries.');
     } else {
@@ -61,10 +67,18 @@ export function validateLargeTaskWorkerProfile(profile, config) {
       }
     }
   }
-  if (object(profile, ['image', 'env', 'resources', 'maxDurationSeconds', 'codeExecution', 'runtimeClassName', 'egress'], '')) {
+  if (object(profile, ['image', 'env', 'resources', 'maxDurationSeconds', 'codeExecution', 'runtimeClassName', 'egress', 'args', 'runAsUser', 'runAsGroup'], '')) {
     const approval = approvedImages.find((entry) => entry && entry.ref === profile.image);
     if (typeof profile.image !== 'string' || !DIGEST_IMAGE.test(profile.image) || !approval) {
       fail('image', 'Image must exactly match an approved digest-pinned ref.', 'image_not_approved');
+    }
+    if (profile.args !== undefined && (!Array.isArray(profile.args) || profile.args.some(arg => typeof arg !== 'string'))) {
+      fail('args', 'Expected operator string arguments.');
+    }
+    for (const key of ['runAsUser', 'runAsGroup']) {
+      if (profile[key] !== undefined && (!Number.isSafeInteger(profile[key]) || profile[key] <= 0 || config?.openshiftRestricted)) {
+        fail(key, 'Expected a positive identity, omitted under OpenShift restricted.');
+      }
     }
     if (!Array.isArray(profile.env)) {
       fail('env', 'Expected literal environment pairs.');
@@ -109,6 +123,9 @@ export function validateLargeTaskWorkerProfile(profile, config) {
     if (object(profile.egress, ['dnsNamespaces', 'allowedNamespaces'], 'egress')) {
       strings(profile.egress.dnsNamespaces, 'egress.dnsNamespaces', DNS_LABEL);
       strings(profile.egress.allowedNamespaces, 'egress.allowedNamespaces', DNS_LABEL);
+      if (config?.platformNamespace && profile.egress.allowedNamespaces?.includes?.(config.platformNamespace)) {
+        fail('egress.allowedNamespaces', 'The platform namespace must not be allowed.');
+      }
     }
   }
   return { ok: violations.length === 0, violations };

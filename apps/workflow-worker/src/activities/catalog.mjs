@@ -12,6 +12,8 @@ import { assertPayloadSize } from './limits.mjs';
 import { assertExecutionToken } from './execution-token.mjs';
 import { resolveExecutionTokenRef } from './execution-token-ref.mjs';
 
+import { largeTaskRun, largeTaskRunInputSchema, largeTaskRunOutputSchema } from './large-task-run.mjs';
+
 import { dbQuery, dbQueryInputSchema, dbQueryOutputSchema } from './db-query.mjs';
 import { storagePut, storagePutInputSchema, storagePutOutputSchema } from './storage-put.mjs';
 import { storageGet, storageGetInputSchema, storageGetOutputSchema } from './storage-get.mjs';
@@ -24,6 +26,7 @@ import { llmComplete, llmCompleteInputSchema, llmCompleteOutputSchema } from './
 
 // Register once at module load. Each entry carries the activity plus its input/output
 // JSON Schemas (the palette/docs contract). Names MUST equal catalog-names.mjs.
+registerActivity('largeTask.run', { activity: largeTaskRun, inputSchema: largeTaskRunInputSchema, outputSchema: largeTaskRunOutputSchema });
 registerActivity('db.query', { activity: dbQuery, inputSchema: dbQueryInputSchema, outputSchema: dbQueryOutputSchema });
 registerActivity('storage.put', { activity: storagePut, inputSchema: storagePutInputSchema, outputSchema: storagePutOutputSchema });
 registerActivity('storage.get', { activity: storageGet, inputSchema: storageGetInputSchema, outputSchema: storageGetOutputSchema });

@@ -4,7 +4,7 @@ import { runtimeTenantOwnership, validateRuntimeNamespace } from './runtime/mcp-
 
 const violation = (code, message, field) => ({ code, severity: 'error', message, field });
 
-function taskContext({ tenantId, taskId, namespace, profile, config }) {
+function taskContext({ tenantId, workspaceId, generation, taskId, namespace, profile, config }) {
   const { violations } = validateLargeTaskWorkerProfile(profile, config);
   let resolvedNamespace;
   try {
@@ -31,6 +31,8 @@ function taskContext({ tenantId, taskId, namespace, profile, config }) {
       'in-falcone.io/component': 'large-task-worker',
       'in-falcone.io/tenant': runtimeTenantOwnership(tenantId),
       'in-falcone.io/task': taskLabel,
+      ...(workspaceId === undefined ? {} : { 'in-falcone.io/workspace': runtimeTenantOwnership(workspaceId) }),
+      ...(generation === undefined ? {} : { 'in-falcone.io/generation': String(generation) }),
     },
   };
 }
@@ -45,33 +47,47 @@ export function buildLargeTaskJob(input = {}) {
     manifest: {
       apiVersion: 'batch/v1',
       kind: 'Job',
-      metadata: { name: context.name, namespace: context.namespace, labels: { ...context.labels } },
+      metadata: { name: context.name, namespace: context.namespace, labels: { ...context.labels },
+        ...(input.paramsSha256 === undefined ? {} : { annotations: { 'in-falcone.io/params-sha256': input.paramsSha256 } }),
+        ...ownerReference(input.ownerJob),
+      },
       spec: {
         backoffLimit: 0,
         activeDeadlineSeconds: profile.maxDurationSeconds,
-        ttlSecondsAfterFinished: 600,
+        ttlSecondsAfterFinished: input.ttlSecondsAfterFinished ?? 600,
+        ...(input.suspend === undefined ? {} : { suspend: input.suspend }),
         template: {
           metadata: { labels: { ...context.labels } },
           spec: {
             restartPolicy: 'Never',
+            ...(input.terminationGracePeriodSeconds === undefined ? {} : { terminationGracePeriodSeconds: input.terminationGracePeriodSeconds }),
+            ...(input.nodeNames === undefined ? {} : { affinity: { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: {
+              nodeSelectorTerms: input.nodeNames.map(name => ({ matchFields: [{ key: 'metadata.name', operator: 'In', values: [name] }] })),
+            } } } }),
             automountServiceAccountToken: false,
             enableServiceLinks: false,
             ...(profile.runtimeClassName === undefined ? {} : { runtimeClassName: profile.runtimeClassName }),
             containers: [{
               name: 'worker',
+              ...(input.terminationMessagePolicy === undefined ? {} : { terminationMessagePolicy: input.terminationMessagePolicy }),
               image: profile.image,
+              ...(profile.args === undefined ? {} : { args: [...profile.args] }),
               env: profile.env.map(({ name, value }) => ({ name, value })),
               securityContext: {
                 runAsNonRoot: true,
+                ...(profile.runAsUser === undefined ? {} : { runAsUser: profile.runAsUser }),
+                ...(profile.runAsGroup === undefined ? {} : { runAsGroup: profile.runAsGroup }),
                 allowPrivilegeEscalation: false,
                 capabilities: { drop: ['ALL'] },
                 seccompProfile: { type: 'RuntimeDefault' },
                 readOnlyRootFilesystem: true,
               },
               resources: { requests: { ...resources }, limits: { ...resources } },
-              volumeMounts: [{ name: 'workspace', mountPath: '/work' }],
+              volumeMounts: [{ name: 'workspace', mountPath: '/work' },
+                ...(input.paramsConfigMap === undefined ? [] : [{ name: 'params', mountPath: '/task', readOnly: true }])],
             }],
-            volumes: [{ name: 'workspace', emptyDir: { sizeLimit: profile.resources.ephemeralStorage } }],
+            volumes: [{ name: 'workspace', emptyDir: { sizeLimit: profile.resources.ephemeralStorage } },
+              ...(input.paramsConfigMap === undefined ? [] : [{ name: 'params', configMap: { name: input.paramsConfigMap } }])],
           },
         },
       },
@@ -97,7 +113,10 @@ export function buildLargeTaskNetworkPolicy(input = {}) {
     manifest: {
       apiVersion: 'networking.k8s.io/v1',
       kind: 'NetworkPolicy',
-      metadata: { name: context.name, namespace: context.namespace, labels: { ...context.labels } },
+      metadata: { name: context.name, namespace: context.namespace, labels: { ...context.labels },
+        ...(input.paramsSha256 === undefined ? {} : { annotations: { 'in-falcone.io/params-sha256': input.paramsSha256 } }),
+        ...ownerReference(input.ownerJob),
+      },
       spec: {
         podSelector: { matchLabels: { ...context.labels } },
         policyTypes: ['Ingress', 'Egress'],
@@ -139,4 +158,39 @@ export function classifyLargeTaskTermination({ job, pods = [], cancelRequested =
 /** Explicit projection keeps environment values and image credentials out of audit data. */
 export function largeTaskAuditRecord({ tenantId, workspaceId, taskId, code, profileVersion }) {
   return { tenantId, workspaceId, taskId, code, profileVersion };
+}
+
+function ownerReference(ownerJob) {
+  return ownerJob ? { ownerReferences: [{ apiVersion: 'batch/v1', kind: 'Job', name: ownerJob.name, uid: ownerJob.uid, blockOwnerDeletion: false }] } : {};
+}
+
+export function buildLargeTaskParamsConfigMap(input = {}) {
+  const context = taskContext(input);
+  let serialized;
+  try { serialized = JSON.stringify({ parameters: input.parameters ?? null }); } catch { /* invalid input */ }
+  if (serialized === undefined || Buffer.byteLength(serialized) > 65536) {
+    context.violations.push(violation('params_too_large', 'Parameters must serialize to at most 65536 bytes including the envelope.', 'parameters'));
+  }
+  if (context.violations.length) return { manifest: null, violations: context.violations };
+  return { manifest: {
+    apiVersion: 'v1', kind: 'ConfigMap',
+    metadata: { name: context.name, namespace: context.namespace, labels: { ...context.labels }, ...ownerReference(input.ownerJob) },
+    data: { 'params.json': serialized },
+  }, violations: [] };
+}
+
+/** Observe only this Job's pods. Absence after starting cannot prove safe re-execution. */
+export function classifyLargeTaskState({ job, pods = [], events = [], observedPod, cancelRequested = false } = {}) {
+  const owned = job?.metadata?.uid ? pods.filter(p => p.metadata?.labels?.['batch.kubernetes.io/controller-uid'] === job.metadata.uid) : [];
+  const terminal = classifyLargeTaskTermination({ job, pods: owned, cancelRequested });
+  if (!['LARGE_TASK_FAILED', 'LARGE_TASK_LOST'].includes(terminal)) return terminal;
+  if (!job) return 'LARGE_TASK_OUTCOME_UNKNOWN';
+  if (events.some(e => e.involvedObject?.uid === job.metadata.uid && e.reason === 'FailedCreate' && /exceeded quota/i.test(e.message ?? ''))) return 'LARGE_TASK_CAPACITY';
+  const hasTerminal = owned.some(p => ['Failed', 'Succeeded'].includes(p.status?.phase))
+    || job.status?.conditions?.some(c => ['Failed', 'Complete'].includes(c.type) && c.status === 'True');
+  if (hasTerminal) return terminal;
+  if (observedPod && !owned.some(p => p.metadata?.uid === observedPod || p.metadata?.name === observedPod)) return 'LARGE_TASK_LOST';
+  if (owned.some(p => p.status?.phase === 'Running')) return 'RUNNING';
+  if (!owned.length || owned.every(p => p.status?.phase === 'Pending')) return 'PENDING';
+  return terminal;
 }
