@@ -22,7 +22,7 @@ persistence is available (#963). No Free or Paid plan values are seeded here.
 ## Request a decision
 
 Send `POST /v1/workspaces/{workspaceId}/quota-decisions` with a verified bearer
-token and a JSON body:
+token and a JSON body. Use the workspace's canonical ID; slugs are not accepted.
 
 ```json
 {

@@ -12,8 +12,8 @@ async function fixture(t, options = {}) {
   const server = await startDenialServer({ database: pool, localHandlers: LOCAL_HANDLERS,
     verifier: { verify: async token => ({ payload: JSON.parse(token), trust: { kind: 'tenant', realm: 'tenant-a' } }) } });
   t.after(() => server.close());
-  return { pool, async request(body = { dimensionKey: key, currentUsage: 0 }, claims = owner) {
-    const response = await server.request(path, { method: 'POST', body: JSON.stringify(body), bearer: JSON.stringify(claims) });
+  return { pool, async request(body = { dimensionKey: key, currentUsage: 0 }, claims = owner, workspaceId = 'ws-a') {
+    const response = await server.request(path.replace('ws-a', workspaceId), { method: 'POST', body: JSON.stringify(body), bearer: JSON.stringify(claims) });
     return { status: response.status, body: JSON.parse(response.body) };
   } };
 }
@@ -82,6 +82,22 @@ test('tenant authorization precedes evaluation and quota logging, including cros
   const missing = await fixture(t, { missingWorkspace: true });
   assert.equal((await missing.request()).status, 404);
   assert.equal(missing.pool.logs.length, 0);
+});
+
+test('workspace IDs resolve exactly despite colliding slugs; slug-only paths are not IDs', async t => {
+  const { pool, request } = await fixture(t, { workspaces: [
+    { id: 'ws-b', tenant_id: 'tenant-b', slug: 'ws-a' },
+    { id: 'ws-a', tenant_id: 'tenant-a', slug: 'shared' },
+    { id: 'ws-c', tenant_id: 'tenant-c', slug: 'shared' },
+  ] });
+  for (const claims of [owner, { ...owner, actor_type: 'tenant_member', workspace_id: 'ws-a' }]) {
+    const result = await request(undefined, claims);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.allowed, true);
+  }
+  assert.equal((await request(undefined, owner, 'shared')).status, 404);
+  assert.equal((await request(undefined, owner, 'ws-b')).status, 403);
+  assert.equal(pool.logs.length, 0);
 });
 
 test('catalog and resolver outages return 503, while audit outages cannot allow a denial', async t => {

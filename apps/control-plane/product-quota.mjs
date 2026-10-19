@@ -1,4 +1,3 @@
-import { getWorkspace } from './tenant-store.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { recordQuotaEnforcement } from './audit-writer.mjs';
 
@@ -38,8 +37,9 @@ export async function decideProductQuota(pool, { tenantId, dimensionKey, current
     if (!Number.isSafeInteger(eff?.effectiveLimit) || eff.effectiveLimit < -1) return { unavailable: true };
     const projectedUsage = currentUsage + requested;
     let decision = mods.evaluateQuotaDecision({ ...eff, currentUsage: projectedUsage - 1 });
-    // Exact hard fills are allowed, but the product's soft grace ceiling is exclusive.
-    if (eff.quotaType === 'soft' && eff.effectiveLimit !== -1 && projectedUsage >= decision.effectiveCeiling) {
+    // Soft grace uses the full projection for its warning and exclusive ceiling.
+    if (eff.quotaType === 'soft' && eff.effectiveLimit !== -1
+      && (projectedUsage > eff.effectiveLimit || projectedUsage >= decision.effectiveCeiling)) {
       decision = mods.evaluateQuotaDecision({ ...eff, currentUsage: projectedUsage });
     }
     return { ...decision, dimensionKey, currentUsage, projectedUsage, source: eff.source ?? 'default' };
@@ -51,7 +51,9 @@ export async function decideProductQuota(pool, { tenantId, dimensionKey, current
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
 
 async function productQuotaDecision(ctx) {
-  const workspace = await getWorkspace(ctx.pool, ctx.params.workspaceId);
+  // Authorization binds to the canonical ID, never an ambiguous cross-tenant slug.
+  const { rows: [workspace] } = await ctx.pool.query(
+    'SELECT id, tenant_id FROM workspaces WHERE id = $1', [ctx.params.workspaceId]);
   if (!workspace) return err(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
   const identity = ctx.identity;
   const bindings = [identity?.workspaceId, ...(identity?.workspaceIds ?? [])];

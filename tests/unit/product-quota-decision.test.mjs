@@ -45,7 +45,7 @@ test('soft grace warns below its ceiling and denies at or above it; unlimited pe
   assert.equal(grace.allowed, true);
   assert.equal(grace.decision, 'soft_grace_allowed');
   assert.equal(grace.effectiveCeiling, 5);
-  assert.match(grace.warning, /Soft quota exceeded/);
+  assert.equal(grace.warning, 'Soft quota exceeded. Usage 4/3 (grace ceiling: 5).');
   assert.equal((await decide(pool, { currentUsage: 4 })).allowed, false);
   assert.equal((await decide(pool, { currentUsage: 5 })).allowed, false);
   const unlimited = await decide(quotaPool({ plan: { [key]: -1 } }), { currentUsage: 100000, requested: 1000 });

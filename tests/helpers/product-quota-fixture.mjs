@@ -1,8 +1,13 @@
 const key = 'codewiki_max_projects';
-export function quotaPool({ plan = {}, types = {}, failure, workspaceTenant = 'tenant-a', missingWorkspace = false, failLog = false } = {}) {
+export function quotaPool({ plan = {}, types = {}, failure, workspaceTenant = 'tenant-a', missingWorkspace = false, failLog = false, workspaces } = {}) {
   const logs = [];
   return { logs, async query(sql, values) {
-    if (/FROM workspaces/i.test(sql)) return { rows: missingWorkspace ? [] : [{ id: values[0], tenant_id: workspaceTenant }] };
+    if (/FROM workspaces/i.test(sql)) {
+      const rows = workspaces
+        ? workspaces.filter(row => row.id === values[0] || (/OR slug\s*=\s*\$1/i.test(sql) && row.slug === values[0])).slice(0, 1)
+        : [{ id: values[0], tenant_id: workspaceTenant }];
+      return { rows: missingWorkspace ? [] : rows };
+    }
     if (/INSERT INTO quota_enforcement_log/i.test(sql)) {
       if (failLog) throw new Error('audit unavailable');
       logs.push(values);

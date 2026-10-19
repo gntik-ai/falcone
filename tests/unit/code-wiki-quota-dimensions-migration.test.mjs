@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import { GOVERNANCE_MIGRATIONS } from '../../apps/control-plane/governance-schema.mjs';
 
 const path = 'packages/provisioning-orchestrator/src/migrations/125-code-wiki-quota-dimensions.sql';
@@ -23,24 +24,30 @@ test('migration 125 only seeds the six product dimensions idempotently, immediat
   assert.equal(GOVERNANCE_MIGRATIONS.filter(item => item === path).length, 1);
 });
 
-let DatabaseSync;
-try { ({ DatabaseSync } = await import('node:sqlite')); } catch { /* Node 20 CI lacks SQLite. */ }
-test('running the seed twice preserves existing catalog values and inserts missing rows once', {
-  skip: !DatabaseSync && 'SQLite unavailable; real PostgreSQL migration verification runs in CI',
-}, async () => {
-  const db = new DatabaseSync(':memory:');
-  try {
-    db.exec(`CREATE TABLE quota_dimension_catalog (dimension_key TEXT PRIMARY KEY, display_label TEXT, unit TEXT, default_value INTEGER, description TEXT);
+test('running the seed twice preserves existing catalog values and inserts missing rows once', async () => {
+  // Ubuntu CI supplies Python's SQLite even on Node 20, which lacks node:sqlite.
+  const result = spawnSync('python3', ['-c', `
+import json, sqlite3, sys
+with sqlite3.connect(':memory:') as db:
+    db.row_factory = sqlite3.Row
+    db.executescript("""CREATE TABLE quota_dimension_catalog (dimension_key TEXT PRIMARY KEY, display_label TEXT, unit TEXT, default_value INTEGER, description TEXT);
       INSERT INTO quota_dimension_catalog VALUES ('max_workspaces', 'Existing', 'count', 17, 'unchanged'),
-        ('codewiki_max_projects', 'Custom', 'count', 19, 'preserve');`);
-    const sql = await readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
-    db.exec(sql);
-    const read = () => db.prepare('SELECT * FROM quota_dimension_catalog ORDER BY dimension_key').all().map(row => ({ ...row }));
-    const first = read();
-    assert.equal(first.length, 7);
-    assert.equal(first.find(row => row.dimension_key === 'max_workspaces').default_value, 17);
-    assert.equal(first.find(row => row.dimension_key === 'codewiki_max_projects').default_value, 19);
-    db.exec(sql);
-    assert.deepEqual(read(), first);
-  } finally { db.close(); }
+        ('codewiki_max_projects', 'Custom', 'count', 19, 'preserve');""")
+    sql = sys.argv[1]
+    db.executescript(sql)
+    first = [dict(row) for row in db.execute('SELECT * FROM quota_dimension_catalog ORDER BY dimension_key')]
+    db.executescript(sql)
+    second = [dict(row) for row in db.execute('SELECT * FROM quota_dimension_catalog ORDER BY dimension_key')]
+    print(json.dumps([first, second]))
+`, await readFile(new URL(`../../${path}`, import.meta.url), 'utf8')], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.error?.message ?? result.stderr);
+  const [first, second] = JSON.parse(result.stdout);
+  assert.equal(first.length, 7);
+  assert.deepEqual(first.find(row => row.dimension_key === 'max_workspaces'), {
+    dimension_key: 'max_workspaces', display_label: 'Existing', unit: 'count', default_value: 17, description: 'unchanged',
+  });
+  assert.deepEqual(first.find(row => row.dimension_key === 'codewiki_max_projects'), {
+    dimension_key: 'codewiki_max_projects', display_label: 'Custom', unit: 'count', default_value: 19, description: 'preserve',
+  });
+  assert.deepEqual(second, first);
 });
