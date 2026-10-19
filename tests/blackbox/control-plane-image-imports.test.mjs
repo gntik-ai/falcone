@@ -82,3 +82,13 @@ test('bbx-c25-control-plane-image-03: the production build imports the database-
     'the production build must fail when the database-startup ESM graph cannot be imported',
   );
 });
+
+test('bbx-970-control-plane-image-04: the operator remediation CLI and its local imports ship in the image', () => {
+  for (const modulePath of reachableLocalModules('remediate-function-secrets.mjs')) {
+    const moduleName = relative(CONTROL_PLANE_DIR, modulePath);
+    assert.ok(
+      copiedControlPlaneModules.has(moduleName),
+      `the production image must COPY the remediation CLI dependency ${moduleName}`,
+    );
+  }
+});

@@ -239,13 +239,13 @@ them to zero. Kubernetes object cleanup does not revoke credentials at an extern
 ## Remediating existing inline Functions
 
 Remediation is explicitly operator-triggered, with **dry-run as the default**. Run the shipped
-`apps/control-plane/remediate-function-secrets.mjs` in the control-plane runtime with its normal
+`/app/remediate-function-secrets.mjs` in the control-plane runtime with its normal
 scoped identity and database configuration. Do not supply secret values on the command line.
 
 Discover affected Functions across the configured Function namespace without enumerating their IDs:
 
 ```sh
-node apps/control-plane/remediate-function-secrets.mjs --discover
+node /app/remediate-function-secrets.mjs --discover
 ```
 
 Discovery paginates the labelled Function Services and checks each one's five owned object kinds.
@@ -257,7 +257,7 @@ operator investigation. Discovery does not automatically convert workloads.
 For conversion, select a reported Function and use its registry tenant/workspace scope:
 
 ```sh
-node apps/control-plane/remediate-function-secrets.mjs --tenant-id TENANT --workspace-id WORKSPACE --resource-id FUNCTION
+node /app/remediate-function-secrets.mjs --tenant-id TENANT --workspace-id WORKSPACE --resource-id FUNCTION
 ```
 
 The report contains only object kinds/names and env names. It checks the owned Service and its
