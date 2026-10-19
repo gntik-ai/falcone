@@ -214,7 +214,10 @@ projection and fails closed when starting new pods.
 
 Replace and DELETE prune owned immutable Revisions containing legacy inline env literals. Their
 foreground deletion removes their Deployment and ReplicaSet descendants. Both operations check all
-five workload kinds before reporting success. Pending Knative reconciliation or garbage collection
+five workload kinds before reporting success. The scan distinguishes user-provided literals from
+Knative's injected user-container env and its queue-proxy container. Leaf projections use background
+deletion with an absence check; Service and Revision cleanup retains foreground garbage collection.
+Pending Knative reconciliation or garbage collection
 returns an error; retry the same replace/delete operation. Function deletion and tenant/workspace
 purge also delete the owned projection, including when the Service is already missing. Unverified
 cleanup retains logical ownership and a 202 deletion/cleanup obligation; retry Function DELETE or

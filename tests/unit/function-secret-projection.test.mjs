@@ -21,13 +21,24 @@ const servicePath = `/apis/serving.knative.dev/v1/namespaces/${NS}/services/fn-e
 
 test('deploy projects only declared values into an owned Secret and binds it to the Service UID', async (t) => {
   installInvocationFixture(t, invocationFixture());
-  const api = cluster();
+  const api = cluster({ allowBlockingOwnerReferences: false });
   await deployKnativeService('fn-example', 'return 1', { ...scope, request: api.request, secretEnv: [{ name: 'API_KEY', value: 'marker' }] });
   const secret = api.objects.get(secretPath);
   assert.deepEqual(secret?.data, { API_KEY: Buffer.from('marker').toString('base64') });
   assert.deepEqual(secret.metadata.labels, buildFunctionOwnershipLabels(scope));
-  assert.deepEqual(secret.metadata.ownerReferences, [{ apiVersion: 'serving.knative.dev/v1', kind: 'Service', name: 'fn-example', uid: api.objects.get(servicePath).metadata.uid, controller: true, blockOwnerDeletion: true }]);
+  assert.deepEqual(secret.metadata.ownerReferences, [{ apiVersion: 'serving.knative.dev/v1', kind: 'Service', name: 'fn-example', uid: api.objects.get(servicePath).metadata.uid, controller: true }]);
   assert.equal(JSON.stringify(api.objects.get(servicePath)).includes('marker'), false);
+});
+
+test('redeploy removes an older projection blocking owner reference', async (t) => {
+  installInvocationFixture(t, invocationFixture());
+  const api = cluster();
+  const deploy = () => deployKnativeService('fn-example', 'return 1', { ...scope, request: api.request,
+    secretEnv: [{ name: 'API_KEY', value: 'marker' }] });
+  await deploy();
+  api.objects.get(secretPath).metadata.ownerReferences[0].blockOwnerDeletion = true;
+  await deploy();
+  assert.notEqual(api.objects.get(secretPath).metadata.ownerReferences[0].blockOwnerDeletion, true);
 });
 
 test('Secret write errors are redacted and stop before any Service write', async (t) => {
@@ -54,7 +65,7 @@ test('failed Service creation rolls back the new Secret', async (t) => {
 });
 test('redeploy fully replaces Secret keys, and an empty declaration deletes the projection', async (t) => {
   installInvocationFixture(t, invocationFixture());
-  const api = cluster();
+  const api = cluster({ deferForegroundDeletion: true });
   const deploy = (secretEnv) => deployKnativeService('fn-example', 'return 1', { ...scope, request: api.request, secretEnv });
   await deploy([{ name: 'KEEP', value: 'one' }, { name: 'DROP', value: 'two' }]);
   await deploy([{ name: 'KEEP', value: 'three' }]);
@@ -92,6 +103,29 @@ test('legacy remediation defaults to a value-free dry run and apply prunes inlin
   assert.equal(JSON.stringify(api.objects.get(servicePath)).includes('marker'), false);
 });
 
+test('operator remediation distinguishes legacy user env from Knative-injected env', async (t) => {
+  installInvocationFixture(t, invocationFixture());
+  const { runFunctionSecretRemediation } = await import('../../apps/control-plane/remediate-function-secrets.mjs');
+  for (const envName of ['API_KEY', 'PORT', 'K_REVISION', 'K_CONFIGURATION']) {
+    const api = cluster({ knative: true });
+    const manifest = buildFunctionKsvcManifest('fn-example', 'return 1', scope);
+    manifest.spec.template.spec.containers[0].env.push({ name: envName, value: 'legacy-marker' });
+    await api.request('POST', servicePath.slice(0, servicePath.lastIndexOf('/')), manifest);
+    const row = { resource_id: scope.functionResourceId, tenant_id: scope.tenantId, workspace_id: scope.workspaceId,
+      ksvc_name: 'fn-example', source_code: 'return 1', secret_refs: [{ name: 'api-key', env: envName }] };
+    const options = { ...scope, pool: { query: async () => ({ rows: [row] }) }, resourceId: row.resource_id,
+      request: api.request, vault: { resolveEnv: async () => [{ name: envName, value: 'new-marker' }] } };
+    const report = await runFunctionSecretRemediation(options);
+    assert.deepEqual(report.affected.map((item) => item.kind), ['Service', 'Configuration', 'Revision', 'Deployment', 'ReplicaSet']);
+    for (const item of report.affected) assert.deepEqual(item.envNames, [envName]);
+    const result = await runFunctionSecretRemediation({ ...options, apply: true });
+    assert.equal(result.code, undefined);
+    assert.deepEqual(result.pending, []);
+    assert.equal(JSON.stringify([...api.objects.values()]).includes('legacy-marker'), false);
+    assert.deepEqual((await runFunctionSecretRemediation(options)).affected, []);
+  }
+});
+
 test('remediation follows UID ancestry through all five kinds and retains unrelated workloads', async (t) => {
   installInvocationFixture(t, invocationFixture());
   const { remediateFunctionSecrets } = await import('../../apps/control-plane/function-executor.mjs');
@@ -127,6 +161,23 @@ test('remediation follows UID ancestry through all five kinds and retains unrela
   assert.deepEqual(result.pending, []);
   assert.equal(JSON.stringify([...api.objects.entries()].filter(([p]) => p !== foreignPath)).includes('legacy-marker'), false);
   assert.deepEqual(api.objects.get(foreignPath), foreign);
+});
+
+test('remediation reports foreground Revision descendants until garbage collection completes', async (t) => {
+  installInvocationFixture(t, invocationFixture());
+  const { remediateFunctionSecrets } = await import('../../apps/control-plane/function-executor.mjs');
+  const api = cluster({ knative: true, deferForegroundDeletion: true });
+  const manifest = buildFunctionKsvcManifest('fn-example', 'return 1', scope);
+  manifest.spec.template.spec.containers[0].env.push({ name: 'KEY', value: 'legacy-marker' });
+  await api.request('POST', servicePath.slice(0, servicePath.lastIndexOf('/')), manifest);
+  const options = { ...scope, request: api.request, dryRun: false, secretEnv: [{ name: 'KEY', value: 'new-marker' }] };
+  const applied = await remediateFunctionSecrets('fn-example', 'return 1', options);
+  assert.deepEqual(applied.pending.map((item) => item.kind), ['Revision', 'Deployment', 'ReplicaSet']);
+  assert.equal(JSON.stringify(applied).includes('legacy-marker'), false);
+  api.collectGarbage();
+  const retried = await remediateFunctionSecrets('fn-example', 'return 1', options);
+  assert.deepEqual(retried.pending, []);
+  assert.equal(JSON.stringify([...api.objects.values()]).includes('legacy-marker'), false);
 });
 
 test('an owner-reference write failure removes both newly created resources', async (t) => {

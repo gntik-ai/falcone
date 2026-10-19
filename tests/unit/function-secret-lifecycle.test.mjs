@@ -32,7 +32,7 @@ import { deployKnativeService, NS } from '../../apps/control-plane/function-exec
 import { invocationFixture, installInvocationFixture } from '../helpers/function-invocation-fixture.mjs';
 test('replace propagates to every consumer and delete revokes projections with a bodyless consumer report', async (t) => {
   installInvocationFixture(t, invocationFixture());
-  const api = cluster();
+  const api = cluster({ knative: true, deferForegroundDeletion: true });
   const ctx = context();
   ctx.functionKubernetesRequest = api.request;
   ctx.store.listFnActions = async () => [row, { ...row, resource_id: 'fn-b', ksvc_name: 'fn-other' }];
@@ -83,6 +83,35 @@ test('Function deletion retains a retryable obligation when Secret cleanup fails
   assert.equal(result.body.status, 'deletion_pending');
   assert.equal(result.body.resourceId, row.resource_id);
   assert.equal(attemptedSecretDelete, true);
+});
+
+test('Function DELETE remains retryable while foreground Service garbage collection is pending', async (t) => {
+  installInvocationFixture(t, invocationFixture());
+  const api = cluster({ knative: true, deferForegroundDeletion: true });
+  await deployKnativeService(row.ksvc_name, row.source_code, { tenantId: ws.tenant_id, workspaceId: ws.id,
+    functionResourceId: row.resource_id, secretEnv: [{ name: 'API_KEY', value: 'synthetic-marker' }], request: api.request });
+  const ctx = context();
+  ctx.params = { actionId: row.resource_id };
+  let deleted = false;
+  ctx.store.getFnAction = async () => deleted ? null : row;
+  ctx.store.deleteFnAction = async () => { deleted = true; return row; };
+  ctx.functionKubernetesRequest = api.request;
+  ctx.pool.query = async () => ({ rows: [{ obligation_id: 'cleanup-a', tenant_id: ws.tenant_id,
+    workspace_id: ws.id, resource_id: row.resource_id, correlation_id: 'corr-a', status: 'pending' }] });
+  const pending = await FN_HANDLERS.fnDelete(ctx);
+  assert.equal(pending.statusCode, 202);
+  assert.equal(pending.body.status, 'deletion_pending');
+  assert.equal(deleted, false);
+  assert.equal([...api.objects.keys()].some((path) => path.includes('/secrets/')), false);
+  const service = api.objects.get(`/apis/serving.knative.dev/v1/namespaces/${NS}/services/${row.ksvc_name}`);
+  assert.ok(service.metadata.deletionTimestamp);
+  assert.deepEqual(service.metadata.finalizers, ['foregroundDeletion']);
+  api.collectGarbage();
+  const retried = await FN_HANDLERS.fnDelete(ctx);
+  assert.equal(retried.statusCode, 202);
+  assert.equal(retried.body.status, 'accepted');
+  assert.equal(deleted, true);
+  assert.equal(api.objects.size, 0);
 });
 
 test('rollback resolves the retained names from OpenBao rather than losing the secret declaration', async (t) => {
@@ -142,6 +171,23 @@ test('missing backend and missing declared source secrets fail closed', async ()
   assert.equal((await FN_HANDLERS.fnDeploy(ctx)).statusCode, 501);
   ctx.vaultStore = { resolveEnv: async () => [] };
   assert.equal((await FN_HANDLERS.fnDeploy(ctx)).statusCode, 400);
+});
+
+test('rollback uses the same fail-closed, redacted secret resolution responses as deploy', async () => {
+  for (const [backend, statusCode] of [[null, 501], [{ resolveEnv: async () => [] }, 400],
+    [{ resolveEnv: async () => { throw new Error('synthetic-marker'); } }, 502]]) {
+    const ctx = context();
+    ctx.params = { actionId: row.resource_id };
+    ctx.body = { versionId: 'fnv_old123' };
+    ctx.store.getFnAction = async () => row;
+    ctx.store.listFnActionVersions = async () => [{ ...row, version_id: 'fnv_old123', status: 'historical', version_number: 1 },
+      { ...row, version_id: 'fnv_new123', status: 'active', version_number: 2 }];
+    ctx.vaultStore = backend;
+    ctx.deployKnativeService = async () => assert.fail('must not deploy without source material');
+    const result = await FN_HANDLERS.fnRollback(ctx);
+    assert.equal(result.statusCode, statusCode);
+    assert.equal(JSON.stringify(result).includes('synthetic-marker'), false);
+  }
 });
 
 test('rotation reports legacy objects still awaiting controller reconciliation', async (t) => {

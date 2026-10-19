@@ -208,8 +208,8 @@ function verifiedMetadata(resource, labels) {
   return resource.metadata;
 }
 
-function deleteOptions(metadata) {
-  return { apiVersion: 'v1', kind: 'DeleteOptions', propagationPolicy: 'Foreground',
+function deleteOptions(metadata, propagationPolicy = 'Foreground') {
+  return { apiVersion: 'v1', kind: 'DeleteOptions', propagationPolicy,
     preconditions: { uid: metadata.uid, resourceVersion: metadata.resourceVersion } };
 }
 
@@ -219,7 +219,7 @@ export function buildFunctionSecretManifest(name, { tenantId, functionResourceId
     apiVersion: 'v1', kind: 'Secret', type: 'Opaque',
     metadata: { name: functionSecretName(name), namespace: NS, labels,
       ...(serviceUid ? { ownerReferences: [{ apiVersion: 'serving.knative.dev/v1', kind: 'Service',
-        name, uid: serviceUid, controller: true, blockOwnerDeletion: true }] } : {}) },
+        name, uid: serviceUid, controller: true }] } : {}) },
     data: Object.fromEntries(secretEnv.map(({ name: key, value }) => [key, Buffer.from(String(value)).toString('base64')])),
   };
 }
@@ -230,7 +230,9 @@ async function deleteOwnedSecret(name, labels, request, verifyAbsence = false) {
   try { existing = await request('GET', path); }
   catch (error) { if (error.statusCode === 404) return; throw error; }
   const metadata = verifiedMetadata(existing, labels);
-  try { await request('DELETE', path, deleteOptions(metadata)); }
+  // A projection is a leaf: background deletion avoids a foreground GC finalizer while
+  // still verifying absence before revocation succeeds. Custom finalizers remain fail-closed.
+  try { await request('DELETE', path, deleteOptions(metadata, 'Background')); }
   catch (error) { if (error.statusCode !== 404) throw error; }
   if (verifyAbsence) {
     try { await request('GET', path); }
@@ -264,7 +266,8 @@ export async function deployKnativeService(name, source, opts = {}) {
     const metadata = verifiedMetadata(projected, labels);
     const serviceMetadata = verifiedMetadata(service, labels);
     const ownerReferences = buildFunctionSecretManifest(name, { ...manifestOptions, serviceUid: serviceMetadata.uid }).metadata.ownerReferences;
-    if (metadata.ownerReferences?.length === 1 && Object.entries(ownerReferences[0]).every(([key, value]) => metadata.ownerReferences[0][key] === value)) return;
+    if (metadata.ownerReferences?.length === 1 && metadata.ownerReferences[0].blockOwnerDeletion !== true
+        && Object.entries(ownerReferences[0]).every(([key, value]) => metadata.ownerReferences[0][key] === value)) return;
     projected = await request('PATCH', namedSecretPath, {
       metadata: { resourceVersion: metadata.resourceVersion, ownerReferences },
     }, { contentType: 'application/merge-patch+json' });
@@ -393,17 +396,25 @@ export async function deleteKnativeService(
 }
 
 const descendantCollections = () => [
-  ['Configuration', `/apis/serving.knative.dev/v1/namespaces/${NS}/configurations`],
-  ['Revision', `/apis/serving.knative.dev/v1/namespaces/${NS}/revisions`],
-  ['Deployment', `/apis/apps/v1/namespaces/${NS}/deployments`],
-  ['ReplicaSet', `/apis/apps/v1/namespaces/${NS}/replicasets`],
+  ['Configuration', `/apis/serving.knative.dev/v1/namespaces/${encodeURIComponent(NS)}/configurations`],
+  ['Revision', `/apis/serving.knative.dev/v1/namespaces/${encodeURIComponent(NS)}/revisions`],
+  ['Deployment', `/apis/apps/v1/namespaces/${encodeURIComponent(NS)}/deployments`],
+  ['ReplicaSet', `/apis/apps/v1/namespaces/${encodeURIComponent(NS)}/replicasets`],
 ];
 
-function inlineEnvNames(resource) {
+const KNATIVE_USER_CONTAINER_ENV = new Set(['PORT', 'K_REVISION', 'K_CONFIGURATION']);
+
+function inlineEnvNames(resource, kind, userEnvNames = new Set()) {
   const spec = resource?.spec?.template?.spec ?? resource?.spec;
-  return (spec?.containers ?? []).flatMap((container) => (container.env ?? [])
+  const reconciled = kind === 'Deployment' || kind === 'ReplicaSet';
+  return [...new Set((spec?.containers ?? [])
+    .filter((container) => !reconciled || container.name !== 'queue-proxy')
+    .flatMap((container) => (container.env ?? [])
     .filter((env) => Object.hasOwn(env, 'value') && !isReservedFunctionEnvName(env.name))
-    .map((env) => env.name));
+    // Knative adds these literals only in reconciled pod templates. A name also present in
+    // an inline user template must still be checked for legacy secret material.
+    .filter((env) => !reconciled || !KNATIVE_USER_CONTAINER_ENV.has(env.name) || userEnvNames.has(env.name))
+    .map((env) => env.name)))];
 }
 
 // Selectors narrow reads; UID ancestry, rather than a selector alone, authorizes deletion.
@@ -432,12 +443,18 @@ async function legacyFunctionObjects(name, opts) {
       }
     }
   } while (changed);
-  return [{ kind: 'Service', collection: servicePath(name).slice(0, servicePath(name).lastIndexOf('/')), resource: service },
-    ...candidates.filter(({ resource }) => owned.has(resource.metadata?.uid))]
-    .filter(({ resource }) => inlineEnvNames(resource).length);
+  const items = [{ kind: 'Service', collection: servicePath(name).slice(0, servicePath(name).lastIndexOf('/')), resource: service },
+    ...candidates.filter(({ resource }) => owned.has(resource.metadata?.uid))];
+  const userEnvNames = new Set();
+  for (const { kind, resource } of items) {
+    if (kind === 'Deployment' || kind === 'ReplicaSet') continue;
+    for (const envName of inlineEnvNames(resource, kind)) userEnvNames.add(envName);
+  }
+  return items.map((item) => ({ ...item, envNames: inlineEnvNames(item.resource, item.kind, userEnvNames) }))
+    .filter(({ envNames }) => envNames.length);
 }
 
-const legacyReport = (items) => items.map(({ kind, resource }) => ({ kind, name: resource.metadata.name, envNames: inlineEnvNames(resource) }));
+const legacyReport = (items) => items.map(({ kind, resource, envNames }) => ({ kind, name: resource.metadata.name, envNames }));
 
 export async function pruneInlineFunctionRevisions(name, opts = {}) {
   const request = opts.request ?? k8s;

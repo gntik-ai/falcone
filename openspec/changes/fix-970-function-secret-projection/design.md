@@ -9,6 +9,9 @@ policy model; this change reuses the existing control-plane OpenBao authorizatio
 Use one Secret per Function, tenant/Function ownership labels, resourceVersion-guarded adoption,
 and an owner reference to the Service UID. Secret env references use `optional: false`. Replacement
 uses a full data-map write to remove dropped keys; redeploy without secrets deletes the projection.
+The owner reference omits `blockOwnerDeletion`: explicit owner-checked Secret cleanup and ordinary
+garbage collection suffice, without granting `services/finalizers` updates to satisfy owner-reference
+admission on OpenShift. Redeploy also removes that flag from an older projection's owner reference.
 Create the projection before creating or patching the Service. Roll back newly created resources
 on failure; restore the previous data map after a rejected Service update using ownership and
 resourceVersion guards. Retain a durable Function cleanup obligation if rollback cannot complete. Errors
@@ -26,10 +29,17 @@ retryable and cannot be reported as successful revocation. Existing action rows 
 mappings require explicit operator-provided names/mappings for remediation. The shipped command
 is read-only by default, reports identifiers/env names only, and requires `--apply` for conversion.
 No upgrade hook runs remediation automatically.
+The scan excludes the reconciler's `queue-proxy` container from Deployment/ReplicaSet checks and
+ignores their injected `PORT`, `K_REVISION` and `K_CONFIGURATION` literals unless an owned
+Service/Configuration/Revision has that name inline. This retains detection of legacy user mappings
+while allowing by-reference workloads with Knative-injected env to pass rotation and remediation.
 
 Function and aggregate teardown share the owner-safe delete boundary, which explicitly removes the
 projection even if the Service disappeared. A Secret deletion error or unobserved deletion leaves
 the logical Function and a durable retry obligation. Foreground Service GC removes owned children.
+Leaf Secrets use background deletion and a fresh absence check, avoiding a foreground finalizer
+that would otherwise make revocation or an empty redeploy fail before GC runs. Services and legacy
+Revisions retain foreground deletion: pending GC is reported and retryable through the existing APIs.
 Already-running pods can retain old values in memory; the affected Function list identifies the
 rollouts/scale-to-zero an operator should verify. Hosted MCP still receives no workspace secrets.
 

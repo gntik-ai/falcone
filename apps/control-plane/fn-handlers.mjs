@@ -96,6 +96,17 @@ async function resolvedRefCount(ctx, ws, secretName) {
   return (await secretConsumers(ctx, ws, secretName)).length;
 }
 
+async function resolveDeclaredFunctionSecrets(ctx, tenantId, workspaceId, refs) {
+  if (!refs.length) return { secretEnv: [] };
+  const vault = ctx.vaultStore ?? vaultStore;
+  if (!vault) return { error: err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)') };
+  let secretEnv;
+  try { secretEnv = await vault.resolveEnv(tenantId, workspaceId, refs); }
+  catch { return { error: err(502, 'SECRET_RESOLVE_FAILED', 'Workspace secrets could not be resolved.') }; }
+  if (secretEnv.length !== refs.length) return { error: err(400, 'SECRET_NOT_FOUND', 'A declared workspace secret is missing') };
+  return { secretEnv };
+}
+
 async function propagateSecret(ctx, ws, consumers, deletedName = null) {
   const vault = ctx.vaultStore ?? vaultStore;
   const pendingResources = [];
@@ -496,14 +507,8 @@ async function fnDeploy(ctx) {
   // Resolve declared references from OpenBao for the owned Secret projection.
   // Values are read from THIS workspace's own KV path,
   // so a function only ever sees its own tenant/workspace secrets.
-  const vault = ctx.vaultStore ?? vaultStore;
-  let secretEnv = [];
-  if (Array.isArray(secretRefs) && secretRefs.length > 0) {
-    if (!vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
-    try { secretEnv = await vault.resolveEnv(ws.tenant_id, ws.id, secretRefs); }
-    catch (e) { return err(502, 'SECRET_RESOLVE_FAILED', 'Workspace secrets could not be resolved.'); }
-    if (secretEnv.length !== secretRefs.length) return err(400, 'SECRET_NOT_FOUND', 'A declared workspace secret is missing');
-  }
+  const { secretEnv, error: resolutionError } = await resolveDeclaredFunctionSecrets(ctx, ws.tenant_id, ws.id, secretRefs);
+  if (resolutionError) return resolutionError;
   const saveAction = () => st.upsertFnAction(ctx.pool, {
     resourceId, workspaceId: ws.id, tenantId: ws.tenant_id, actionName,
     runtime: b.execution?.runtime ?? 'nodejs:22', entrypoint: b.execution?.entrypoint ?? 'main',
@@ -836,12 +841,8 @@ async function fnRollback(ctx) {
   }
 
   const refs = normalizeFunctionSecretRefs(functionSecretRefs(target));
-  const vault = ctx.vaultStore ?? vaultStore;
-  if (refs.length && !vault) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
-  let secretEnv = [];
-  try { if (refs.length) secretEnv = await vault.resolveEnv(r.tenant_id, r.workspace_id, refs); }
-  catch { return err(502, 'SECRET_RESOLVE_FAILED', 'Workspace secrets could not be resolved.'); }
-  if (secretEnv.length !== refs.length) return err(400, 'SECRET_NOT_FOUND', 'A declared workspace secret is missing');
+  const { secretEnv, error: resolutionError } = await resolveDeclaredFunctionSecrets(ctx, r.tenant_id, r.workspace_id, refs);
+  if (resolutionError) return resolutionError;
   const deployName = r.ksvc_name ?? target.ksvc_name;
   if (deployName) {
     try {
