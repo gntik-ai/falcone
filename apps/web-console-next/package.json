@@ -16,7 +16,10 @@
     "check:i18n": "node scripts/check-i18n.mjs",
     "lint:i18n": "node scripts/lint-i18n.mjs",
     "test:i18n": "node --test tests/check-i18n.test.mjs tests/lint-i18n.test.mjs",
-    "test:i18n-chunks": "node --test tests/i18n-chunks.test.mjs"
+    "test:i18n-chunks": "node --test tests/i18n-chunks.test.mjs",
+    "test:parity": "playwright test --config tests/parity/playwright.config.mjs && node tests/parity/verify-negatives.mjs",
+    "parity:validate": "node tests/parity/validate.mjs",
+    "parity:scan": "node tests/parity/scan-fixtures.mjs"
   },
   "dependencies": {
     "@fontsource/geist-mono": "5.2.5",
