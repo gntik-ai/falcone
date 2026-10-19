@@ -1,7 +1,14 @@
 import { lazy, Suspense, type ComponentType } from 'react'
-import { useTranslation } from 'react-i18next'
 import { Outlet, type RouteObject, useRoutes } from 'react-router-dom'
 import { StatusPage } from './StatusPage'
+import { ProtectedRoute } from './shell/session'
+import { Shell } from './shell/Shell'
+import { Guard, ConsoleIndexRedirect } from './shell/guards'
+import { RouteState } from './shell/RouteState'
+import { pendingConsoleRoutes } from './shell/routes'
+
+declare const __SHELL_TEST_FIXTURES__: boolean
+const FixtureRoutes = __SHELL_TEST_FIXTURES__ ? lazy(() => import('./shell/fixtures/FixtureRoutes')) : null
 
 export function routerBasename(base = import.meta.env.VITE_BASE_PATH || '/'): string {
   return base.replace(/\/+$/, '') || '/'
@@ -18,14 +25,6 @@ function lazyPage(_namespace: string, load: () => Promise<{ default: ComponentTy
   return <Page />
 }
 
-function NotFound() {
-  const { t } = useTranslation('common')
-  return <section>
-    <h1 className="text-2xl font-semibold">{t('states.notFound.title')}</h1>
-    <p className="mt-2 text-muted-foreground">{t('placeholder.body')}</p>
-  </section>
-}
-
 export const appRoutes: RouteObject[] = [
   {
     element: <Outlet />,
@@ -36,61 +35,22 @@ export const appRoutes: RouteObject[] = [
       { path: '/invitations/:tenantId/:invitationId', element: lazyPage('invitation', () => import('./pages/invitation')) },
       { path: '/signup', element: lazyPage('signup', () => import('./pages/signup')) },
       { path: '/signup/pending-activation', element: lazyPage('pendingActivation', () => import('./pages/pendingActivation')) },
-      { path: '*', element: <NotFound /> }
+      { path: '*', element: <RouteState state="notFound" /> }
     ]
   },
   {
     path: '/console',
-    element: <Outlet />,
+    element: <ProtectedRoute><Shell /></ProtectedRoute>,
     children: [
-      { index: true, element: lazyPage('dashboard', () => import('./pages/dashboard')) },
+      { index: true, element: <ConsoleIndexRedirect /> },
       { path: 'overview', element: lazyPage('overview', () => import('./pages/overview')) },
-      ...[
-        'tenants',
-        'workspaces',
-        'database',
-        'functions-registry',
-        'iam-access',
-        'members',
-        'plans',
-        'plans/new',
-        'plans/:planId',
-        'tenants/:tenantId/plan',
-        'my-plan',
-        'my-plan/allocation',
-        'workspaces/:workspaceId',
-        'auth',
-        'auth-config',
-        'postgres',
-        'postgres/data',
-        'mongo',
-        'mongo/data',
-        'kafka',
-        'events/data',
-        'functions',
-        'functions/data',
-        'realtime/changes',
-        'flows',
-        'flows/:flowId',
-        'flows/:flowId/runs',
-        'flows/:flowId/runs/:executionId',
-        'storage',
-        'observability',
-        'runtime',
-        'service-accounts',
-        'quotas',
-        'operations',
-        'operations/:operationId',
-        'mcp/servers/:mcpServerId',
-        'workspaces/:workspaceId/realtime',
-        'workspaces/:workspaceId/docs',
-        'secrets',
-        'secrets/:encodedSecretPath/rotate',
-        'workspace-secrets',
-        'profile'
-      ].map((path) => ({ path, element: lazyPage('pendingPage', () => import('./pages/pendingPage')) })),
+      ...pendingConsoleRoutes.map(({ guard, ...route }) => {
+        const page = lazyPage('pendingPage', () => import('./pages/pendingPage'))
+        return { ...route, element: guard ? <Guard kind={guard}>{page}</Guard> : page }
+      }),
+      ...(__SHELL_TEST_FIXTURES__ && FixtureRoutes ? [{ path: '__fixture/*', element: <FixtureRoutes /> }] : []),
       { path: 'settings', element: lazyPage('settings', () => import('./pages/settings')) },
-      { path: '*', element: <NotFound /> }
+      { path: '*', element: <RouteState state="unknown" /> }
     ]
   }
 ]

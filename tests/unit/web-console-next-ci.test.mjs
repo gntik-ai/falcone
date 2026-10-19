@@ -56,3 +56,22 @@ test('the next-console CSP step builds both bases and enforces the dist and Chro
   assert.match(step.run, /web-console-next validate:dist/);
   assert.match(step.run, /VITE_BASE_PATH="\$base".*web-console-next test:csp/);
 });
+
+test('the shell step enforces release exclusion, fixture build and browser tests without changing legacy CI', () => {
+  const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
+  const job = ci.jobs['web-console-next'];
+  const shell = job.steps.find((step) => step.name === 'Test authenticated next-console shell');
+  assert.ok(shell, 'The shell browser spec must be an enforced step');
+  assert.equal(shell.if, undefined);
+  assert.equal(shell['continue-on-error'], undefined);
+  assert.match(shell.run, /SHELL_TEST_FIXTURES= VITE_BASE_PATH=\/next\/.*web-console-next build/);
+  assert.match(shell.run, /node --test tests\/shell-release.test.mjs/);
+  assert.match(shell.run, /SHELL_TEST_FIXTURES=true.*web-console-next build/);
+  assert.match(shell.run, /web-console-next exec playwright test --config tests\/shell\/playwright.config.mjs/);
+  assert.equal(ci.jobs['web-console'].steps.some((step) => /web-console-next/.test(step.run ?? '')), false);
+  const unit = job.steps.find((step) => step.run === 'pnpm --filter @in-falcone/web-console-next test');
+  assert.equal(unit.if, undefined);
+  assert.equal(unit['continue-on-error'], undefined);
+  const release = job.steps.find((step) => step.name === 'Build the next release SPA');
+  assert.ok(!release.env.SHELL_TEST_FIXTURES);
+});

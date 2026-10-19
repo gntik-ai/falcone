@@ -1,3 +1,4 @@
+import { installSession } from '../browser-session.mjs';
 import { test, expect } from '@playwright/test';
 import { startServer, securityHeaders } from './server.mjs';
 
@@ -55,6 +56,7 @@ async function expectFonts(page, observed, mono = false) {
 
 test('every concrete appRoutes path renders under the unchanged CSP with local assets', async ({ page }) => {
   test.setTimeout(300_000);
+  const unmatched = await installSession(page);
   const observed = await observe(page);
   await page.goto(server.url('tests/csp/index.html'));
   await expect(page.locator('[data-app-route]').first()).toBeVisible();
@@ -74,6 +76,7 @@ test('every concrete appRoutes path renders under the unchanged CSP with local a
     expect(icon.headers()['content-type']).toContain('image/svg+xml');
     await expectClean(page, observed);
   }
+  expect(unmatched).toEqual([]);
 });
 
 test('the test-only Monaco and xyflow page uses local workers, fonts and inline SVG', async ({ page }) => {

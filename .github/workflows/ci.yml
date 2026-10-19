@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '6c093a35afca99fb7a3c180370c2da8e2c9a6e11'
+  FALCONE_CHARTS_REF: '12322f99fdfa9088785374b912f9b133b7af85ab'
 
 jobs:
   quality:
@@ -474,6 +474,13 @@ jobs:
             pnpm --filter @in-falcone/web-console-next validate:dist
             VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next test:csp
           done
+
+      - name: Test authenticated next-console shell
+        run: |
+          SHELL_TEST_FIXTURES= VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next build
+          (cd apps/web-console-next && node --test tests/shell-release.test.mjs)
+          SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/next/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
+          VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
 
       - name: Build the legacy release SPA
         run: pnpm --filter @in-falcone/web-console exec vite build
