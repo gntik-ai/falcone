@@ -147,9 +147,12 @@ async function propagateSecret(ctx, ws, consumers, deletedName = null) {
 }
 
 function secretMutationError(code, error) {
-  return { ...err(502, code, 'Workspace secret propagation could not be completed; retry the operation.'),
-    body: { code, message: 'Workspace secret propagation could not be completed; retry the operation.',
-      ...(error.pendingResources ? { affectedFunctions: error.affectedFunctions, pendingResources: error.pendingResources } : {}) } };
+  // Keep the existing backend-unavailable response without ever forwarding upstream messages.
+  // Propagation failures additionally report value-free, retryable cleanup obligations.
+  const message = error?.pendingResources
+    ? 'Workspace secret propagation could not be completed; retry the operation.' : 'vault unavailable';
+  return { statusCode: 502, body: { code, message,
+    ...(error?.pendingResources ? { affectedFunctions: error.affectedFunctions, pendingResources: error.pendingResources } : {}) } };
 }
 
 // Stamp the published FunctionWorkspaceSecret metadata onto a store meta object: tenantId/workspaceId
@@ -936,7 +939,7 @@ async function secretSet(ctx) {
     const meta = await vault.set(ws.tenant_id, ws.id, name, value, description);
     const refCount = await resolvedRefCount(ctx, ws, name);
     return auditedSecretResult(ok(201, secretMetaOut(meta, ws, refCount)), ws);
-  } catch (e) { return auditedSecretResult(err(502, 'SECRET_WRITE_FAILED', 'Workspace secret update or propagation could not be completed; retry the operation.'), ws); }
+  } catch (e) { return auditedSecretResult(secretMutationError('SECRET_WRITE_FAILED', e), ws); }
 }
 
 // PUT /v1/functions/workspaces/{workspaceId}/secrets/{secretName}  { secretValue, description? }
@@ -973,7 +976,8 @@ async function secretReplace(ctx) {
     const consumers = await secretConsumers(ctx, ws, name);
     const meta = await vault.replace(ws.tenant_id, ws.id, name, value, description);
     await propagateSecret(ctx, ws, consumers);
-    return scoped(ok(200, { ...secretMetaOut(meta, ws, consumers.length), affectedFunctions: consumers.map((r) => r.resource_id) }));
+    return scoped(ok(200, { ...secretMetaOut(meta, ws, consumers.length),
+      ...(consumers.length ? { affectedFunctions: consumers.map((r) => r.resource_id) } : {}) }));
   } catch (e) { return scoped(secretMutationError('SECRET_WRITE_FAILED', e)); }
 }
 
@@ -1028,10 +1032,12 @@ async function secretDelete(ctx) {
     // Revoke derived material first; a failed propagation leaves the source available for retry.
     await propagateSecret(ctx, ws, consumers, name);
     await vault.delete(ws.tenant_id, ws.id, name);
-    return auditedSecretResult({ ...ok(204, null), headers: {
+    const result = ok(204, null);
+    if (consumers.length) result.headers = {
       'x-falcone-affected-functions': JSON.stringify(consumers.map((r) => r.resource_id)),
       'x-falcone-resolved-ref-count': String(consumers.length),
-    } }, ws);
+    };
+    return auditedSecretResult(result, ws);
   } catch (e) { return auditedSecretResult(secretMutationError('SECRET_DELETE_FAILED', e), ws); }
 }
 

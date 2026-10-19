@@ -28,6 +28,8 @@ Definition imports preserve the existing service name and declared refs when dep
 is absent or null, so importing code cannot detach a live projection from revocation or cleanup.
 An explicit empty refs array from deployment still removes the declaration.
 DELETE preserves 204 with affected Function IDs in headers; replace returns the same IDs in metadata.
+With no consumers, omit impact fields/headers to preserve existing responses. Backend mutation
+failures return a fixed `vault unavailable` message; upstream error text is never forwarded.
 Revocation retains the deleted declaration for consumer counts/warnings and leaves its reference
 `optional: false`, even when the projection no longer exists. This intentional fail-closed state
 differs from an ordinary deploy/rollback, which rejects a missing source secret before any write.

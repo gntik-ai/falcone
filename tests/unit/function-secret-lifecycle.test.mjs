@@ -27,6 +27,48 @@ test('deploy persists only names and env mapping and metadata counts the real co
   assert.equal(JSON.stringify(meta).includes('synthetic-marker'), false);
 });
 
+test('mutating an unconsumed secret preserves its metadata and bodyless response without impact fields', async () => {
+  const ctx = context();
+  ctx.vaultStore = { validName: () => true, exists: async () => true,
+    replace: async () => ({ name: 'api-key' }), delete: async () => {},
+  };
+  ctx.body = { value: 'synthetic-marker' };
+  const replaced = await FN_HANDLERS.secretReplace(ctx);
+  assert.equal(replaced.statusCode, 200);
+  assert.deepEqual(replaced.body, { secretName: 'api-key', name: 'api-key', tenantId: ws.tenant_id,
+    workspaceId: ws.id, resolvedRefCount: 0, timestamps: { createdAt: null, updatedAt: null } });
+  assert.deepEqual(replaced.headers ?? {}, {});
+  const deleted = await FN_HANDLERS.secretDelete(ctx);
+  assert.equal(deleted.statusCode, 204);
+  assert.equal(deleted.body, null);
+  assert.deepEqual(deleted.headers ?? {}, {});
+  for (const result of [replaced, deleted]) {
+    assert.deepEqual(result.auditScope, { tenantId: ws.tenant_id, workspaceId: ws.id });
+    assert.equal(JSON.stringify(result).includes('synthetic-marker'), false);
+  }
+});
+
+test('secret mutation backend failures keep the unavailable response without returning upstream values', async () => {
+  for (const [handler, method, code] of [
+    ['secretSet', 'set', 'SECRET_WRITE_FAILED'],
+    ['secretReplace', 'replace', 'SECRET_WRITE_FAILED'],
+    ['secretDelete', 'delete', 'SECRET_DELETE_FAILED'],
+  ]) {
+    for (const message of ['vault unavailable', 'backend rejected synthetic-marker']) {
+      const ctx = context();
+      ctx.body = { name: 'api-key', value: 'synthetic-marker' };
+      ctx.vaultStore = { validName: () => true, exists: async () => handler !== 'secretSet',
+        [method]: async () => { throw new Error(message); },
+      };
+      const result = await FN_HANDLERS[handler](ctx);
+      assert.equal(result.statusCode, 502);
+      assert.deepEqual(result.body, { code, message: 'vault unavailable' });
+      assert.deepEqual(result.auditScope, { tenantId: ws.tenant_id, workspaceId: ws.id });
+      assert.equal(JSON.stringify(result).includes('synthetic-marker'), false);
+    }
+  }
+});
+
 import { cluster } from '../helpers/function-kubernetes-fixture.mjs';
 import { deployKnativeService, NS } from '../../apps/control-plane/function-executor.mjs';
 import { invocationFixture, installInvocationFixture } from '../helpers/function-invocation-fixture.mjs';

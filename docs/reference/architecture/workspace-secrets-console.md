@@ -211,8 +211,10 @@ Replace updates every consumer and rolls its Service template so new pods read t
 returns metadata plus `affectedFunctions` (Function resource IDs). DELETE first revokes every
 consumer projection, then removes the OpenBao entry. It retains the existing **204/no body** contract;
 `x-falcone-affected-functions` contains a JSON array of affected Function IDs and
-`x-falcone-resolved-ref-count` contains the number of consumers. Remaining declared refs are kept
-for inventory and revocation warnings, including the deleted name in `fn_actions.secret_refs`.
+`x-falcone-resolved-ref-count` contains the number of consumers. With no consumers, PUT omits
+`affectedFunctions` and DELETE omits these impact headers, preserving their existing responses.
+Remaining declared refs are kept for inventory and revocation warnings, including the deleted name
+in `fn_actions.secret_refs`.
 A Function with only the revoked secret references a missing projection using `optional: false`
 and fails closed when starting new pods. This is deliberate revocation behavior: ordinary deploy
 and rollback reject missing declared source secrets before any runtime write. To resume, recreate
