@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { kcAdmin as defaultKcAdmin } from '../apps/control-plane/kc-admin.mjs';
+import { kcAdmin as defaultKcAdmin, isWorkspaceClaimMapper } from '../apps/control-plane/kc-admin.mjs';
 import { ROLE, ROLLBACK_MARKER, parseArgs, preflight, cliMain, inspect, isBinding,
   withRegistryLock, requireState, safeFailure, verifyDisabled } from './lib/workspace-service-accounts.mjs';
 
@@ -16,8 +16,7 @@ async function migrate(kc, state) {
     await verifyDisabled(kc, state);
     changed = true;
     await kc.ensureWorkspaceIdMapper(realm, uuid, row.joined_workspace_id);
-    const bindings = (await kc.listClientMappers(realm, uuid)).filter(mapper =>
-      ['workspace_id', 'workspace_ids'].includes(mapper.config?.['claim.name']));
+    const bindings = (await kc.listClientMappers(realm, uuid)).filter(isWorkspaceClaimMapper);
     requireState(bindings.length === 1 && isBinding(bindings[0], row.joined_workspace_id), 'workspace-mapper-verification-failed');
     for (const scope of state.detach) {
       if (scope.type === 'default') await kc.removeClientDefaultScope(realm, uuid, scope.id);
@@ -35,10 +34,17 @@ async function migrate(kc, state) {
     const effective = (await kc.listEffectiveRealmRoles(realm, user.id)).map(role => role.name);
     requireState(effective.includes(ROLE) && roles.every(role => effective.includes(role)), 'effective-role-verification-failed');
     if (client.enabled || client.attributes?.[ROLLBACK_MARKER] === row.joined_workspace_id) {
-      const attributes = { ...client.attributes };
-      delete attributes[ROLLBACK_MARKER];
-      await kc.setClientEnabled(realm, uuid, true, attributes);
-      requireState((await kc.getClient(realm, uuid))?.enabled === true, 'client-enable-verification-failed');
+      if (client.attributes?.[ROLLBACK_MARKER]) {
+        // Client PUT merges attributes: omission does not clear a key. Remove it
+        // explicitly and verify while disabled, before restoring token issuance.
+        await kc.setClientEnabled(realm, uuid, false, { ...client.attributes, [ROLLBACK_MARKER]: null });
+        const cleared = await kc.getClient(realm, uuid);
+        requireState(cleared?.enabled === false && cleared.attributes?.[ROLLBACK_MARKER] == null,
+          'rollback-marker-not-cleared');
+      }
+      await kc.setClientEnabled(realm, uuid, true);
+      const enabled = await kc.getClient(realm, uuid);
+      requireState(enabled?.enabled === true && enabled.attributes?.[ROLLBACK_MARKER] == null, 'client-enable-verification-failed');
     }
   } catch (error) {
     if (changed) {
@@ -62,7 +68,7 @@ async function migrate(kc, state) {
 export async function runBackfill({ argv = [], pool, kcAdmin = defaultKcAdmin, outStream = process.stdout } = {}) {
   const { dryRun } = parseArgs(argv);
   const state = await preflight({ pool, kcAdmin });
-  if (!dryRun && state.failed.length === 0) {
+  if (!dryRun && !state.blocked) {
     for (const item of state.inspected) {
       try {
         await withRegistryLock(pool, item.row, async row => migrate(kcAdmin, await inspect(kcAdmin, row)));

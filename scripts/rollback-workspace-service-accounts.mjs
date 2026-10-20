@@ -1,16 +1,18 @@
 // Separate entry point so rollback cannot be selected accidentally by a back-fill flag.
 import { pathToFileURL } from 'node:url';
 import { kcAdmin as defaultKcAdmin } from '../apps/control-plane/kc-admin.mjs';
-import { markServiceAccountCredentialsInvalidatedUntil } from '../apps/control-plane/tenant-store.mjs';
+import { markServiceAccountCredentialsInvalidatedAhead } from '../apps/control-plane/tenant-store.mjs';
 import { ROLE, ROLLBACK_MARKER, parseArgs, preflight, cliMain, inspect,
   withRegistryLock, requireState, safeFailure, verifyDisabled } from './lib/workspace-service-accounts.mjs';
 
 export async function runRollback({ argv = [], pool, kcAdmin = defaultKcAdmin, outStream = process.stdout,
-  now = () => Date.now(), skewSec = Number(process.env.SA_REVOCATION_SKEW_SEC ?? 1) } = {}) {
+  skewSec = Number(process.env.SA_REVOCATION_SKEW_SEC ?? 1) } = {}) {
   const { dryRun } = parseArgs(argv);
   requireState(Number.isSafeInteger(skewSec) && skewSec >= 0, 'invalid-revocation-skew');
   const state = await preflight({ pool, kcAdmin, rollback: true });
-  if (!dryRun && state.failed.length === 0) {
+  // Contain every independently verified bound SA, even if another row cannot be
+  // rolled back. Those rows remain untouched and keep the report nonzero.
+  if (!dryRun) {
     for (const item of state.inspected) {
       try {
         await withRegistryLock(pool, item.row, async (row, db) => {
@@ -19,13 +21,13 @@ export async function runRollback({ argv = [], pool, kcAdmin = defaultKcAdmin, o
           await kcAdmin.setClientEnabled(realm, uuid, false, { ...client.attributes, [ROLLBACK_MARKER]: row.joined_workspace_id });
           await verifyDisabled(kcAdmin, current);
           requireState((await kcAdmin.getClient(realm, uuid))?.attributes?.[ROLLBACK_MARKER] === row.joined_workspace_id, 'rollback-marker-not-persisted');
-          const cutoff = new Date(now() + (skewSec + 2) * 1000);
-          await markServiceAccountCredentialsInvalidatedUntil(db, row.id, cutoff);
+          const cutoff = new Date(await markServiceAccountCredentialsInvalidatedAhead(db, row.id, skewSec + 2));
+          requireState(Number.isFinite(cutoff.getTime()), 'missing-credential-cutoff');
           if (roles.includes(ROLE)) await kcAdmin.removeRealmRoles(realm, user.id, [ROLE]);
           const effective = (await kcAdmin.listEffectiveRealmRoles(realm, user.id)).map(role => role.name);
           requireState(!effective.includes(ROLE), 'workspace-role-still-inherited');
           requireState(roles.filter(role => role !== ROLE).every(role => effective.includes(role)), 'previous-role-missing');
-          await kcAdmin.inspectWorkspaceClaimSources(realm, uuid, row.joined_workspace_id);
+          await inspect(kcAdmin, row, { rollback: true });
           await verifyDisabled(kcAdmin, current);
           item.report.cutoff = cutoff.toISOString();
         });

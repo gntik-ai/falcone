@@ -22,12 +22,25 @@ export const WORKSPACE_ID_MAPPER = Object.freeze({
   }),
 });
 
-function isWorkspaceIdMapper(mapper, workspaceId) {
+export function isWorkspaceIdMapper(mapper, workspaceId) {
   const expected = { ...WORKSPACE_ID_MAPPER.config, 'claim.value': workspaceId };
   return mapper?.name === WORKSPACE_ID_MAPPER.name && mapper.protocol === WORKSPACE_ID_MAPPER.protocol
     && mapper.protocolMapper === WORKSPACE_ID_MAPPER.protocolMapper
     && Object.keys(mapper.config ?? {}).length === Object.keys(expected).length
     && Object.entries(expected).every(([key, value]) => mapper.config?.[key] === value);
+}
+
+export function isWorkspaceClaimMapper(mapper) {
+  return ['workspace_id', 'workspace_ids'].includes(mapper.config?.['claim.name']);
+}
+
+export function isServiceAccountRoleMapper(mapper) {
+  return ['oidc-hardcoded-role-mapper', 'oidc-role-name-mapper'].includes(mapper.protocolMapper)
+    || ['realm_access', 'resource_access', 'roles', 'actor_type'].includes(mapper.config?.['claim.name']);
+}
+
+export function serviceAccountAllowedRoles(realm) {
+  return new Set(['workspace_service_account', 'offline_access', 'uma_authorization', `default-roles-${realm}`]);
 }
 
 export function tenantDataApiAudience(env = process.env) {
@@ -582,15 +595,13 @@ export const kcAdmin = {
     for (const scopeId of new Set(scopes.map(scope => scope.id))) {
       scopedMappers.push(...await this.listScopeMappers(realm, scopeId));
     }
-    const sources = clientMappers.filter(mapper => ['workspace_id', 'workspace_ids'].includes(mapper.config?.['claim.name']));
+    const sources = clientMappers.filter(isWorkspaceClaimMapper);
     if (sources.length !== 1 || !isWorkspaceIdMapper(sources[0], workspaceId)) {
       throw new Error('Service-account workspace claim sources are not allowed');
     }
     for (const mapper of [...clientMappers, ...scopedMappers]) {
-      const claim = mapper.config?.['claim.name'];
-      if (['oidc-hardcoded-role-mapper', 'oidc-role-name-mapper'].includes(mapper.protocolMapper)
-        || ['realm_access', 'resource_access', 'roles', 'actor_type'].includes(claim)
-        || (scopedMappers.includes(mapper) && ['workspace_id', 'workspace_ids'].includes(claim))) {
+      if (isServiceAccountRoleMapper(mapper)
+        || (scopedMappers.includes(mapper) && isWorkspaceClaimMapper(mapper))) {
         throw new Error('Service-account token mapper is not allowed');
       }
     }

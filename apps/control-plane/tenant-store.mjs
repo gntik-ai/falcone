@@ -1205,6 +1205,13 @@ export async function markServiceAccountCredentialsInvalidatedUntil(pool, id, cu
   if (!(cutoff instanceof Date) || !Number.isFinite(cutoff.getTime())) throw new TypeError('Invalid credential cutoff');
   await pool.query('UPDATE service_accounts SET credentials_invalidated_at = GREATEST(COALESCE(credentials_invalidated_at, NOW()), NOW(), $2::timestamptz) WHERE id = $1', [id, cutoff]);
 }
+// Use the live DB clock rather than transaction-start NOW(): a Keycloak migration
+// may have held the row lock for seconds before reaching this statement.
+export async function markServiceAccountCredentialsInvalidatedAhead(pool, id, leadSec) {
+  if (!Number.isSafeInteger(leadSec) || leadSec < 0) throw new TypeError('Invalid credential cutoff lead');
+  const { rows } = await pool.query("UPDATE service_accounts SET credentials_invalidated_at = GREATEST(COALESCE(credentials_invalidated_at, NOW()), clock_timestamp() + $2::double precision * INTERVAL '1 second') WHERE id = $1 RETURNING credentials_invalidated_at", [id, leadSec]);
+  return rows[0]?.credentials_invalidated_at;
+}
 // Auth-path read for the SA revocation check (fix-sa-credential-revocation-invalidate-tokens, #684):
 // resolve a SA by its Keycloak client id (the token's `azp`) AND its realm (== tenant id, taken from
 // the verified token issuer) to its revocation-relevant state. Returns { status,

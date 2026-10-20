@@ -3,6 +3,37 @@ import assert from 'node:assert/strict';
 import { runBackfill } from '../../scripts/backfill-workspace-service-accounts.mjs';
 import { fixture, W, ROLE, MARKER } from './helpers/workspace-sa-fixture.mjs';
 
+test('pre-1140 SA without a stored workspace attribute reaches the canonical bound end state', async () => {
+  const f = fixture();
+  f.state.user.attributes = {};
+  const { exitCode } = await runBackfill({ ...f.options, argv: ['--apply'] });
+  assert.equal(exitCode, 0);
+  assert.equal(f.state.client.enabled, true);
+  assert.equal(f.state.mappers[0].config['claim.value'], W);
+  assert.deepEqual(f.state.defaults, []);
+  assert.ok(f.state.roles.includes(ROLE));
+  assert.deepEqual(f.state.user.attributes, {}); // W comes only from the registry.
+});
+
+test('a terminal revoked row is reported without blocking an active legacy SA or touching its client', async () => {
+  const f = fixture();
+  f.state.additionalRows = [{ ...f.state.row, id: 'revoked-sa', status: 'revoked',
+    kc_client_id: 'sa-revoked', kc_client_uuid: 'revoked-client' }];
+  f.state.unregistered = [{ id: 'revoked-client', clientId: 'sa-revoked',
+    attributes: { 'in-falcone.kind': 'service-account' } }];
+  const dryRun = await runBackfill(f.options);
+  assert.equal(dryRun.exitCode, 1);
+  assert.deepEqual(f.writes, []);
+  const { exitCode, result } = await runBackfill({ ...f.options, argv: ['--apply'] });
+  assert.equal(exitCode, 1);
+  assert.deepEqual(result.failed, [{ serviceAccountId: 'revoked-sa', reason: 'inactive-registry-row' }]);
+  assert.ok(f.state.roles.includes(ROLE));
+  assert.equal(f.state.mappers[0].config['claim.value'], W);
+  f.writes.length = 0;
+  assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 1);
+  assert.deepEqual(f.writes, []);
+});
+
 test('dry-run reports each registry plan and extra effective roles without writing', async () => {
   const f = fixture();
   f.state.inheritedRoles.push('tenant_admin');
@@ -66,13 +97,24 @@ for (const value of ['true', 'false']) {
 }
 
 for (const value of [undefined, [], [''], ['  '], ['other'], [W, 'other']]) {
-  test(`legacy own workspace attribute ${JSON.stringify(value)} fails closed even with inherited W`, async () => {
+  test(`legacy attribute ${JSON.stringify(value)} and inherited values cannot override registry W`, async () => {
     const f = fixture();
     f.state.user.attributes.workspace_id = value;
-    f.state.user.groups = [{ attributes: { workspace_id: [W] } }];
+    f.state.user.groups = [{ attributes: { workspace_id: ['foreign'] } }];
+    assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+    assert.equal(f.state.mappers[0].config['claim.value'], W);
+    assert.equal(f.state.client.enabled, true);
+    assert.deepEqual(f.state.defaults, []);
+    assert.ok(f.state.roles.includes(ROLE));
+  });
+  test(`unverified migration of legacy attribute ${JSON.stringify(value)} stays disabled without a new role`, async () => {
+    const f = fixture({ fail: 'verify-claims' });
+    f.state.user.attributes.workspace_id = value;
+    f.state.user.groups = [{ attributes: { workspace_id: ['foreign'] } }];
     assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 1);
-    assert.deepEqual(f.writes, []);
+    assert.equal(f.state.client.enabled, false);
     assert.ok(!f.state.roles.includes(ROLE));
+    assert.ok(!f.writes.includes('enable'));
   });
 }
 

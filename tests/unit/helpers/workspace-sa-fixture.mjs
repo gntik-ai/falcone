@@ -14,7 +14,7 @@ export function fixture({ fail, failAt, afterCommit = false } = {}) {
       joined_workspace_id: W, workspace_tenant_id: REALM, joined_tenant_id: REALM, tenant_realm: REALM },
     client: { id: 'client-one', clientId: 'sa-worker', enabled: true, serviceAccountsEnabled: true,
       attributes: { 'in-falcone.kind': 'service-account', keep: 'yes' } },
-    user: { id: 'user-one', attributes: { workspace_id: [W] } },
+    user: { id: 'user-one', attributes: {} },
     mappers: [], defaults: [{ id: 'scope-one', name: 'workspace-context' }], optional: [],
     scopeMappers: { 'scope-one': structuredClone(CONTEXT_SCOPE_CLAIM_MAPPERS['workspace-context']) },
     roles: ['offline_access'], inheritedRoles: [], cutoff: null,
@@ -52,9 +52,21 @@ export function fixture({ fail, failAt, afterCommit = false } = {}) {
     removeClientOptionalScope: async (_realm, _uuid, id) => step('remove-optional', true, () => { state.optional = state.optional.filter(scope => scope.id !== id); }),
     setClientEnabled: async (_realm, _uuid, enabled, attributes) => step(enabled ? 'enable' : 'disable', true, () => {
       state.client.enabled = enabled;
-      if (attributes) state.client.attributes = attributes;
+      // Keycloak merges client attributes. Omitted keys survive; explicit null
+      // removes a key. User PUT has different (replacement) semantics.
+      for (const [key, value] of Object.entries(attributes ?? {})) {
+        if (value === null) {
+          if (!state.ignoreMarkerRemoval || key !== MARKER) delete state.client.attributes[key];
+        } else state.client.attributes[key] = value;
+      }
     }),
-    assignRealmRoles: async (_realm, _user, roles) => step('assign', true, () => { state.roles.push(...roles); }),
+    assignRealmRoles: async (_realm, _user, roles) => step('assign', true, () => {
+      assert.equal(state.client.enabled, false);
+      assert.deepEqual(state.defaults, []);
+      assert.deepEqual(state.optional, []);
+      assert.equal(state.mappers[0].config['claim.value'], W);
+      state.roles.push(...roles);
+    }),
     removeRealmRoles: async (_realm, _user, roles) => step('remove-role', true, () => { state.roles = state.roles.filter(role => !roles.includes(role)); }),
   };
   let transactionCutoff;
@@ -62,13 +74,17 @@ export function fixture({ fail, failAt, afterCommit = false } = {}) {
     query: async (sql, values) => {
       if (sql.startsWith('SELECT id, iam_realm FROM tenants')) return { rows: [{ id: REALM, iam_realm: REALM }] };
       if (sql.includes('UPDATE service_accounts')) return step('cutoff', true, () => {
-        state.cutoff = new Date(Math.max(state.cutoff?.getTime() ?? 0, values[1]?.getTime() ?? Date.now()));
-        return { rows: [] };
+        const databaseNow = state.databaseNow ?? Date.now();
+        const proposed = sql.includes('clock_timestamp()') ? databaseNow + values[1] * 1000
+          : values[1]?.getTime() ?? databaseNow;
+        state.cutoff = new Date(Math.max(state.cutoff?.getTime() ?? 0, proposed));
+        return { rows: [{ credentials_invalidated_at: state.cutoff }] };
       });
       if (sql === 'BEGIN') { transactionCutoff = state.cutoff; return { rows: [] }; }
       if (sql === 'ROLLBACK') { state.cutoff = transactionCutoff; return { rows: [] }; }
       if (sql === 'COMMIT') return { rows: [] };
-      return step('registry', false, () => ({ rows: [state.row] }));
+      return step('registry', false, () => ({ rows: [state.row, ...(state.additionalRows ?? [])]
+        .filter(row => !sql.includes('WHERE sa.id = $1') || row.id === values[0]) }));
     },
     connect: async () => ({ query: pool.query, release() {} }),
   };

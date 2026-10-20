@@ -173,9 +173,10 @@ node scripts/backfill-workspace-service-accounts.mjs --apply
 
 Review the dry-run's per-SA `plan`, `previousRoles`, `extraRoles` and `failed` entries first.
 Workspace IDs come exclusively from the registry join, not attributes or groups. The complete
-preflight is read-only; any revoked/orphan/mismatched row, unregistered service-account client,
-or conflicting mapper makes the invocation nonzero and prevents all writes. Resolve discrepancies
-through the existing lifecycle/admin procedures before applying; never reactivate a revoked row.
+preflight is read-only. Revoked rows are reported with a nonzero status and left untouched,
+including their registered clients; they do not block active SAs. Orphan/mismatched active rows,
+unregistered service-account clients or conflicting mappers prevent all forward writes. Resolve
+discrepancies through the existing lifecycle/admin procedures; never reactivate a revoked row.
 Effective extra roles (including group/composite grants) are reported for review and never removed.
 
 Apply locks and rechecks each registry row, verifies the client UUID, clientId and kind in its
@@ -185,9 +186,12 @@ that no other workspace claim sources remain, assigns `workspace_service_account
 verifies effective roles before restoring the client's enabled state. A second successful apply
 makes zero writes. No token or client secret is fetched or logged.
 
-Blank, missing, multiple or foreign stored legacy bindings fail closed, including users whose
-workspace comes only from a group. The script does not guess or rewrite these bindings. Failed
-migrations keep clients disabled and bindings intact; roles that predate the run are kept. An
+Legacy SAs normally have no stored workspace attribute. Blank, missing, multiple, foreign and
+group-inherited attribute values cannot authorize a grant or supply W. The script does not read
+them as workspace authority or rewrite them: it disables issuance before installing W and removes
+the canonical attribute scope before verifying claim sources and assigning the role. Failure to
+prove the hardcoded W is the only remaining workspace source keeps the client disabled with no
+new role. Failed migrations keep bindings intact; roles that predate the run are kept. An
 unmarked client already disabled before a run stays disabled. For a partially migrated client,
 resolve the reported conflict, rerun to finish its binding while disabled, then use the rollback
 script below to mark it before an explicit forward rerun. Do not manually enable a partial SA.
@@ -244,8 +248,10 @@ undefined. `bbx-wsid-04` fails if one is ever added.
 
 ### Workspace service-account repair (#1165)
 
-Use the separate rollback script before reverting the image. It is dry-run by default and shares
-the back-fill's read-only conflict preflight. Run it in the same announced operator window:
+Use the separate rollback script before reverting the image. It is dry-run by default and inspects
+each SA before writing. Run it in the same announced operator window. Set the script process's
+`SA_REVOCATION_SKEW_SEC` to the **maximum configured skew across control-plane and executor**;
+the executor may use a larger value than the pod's default.
 
 ```bash
 cd /repo
@@ -253,9 +259,13 @@ node scripts/rollback-workspace-service-accounts.mjs
 node scripts/rollback-workspace-service-accounts.mjs --apply
 ```
 
-Rollback requires the canonical hardcoded W binding with no overlapping sources. It disables the
+Rollback acts on each safely verified active SA independently; rejected or revoked rows are
+reported with nonzero status and left untouched without blocking the others. It includes SAs
+created natively by #1140 as well as back-filled SAs. It requires the canonical hardcoded W binding;
+a canonical `workspace-context` left attached by a partial migration is retained while disabled.
+Clients without W or with conflicting sources are reported and left untouched. It disables the
 client while preserving client attributes and stamps `in-falcone.workspace-rollback=W`. It sets
-`credentials_invalidated_at` to at least the rollback clock plus `SA_REVOCATION_SKEW_SEC + 2`
+`credentials_invalidated_at` to at least the current **database clock** plus `SA_REVOCATION_SKEW_SEC + 2`
 seconds, removes only the `workspace_service_account` role, and keeps the binding and all other
 roles. Inherited workspace roles that cannot be removed are reported; the client remains disabled.
 Removing only the role from an enabled SA or removing W would widen access and is prohibited.
@@ -269,7 +279,9 @@ logs or the report. These live checks are operator verification, not repository 
 
 Later rotate/revoke calls use `GREATEST` and cannot lower a future watermark. To restore a marked
 client, review and rerun the forward back-fill, which verifies the binding and roles before
-re-enabling it and clearing the marker. Existing unmarked disabled clients remain disabled.
+re-enabling it. The marker is explicitly removed with a null client attribute and its absence
+verified while disabled; a provider that fails to clear it leaves the client disabled. A second
+forward apply makes zero writes. Existing unmarked disabled clients remain disabled.
 Wait until the reported cutoff has passed before expecting new tokens to be accepted.
 The monotonic SQL can remain in place across an image rollback.
 

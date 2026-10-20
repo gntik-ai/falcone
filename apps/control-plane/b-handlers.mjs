@@ -7,7 +7,7 @@ import { can } from './model-authz.mjs';
 import { deriveRealmTopology } from './jwt-verify.mjs';
 import { resolveWorkspaceForManage, kcBackedErr, statusFromError } from './workspace-iam-context.mjs';
 import { createWorkspaceIamClient } from './workspace-iam-client-handlers.mjs';
-import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, normalizeKeycloakAttributes, TENANT_REALM_ROLES } from './kc-admin.mjs';
+import { kcAdmin, KEYCLOAK_ADMIN_SAFE_MESSAGE, normalizeKeycloakAttributes, TENANT_REALM_ROLES, serviceAccountAllowedRoles } from './kc-admin.mjs';
 import * as store from './tenant-store.mjs';
 import { socialProviderView, validateSocialProvider, SocialProviderValidationError } from './social-providers.mjs';
 import { keycloakPublicBase } from './keycloak-public-base.mjs';
@@ -826,7 +826,7 @@ async function createServiceAccount(ctx) {
     if (!saUser?.id) throw new Error('Service-account user is missing');
     await kc.assignRealmRoles(r.realm, saUser.id, ['workspace_service_account']);
     const roles = await kc.listEffectiveRealmRoles(r.realm, saUser.id);
-    const allowedRoles = new Set(['workspace_service_account', 'offline_access', 'uma_authorization', `default-roles-${r.realm}`]);
+    const allowedRoles = serviceAccountAllowedRoles(r.realm);
     if (!roles.some(role => role.name === 'workspace_service_account') || roles.some(role => !allowedRoles.has(role.name))) {
       throw new Error('Service-account effective roles are not allowed');
     }

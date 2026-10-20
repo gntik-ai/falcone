@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { markServiceAccountCredentialsInvalidated, markServiceAccountCredentialsInvalidatedUntil } from '../../apps/control-plane/tenant-store.mjs';
+import { markServiceAccountCredentialsInvalidated, markServiceAccountCredentialsInvalidatedUntil,
+  markServiceAccountCredentialsInvalidatedAhead } from '../../apps/control-plane/tenant-store.mjs';
 import { LOCAL_HANDLERS } from '../../apps/control-plane/b-handlers.mjs';
 
 test('rotate and revoke preserve a later credential invalidation cutoff in the database', async () => {
@@ -43,5 +44,19 @@ test('rollback accepts a future cutoff without lowering any existing cutoff', as
   assert.match(calls[0][0], /GREATEST\(COALESCE\(credentials_invalidated_at, NOW\(\)\), NOW\(\), \$2::timestamptz\)/);
   assert.deepEqual(calls[0][1], ['sa-one', cutoff]);
   await assert.rejects(() => markServiceAccountCredentialsInvalidatedUntil(pool, 'sa-one', new Date('invalid')));
+  assert.equal(calls.length, 1);
+});
+
+test('rollback lead time uses the current database clock and returns the persisted monotonic cutoff', async () => {
+  const calls = [];
+  const persisted = new Date('2035-01-01T00:00:10.900Z');
+  const pool = { query: async (...args) => { calls.push(args); return { rows: [{ credentials_invalidated_at: persisted }] }; } };
+  assert.equal(await markServiceAccountCredentialsInvalidatedAhead(pool, 'sa-one', 10), persisted);
+  assert.match(calls[0][0], /GREATEST\(COALESCE\(credentials_invalidated_at, NOW\(\)\), clock_timestamp\(\) \+ \$2::double precision \* INTERVAL '1 second'\)/);
+  assert.match(calls[0][0], /RETURNING credentials_invalidated_at/);
+  assert.deepEqual(calls[0][1], ['sa-one', 10]);
+  for (const invalid of [-1, NaN, Infinity, 0.1, '10']) {
+    await assert.rejects(() => markServiceAccountCredentialsInvalidatedAhead(pool, 'sa-one', invalid));
+  }
   assert.equal(calls.length, 1);
 });

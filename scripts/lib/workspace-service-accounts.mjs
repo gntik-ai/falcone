@@ -1,5 +1,6 @@
 import { kcAdmin as defaultKcAdmin, CONTEXT_SCOPE_CLAIM_MAPPERS, WORKSPACE_ID_MAPPER,
-  KEYCLOAK_ADMIN_SAFE_MESSAGE } from '../../apps/control-plane/kc-admin.mjs';
+  KEYCLOAK_ADMIN_SAFE_MESSAGE, isWorkspaceIdMapper, isWorkspaceClaimMapper,
+  isServiceAccountRoleMapper, serviceAccountAllowedRoles } from '../../apps/control-plane/kc-admin.mjs';
 
 export const ROLE = 'workspace_service_account';
 export const ROLLBACK_MARKER = 'in-falcone.workspace-rollback';
@@ -41,15 +42,9 @@ function matches(mapper, definition) {
     && Object.keys(mapper.config ?? {}).length === Object.keys(definition.config).length
     && Object.entries(definition.config).every(([key, value]) => mapper.config?.[key] === value);
 }
-export function isBinding(mapper, workspaceId) {
-  return matches(mapper, { ...WORKSPACE_ID_MAPPER, config: { ...WORKSPACE_ID_MAPPER.config, 'claim.value': workspaceId } });
-}
-function claimSource(mapper) {
-  return ['workspace_id', 'workspace_ids'].includes(mapper.config?.['claim.name']);
-}
+export const isBinding = isWorkspaceIdMapper;
 function verifyOtherMapper(mapper) {
-  requireState(!['oidc-hardcoded-role-mapper', 'oidc-role-name-mapper'].includes(mapper.protocolMapper)
-    && !['realm_access', 'resource_access', 'roles', 'actor_type'].includes(mapper.config?.['claim.name']), 'conflicting-role-source');
+  requireState(!isServiceAccountRoleMapper(mapper), 'conflicting-role-source');
 }
 export async function inspect(kc, row, { rollback = false } = {}) {
   verifyRegistry(row);
@@ -60,7 +55,7 @@ export async function inspect(kc, row, { rollback = false } = {}) {
     && client.attributes?.['in-falcone.kind'] === 'service-account'
     && client.serviceAccountsEnabled === true && typeof client.enabled === 'boolean', 'client-registry-mismatch');
   const mappers = await kc.listClientMappers(realm, uuid);
-  const binding = mappers.filter(mapper => claimSource(mapper) || mapper.name === WORKSPACE_ID_MAPPER.name);
+  const binding = mappers.filter(mapper => isWorkspaceClaimMapper(mapper) || mapper.name === WORKSPACE_ID_MAPPER.name);
   requireState(binding.length <= 1 && binding.every(mapper => isBinding(mapper, row.joined_workspace_id)), 'conflicting-client-claim-source');
   mappers.forEach(verifyOtherMapper);
   const detach = [];
@@ -75,24 +70,21 @@ export async function inspect(kc, row, { rollback = false } = {}) {
         requireState(sources.length === 1 && matches(sources[0], CONTEXT_SCOPE_CLAIM_MAPPERS['workspace-context'][0])
           && sources[0].consentRequired !== true, 'noncanonical-workspace-context');
         detach.push({ type, id: scope.id });
-      } else requireState(!sources.some(claimSource), 'conflicting-scope-claim-source');
+      } else requireState(!sources.some(isWorkspaceClaimMapper), 'conflicting-scope-claim-source');
     }
   }
   const user = await kc.getServiceAccountUser(realm, uuid);
   requireState(user?.id, 'missing-service-account-user');
   const roles = (await kc.listEffectiveRealmRoles(realm, user.id)).map(role => role.name);
   const complete = binding.length === 1 && detach.length === 0 && roles.includes(ROLE);
-  if (!rollback && !complete) {
-    // A stored blank/missing attribute cannot prove the legacy overlap safe: groups may
-    // contribute a different value. Never infer W from this attribute; W is from the join.
-    const own = user.attributes?.workspace_id;
-    requireState(Array.isArray(own) && own.length === 1 && own[0] === row.joined_workspace_id
-      && own[0].trim().length > 0, 'unverified-legacy-workspace-claim');
-  }
-  if (rollback) requireState(binding.length === 1 && detach.length === 0, 'rollback-requires-canonical-binding');
+  // Stored or inherited attributes are not evidence of emitted claims. Forward
+  // migration disables the client until only the registry's hardcoded W remains.
+  // A failed forward run can leave the canonical legacy scope attached. Rollback
+  // keeps it and W intact while disabling the client; it never emits a new token.
+  if (rollback) requireState(binding.length === 1, 'rollback-requires-canonical-binding');
   const marker = client.attributes?.[ROLLBACK_MARKER];
-  requireState(marker === undefined || marker === row.joined_workspace_id, 'rollback-marker-mismatch');
-  const allowed = new Set([ROLE, 'offline_access', 'uma_authorization', `default-roles-${realm}`]);
+  requireState(marker == null || marker === row.joined_workspace_id, 'rollback-marker-mismatch');
+  const allowed = serviceAccountAllowedRoles(realm);
   const plan = rollback ? ['disable-with-marker', 'invalidate-credentials', 'remove-workspace-role'] : complete && !marker ? [] : [
     ...(client.enabled ? ['disable-client'] : []),
     ...(!binding.length ? ['install-workspace-mapper'] : []),
@@ -108,23 +100,32 @@ export async function inspect(kc, row, { rollback = false } = {}) {
       plan, previousRoles: roles, extraRoles: roles.filter(role => !allowed.has(role)) } };
 }
 
-// Inspect everything before the first write, so a conflict makes the entire invocation read-only.
+// Inspect before writing. Terminal rows are report-only and remain in the inventory
+// so their registered clients cannot be mistaken for unregistered clients.
 export async function preflight({ pool, kcAdmin = defaultKcAdmin, rollback = false }) {
   const inspected = [];
   const failed = [];
+  let blocked = false;
   let rows, tenants;
   try {
     ({ rows } = await pool.query(`${REGISTRY_SQL} ORDER BY sa.id`));
     tenants = (await pool.query('SELECT id, iam_realm FROM tenants WHERE iam_realm IS NOT NULL ORDER BY id')).rows;
   } catch (error) {
-    return { inspected, failed: [{ phase: 'registry', reason: safeFailure(error) }] };
+    return { inspected, blocked: true, failed: [{ phase: 'registry', reason: safeFailure(error) }] };
   }
   for (const row of rows) {
+    if (row.status !== 'active') {
+      failed.push({ serviceAccountId: row.id, reason: 'inactive-registry-row' });
+      continue;
+    }
     try {
       requireState(rows.filter(other => other.iam_realm === row.iam_realm
         && (other.kc_client_uuid === row.kc_client_uuid || other.kc_client_id === row.kc_client_id)).length === 1, 'duplicate-registry-client');
       inspected.push(await inspect(kcAdmin, row, { rollback }));
-    } catch (error) { failed.push({ serviceAccountId: row.id, reason: safeFailure(error) }); }
+    } catch (error) {
+      blocked = true;
+      failed.push({ serviceAccountId: row.id, reason: safeFailure(error) });
+    }
   }
   for (const tenant of tenants) {
     try {
@@ -133,9 +134,12 @@ export async function preflight({ pool, kcAdmin = defaultKcAdmin, rollback = fal
         requireState(rows.some(row => row.tenant_id === tenant.id && row.iam_realm === tenant.iam_realm
           && row.kc_client_uuid === client.id && row.kc_client_id === client.clientId), 'client-missing-from-registry');
       }
-    } catch (error) { failed.push({ realm: tenant.iam_realm, reason: safeFailure(error) }); }
+    } catch (error) {
+      blocked = true;
+      failed.push({ realm: tenant.iam_realm, reason: safeFailure(error) });
+    }
   }
-  return { inspected, failed };
+  return { inspected, failed, blocked };
 }
 
 // Stabilize registry identity/status across the KC migration. Operators pause other
