@@ -13,6 +13,7 @@ import { Kafka, logLevel } from 'kafkajs';
 import * as store from './tenant-store.mjs';
 import { resolveKafkaSecurity } from './transport-security.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
+import { canAccessWorkspace } from './workspace-authz.mjs';
 import { can } from './model-authz.mjs';
 import { checkDimensionQuota, quotaDenial } from './dimension-quota.mjs';
 
@@ -179,10 +180,13 @@ export async function deleteTopics(physicalNames) {
 // a cross-tenant id is reported as 404 (no existence leak), mirroring the
 // executor's workspace-ownership guard.
 async function resolveOwnedWorkspace(ctx) {
-  const ws = await getStore().getWorkspace(ctx.pool, ctx.params.workspaceId);
+  const ws = await (ctx.store ?? getStore()).getWorkspace(ctx.pool, ctx.params.workspaceId);
   if (!ws) return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
   const scope = callerTenantScope(ctx.identity);
-  if (scope != null && ws.tenant_id !== scope) return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
+  if ((scope != null && ws.tenant_id !== scope)
+    || !canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, ['topic.read', 'topic.publish', 'topic.consume', 'topic.admin'])) {
+    return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
+  }
   return { ws };
 }
 
@@ -410,13 +414,16 @@ async function eventsProvisionTopic(ctx) {
 }
 
 async function resolveTopic(ctx) {
-  const t = await getStore().getTopicByResourceId(ctx.pool, ctx.params.topicId);
+  const t = await (ctx.store ?? getStore()).getTopicByResourceId(ctx.pool, ctx.params.topicId);
   if (!t) return { error: err(404, 'TOPIC_NOT_FOUND', `topic ${ctx.params.topicId} not found`) };
   // Enforce the caller's verified tenant owns the topic. A cross-tenant resource
   // id resolves to 404 (no existence leak) — closing the Events/Kafka IDOR where
   // a tenant could read/publish/consume another tenant's topic (P0 ISO-EVENTS).
   const scope = callerTenantScope(ctx.identity);
-  if (scope != null && t.tenant_id !== scope) return { error: err(404, 'TOPIC_NOT_FOUND', `topic ${ctx.params.topicId} not found`) };
+  if ((scope != null && t.tenant_id !== scope)
+    || !canAccessWorkspace(ctx.identity, t, ['topic.read', 'topic.publish', 'topic.consume', 'topic.admin'])) {
+    return { error: err(404, 'TOPIC_NOT_FOUND', `topic ${ctx.params.topicId} not found`) };
+  }
   return { t };
 }
 
@@ -516,15 +523,13 @@ async function eventsWorkspaceTopicMessages(ctx) {
 
 // GET /v1/events/topics/{resourceId}/stream  (SSE — owns the response)
 async function eventsTopicStream(ctx, res) {
-  const t = await getStore().getTopicByResourceId(ctx.pool, ctx.params.topicId);
-  // Same tenant boundary as resolveTopic — a cross-tenant id must not open an SSE
-  // consumer onto another tenant's topic (P0 ISO-EVENTS).
-  const scope = callerTenantScope(ctx.identity);
-  if (!t || (scope != null && t.tenant_id !== scope)) {
+  const resolved = await resolveTopic(ctx);
+  if (resolved.error) {
     res.writeHead(404, { 'content-type': 'application/json', ...(ctx.cors ?? {}) });
     res.end(JSON.stringify({ code: 'TOPIC_NOT_FOUND', message: `topic ${ctx.params.topicId} not found` }));
     return;
   }
+  const { t } = resolved;
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive', ...(ctx.cors ?? {}) });
   res.write(': connected\n\n');
   const consumer = getKafka().consumer({ groupId: `console-stream-${randomUUID().slice(0, 8)}` });

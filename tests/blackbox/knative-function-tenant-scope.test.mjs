@@ -300,8 +300,8 @@ test('#1083: trusted platform readers and same-tenant read roles receive the pag
   const tenant = ['tenant_owner', 'tenant_admin'].map((role) => ({ ...IDENTITY_A, roles: [role] }));
   const workspace = [
     'workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_operator',
-    'workspace_viewer', 'workspace_auditor', 'service_account', 'developer_external',
-  ].map((role) => ({ ...IDENTITY_A, roles: [role], workspaceId: 'ws-a' }));
+    'workspace_viewer', 'workspace_auditor', 'workspace_service_account',
+  ].map((role) => ({ ...IDENTITY_A, roles: [role], workspaceId: 'ws-a', workspaceIds: ['ws-a'] }));
   for (const identity of [...platform, ...tenant, ...workspace]) {
     const result = await FN_HANDLERS.fnActivations(ctx(identity));
     assert.equal(result.statusCode, 200, identity.roles[0]);

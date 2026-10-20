@@ -80,8 +80,8 @@ function ctx({ method = 'GET', url, body = {}, query = {}, identity, params = {}
     webhookWritePool: WEBHOOK_WRITE_POOL,
   };
 }
-const A = { sub: 'user-a', tenantId: 'tenant-a', workspaceId: 'ws-a', actorType: 'tenant_owner' };
-const B = { sub: 'user-b', tenantId: 'tenant-b', workspaceId: 'ws-b', actorType: 'tenant_owner' };
+const A = { sub: 'user-a', tenantId: 'tenant-a', workspaceId: 'ws-a', actorType: 'tenant_owner', roles: ['tenant_owner'] };
+const B = { sub: 'user-b', tenantId: 'tenant-b', workspaceId: 'ws-b', actorType: 'tenant_owner', roles: ['tenant_owner'] };
 // IP-literal HTTPS target -> validator takes the IP-blocklist path, no DNS (deterministic, offline).
 const TARGET = 'https://93.184.216.34/hook';
 
@@ -237,7 +237,7 @@ test('bbx-957-01: superadmin lists and creates under the resolved workspace tena
 
 test('bbx-957-01b: same-tenant admin keeps workspace-path create and list access', async () => {
   const db = memDb();
-  const admin = { sub: 'admin-a', tenantId: 'tenant-a', workspaceId: null, actorType: 'tenant_admin' };
+  const admin = { sub: 'admin-a', tenantId: 'tenant-a', workspaceId: null, actorType: 'tenant_admin', roles: ['tenant_admin'] };
   const opts = { buildDb: () => db, getWorkspace: ownedWs('tenant-a') };
   const request = (method, body) => ctx({
     method, url: '/v1/workspaces/ws-a/webhooks/subscriptions', identity: admin,
@@ -251,7 +251,7 @@ test('bbx-957-01b: same-tenant admin keeps workspace-path create and list access
 });
 
 test('bbx-957-02: same-tenant member sees event catalogue but cannot manage subscriptions', async () => {
-  const member = { sub: 'member-a', tenantId: 'tenant-a', workspaceId: null, actorType: 'tenant_member' };
+  const member = { sub: 'member-a', tenantId: 'tenant-a', workspaceId: null, workspaceIds: ['ws-a'], roles: ['tenant_viewer'], actorType: 'tenant_member' };
   let dbBuilds = 0;
   const opts = { buildDb: () => { dbBuilds++; return memDb(); }, getWorkspace: ownedWs('tenant-a') };
   for (const method of ['GET', 'POST']) {

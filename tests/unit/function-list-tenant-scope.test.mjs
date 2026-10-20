@@ -14,13 +14,13 @@
  * source.inlineCode (the function's source) and tenantId. The by-id siblings
  * (fnActionDetail/fnInvoke) and the export handler already gate on the caller's tenant;
  * these two LIST handlers were the only ones skipping the gate. The fix gates both via the
- * existing ownedWorkspace(ctx, workspaceId) helper (403 for foreign/unknown; superadmin
+ * existing ownedWorkspace(ctx, workspaceId) helper (404 for foreign/unknown; superadmin
  * bypass preserved) and adds a tenant predicate to listFnActions (defense-in-depth).
  *
  * Each test is RED on the current (broken) code and GREEN after the fix.
  *
- * bbx-fn-list-scope-01: Tenant B principal reads Tenant A workspace inventory → 403, no leak
- * bbx-fn-list-scope-02: Tenant B principal lists Tenant A workspace actions   → 403, no leak
+ * bbx-fn-list-scope-01: Tenant B principal reads Tenant A workspace inventory → 404, no leak
+ * bbx-fn-list-scope-02: Tenant B principal lists Tenant A workspace actions   → 404, no leak
  * bbx-fn-list-scope-03: Tenant A principal reads its own workspace inventory  → 200 (+source.inlineCode)
  * bbx-fn-list-scope-04: Tenant A principal lists its own workspace actions    → 200
  * bbx-fn-list-scope-05: Superadmin reads any workspace inventory              → 200 (cross-tenant bypass)
@@ -136,12 +136,12 @@ function ctx(identity, params = {}) {
 }
 
 // ===========================================================================
-// bbx-fn-list-scope-01: Tenant B reads Tenant A workspace inventory → 403, no leak
+// bbx-fn-list-scope-01: Tenant B reads Tenant A workspace inventory → 404, no leak
 // ===========================================================================
-test('bbx-fn-list-scope-01: fnInventory cross-tenant LIST returns 403 with no foreign data', async () => {
+test('bbx-fn-list-scope-01: fnInventory cross-tenant LIST returns 404 with no foreign data', async () => {
   const result = await FN_HANDLERS.fnInventory(ctx(IDENTITY_B, { workspaceId: 'ws-a' }));
-  assert.equal(result.statusCode, 403,
-    `expected 403 for cross-tenant inventory, got ${result.statusCode} (body: ${JSON.stringify(result.body)})`);
+  assert.equal(result.statusCode, 404,
+    `expected 404 for cross-tenant inventory, got ${result.statusCode} (body: ${JSON.stringify(result.body)})`);
   assert.ok(result.body?.code, 'response must include an error code');
   const serialized = JSON.stringify(result.body);
   assert.ok(!serialized.includes('ACME-SECRET'), 'cross-tenant response must not leak source code');
@@ -149,12 +149,12 @@ test('bbx-fn-list-scope-01: fnInventory cross-tenant LIST returns 403 with no fo
 });
 
 // ===========================================================================
-// bbx-fn-list-scope-02: Tenant B lists Tenant A workspace actions → 403, no leak
+// bbx-fn-list-scope-02: Tenant B lists Tenant A workspace actions → 404, no leak
 // ===========================================================================
-test('bbx-fn-list-scope-02: fnListActions cross-tenant LIST returns 403 with no foreign data', async () => {
+test('bbx-fn-list-scope-02: fnListActions cross-tenant LIST returns 404 with no foreign data', async () => {
   const result = await FN_HANDLERS.fnListActions(ctx(IDENTITY_B, { workspaceId: 'ws-a' }));
-  assert.equal(result.statusCode, 403,
-    `expected 403 for cross-tenant actions list, got ${result.statusCode} (body: ${JSON.stringify(result.body)})`);
+  assert.equal(result.statusCode, 404,
+    `expected 404 for cross-tenant actions list, got ${result.statusCode} (body: ${JSON.stringify(result.body)})`);
   assert.ok(result.body?.code, 'response must include an error code');
   const serialized = JSON.stringify(result.body);
   assert.ok(!serialized.includes('ACME-SECRET'), 'cross-tenant response must not leak source code');

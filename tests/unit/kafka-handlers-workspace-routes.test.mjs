@@ -44,7 +44,7 @@ function matchRoute(compiledRoutes, method, path) {
 function ownerCtx(overrides = {}) {
   return {
     pool: {},
-    identity: { actorType: 'tenant_owner', tenantId: 'ten_1', sub: 'owner_1' },
+    identity: { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: 'ten_1', sub: 'owner_1' },
     params: { workspaceId: 'ws_1' },
     query: {},
     body: {},
@@ -274,7 +274,7 @@ test('fix-777-05: same-tenant non-admin cannot publish through the workspace top
   });
 
   const response = await KAFKA_HANDLERS.eventsWorkspaceTopicPublish(ownerCtx({
-    identity: { actorType: 'tenant_member', tenantId: 'ten_1', sub: 'viewer_1' },
+    identity: { actorType: 'tenant_member', roles: ['tenant_viewer'], workspaceIds: ['ws_1'], tenantId: 'ten_1', sub: 'viewer_1' },
     params: { workspaceId: 'ws_1', topic: 'orders' },
     body: { value: { amount: 10 } }
   }));

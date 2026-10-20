@@ -15,7 +15,7 @@ const routes = [
   ['eventsTopicPublish', { topicId: topic.id }],
   ['eventsWorkspaceTopicPublish', { workspaceId: topic.workspace_id, topic: topic.topic_name }]
 ];
-const owner = { actorType: 'tenant_owner', tenantId: topic.tenant_id, sub: 'owner_1' };
+const owner = { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: topic.tenant_id, sub: 'owner_1' };
 
 test.afterEach(__resetKafkaHandlersTestHooks);
 
@@ -117,7 +117,7 @@ for (const [handler, params] of routes) {
 
   test(`fix-1009-04: ${handler} denies an empty publish before payload validation`, async () => {
     const { response, calls } = await publish(handler, params, {}, {
-      actorType: 'tenant_member', tenantId: topic.tenant_id, sub: 'viewer_1'
+      actorType: 'tenant_member', roles: ['tenant_viewer'], workspaceIds: [topic.workspace_id], tenantId: topic.tenant_id, sub: 'viewer_1'
     });
     assert.equal(response.statusCode, 403);
     assert.equal(response.body.code, 'FORBIDDEN');

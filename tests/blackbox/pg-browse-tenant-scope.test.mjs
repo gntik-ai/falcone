@@ -52,7 +52,7 @@ const pool = {
   },
 };
 
-const acmeOwner = { actorType: 'tenant_owner', tenantId: ACME };
+const acmeOwner = { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: ACME };
 const superadmin = { actorType: 'superadmin' };
 
 const ctx = (identity, params = {}) => ({ pool, identity, params, query: {} });

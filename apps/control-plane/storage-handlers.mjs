@@ -13,11 +13,8 @@ import { checkBucketQuota, checkTenantByteQuota, tenantByteLimit, usageLimits, d
 import { quotaDenial } from './dimension-quota.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { can } from './model-authz.mjs';
-import authorizationModel from '../../packages/internal-contracts/src/authorization-model.json' with { type: 'json' };
+import { canAccessWorkspace } from './workspace-authz.mjs';
 import { isJsonBody } from './request-body.mjs';
-
-// #973: derive tenant-tier roles once from the same shipped model used by can().
-const TENANT_ROLES = new Set(authorizationModel.permission_matrix.tenant.map(({ role }) => role));
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, or any
 // S3-compatible backend). Legacy MINIO_* names remain as backward-compatible fallbacks;
@@ -370,16 +367,8 @@ function isSuperOrInternal(identity) {
 // #973: bucket reads require model authority or a tenant role with a verified workspace binding.
 // Return the existing 404 shape before S3; request fields never grant workspace authority.
 function canReadWorkspaceBuckets(identity, rec) {
-  if (isSuperOrInternal(identity)) return true;
-  if (rec) {
-    const scope = { tenantId: rec.tenant_id, workspaceId: rec.workspace_id };
-    if (['bucket.read', 'bucket.write', 'bucket.admin'].some((action) => can(identity, action, scope))) return true;
-    if (rec.tenant_id && identity.tenantId === rec.tenant_id && rec.workspace_id
-      && Array.isArray(identity.roles)
-      && identity.roles.some((role) => TENANT_ROLES.has(role))
-      && Array.isArray(identity.workspaceIds) && identity.workspaceIds.includes(rec.workspace_id)) return true;
-  }
-  return false;
+  // Preserve #973's model grants for legacy unmapped buckets, including owner/admin reads.
+  return canAccessWorkspace(identity, rec, ['bucket.read', 'bucket.write', 'bucket.admin'], { allowUnmapped: true });
 }
 function denyUnlessWorkspaceBucketReader(ctx, bucket, rec) {
   if (canReadWorkspaceBuckets(ctx.identity, rec)) return null;
@@ -691,7 +680,10 @@ async function storageWorkspaceUsage(ctx) {
   const workspaceId = ctx.params.workspaceId;
   const { ws, error } = await requireOwnedWorkspace(ctx);
   if (error) return error;
-  const mapped = await store.listBucketsForWorkspace(ctx.pool, workspaceId);
+  if (!canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, ['bucket.read', 'bucket.write', 'bucket.admin'])) {
+    return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
+  }
+  const mapped = await (ctx.store ?? store).listBucketsForWorkspace(ctx.pool, workspaceId);
   let totalBytes = 0, objectCount = 0; const bucketEntries = [];
   for (const row of mapped) {
     try {
@@ -730,7 +722,8 @@ async function storageProvisionBucket(ctx) {
   if (error) return error;
   // Trusted resource ownership for dispatch audit, never request bodies (#971).
   const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
-  if (!can(ctx.identity, 'bucket.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
+  if (!canReadWorkspaceBuckets(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id })
+    || !can(ctx.identity, 'bucket.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
     return scoped(err(403, 'FORBIDDEN', 'caller may not administer buckets in this workspace'));
   }
   // Per-workspace bucket-count quota admission (#674). Count THIS workspace's buckets (the

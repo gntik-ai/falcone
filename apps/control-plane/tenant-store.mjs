@@ -768,6 +768,11 @@ export async function databaseWorkspaceMap(pool) {
   for (const r of rows) map[r.database_name] = r;
   return map;
 }
+
+export async function mongoDatabaseWorkspaceMappings(pool) {
+  const { rows } = await pool.query('SELECT database_name, workspace_id, tenant_id FROM workspace_mongo_databases');
+  return rows;
+}
 export async function getWorkspaceDatabase(pool, workspaceId) {
   const { rows } = await pool.query(
     `SELECT id, workspace_id, tenant_id, engine, database_name, mode, username, host, port, status, created_at, created_by

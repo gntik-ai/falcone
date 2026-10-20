@@ -106,7 +106,7 @@ test('fix-788-01: owned workspace realtime config returns ConsoleRealtimePage re
 
     const res = await REALTIME_HANDLERS.getWorkspaceRealtime({
       params: { workspaceId: 'ws-acme' },
-      identity: { actorType: 'tenant_owner', tenantId: 'ten-acme', sub: 'owner-1' },
+      identity: { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: 'ten-acme', sub: 'owner-1' },
       pool,
       store: fakeStore({ id: 'ws-acme-canonical', tenant_id: 'ten-acme' }),
     });
@@ -144,7 +144,7 @@ test('fix-788-02: owned workspace with no realtime_channels rows returns 200 emp
   const pool = fakePool([]);
   const res = await REALTIME_HANDLERS.getWorkspaceRealtime({
     params: { workspaceId: 'ws-acme' },
-    identity: { actorType: 'tenant_owner', tenantId: 'ten-acme', sub: 'owner-1' },
+    identity: { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: 'ten-acme', sub: 'owner-1' },
     pool,
     store: fakeStore({ id: 'ws-acme', tenant_id: 'ten-acme' }),
   });
@@ -159,7 +159,7 @@ test('fix-788-02b: read-only same-tenant caller can load the config route', asyn
   const pool = fakePool([]);
   const res = await REALTIME_HANDLERS.getWorkspaceRealtime({
     params: { workspaceId: 'ws-acme' },
-    identity: { actorType: 'tenant_member', tenantId: 'ten-acme', roles: ['tenant_viewer'], sub: 'viewer-1' },
+    identity: { actorType: 'tenant_member', tenantId: 'ten-acme', roles: ['tenant_viewer'], workspaceIds: ['ws-acme'], sub: 'viewer-1' },
     pool,
     store: fakeStore({ id: 'ws-acme', tenant_id: 'ten-acme' }),
   });
@@ -177,7 +177,7 @@ test('fix-788-03: foreign workspace id is scoped by verified tenant and does not
 
   const res = await REALTIME_HANDLERS.getWorkspaceRealtime({
     params: { workspaceId: 'ws-acme' },
-    identity: { actorType: 'tenant_owner', tenantId: 'ten-acme', sub: 'owner-1' },
+    identity: { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: 'ten-acme', sub: 'owner-1' },
     pool,
     store: fakeStore({ id: 'ws-acme', tenant_id: 'ten-other' }),
   });
@@ -222,7 +222,7 @@ test('fix-788-04: missing realtime_channels relation degrades to an empty succes
 
   const res = await REALTIME_HANDLERS.getWorkspaceRealtime({
     params: { workspaceId: 'ws-acme' },
-    identity: { actorType: 'tenant_owner', tenantId: 'ten-acme', sub: 'owner-1' },
+    identity: { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: 'ten-acme', sub: 'owner-1' },
     pool,
     store: fakeStore({ id: 'ws-acme', tenant_id: 'ten-acme' }),
   });
