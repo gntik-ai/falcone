@@ -11,11 +11,15 @@ TypeScript parser, comparing full paths without loading the legacy React app.
 
 ```sh
 pnpm --filter @in-falcone/web-console-next typecheck
-SHELL_TEST_FIXTURES=true pnpm --filter @in-falcone/web-console-next test
+pnpm --filter @in-falcone/web-console-next test
+SHELL_TEST_FIXTURES=true pnpm --filter @in-falcone/web-console-next exec vitest run tests/shell-fixtures.test.tsx
 pnpm --filter @in-falcone/web-console-next lint:colours
 node scripts/validate-gntik-ui-pin.mjs
 VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next build
 ```
+
+Run fixture tests separately: the normal route-parity test checks the release
+route set, which intentionally excludes fixture routes.
 
 `VITE_BASE_PATH` defaults to `/`. Set it to `/next/` for side-by-side development;
 it configures both Vite asset URLs and the router basename. Tailwind's Vite plugin
