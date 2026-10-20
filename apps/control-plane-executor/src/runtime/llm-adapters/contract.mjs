@@ -1,6 +1,7 @@
 // Shared pure provider adapter contract (add-compatible-provider-adapter-contract / #940).
 export const ERROR_CODES = Object.freeze({
   LLM_PROVIDER_AUTH_FAILED: 424,
+  LLM_PROVIDER_SECRET_UNRESOLVED: 500,
   LLM_PROVIDER_REQUEST_REJECTED: 424,
   LLM_PROVIDER_RATE_LIMITED: 429,
   LLM_PROVIDER_UNAVAILABLE: 503,

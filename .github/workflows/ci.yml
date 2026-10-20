@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '83e9893a31f5513c66f27e5f4944731cb7111106'
+  FALCONE_CHARTS_REF: '7f6391336faa3b29644d31bdec9dd0ef750ac7af'
 
 jobs:
   quality:
@@ -61,7 +61,9 @@ jobs:
 
       - name: LLM provider tests
         run: |
-          node --test tests/blackbox/byok-workspace-secrets.test.mjs \
+          node --test tests/unit/provider-credential-broker.test.mjs \
+            tests/blackbox/llm-provider-credential-broker.test.mjs \
+            tests/blackbox/byok-workspace-secrets.test.mjs \
             tests/blackbox/byok-workspace-worker.test.mjs \
             tests/blackbox/byok-provider-confinement.test.mjs \
             tests/blackbox/vault-workspace-secrets.test.mjs \
@@ -348,7 +350,7 @@ jobs:
         env:
           LLM_CONNECTIONS_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
           LLM_CONNECTIONS_TEST_REQUIRED: '1'
-        run: node --test tests/integration/llm-provider-connections-postgres.test.mjs
+        run: node --test tests/integration/llm-provider-connections-postgres.test.mjs tests/integration/provider-credential-broker-postgres.test.mjs
 
       - name: Real Postgres embedding connection registry
         env:
