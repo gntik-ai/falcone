@@ -95,11 +95,13 @@ loading, empty, unauthorized (401), forbidden (403), not-found (404), server-err
 
 Use `src/i18n/format.ts` for Intl dates, numbers and relative times; it reads the
 active locale on every call. React consumers must subscribe with `useTranslation`
-so formatting re-renders on switches. Pass the active locale to kit Timestamp,
-Calendar and DatePicker when using their locale props in future page migrations.
-Pass kit label props explicitly; common provides pagination summaries (ICU plural),
-filter controls and saved-view fallbacks for lower-level compositions where kit
-controls have embedded English copy. The scaffold does not mount those controls.
+so formatting re-renders on switches. Kit 0.9.0 built-in labels follow the shell's
+`I18nProvider`, which receives the active app locale. The mounted breadcrumb
+landmark is labelled `Ruta de navegación` by default and `Breadcrumb` after
+switching to English; the locale unit and browser tests assert both labels.
+Explicit kit label props override the catalog, so use translated app resources
+when supplying them. Common provides pagination summaries (ICU plural), filter
+controls and saved-view fallbacks for future page compositions.
 
 Additional checks:
 
