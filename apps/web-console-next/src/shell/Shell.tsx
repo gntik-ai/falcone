@@ -2,7 +2,7 @@ import { LayoutDashboard } from 'lucide-react'
 import { Suspense, useState, useEffect, type ComponentPropsWithRef } from 'react'
 import { AppSidebar, AppTopbar } from '@gntik-ai/blocks'
 import { SidebarLayout, Breadcrumbs, WorkspaceSwitcher, LinkProvider, MobileNav, type NavGroup } from '@gntik-ai/ui'
-import { Outlet, useLocation, matchRoutes, type RouteObject } from 'react-router-dom'
+import { Link, Outlet, useLocation, matchRoutes, type RouteObject } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
 import { PermissionsProvider, usePermissions } from './permissions'
@@ -12,12 +12,18 @@ import { ConsoleContextProvider, useConsoleContext } from './context'
 import { pendingConsoleRoutes } from './routes'
 import { useSession } from './session'
 import { AccountMenu } from './AccountMenu'
-import { navigation, navigationGroups } from './navigation'
+import { isMigratedRoute, navigation, navigationGroups } from './navigation'
 import { buildBreadcrumbs } from './breadcrumbs'
 
 // Unmigrated pages deliberately hand off to the legacy SPA in the same tab.
 // Their root-relative href must not inherit /next/ from the new router basename.
 function LegacyLink(props: ComponentPropsWithRef<'a'>) { return <a {...props} /> }
+
+function ShellLink({ href, children, ...props }: ComponentPropsWithRef<'a'>) {
+  return href && isMigratedRoute(href)
+    ? <Link to={href} {...props}><>{children}</></Link>
+    : <LegacyLink href={href} {...props}>{children}</LegacyLink>
+}
 
 const shellRoutes: RouteObject[] = [{ path: '/console', children: pendingConsoleRoutes }]
 
@@ -50,7 +56,7 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
     }).map((item) => ({ label: t(`navigation.${item.key}`), href: item.path, icon: (props: { size?: number; 'aria-hidden'?: boolean; className?: string }) => <item.icon {...props} />, current: pathname === item.path || (!('exactActive' in item) && pathname.startsWith(item.path + '/')) }))
   })).filter((group) => group.items.length)
   const breadcrumbs = buildBreadcrumbs(pathname, t)
-  return <LinkProvider component={LegacyLink}>
+  return <LinkProvider component={ShellLink}>
     <SidebarLayout fullScreen className="console-shell" drawerOpen={false} sidebarLabel={t('shell.navigation')}
       sidebar={({ collapsed, closeDrawer }) => <>
         <AppSidebar collapsed={collapsed} workspaces={[]} user={null} usage={null} helpHref="" navLabel={t('shell.navigation')}
@@ -79,6 +85,6 @@ function ContextPanel() {
       currentId={context.activeWorkspaceId ?? ''} onSelect={(workspace) => context.selectWorkspace(workspace.id)} label={t('shell.workspace')}
       emptyText={t('shell.selectWorkspace')} />
     {permissions.isReadOnly && <span>{t('shell.readOnly')}</span>}
-    {context.error && <p role="status">{t('states.network.body')}</p>}
+    {context.error && <p role="status">{context.error.status === 403 ? t('states.forbidden.body') : t('states.network.body')}</p>}
   </section>
 }

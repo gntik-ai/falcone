@@ -1,6 +1,10 @@
 import { expect, vi } from 'vitest'
 import { buildConsoleLoginSessionFixture } from '@in-falcone/console-api/fixtures'
-import { persistConsoleShellSession } from '@in-falcone/console-api/session'
+import { createElement, type ReactNode } from 'react'
+import { render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { SessionProvider } from '../src/shell/session'
+import { readConsoleShellSession, persistConsoleShellSession } from '@in-falcone/console-api/session'
 
 export const tenantUrl = '/v1/tenants?page%5Bsize%5D=100&sort=displayName'
 export const workspaceUrl = (tenant: string) => `/v1/workspaces?page%5Bsize%5D=100&sort=displayName&filter%5BtenantId%5D=${tenant}`
@@ -20,4 +24,12 @@ export function strictFetch(routes: Record<string, unknown | ((init: RequestInit
   })
   vi.stubGlobal('fetch', mock)
   return { mock, verify: () => expect(unmatched).toEqual([]) }
+}
+
+// Seed with login() or persistConsoleShellSession() first. No ProtectedRoute lifecycle.
+export function renderWithSession(page: ReactNode, { route = '/console/overview', basename }: { route?: string; basename?: string } = {}) {
+  const session = readConsoleShellSession()
+  if (!session) throw new Error('Persist a shell session before rendering a page')
+  return render(createElement(MemoryRouter, { initialEntries: [route], basename },
+    createElement(SessionProvider, { value: session }, page)))
 }

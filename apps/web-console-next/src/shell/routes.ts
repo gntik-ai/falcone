@@ -2,6 +2,8 @@ export type GuardKind = 'superadmin' | 'observer' | 'secrets'
 
 interface PendingConsoleRoute {
   path: string
+  // Opt in only when the page migration lands. Absent means legacy navigation.
+  migrated?: boolean
   guard?: GuardKind
   handle?: { platformGlobal: boolean }
 }

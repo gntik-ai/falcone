@@ -1,3 +1,5 @@
+import { matchPath } from 'react-router-dom'
+import { pendingConsoleRoutes } from './routes'
 import { Activity, Database, FolderKanban, Gauge, KeyRound, KeySquare, LayoutDashboard, LogIn, PieChart, Rocket, Settings, Shield, Users, Workflow } from 'lucide-react'
 
 // Application destinations and role visibility follow the legacy shell.
@@ -34,3 +36,13 @@ export const navigation = [
 ] as const
 
 export const navigationGroups = ['main', 'workspace', 'functions', 'administration', 'dataPlane', 'operations', 'restricted'] as const
+
+export function isMigratedRoute(href: string) {
+  if (!href.startsWith('/console/') || !pendingConsoleRoutes.some((route) => route.migrated === true)) return false
+  const pathname = href.split(/[?#]/, 1)[0]
+  // Prefer the most specific route (including unmarked child routes).
+  const routes = [...pendingConsoleRoutes].sort((a, b) =>
+    b.path.split('/').length - a.path.split('/').length ||
+    a.path.split(':').length - b.path.split(':').length)
+  return routes.find((route) => matchPath(`/console/${route.path}`, pathname))?.migrated === true
+}
