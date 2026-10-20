@@ -152,3 +152,27 @@ release build with `tests/shell-release.test.mjs`, then builds the fixture varia
 the existing final release build also leaves fixtures disabled. For the focused
 Vitest fixture checks, set `SHELL_TEST_FIXTURES=true` and run
 `vitest run tests/shell-fixtures.test.tsx` from this package.
+
+### Page migration prerequisites
+
+Route metadata in `src/shell/routes.ts` accepts `migrated?: boolean`; omission
+means false. No shipped route opts in yet. Sidebar and mobile links resolve the
+matching route through `navigation.ts`: only `migrated: true` uses the router
+Link, while all other hrefs remain root-relative legacy hand-offs. The account
+menu has no route links. Keep each page's migration marker with its route.
+
+`Guard` accepts optional translated `denialTitle` and `denialDescription` props;
+`RouteState` accepts `title` and `description`. Omitted copy uses the existing
+`states.forbidden` resources. Tenant/workspace context failures retain numeric
+HTTP status: exactly 403 displays `states.forbidden.body`; other and unknown
+failures display `states.network.body`.
+
+`ProtectedRoute` uses the router's basename when storing pathname, query and
+fragment as the shared protected intent. Restoring that intent after sign-in
+belongs to the login migration; the login page remains a placeholder.
+
+Vitest page tests can call `login(roles, tenantIds, workspaceIds)` then
+`renderWithSession(<Page />, { route, basename })` from `tests/shell-support.ts`.
+It reads the persisted session and provides `useSession` synchronously without
+mounting ProtectedRoute, checking/refreshing authentication, or showing its
+loading StatusPage. Compose ConsoleContextProvider when the page needs context.

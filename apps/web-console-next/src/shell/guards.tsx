@@ -7,14 +7,14 @@ import { useSession } from './session'
 import { usePermissions } from './permissions'
 import type { GuardKind } from './routes'
 
-export function Guard({ kind, children }: { kind: GuardKind; children: ReactNode }) {
+export function Guard({ kind, children, denialTitle, denialDescription }: { kind: GuardKind; children: ReactNode; denialTitle?: string; denialDescription?: string }) {
   const session = useSession()
   const { activeWorkspaceId } = useConsoleContext()
   const roles = session?.principal?.platformRoles ?? []
   const allowed = kind === 'superadmin' ? roles.includes('superadmin') : kind === 'observer'
     ? roles.some((role) => ['superadmin', 'platform_admin', 'platform_operator', 'platform_auditor'].includes(role))
     : canManageWorkspaceSecrets(session, activeWorkspaceId)
-  return allowed ? children : <RouteState state="forbidden" />
+  return allowed ? children : <RouteState state="forbidden" title={denialTitle} description={denialDescription} />
 }
 export function ConsoleIndexRedirect() {
   const permissions = usePermissions()

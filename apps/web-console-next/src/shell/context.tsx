@@ -29,10 +29,14 @@ function persist(userId: string, tenantId: string | null, workspaceId: string | 
     else localStorage.setItem(contextKey, JSON.stringify({ userId, tenantId, workspaceId, updatedAt: new Date().toISOString() } satisfies Snapshot))
   } catch { /* Storage disabled. Selection remains available for this page. */ }
 }
+function contextError(cause: unknown): { status?: number } {
+  const status = cause && typeof cause === 'object' && 'status' in cause ? cause.status : undefined
+  return { status: typeof status === 'number' ? status : undefined }
+}
 const normalizeId = (id?: string | null) => id?.trim() || null
 interface ContextValue {
   tenants: Tenant[]; workspaces: Workspace[]; activeTenantId: string | null; activeWorkspaceId: string | null
-  loading: boolean; error: boolean
+  loading: boolean; error: { status?: number } | null
   selectTenant: (id: string | null) => void; selectWorkspace: (id: string | null) => void
 }
 const Context = createContext<ContextValue | null>(null)
@@ -51,7 +55,7 @@ export function ConsoleContextProvider({ children, routeWorkspaceId }: { childre
   const [activeTenantId, setTenant] = useState<string | null>(null)
   const [activeWorkspaceId, setWorkspace] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<{ status?: number } | null>(null)
   const [selection, setSelection] = useState<{ tenantId: string | null; route: string | null } | null>(null)
 
   useEffect(() => {
@@ -67,7 +71,7 @@ export function ConsoleContextProvider({ children, routeWorkspaceId }: { childre
     }
     void tenantRequest.current.promise.then((result) => {
       if (!cancelled) setTenants(result.items.filter((tenant) => !ownTenantIds.length || ownTenantIds.includes(tenant.tenantId)))
-    }).catch(() => { if (!cancelled) { setError(true); setTenants([]); setLoading(false) } })
+    }).catch((cause: unknown) => { if (!cancelled) { setError(contextError(cause)); setTenants([]); setLoading(false) } })
     return () => { cancelled = true }
   }, [session, userId])
 
@@ -110,8 +114,8 @@ export function ConsoleContextProvider({ children, routeWorkspaceId }: { childre
         if (cancelled) return
         setTenant(tenantId); setWorkspace(workspaceId); setWorkspaces(options)
         persist(userId, tenantId, workspaceId)
-      } catch {
-        if (!cancelled) { setWorkspace(null); setWorkspaces([]); setError(true) }
+      } catch (cause) {
+        if (!cancelled) { setWorkspace(null); setWorkspaces([]); setError(contextError(cause)) }
       } finally { if (!cancelled) setLoading(false) }
     }
     void resolve()
@@ -122,7 +126,7 @@ export function ConsoleContextProvider({ children, routeWorkspaceId }: { childre
     const tenantId = normalizeId(id)
     if (tenantId && !tenants?.some((tenant) => tenant.tenantId === tenantId)) return
     if (tenantId === activeTenantId) return
-    setTenant(tenantId); setWorkspace(null); setWorkspaces([]); setError(false)
+    setTenant(tenantId); setWorkspace(null); setWorkspaces([]); setError(null)
     persist(userId, tenantId, null)
     setSelection({ tenantId, route: routeId })
   }

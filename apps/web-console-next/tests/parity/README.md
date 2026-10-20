@@ -43,3 +43,34 @@ in a follow-up, outside this harness change.
 
 CI initially reports an optional check. Before removing this job after making
 it required, the operator must first remove its branch-protection requirement.
+
+Page manifests may opt into `workspace_admin` and `workspace_viewer` in `roles`;
+the default shell matrix stays unchanged. To register page endpoints, add a typed
+`endpoints` map to the manifest and set this in the companion spec before its tests:
+
+```js
+test.use({ pageEndpoints: manifest.endpoints ?? {} });
+```
+
+Each map entry has `method`, an absolute `/v1/...` `path`, and a `fixtures` map.
+A fixture is `{ status, body, network?, delayMs? }` or a function from role to
+that response. Provide `success` and any page-specific fixtures such as `empty`.
+Page endpoints also support the standard `401`, `403`, `404`, `500` and `network`
+variants. Shell and page endpoints share one registry. Duplicate names and
+duplicate method/path pairs are rejected, including collisions between pages.
+Unregistered API calls and external calls still fail automatic teardown.
+
+`parity.open(route, variants)` and `parity.network.setVariants(variants)` accept
+strings as before, `{ variant: 'success', delayMs: 1000 }` for a delayed response,
+and arrays such as `['500', 'success']` for a retry scenario. Each endpoint
+advances independently and repeats its final response. Opening a page or setting
+variants resets sequence counters; an unknown endpoint/fixture is an error.
+Responses can also specify `delayMs` directly in the fixture.
+
+`parity.open` waits for the shell and lazy page to settle. To observe a page's
+initial loading state, configure variants first and navigate with
+`parity.page.goto(...)` directly, or trigger the request after `open`.
+`fixtures/page.ts` and the page-endpoint cases in `harness.spec.mjs` demonstrate
+registration for both workspace roles, loading before data, and error then retry.
+The negative suite also verifies that page registration keeps unmatched requests
+fatal. No synthetic page route is shipped in the application.

@@ -82,3 +82,17 @@ test('kit-conformance raw colour', async () => {
     await check.kitConformance({ sources: [file] });
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test.describe('registered page endpoints keep the unmatched-request gate', () => {
+  test.use({ pageEndpoints: { records: { method: 'GET', path: '/v1/synthetic-records', fixtures: { success: { status: 200, body: { items: [] } } } } } });
+  test('unregistered request fails with page endpoints', async ({ parity }) => {
+    await parity.open(manifest.route);
+    await parity.page.evaluate(() => fetch('/v1/synthetic-page-unregistered'));
+    // Automatic teardown must still fail with a registered page fixture.
+  });
+  test('external request fails even for a registered endpoint path', async ({ parity }) => {
+    await parity.open(manifest.route);
+    await parity.page.goto('https://synthetic.invalid/v1/synthetic-records');
+    // The endpoint path matches, but the origin must still be rejected.
+  });
+});

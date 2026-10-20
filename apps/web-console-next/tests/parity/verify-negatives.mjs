@@ -14,6 +14,8 @@ function collect(suite) { specs.push(...(suite.specs ?? [])); for (const child o
 collect(report);
 const expected = new Map([
   ['unmatched request names method and path', /POST \/v1\/synthetic-unmatched/],
+  ['unregistered request fails with page endpoints', /GET \/v1\/synthetic-page-unregistered/],
+  ['external request fails even for a registered endpoint path', /GET \/v1\/synthetic-records/],
   ['runtime-health console.error', /runtime-health:.*synthetic-console-error/s],
   ['runtime-health pageerror', /runtime-health:.*synthetic-page-error/s],
   ['runtime-health unhandledrejection', /runtime-health:.*synthetic-rejection/s],

@@ -1,17 +1,19 @@
 import { test as base, expect } from '@playwright/test';
 import { startServer } from '../csp/server.mjs';
 import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
+import { createEndpointRegistry } from './endpoint-registry.ts';
 
 export { expect };
 export const test = base.extend({
   role: ['superadmin', { option: true }],
+  pageEndpoints: [{}, { option: true }],
   server: [async ({}, use) => {
     const server = await startServer();
     try { await use(server); } finally { await server.close(); }
   }, { scope: 'worker' }],
-  parity: [async ({ page, server, role, locale }, use) => {
+  parity: [async ({ page, server, role, locale, pageEndpoints }, use) => {
     const requests = [], unmatched = [], faults = [];
-    let selected = {};
+    const registry = createEndpointRegistry(endpoints, responseFor, pageEndpoints);
     await page.clock.setFixedTime(new Date('2026-06-01T12:00:00Z'));
     await page.exposeBinding('__parityFault', (_, message) => { faults.push(message); });
     page.on('pageerror', (error) => faults.push(`pageerror: ${error.message}`));
@@ -40,21 +42,22 @@ export const test = base.extend({
       let body;
       try { body = request.postDataJSON() ?? undefined; } catch { body = request.postData(); }
       requests.push({ method, path: path + url.search, body });
-      const name = Object.keys(endpoints).find((key) => endpoints[key].method === method && endpoints[key].path === path);
+      const name = registry.find(method, path);
       if (url.origin !== server.origin || !name) {
         unmatched.push(`${method} ${path}${url.search}`);
         await route.fulfill({ status: 404, json: { error_msg: '404 Route Not Found' } });
         return;
       }
-      const response = responseFor(name, selected[name] ?? 'success', role);
+      const response = registry.responseFor(name, role);
+      if (response.delayMs) await new Promise((done) => setTimeout(done, response.delayMs));
       if (response.network) await route.abort('failed');
-      else await route.fulfill({ status: response.status, json: response.body });
+      else await route.fulfill({ status: response.status ?? 200, json: response.body });
     });
-    const network = { requests, setVariants: (value) => { selected = value; } };
+    const network = { requests, setVariants: (value) => registry.setVariants(value) };
     const parity = {
       page, locale, role, network, faults,
       async open(route, variants = {}) {
-        selected = variants;
+        registry.setVariants(variants);
         await page.goto(server.url(route.replace(/^\//, '')));
         await expect(page.locator('main')).toBeVisible();
         await expect(page.locator('main h1')).toBeVisible();
