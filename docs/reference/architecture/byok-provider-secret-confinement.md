@@ -11,9 +11,9 @@ properties are enforced as a single fail-closed chokepoint
 (`apps/control-plane-executor/src/runtime/byok-provider-guard.mjs`), shared by the LLM executor, the embedding
 executor, and the workflow worker's `llm.complete` activity:
 
-1. **Secret confinement** — the key is resolvable only from a secret whose env-var name carries an
-   operator-controlled reserved prefix (default `BYOK_`). A caller can never name an unrelated
-   platform secret.
+1. **Secret confinement** — the key resolves from a write-only workspace secret under the verified
+   connection scope, or from an env-var name carrying an operator-controlled reserved prefix
+   (default `BYOK_`). A caller cannot select another workspace or an unrelated platform env var.
 2. **Endpoint SSRF guard** — the provider endpoint is validated against the shared SSRF blocklist; an
    internal/loopback/link-local/metadata/private target is rejected.
 
@@ -60,6 +60,28 @@ To onboard a BYOK key, mount it under a `BYOK_`-prefixed env var (e.g. `BYOK_OPE
 
 > A `secretRef` with no `name` (e.g. a `{ "vaultPath": "…" }` form handled by a different resolver)
 > is not an env-var lookup and is left to that resolver's own fail-closed handling.
+
+## Workspace secret references (#938)
+
+LLM and embedding connections also accept `secretRef: { "workspaceSecret": "openai-key" }`.
+Create or replace that key through the existing write-only workspace secret API. The name must
+pass the store's lowercase, letter-first, 63-character rule; slashes, dots and uppercase fail.
+A reference cannot combine `name` and `workspaceSecret`.
+
+Configuration deploy/create/replace checks existence in the verified caller workspace before
+persisting. Invalid refs return 400 `BYOK_SECRET_REF_NOT_ALLOWED`; absent secrets return 422
+`BYOK_WORKSPACE_SECRET_NOT_FOUND`. OpenBao check errors return a sanitized 500
+`BYOK_WORKSPACE_SECRET_UNRESOLVED` and no configuration is written.
+
+The control-plane executor shares one `vaultStoreFromEnv` store between completions and embeddings.
+Each provider request reads through `getValue` under the connection's tenant/workspace. Batch
+reconciliation uses its saved row's scope and reference, even if the connection later changes.
+No resolved value is cached, added to configuration, or stored in batch rows. Rotation is immediate.
+Missing/disabled/erroring stores fail with 500 `LLM_PROVIDER_SECRET_UNRESOLVED` or
+`EMBEDDING_SECRET_UNRESOLVED` before provider I/O. Store logs contain bounded operation/status only.
+
+The workflow worker has no injected workspace store and fails closed for workspace references,
+without reading credential env vars. Worker OpenBao service-account binding remains a follow-up.
 
 ## Flow `llm.complete` binds to the execution-token workspace (#663)
 

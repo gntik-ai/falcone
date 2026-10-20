@@ -615,8 +615,10 @@ Workspace lifecycle, application inventory, workload identities, and managed-res
 | DELETE | `/v1/workspaces/{workspaceId}/docs/notes/{noteId}` | workspace | workspace_doc_note | Delete a custom workspace documentation note |
 | PUT | `/v1/workspaces/{workspaceId}/docs/notes/{noteId}` | workspace | workspace_doc_note | Update a custom workspace documentation note |
 | GET | `/v1/workspaces/{workspaceId}/effective-capabilities` | workspace | workspace_capabilities | Resolve effective capabilities for one workspace |
+| PUT | `/v1/workspaces/{workspaceId}/embedding-provider` | workspace | workspace | Configure the workspace embedding provider credential reference |
 | GET | `/v1/workspaces/{workspaceId}/functions` | workspace | workspaces | List workspace function definitions |
 | POST | `/v1/workspaces/{workspaceId}/functions` | workspace | workspaces | Register a workspace function definition |
+| PUT | `/v1/workspaces/{workspaceId}/llm-provider` | workspace | workspace | Configure the workspace llm provider credential reference |
 | POST | `/v1/workspaces/{workspaceId}/managed-resources` | workspace | managed_resource | Submit a canonical managed resource write request |
 | GET | `/v1/workspaces/{workspaceId}/managed-resources/{resourceId}` | workspace | managed_resource | Fetch one canonical managed resource entity |
 | POST | `/v1/workspaces/{workspaceId}/memberships` | workspace | workspace_membership | Submit a workspace membership write request |

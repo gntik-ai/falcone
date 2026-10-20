@@ -174,6 +174,8 @@ export async function wireActivityDeps(opts = {}) {
     // CONFINED secretResolver (the resolved key is read ONLY from an allow-listed env var, never an
     // arbitrary caller-named one) and inherits the endpoint SSRF guard. A flow `llm.complete`
     // against a malicious pre-existing provider row therefore fails closed.
+    // No workspaceSecretStore is injected: workspaceSecret refs fail closed without an env
+    // fallback until the worker has its own approved OpenBao service-account binding.
     const llmExecutor = createLlmExecutor({
       providerStore: createLlmProviderStore({ pool: keyPool }),
       usageStore: createLlmUsageStore({ pool: keyPool }),

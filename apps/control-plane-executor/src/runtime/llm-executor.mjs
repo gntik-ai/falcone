@@ -6,8 +6,8 @@
 // production providers), model allow-listing, and per-tenant/workspace token-usage metering.
 //
 // Secret handling matches the embedding executor: the key is resolved at REQUEST time via an
-// injected `secretResolver(secretRef)` (ESO/Vault mounts the value as the env var named by
-// `secretRef.name`); resolution is never cached, so key rotation is picked up immediately, and
+// scoped secretResolver: workspace refs read OpenBao using the connection scope; env refs retain
+// the reserved-prefix lookup. Resolution is never cached, so key rotation is picked up immediately, and
 // a null/absent secret fails CLOSED (no unauthenticated provider call is ever made).
 //
 // BYOK confinement (fix-byok-secretref-endpoint-confinement / #659): the secretRef name is
@@ -27,8 +27,8 @@ import { createLlmTransport } from './llm-adapters/transport.mjs';
 import { normalizeUsage, normalizeFinishReason, adapterError } from './llm-adapters/contract.mjs';
 import {
   assertSecretRefAllowed,
+  assertProviderSecretRefExists,
   assertEndpointAllowed,
-  isAllowedSecretName,
   createConfinedSecretResolver,
   parseAllowedSecretPrefixes,
 } from './byok-provider-guard.mjs';
@@ -496,7 +496,7 @@ export function createLlmUsageStore(options = {}) {
 
 // ---------------------------------------------------------------------------
 // Executor — ties the provider store, secret resolution, the backend, allow-listing, and metering
-// together. secretResolver(secretRef) bridges to Vault/ESO; backendFactory is the test seam.
+// together. secretResolver(secretRef, scope) bridges to OpenBao or confined env; backendFactory is the test seam.
 // ---------------------------------------------------------------------------
 export function createLlmExecutor(options = {}) {
   const providerStore = options.providerStore ?? createLlmProviderStore();
@@ -516,8 +516,8 @@ export function createLlmExecutor(options = {}) {
   const endpointResolver = options.endpointResolver; // (hostname) -> Promise<string[]> (test seam)
   const enforceEndpointGuard = options.enforceEndpointGuard !== false;
   // DEFAULT to a confined resolver so a non-allow-listed env var is NEVER read; an explicit
-  // resolver (tests) is still honored but is additionally gated by isAllowedSecretName below.
-  const secretResolver = options.secretResolver ?? createConfinedSecretResolver({ env: guardEnv, prefixes });
+  // resolver (tests) is still honored but is additionally gated by assertSecretRefAllowed below.
+  const secretResolver = options.secretResolver ?? createConfinedSecretResolver({ env: guardEnv, prefixes, workspaceSecretStore: options.workspaceSecretStore });
 
   const endpointGuardOpts = { env: guardEnv, ...(endpointResolver ? { resolver: endpointResolver } : {}) };
   // Validate a configured endpoint; a nullish endpoint is a no-op (a mock/local backend makes no
@@ -561,12 +561,14 @@ export function createLlmExecutor(options = {}) {
   // row (persisted before this guard shipped) can never resolve an arbitrary env var, regardless
   // of which resolver is injected.
   async function resolveSecretOrThrow(config) {
-    if (config?.secretRef?.name !== undefined && !isAllowedSecretName(config.secretRef.name, prefixes)) {
-      throw clientError('LLM provider secret could not be resolved', 500, 'LLM_PROVIDER_SECRET_UNRESOLVED');
+    try {
+      assertSecretRefAllowed(config.secretRef, prefixes);
+      const apiKey = await secretResolver(config.secretRef, { tenantId: config.tenantId, workspaceId: config.workspaceId });
+      if (apiKey) return apiKey;
+    } catch {
+      // Never surface a store/resolver error that could carry a credential.
     }
-    const apiKey = secretResolver ? await secretResolver(config.secretRef) : null;
-    if (!apiKey) throw clientError('LLM provider secret could not be resolved', 500, 'LLM_PROVIDER_SECRET_UNRESOLVED');
-    return apiKey;
+    throw clientError('LLM provider secret could not be resolved', 500, 'LLM_PROVIDER_SECRET_UNRESOLVED');
   }
 
   function backendFor(config) {
@@ -623,7 +625,7 @@ export function createLlmExecutor(options = {}) {
   // Config-deploy: confine the secretRef + SSRF-validate the endpoint BEFORE persisting, so a
   // rejected config (400) writes NO row. The store still strips any mis-passed plaintext key.
   async function setProvider(workspaceId, config = {}) {
-    assertSecretRefAllowed(config.secretRef, prefixes);
+    await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
     if (config.endpoint !== undefined) await assertEndpoint(config.endpoint);
     return providerStore.deployProvider(workspaceId, config);
   }
@@ -708,12 +710,12 @@ export function createLlmExecutor(options = {}) {
     // secretRef + SSRF-validates the endpoint before persisting (#659).
     setProvider,
     async createConnection(workspaceId, config = {}) {
-      assertSecretRefAllowed(config.secretRef, prefixes);
+      await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
       await assertEndpoint(config.endpoint);
       return providerStore.createConnection(workspaceId, config);
     },
     async replaceConnection(workspaceId, connectionId, config = {}) {
-      assertSecretRefAllowed(config.secretRef, prefixes);
+      await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
       await assertEndpoint(config.endpoint);
       return providerStore.replaceConnection(workspaceId, connectionId, config);
     },

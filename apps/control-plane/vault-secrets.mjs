@@ -322,6 +322,10 @@ export function createVaultKvClient({ addr, token, tokenProvider, mount = 'secre
 // Function-secret names: lowercase, letter-first, <=63 (matches FUNCTION_SECRET_NAME_PATTERN).
 const SECRET_NAME_RE = /^[a-z][a-z0-9_-]{0,62}$/;
 
+export function validWorkspaceSecretName(name) {
+  return typeof name === 'string' && SECRET_NAME_RE.test(name);
+}
+
 /** Default env-var name for a secret (UPPER_SNAKE) when a ref does not specify one. */
 export function secretEnvVarName(name) {
   return String(name).toUpperCase().replace(/[^A-Z0-9_]/g, '_');
@@ -425,7 +429,7 @@ export function createWorkspaceSecretStore(client) {
       state: 'ok', lastSuccessAt: null, lastFailureAt: null, lastFailureStatus: null,
       consecutiveFailures: 0, tokenExpiresAt: null,
     },
-    validName: (n) => SECRET_NAME_RE.test(String(n ?? '')),
+    validName: validWorkspaceSecretName,
 
     async purgeWorkspace(tenantId, workspaceId) {
       requireScopeId(tenantId);

@@ -18,6 +18,7 @@ import { createFunctionsExecutor } from './functions-executor.mjs';
 import { createEmbeddingProviderStore, createEmbeddingExecutor, createEmbeddingMappingStore } from './embedding-executor.mjs';
 import { createLlmExecutor, createLlmProviderStore, createLlmUsageStore } from './llm-executor.mjs';
 import { parseAllowedSecretPrefixes } from './byok-provider-guard.mjs';
+import { vaultStoreFromEnv } from '../../../control-plane/vault-secrets.mjs';
 import { createFlowExecutor, createFlowStore } from './flow-executor.mjs';
 import { createFlowAuditRelay } from './flow-audit-relay.mjs';
 import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './flow-monitoring-executor.mjs';
@@ -99,16 +100,19 @@ const apiKeyStore = createApiKeyStore({ pool: keyPool });
 // config-deploy time and at request time. Parsed once and passed into BOTH BYOK executors so
 // each defaults its own confined secretResolver and the deploy-time validation is active.
 const byokSecretPrefixes = parseAllowedSecretPrefixes(process.env);
+const workspaceSecretStore = vaultStoreFromEnv(process.env);
 
 // Embedding-provider executor (in-platform embedding for KNN queryText). The provider
 // store is Postgres-backed on the SAME metadata pool as the API-key store, so provider
 // configuration survives a restart and is shared across all control-plane replicas.
 // The executor DEFAULTS a confined secretResolver from byokSecretPrefixes: ESO/Vault mounts the
 // resolved key as an env var named by secretRef.name, but ONLY an allow-listed name is ever read
-// (no plaintext is persisted; a non-allow-listed name fails closed).
+// (no plaintext is persisted; a non-allow-listed name fails closed). Workspace refs instead use
+// the shared OpenBao store below, under the verified connection tenant/workspace.
 const embeddingStore = createEmbeddingProviderStore({ pool: keyPool });
 const embeddingExecutor = createEmbeddingExecutor({
   store: embeddingStore,
+  workspaceSecretStore,
   secretPrefixes: byokSecretPrefixes,
 });
 
@@ -120,13 +124,14 @@ const mappingStore = createEmbeddingMappingStore({ pool: keyPool });
 // BYOK LLM completion plane (change: add-llm-agent-flow-task / #640). Provider config + per-tenant
 // token-usage metering are Postgres-backed on the SAME metadata pool. The executor DEFAULTS a
 // confined secretResolver from byokSecretPrefixes (mirrors the embedding executor): the resolved
-// key is read fresh per completion (rotation is live) but ONLY from an allow-listed env-var name,
+// key is read fresh per completion from the scoped workspace store or an allow-listed env-var name,
 // and the endpoint is SSRF-validated at config-deploy + request time (#659).
 const llmProviderStore = createLlmProviderStore({ pool: keyPool });
 const llmUsageStore = createLlmUsageStore({ pool: keyPool });
 const llmExecutor = createLlmExecutor({
   providerStore: llmProviderStore,
   usageStore: llmUsageStore,
+  workspaceSecretStore,
   secretPrefixes: byokSecretPrefixes,
 });
 
