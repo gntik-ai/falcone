@@ -19,10 +19,15 @@ test.each([
 
 test('user menu changes the shell and route copy without navigation', async () => {
   render(<MemoryRouter initialEntries={['/console/overview']}><App /></MemoryRouter>)
+  expect(localStorage.getItem('falcone-next-locale')).toBeNull()
   expect(await screen.findByRole('heading', { name: 'Resumen' })).toBeVisible()
+  expect(screen.getByRole('navigation', { name: 'Ruta de navegación' })).toBeVisible()
+  expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
   fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
   expect(await screen.findByRole('heading', { name: 'Overview' })).toBeVisible()
+  expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
+  expect(screen.queryByRole('navigation', { name: 'Ruta de navegación' })).not.toBeInTheDocument()
   expect(screen.getByRole('menuitem', { name: 'About' })).toBeVisible()
   expect(document.documentElement.lang).toBe('en')
   expect(localStorage.getItem('falcone-next-locale')).toBe('en')
