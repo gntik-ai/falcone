@@ -158,6 +158,76 @@ Options, in order of preference:
 Do not bulk-assign a default workspace. `workspace_id` is what workspace-scoped authorization binds
 to, so a guessed binding is a granted authorization.
 
+### Existing workspace service accounts (#1165)
+
+Run the following by hand inside the control-plane pod, in an announced operator window with
+concurrent IAM edits, SA issuance, rotation and revocation paused. These commands use the pod's
+existing Keycloak and provisioning DB environment; never print credentials or tokens. R3 human
+approval and both-provider review are required before the operator window.
+
+```bash
+cd /repo
+node scripts/backfill-workspace-service-accounts.mjs
+node scripts/backfill-workspace-service-accounts.mjs --apply
+```
+
+Review the dry-run's per-SA `plan`, `previousRoles`, `extraRoles` and `failed` entries first.
+Workspace IDs come exclusively from the registry join, not attributes or groups. The complete
+preflight is read-only. Revoked rows are reported with a nonzero status and left untouched,
+including their registered clients; they do not block active SAs. Orphan/mismatched active rows,
+unregistered service-account clients or conflicting mappers prevent all forward writes. Resolve
+discrepancies through the existing lifecycle/admin procedures; never reactivate a revoked row.
+Effective extra roles (including group/composite grants) are reported for review and never removed.
+
+Apply locks and rechecks each registry row, verifies the client UUID, clientId and kind in its
+tenant's realm, and disables the client during migration. It installs and verifies the hardcoded
+W mapper before detaching canonical `workspace-context` from default/optional scopes, verifies
+that no other workspace claim sources remain, assigns `workspace_service_account` last, then
+verifies effective roles before restoring the client's enabled state. A second successful apply
+makes zero writes. No token or client secret is fetched or logged.
+
+Legacy SAs normally have no stored workspace attribute. Blank, missing, multiple, foreign and
+group-inherited attribute values cannot authorize a grant or supply W. The script does not read
+them as workspace authority or rewrite them: it disables issuance before installing W and removes
+the canonical attribute scope before verifying claim sources and assigning the role. Failure to
+prove the hardcoded W is the only remaining workspace source keeps the client disabled with no
+new role. Failed migrations keep bindings intact; roles that predate the run are kept. An
+unmarked client already disabled before a run stays disabled. A failed migration of a previously
+enabled client records `in-falcone.workspace-rollback=W` while keeping it disabled. Resolve the
+reported failure, review the dry-run's `enable-marked-client` plan, then rerun the forward script;
+it finishes the binding and role checks before restoring issuance. Do not run fleet-wide rollback
+just to recover a failed forward migration, or manually enable a partial SA.
+
+### One explicitly selected end-user
+
+Use canonical tenant, user and workspace IDs, with one user and one workspace per invocation:
+
+```bash
+cd /repo
+node scripts/rebind-workspace-user.mjs --tenant TENANT_ID --user USER_ID --workspace WORKSPACE_ID
+node scripts/rebind-workspace-user.mjs --tenant TENANT_ID --user USER_ID --workspace WORKSPACE_ID --apply
+```
+
+This is dry-run by default. It checks workspace ownership and excludes SA users, treats blank
+values as absent, refuses a different existing binding, and preserves the full normalized user
+attribute map on PUT. It re-reads the user and requires exactly `workspace_id=[W]` before reporting
+success; a realm that discards undeclared profile attributes returns exit 9 with
+`workspace-binding-not-persisted`. Repair the realm's profile declaration before retrying.
+An identical binding is a no-op. The user needs a **new token** afterwards.
+No group membership or token input supplies the workspace ID.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | Successful plan, binding or unchanged binding |
+| 2 | Invalid, duplicate or bulk arguments |
+| 3 | Unknown workspace |
+| 4 | Foreign-tenant workspace |
+| 5 | Unknown user |
+| 6 | Service-account user |
+| 7 | User already bound to another workspace |
+| 8 | Unknown tenant / missing tenant realm |
+| 9 | DB or identity-provider operation failed (safe message only) |
+
 ## 7. Verify
 
 ```text
@@ -181,11 +251,63 @@ undefined. `bbx-wsid-04` fails if one is ever added.
 
 ## 8. Rollback
 
+### Workspace service-account repair (#1165)
+
+Use the separate rollback script before reverting the image. It is dry-run by default and inspects
+each SA before writing. Run it in the same announced operator window. Set the script process's
+`SA_REVOCATION_SKEW_SEC` to the **maximum configured skew across control-plane and executor**;
+the executor may use a larger value than the pod's default.
+
+```bash
+cd /repo
+node scripts/rollback-workspace-service-accounts.mjs
+node scripts/rollback-workspace-service-accounts.mjs --apply
+```
+
+Rollback acts on each safely verified active SA independently; rejected or revoked rows are
+reported with nonzero status and left untouched without blocking the others. It includes SAs
+created natively by #1140 as well as back-filled SAs. It requires the canonical hardcoded W binding;
+a canonical `workspace-context` left attached by a partial migration is retained while disabled.
+Clients without W or with conflicting sources are reported and left untouched. It disables the
+client while preserving client attributes and stamps `in-falcone.workspace-rollback=W` only if
+the client was enabled at inspection. An already disabled client keeps its existing marker state:
+rollback must not make an incident/lifecycle-disabled client eligible for re-enabling. It sets
+`credentials_invalidated_at` to at least the current **database clock** plus `SA_REVOCATION_SKEW_SEC + 2`
+seconds, removes only the `workspace_service_account` role, and keeps the binding and all other
+roles. Inherited workspace roles that cannot be removed are reported; the client remains disabled.
+Removing only the role from an enabled SA or removing W would widen access and is prohibited.
+
+The cutoff commits with the per-SA registry-lock transaction. If a later Keycloak step or the
+commit fails, that cutoff may be rolled back even though the client remains disabled/marked and
+its role may have been removed. Treat a nonzero rollback report as incomplete: old tokens may
+remain valid until expiry. Resolve the failure and rerun rollback until it succeeds before
+reverting the image or claiming that old tokens have been invalidated.
+
+Wait at least `SA_REVOCATION_CACHE_MS` (default **10 seconds**) after successful rollback before
+checking that previously issued tokens are rejected by both control-plane and executor. The
+revocation comparison remains `iat < floor(cutoff) - skew`: the preceding second is rejected;
+the equality boundary is accepted. The future cutoff puts both boundaries after pre-rollback
+issuance. No new token should be issued while the client is disabled. Do not include tokens in
+logs or the report. These live checks are operator verification, not repository delivery gates.
+
+Later rotate/revoke calls use `GREATEST` and cannot lower a future watermark. To restore a marked
+client, review and rerun the forward back-fill, which verifies the binding and roles before
+re-enabling it. The active marker is overwritten with the nonempty value `restored:W` and verified
+while disabled, avoiding Keycloak-version differences in null attribute deletion. Only a marker
+equal to W permits recovery; `restored:W` records completion and never permits re-enabling a
+subsequently disabled client. A failed forward recovery restores the active W marker so the next
+dry run reports the remaining recovery work. A second successful forward apply makes zero writes.
+Existing unmarked disabled clients remain disabled, including across rollback and forward reruns.
+Wait until the reported cutoff has passed before expecting new tokens to be accepted.
+The monotonic SQL can remain in place across an image rollback.
+
+### Earlier realm/profile rollout
+
 | Step | Reverse |
 | --- | --- |
 | Image roll | `helm rollback falcone <previous-revision> -n "$FALCONE_NS"` |
 | Back-fill | Not automatically reversible, and normally should not be reversed |
-| User re-stamp | Remove the attribute from the affected users through the admin API |
+| User re-stamp | Keep the verified binding; removing it can widen access. Disable the user if access must stop. |
 
 The back-fill is additive: it declares two attributes and adds one protocol mapper. Reverting it
 would re-break claim minting rather than restore a good state. If a rollback of the *image* is
