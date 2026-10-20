@@ -15,8 +15,8 @@
 import { clientError } from './errors.mjs';
 import {
   assertSecretRefAllowed,
+  assertProviderSecretRefExists,
   assertEndpointAllowed,
-  isAllowedSecretName,
   createConfinedSecretResolver,
   parseAllowedSecretPrefixes,
 } from './byok-provider-guard.mjs';
@@ -75,13 +75,15 @@ export function httpEmbeddingBackend({ providerType, model, endpoint, resolveSec
           headers: { 'content-type': 'application/json', Authorization: `Bearer ${secret}` },
           body: JSON.stringify({ model, input: String(text ?? '') })
         });
-      } catch (error) {
-        throw clientError(`Embedding provider request failed: ${error.message}`, 502, 'EMBEDDING_PROVIDER_ERROR');
+      } catch {
+        throw clientError('Embedding provider request failed', 502, 'EMBEDDING_PROVIDER_ERROR');
       }
       if (!response.ok) {
         throw clientError(`Embedding provider returned status ${response.status}`, 502, 'EMBEDDING_PROVIDER_ERROR');
       }
-      const json = await response.json();
+      let json;
+      try { json = await response.json(); }
+      catch { throw clientError('Embedding provider returned an invalid response', 502, 'EMBEDDING_PROVIDER_ERROR'); }
       const embedding = json?.data?.[0]?.embedding ?? json?.embedding ?? json?.embeddings?.[0];
       if (!Array.isArray(embedding)) {
         throw clientError('Embedding provider returned no vector', 502, 'EMBEDDING_PROVIDER_ERROR');
@@ -694,7 +696,7 @@ function createPostgresMappingStore(pool) {
 }
 
 // Resolve a callable embedding backend for a workspace from its stored provider config.
-// secretResolver(secretRef) bridges to Vault/ESO; in tests a mock backend is injected.
+// secretResolver(secretRef, scope) bridges to OpenBao or confined env; in tests a mock backend is injected.
 export function createEmbeddingExecutor(options = {}) {
   const store = options.store ?? createEmbeddingProviderStore();
   const backendFactory = options.backendFactory; // (config, resolveSecret) -> backend (test seam)
@@ -707,8 +709,8 @@ export function createEmbeddingExecutor(options = {}) {
   const endpointResolver = options.endpointResolver; // (hostname) -> Promise<string[]> (test seam)
   const enforceEndpointGuard = options.enforceEndpointGuard !== false;
   // DEFAULT to a confined resolver so a non-allow-listed env var is NEVER read; an explicit
-  // resolver (tests) is still honored but additionally gated by isAllowedSecretName below.
-  const secretResolver = options.secretResolver ?? createConfinedSecretResolver({ env: guardEnv, prefixes });
+  // resolver (tests) is still honored but additionally gated by assertSecretRefAllowed below.
+  const secretResolver = options.secretResolver ?? createConfinedSecretResolver({ env: guardEnv, prefixes, workspaceSecretStore: options.workspaceSecretStore });
 
   const endpointGuardOpts = { env: guardEnv, ...(endpointResolver ? { resolver: endpointResolver } : {}) };
   // Validate a configured endpoint; a nullish endpoint is a no-op (a mock/local backend makes no
@@ -720,16 +722,20 @@ export function createEmbeddingExecutor(options = {}) {
   // Confine the resolved secret to an allow-listed name (#659): re-checked at request time so a
   // pre-existing malicious row can never resolve an arbitrary env var. A name-less secretRef
   // (e.g. a {vaultPath} form) is passed through to the injected resolver unchanged.
-  function confinedResolveSecret(secretRef) {
-    if (!secretResolver) return undefined;
-    if (secretRef?.name !== undefined && !isAllowedSecretName(secretRef.name, prefixes)) return null;
-    return secretResolver(secretRef);
+  async function confinedResolveSecret(config) {
+    try {
+      assertSecretRefAllowed(config.secretRef, prefixes);
+      return await secretResolver(config.secretRef, { tenantId: config.tenantId, workspaceId: config.workspaceId });
+    } catch {
+      // HTTP backend maps null to EMBEDDING_SECRET_UNRESOLVED without exposing errors.
+      return null;
+    }
   }
 
   // Config-deploy: confine the secretRef + SSRF-validate the endpoint BEFORE persisting, so a
   // rejected config (400) writes NO row. The store still strips any mis-passed plaintext key.
   async function deployProvider(workspaceId, config = {}) {
-    assertSecretRefAllowed(config.secretRef, prefixes);
+    await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
     if (config.endpoint !== undefined) await assertEndpoint(config.endpoint);
     return store.deployProvider(workspaceId, config);
   }
@@ -756,14 +762,14 @@ export function createEmbeddingExecutor(options = {}) {
     // fail-closed for any malicious row persisted before this guard shipped).
     await assertEndpoint(endpoint);
     if (backendFactory) {
-      return backendFactory(config, () => confinedResolveSecret(config.secretRef));
+      return backendFactory(config, () => confinedResolveSecret(config));
     }
     return httpEmbeddingBackend({
       providerType: config.providerType,
       model: config.model,
       endpoint,
       fetchImpl: options.fetchImpl,
-      resolveSecret: () => confinedResolveSecret(config.secretRef)
+      resolveSecret: () => confinedResolveSecret(config)
     });
   }
 
@@ -791,12 +797,12 @@ export function createEmbeddingExecutor(options = {}) {
   // deployProvider so the guard is always in force (#659).
   return { store, deployProvider, resolveBackend, embedForWorkspace,
     async createConnection(workspaceId, config = {}) {
-      assertSecretRefAllowed(config.secretRef, prefixes);
+      await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
       await assertEndpoint(config.endpoint);
       return store.createConnection(workspaceId, config);
     },
     async replaceConnection(workspaceId, connectionId, config = {}) {
-      assertSecretRefAllowed(config.secretRef, prefixes);
+      await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
       await assertEndpoint(config.endpoint);
       return store.replaceConnection(workspaceId, connectionId, config);
     },

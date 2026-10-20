@@ -68251,6 +68251,294 @@
         "x-owning-service": "control_api",
         "description": "Tenant managers or verified same-tenant workspace-bound callers may request decisions. A denial returns 200 with allowed:false and is audited. Catalog or resolver failure returns 503 QUOTA_UNAVAILABLE. This endpoint does not reserve or count usage."
       }
+    },
+    "/v1/workspaces/{workspaceId}/llm-provider": {
+      "put": {
+        "operationId": "setLlmProvider",
+        "summary": "Configure the workspace llm provider credential reference",
+        "description": "Use an operator-provisioned env reference or an existing write-only workspace secret. Rotation takes effect on the next request. No plaintext key is accepted into the provider record.",
+        "tags": [
+          "Workspaces"
+        ],
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-owning-service": "control_api",
+        "x-resource-type": "workspace",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_team"
+        ],
+        "x-rate-limit-class": "control-write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmProviderConfiguration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider configured. Only the reference is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmProviderConfiguration"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BYOK_SECRET_REF_NOT_ALLOWED for an invalid or dual-form ref; BYOK_ENDPOINT_BLOCKED for a rejected endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not authorized to configure this workspace provider.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body exceeded the gateway limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "BYOK_WORKSPACE_SECRET_NOT_FOUND: the secret does not exist in the verified workspace. No configuration is persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "BYOK_WORKSPACE_SECRET_UNRESOLVED: OpenBao existence check failed. No configuration is persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the executor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/embedding-provider": {
+      "put": {
+        "operationId": "setEmbeddingProvider",
+        "summary": "Configure the workspace embedding provider credential reference",
+        "description": "Use an operator-provisioned env reference or an existing write-only workspace secret. Rotation takes effect on the next request. No plaintext key is accepted into the provider record.",
+        "tags": [
+          "Workspaces"
+        ],
+        "x-family": "workspaces",
+        "x-scope": "workspace",
+        "x-owning-service": "control_api",
+        "x-resource-type": "workspace",
+        "x-visibility": "public",
+        "x-audiences": [
+          "tenant_owner",
+          "tenant_admin",
+          "workspace_owner",
+          "workspace_admin",
+          "platform_team"
+        ],
+        "x-rate-limit-class": "control-write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XApiVersion"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmbeddingProviderConfiguration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider configured. Only the reference is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingProviderConfiguration"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BYOK_SECRET_REF_NOT_ALLOWED for an invalid or dual-form ref; BYOK_ENDPOINT_BLOCKED for a rejected endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not authorized to configure this workspace provider.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body exceeded the gateway limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "BYOK_WORKSPACE_SECRET_NOT_FOUND: the secret does not exist in the verified workspace. No configuration is persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gateway rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "431": {
+            "description": "Invalid or oversized request headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "BYOK_WORKSPACE_SECRET_UNRESOLVED: OpenBao existence check failed. No configuration is persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timed out waiting for the executor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -104528,6 +104816,84 @@
             ]
           }
         ]
+      },
+      "ByokProviderSecretRef": {
+        "description": "Exactly one provider credential reference. Env names must also pass the operator prefix allow-list (default BYOK_). Workspace names resolve from OpenBao under the verified connection tenant/workspace on every request; values are never returned or persisted in provider configuration. Workflow workers currently fail closed for workspace references.",
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "workspaceSecret"
+            ],
+            "properties": {
+              "workspaceSecret": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,62}$",
+                "maxLength": 63
+              }
+            }
+          }
+        ]
+      },
+      "LlmProviderConfiguration": {
+        "type": "object",
+        "properties": {
+          "providerType": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string",
+            "format": "uri",
+            "description": "Provider endpoint subject to the BYOK SSRF guard."
+          },
+          "secretRef": {
+            "$ref": "#/components/schemas/ByokProviderSecretRef"
+          },
+          "allowedModels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultModel": {
+            "type": "string"
+          }
+        },
+        "description": "Provider configuration only; plaintext provider keys are stripped. The same secretRef forms apply to named provider connections."
+      },
+      "EmbeddingProviderConfiguration": {
+        "type": "object",
+        "properties": {
+          "providerType": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string",
+            "format": "uri",
+            "description": "Provider endpoint subject to the BYOK SSRF guard."
+          },
+          "secretRef": {
+            "$ref": "#/components/schemas/ByokProviderSecretRef"
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "description": "Provider configuration only; plaintext provider keys are stripped. The same secretRef forms apply to named provider connections."
       }
     }
   }

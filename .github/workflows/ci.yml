@@ -61,7 +61,11 @@ jobs:
 
       - name: LLM provider tests
         run: |
-          node --test tests/blackbox/embedding-provider-connections.test.mjs \
+          node --test tests/blackbox/byok-workspace-secrets.test.mjs \
+            tests/blackbox/byok-workspace-worker.test.mjs \
+            tests/blackbox/byok-provider-confinement.test.mjs \
+            tests/blackbox/vault-workspace-secrets.test.mjs \
+            tests/blackbox/embedding-provider-connections.test.mjs \
             tests/blackbox/embedding-provider-legacy-compat.test.mjs \
             tests/blackbox/embedding-provider-persistence.test.mjs \
             tests/blackbox/embedding-provider-get-roundtrip.test.mjs \

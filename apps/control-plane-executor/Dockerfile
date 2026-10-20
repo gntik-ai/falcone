@@ -30,6 +30,7 @@ RUN npm install --omit=dev --no-package-lock
 #   - packages/workspace-docs-service/ (console workspace docs route)
 COPY apps/control-plane-executor/src /app/apps/control-plane-executor/src
 COPY apps/control-plane/knative-runtime.mjs /app/apps/control-plane/knative-runtime.mjs
+COPY apps/control-plane/vault-secrets.mjs /app/apps/control-plane/vault-secrets.mjs
 COPY apps/control-plane/audit-writer.mjs /app/apps/control-plane/audit-writer.mjs
 COPY apps/control-plane/audit-store.mjs /app/apps/control-plane/audit-store.mjs
 COPY apps/control-plane/audit-hash.mjs /app/apps/control-plane/audit-hash.mjs

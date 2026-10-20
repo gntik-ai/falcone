@@ -25,6 +25,7 @@ import dns from 'node:dns';
 import net from 'node:net';
 import { isBlockedIp } from '../../../../packages/webhook-engine/src/webhook-subscription.mjs';
 import { clientError } from './errors.mjs';
+import { validWorkspaceSecretName, logSecretTeardownFailure } from '../../../control-plane/vault-secrets.mjs';
 
 // Reserved env-var prefix that an operator-provisioned BYOK secret MUST carry. Keeping the key
 // behind a dedicated prefix means a caller can never name an unrelated platform secret
@@ -88,16 +89,23 @@ export function isAllowedSecretName(name, prefixes = [DEFAULT_SECRET_PREFIX]) {
 }
 
 /**
- * Config-time assertion for a provider `secretRef`. A secretRef that carries a `name` (the
+ * Config-time assertion for a provider `secretRef`. Workspace refs must be exclusive and pass
+ * the shared workspace-store name rule. A secretRef that carries a `name` (the
  * env-var lookup form the deployed resolver uses) MUST name an allow-listed secret. A secretRef
  * with no `name` (e.g. a `{ vaultPath }` form) is NOT an env-var attack vector and is left to
  * the resolver's own fail-closed handling, so it is not rejected here.
  *
- * @param {{ name?: string }|undefined} secretRef
+ * @param {{ name?: string, workspaceSecret?: string }|undefined} secretRef
  * @param {string[]} prefixes
  * @throws {Error} clientError 400 BYOK_SECRET_REF_NOT_ALLOWED
  */
 export function assertSecretRefAllowed(secretRef, prefixes = [DEFAULT_SECRET_PREFIX]) {
+  if (secretRef?.workspaceSecret !== undefined) {
+    if (secretRef.name !== undefined || !validWorkspaceSecretName(secretRef.workspaceSecret)) {
+      throw clientError('BYOK provider workspace secretRef is invalid', 400, 'BYOK_SECRET_REF_NOT_ALLOWED');
+    }
+    return;
+  }
   // Only the env-var (`name`) form is governed here; a name-less ref cannot resolve an env var.
   if (secretRef?.name === undefined) return;
   if (!isAllowedSecretName(secretRef.name, prefixes)) {
@@ -109,19 +117,52 @@ export function assertSecretRefAllowed(secretRef, prefixes = [DEFAULT_SECRET_PRE
   }
 }
 
+function validSecretScope(tenantId, workspaceId) {
+  return typeof tenantId === 'string' && /^[A-Za-z0-9_-]+$/.test(tenantId)
+    && typeof workspaceId === 'string' && /^[A-Za-z0-9_-]+$/.test(workspaceId);
+}
+
+// Config-time metadata/existence check only. Never resolve or persist the value here.
+export async function assertProviderSecretRefExists(secretRef, { tenantId, workspaceId, workspaceSecretStore, prefixes } = {}) {
+  assertSecretRefAllowed(secretRef, prefixes);
+  if (secretRef?.workspaceSecret === undefined) return;
+  let exists = false;
+  try {
+    if (workspaceSecretStore && validSecretScope(tenantId, workspaceId)) {
+      exists = await workspaceSecretStore.exists(tenantId, workspaceId, secretRef.workspaceSecret);
+    }
+  } catch (error) {
+    logSecretTeardownFailure('byok-exists', error);
+    throw clientError('Workspace provider secret could not be checked', 500, 'BYOK_WORKSPACE_SECRET_UNRESOLVED');
+  }
+  if (!exists) throw clientError('Workspace provider secret not found', 422, 'BYOK_WORKSPACE_SECRET_NOT_FOUND');
+}
+
 /**
- * Build a confined secret resolver: the DEFAULT resolver for both executors. It resolves the
+ * Build a scoped secret resolver: workspace refs use only getValue with verified tenant/workspace
+ * context, without caching. With no store (including the workflow worker), they return null.
+ * The DEFAULT resolver for both executors also resolves the
  * env var named by `secretRef.name` ONLY when that name is allow-listed; otherwise it returns
  * null WITHOUT reading process.env (fail-closed). This makes any pre-existing malicious row —
  * persisted before this guard shipped — resolve to null at request time, so no completion ever
  * leaks an arbitrary env var.
  *
- * @param {{ env?: Record<string,string|undefined>, prefixes?: string[] }} [options]
- * @returns {(secretRef: {name?: string}|undefined) => Promise<string|null>}
+ * @param {{ env?: Record<string,string|undefined>, prefixes?: string[], workspaceSecretStore?: object|null }} [options]
+ * @returns {(secretRef: {name?: string, workspaceSecret?: string}|undefined, scope?: {tenantId?: string, workspaceId?: string}) => Promise<string|null>}
  */
-export function createConfinedSecretResolver({ env = process.env, prefixes } = {}) {
+export function createConfinedSecretResolver({ env = process.env, prefixes, workspaceSecretStore } = {}) {
   const allowed = prefixes ?? parseAllowedSecretPrefixes(env);
-  return async (secretRef) => {
+  return async (secretRef, { tenantId, workspaceId } = {}) => {
+    if (secretRef?.workspaceSecret !== undefined) {
+      if (secretRef.name !== undefined || !validWorkspaceSecretName(secretRef.workspaceSecret)
+        || !workspaceSecretStore || !validSecretScope(tenantId, workspaceId)) return null;
+      try {
+        return await workspaceSecretStore.getValue(tenantId, workspaceId, secretRef.workspaceSecret);
+      } catch (error) {
+        logSecretTeardownFailure('byok-resolve', error);
+        return null;
+      }
+    }
     if (!isAllowedSecretName(secretRef?.name, allowed)) return null; // never read a non-allowed name
     return env[secretRef.name] ?? null;
   };

@@ -50,6 +50,8 @@ COPY --from=build /app/apps/workflow-worker/dist ./dist
 # the same path relative to the dist/ directory as it does in the repo workspace, because
 # webhook-subscription.mjs itself imports from event-catalogue.mjs in the same directory.
 COPY packages/webhook-engine/src /app/packages/webhook-engine/src
+# Shared BYOK validation/logging imports this module; the worker does not construct a store.
+COPY apps/control-plane/vault-secrets.mjs /app/apps/control-plane/vault-secrets.mjs
 
 # worker-deps.mjs::wireActivityDeps (fix-flows-worker-db-activity-wiring / #563, extended
 # by the llm.complete activity #640 and the BYOK confinement #659) dynamically imports a
