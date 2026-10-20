@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import { kcAdmin as defaultKcAdmin, normalizeKeycloakAttributes } from '../apps/control-plane/kc-admin.mjs';
-import { MigrationConflict, safeFailure } from './lib/workspace-service-accounts.mjs';
+import { MigrationConflict, requireState, safeFailure, withCliPool } from './lib/workspace-service-accounts.mjs';
 
 export function parseRebindArgs(argv = []) {
   const options = { dryRun: true };
@@ -47,6 +47,10 @@ export async function runRebind({ argv = [], pool, kcAdmin = defaultKcAdmin, out
     const changed = existing.length === 0;
     if (changed && !options.dryRun) {
       await kcAdmin.updateUser(tenant.iam_realm, user.id, { attributes: { ...attributes, workspace_id: [workspace.id] } });
+      const persisted = await kcAdmin.getUser(tenant.iam_realm, user.id);
+      const binding = normalizeKeycloakAttributes(persisted?.attributes ?? {}).workspace_id;
+      requireState(persisted?.id === user.id && binding?.length === 1 && binding[0] === workspace.id,
+        'workspace-binding-not-persisted');
     }
     return report(0, options.dryRun ? 'dry-run' : changed ? 'bound' : 'unchanged', {
       userId: user.id, workspaceId: workspace.id,
@@ -59,11 +63,7 @@ async function main() {
   // Validate the single-user CLI before opening a database connection.
   try { parseRebindArgs(process.argv.slice(2)); }
   catch { process.stderr.write('Expected one --tenant, one --user and one --workspace.\n'); process.exitCode = 2; return; }
-  // cliMain validates the reconciliation-only flags, so wire this CLI separately.
-  const { default: pg } = await import('pg');
-  const pool = new pg.Pool({ connectionString: process.env.PROVISIONING_DB_URL ?? process.env.DATABASE_URL });
-  try { process.exitCode = (await runRebind({ argv: process.argv.slice(2), pool })).exitCode; }
-  finally { await pool.end(); }
+  await withCliPool(runRebind, process.argv.slice(2));
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(() => { process.stderr.write('Workspace user rebind failed; inspect configuration and provider health.\n'); process.exitCode = 9; });

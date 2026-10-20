@@ -132,6 +132,9 @@ test('failure at every read/write, including lost write acknowledgements, preser
       assert.ok(f.state.roles.includes('offline_access'));
       if (f.writes.some(write => write !== 'disable')) assert.equal(f.state.client.enabled, false);
       assert.doesNotMatch(f.output.join(''), /secret-token|private-provider-body/);
+      assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0,
+        `${index}: retry succeeds`);
+      assert.equal(f.state.client.enabled, true, `${index}: retry restores original issuance`);
     }
   }
 });
@@ -181,4 +184,29 @@ test('apply disables, verifies W before detaching scopes, verifies claims before
   f.writes.length = 0;
   assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
   assert.deepEqual(f.writes, []);
+});
+
+test('a failed forward migration reports recoverable work and restores the prior enabled state on retry', async () => {
+  const f = fixture({ fail: 'assign' });
+  assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 1);
+  assert.equal(f.state.client.enabled, false);
+  const dryRun = await runBackfill(f.options);
+  assert.equal(dryRun.exitCode, 0);
+  assert.ok(dryRun.result.inspected[0].plan.includes('enable-marked-client'));
+  assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+  assert.equal(f.state.client.enabled, true);
+  assert.ok(f.state.roles.includes(ROLE));
+  f.writes.length = 0;
+  assert.deepEqual((await runBackfill(f.options)).result.inspected[0].plan, []);
+  assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+  assert.deepEqual(f.writes, []);
+});
+
+test('a failed migration of an already disabled client does not create recovery permission', async () => {
+  const f = fixture({ fail: 'assign' });
+  f.state.client.enabled = false;
+  assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 1);
+  assert.notEqual(f.state.client.attributes[MARKER], W);
+  assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+  assert.equal(f.state.client.enabled, false);
 });

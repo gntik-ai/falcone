@@ -18,9 +18,15 @@ export async function runRollback({ argv = [], pool, kcAdmin = defaultKcAdmin, o
         await withRegistryLock(pool, item.row, async (row, db) => {
           const current = await inspect(kcAdmin, row, { rollback: true });
           const { realm, uuid, client, user, roles } = current;
-          await kcAdmin.setClientEnabled(realm, uuid, false, { ...client.attributes, [ROLLBACK_MARKER]: row.joined_workspace_id });
+          // A prior incident/lifecycle disable must survive a forward re-run.
+          // Preserve an existing recovery marker, but create one only for a
+          // client whose token issuance this invocation is stopping.
+          const attributes = client.enabled
+            ? { ...client.attributes, [ROLLBACK_MARKER]: row.joined_workspace_id }
+            : client.attributes;
+          await kcAdmin.setClientEnabled(realm, uuid, false, attributes);
           await verifyDisabled(kcAdmin, current);
-          requireState((await kcAdmin.getClient(realm, uuid))?.attributes?.[ROLLBACK_MARKER] === row.joined_workspace_id, 'rollback-marker-not-persisted');
+          requireState((await kcAdmin.getClient(realm, uuid))?.attributes?.[ROLLBACK_MARKER] === attributes?.[ROLLBACK_MARKER], 'rollback-marker-not-persisted');
           const cutoff = new Date(await markServiceAccountCredentialsInvalidatedAhead(db, row.id, skewSec + 2));
           requireState(Number.isFinite(cutoff.getTime()), 'missing-credential-cutoff');
           if (roles.includes(ROLE)) await kcAdmin.removeRealmRoles(realm, user.id, [ROLE]);

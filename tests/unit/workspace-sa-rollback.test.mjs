@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { kcAdmin } from '../../apps/control-plane/kc-admin.mjs';
 import { runBackfill } from '../../scripts/backfill-workspace-service-accounts.mjs';
 import { runRollback } from '../../scripts/rollback-workspace-service-accounts.mjs';
-import { markServiceAccountCredentialsInvalidated } from '../../apps/control-plane/tenant-store.mjs';
 import { createSaRevocationCheck as controlPlaneCheck } from '../../apps/control-plane/sa-revocation.mjs';
 import { createSaRevocationCheck as executorCheck } from '../../apps/control-plane-executor/src/runtime/sa-revocation.mjs';
 import { fixture, W, ROLE, MARKER, REALM } from './helpers/workspace-sa-fixture.mjs';
@@ -65,22 +64,22 @@ test('client disable can atomically preserve attributes and stamp a rollback mar
   assert.deepEqual(writes[0].body, { enabled: false, attributes: { keep: 'yes', 'in-falcone.workspace-rollback': 'workspace-one' } });
 });
 
-test('client PUT transmits explicit null to remove the rollback marker', async (t) => {
+test('client PUT transmits a nonempty completed rollback marker', async (t) => {
   const bodies = [];
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     if (url.endsWith('/protocol/openid-connect/token')) return Response.json({ access_token: 'test-admin', expires_in: 300 });
     bodies.push(JSON.parse(init.body));
     return new Response(null, { status: 204 });
   });
-  await kcAdmin.setClientEnabled(REALM, 'client-one', false, { keep: 'yes', [MARKER]: null });
-  assert.deepEqual(bodies, [{ enabled: false, attributes: { keep: 'yes', [MARKER]: null } }]);
+  await kcAdmin.setClientEnabled(REALM, 'client-one', false, { keep: 'yes', [MARKER]: 'restored:workspace-one' });
+  assert.deepEqual(bodies, [{ enabled: false, attributes: { keep: 'yes', [MARKER]: 'restored:workspace-one' } }]);
 });
 
-test('a forward run verifies marker removal before enabling and fails closed if it persists', async () => {
+test('a forward run verifies marker completion before enabling and fails closed if the active marker persists', async () => {
   const f = fixture();
   await runBackfill({ ...f.options, argv: ['--apply'] });
   await runRollback({ ...f.options, argv: ['--apply'] });
-  f.state.ignoreMarkerRemoval = true;
+  f.state.ignoreMarkerWrites = true;
   f.writes.length = 0;
   const { exitCode } = await runBackfill({ ...f.options, argv: ['--apply'] });
   assert.equal(exitCode, 1);
@@ -112,6 +111,8 @@ test('a failure at every marked-client recovery step keeps prior roles and never
       assert.ok(!f.state.roles.includes(ROLE));
       assert.deepEqual(f.state.roles, ['offline_access', 'tenant_admin']);
       assert.equal(f.state.mappers[0].config['claim.value'], W);
+      assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+      assert.equal(f.state.client.enabled, true);
     }
   }
 });
@@ -190,11 +191,9 @@ test('rollback dry-run is read-only; apply disables with marker, keeps W and oth
   assert.equal(f.state.cutoff.toISOString(), '2030-01-01T00:00:05.900Z');
   assert.equal(f.state.mappers[0].config['claim.value'], W);
   assert.deepEqual(f.state.roles, ['offline_access', 'tenant_admin']);
-  await markServiceAccountCredentialsInvalidated(f.pool, f.state.row.id);
-  assert.equal(f.state.cutoff.toISOString(), '2030-01-01T00:00:05.900Z');
   assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
   assert.equal(f.state.client.enabled, true);
-  assert.equal(f.state.client.attributes[MARKER], undefined);
+  assert.equal(f.state.client.attributes[MARKER], 'restored:workspace-one');
   assert.ok(f.state.roles.includes(ROLE));
   f.writes.length = 0;
   await runBackfill({ ...f.options, argv: ['--apply'] });
@@ -222,3 +221,55 @@ for (const [name, create] of [['control-plane', controlPlaneCheck], ['executor',
     assert.equal(await check({ ...token, iat: 1893456002 }), false); // floor(cutoff) - skew
   });
 }
+
+test('rollback never makes a previously disabled unmarked client eligible for re-enabling', async () => {
+  const f = fixture();
+  await runBackfill({ ...f.options, argv: ['--apply'] });
+  f.state.client.enabled = false; // Incident/operator disable outside this migration.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    assert.equal((await runRollback({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+    assert.notEqual(f.state.client.attributes[MARKER], W);
+    assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+    assert.equal(f.state.client.enabled, false);
+  }
+});
+
+test('forward recovery works when Keycloak ignores null client attributes and remains idempotent', async () => {
+  const f = fixture();
+  await runBackfill({ ...f.options, argv: ['--apply'] });
+  await runRollback({ ...f.options, argv: ['--apply'] });
+  // Some Keycloak versions discard null/empty values in client updates.
+  f.state.ignoreMarkerRemoval = true;
+  assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+  assert.equal(f.state.client.enabled, true);
+  assert.notEqual(f.state.client.attributes[MARKER], W);
+  f.writes.length = 0;
+  assert.deepEqual((await runBackfill(f.options)).result.inspected[0].plan, []);
+  assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+  assert.deepEqual(f.writes, []);
+});
+
+test('a failed rollback reports failure and reverts the transactional cutoff while retaining containment', async () => {
+  const f = fixture({ fail: 'remove-role' });
+  await runBackfill({ ...f.options, argv: ['--apply'] });
+  assert.equal((await runRollback({ ...f.options, argv: ['--apply'] })).exitCode, 1);
+  assert.equal(f.state.cutoff, null);
+  assert.equal(f.state.client.enabled, false);
+  assert.equal(f.state.client.attributes[MARKER], W);
+  assert.equal(f.state.mappers[0].config['claim.value'], W);
+  assert.equal((await runRollback({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+  assert.ok(f.state.cutoff instanceof Date);
+});
+
+test('a completed recovery marker cannot undo a later incident disable through rollback', async () => {
+  const f = fixture();
+  await runBackfill({ ...f.options, argv: ['--apply'] });
+  await runRollback({ ...f.options, argv: ['--apply'] });
+  await runBackfill({ ...f.options, argv: ['--apply'] });
+  assert.equal(f.state.client.attributes[MARKER], 'restored:workspace-one');
+  f.state.client.enabled = false;
+  assert.equal((await runRollback({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+  assert.equal(f.state.client.attributes[MARKER], 'restored:workspace-one');
+  assert.equal((await runBackfill({ ...f.options, argv: ['--apply'] })).exitCode, 0);
+  assert.equal(f.state.client.enabled, false);
+});

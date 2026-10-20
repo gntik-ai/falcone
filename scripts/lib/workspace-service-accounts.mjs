@@ -4,6 +4,7 @@ import { kcAdmin as defaultKcAdmin, CONTEXT_SCOPE_CLAIM_MAPPERS, WORKSPACE_ID_MA
 
 export const ROLE = 'workspace_service_account';
 export const ROLLBACK_MARKER = 'in-falcone.workspace-rollback';
+export const restoredMarker = workspaceId => `restored:${workspaceId}`;
 export class MigrationConflict extends Error {
   constructor(code) { super(code); this.code = code; }
 }
@@ -83,9 +84,11 @@ export async function inspect(kc, row, { rollback = false } = {}) {
   // keeps it and W intact while disabling the client; it never emits a new token.
   if (rollback) requireState(binding.length === 1, 'rollback-requires-canonical-binding');
   const marker = client.attributes?.[ROLLBACK_MARKER];
-  requireState(marker == null || marker === row.joined_workspace_id, 'rollback-marker-mismatch');
+  requireState(marker == null || marker === row.joined_workspace_id
+    || marker === restoredMarker(row.joined_workspace_id), 'rollback-marker-mismatch');
+  const recover = marker === row.joined_workspace_id;
   const allowed = serviceAccountAllowedRoles(realm);
-  const plan = rollback ? ['disable-with-marker', 'invalidate-credentials', 'remove-workspace-role'] : complete && !marker ? [] : [
+  const plan = rollback ? [client.enabled || recover ? 'disable-with-marker' : 'keep-disabled', 'invalidate-credentials', 'remove-workspace-role'] : complete && !recover ? [] : [
     ...(client.enabled ? ['disable-client'] : []),
     ...(!binding.length ? ['install-workspace-mapper'] : []),
     'verify-workspace-mapper',
@@ -93,7 +96,7 @@ export async function inspect(kc, row, { rollback = false } = {}) {
     'verify-claim-sources',
     ...(!roles.includes(ROLE) ? ['ensure-workspace-role', 'assign-workspace-role'] : []),
     'verify-effective-roles',
-    ...(marker ? ['enable-marked-client'] : client.enabled ? ['restore-enabled-client'] : []),
+    ...(recover ? ['enable-marked-client'] : client.enabled ? ['restore-enabled-client'] : []),
   ];
   return { row, realm, uuid, client, user, roles, detach, complete,
     report: { serviceAccountId: row.id, realm, clientId: row.kc_client_id, workspaceId: row.joined_workspace_id,
@@ -167,6 +170,10 @@ export async function verifyDisabled(kc, state) {
 
 export async function cliMain(run, argv) {
   parseArgs(argv);
+  return withCliPool(run, argv);
+}
+
+export async function withCliPool(run, argv) {
   const { default: pg } = await import('pg');
   const pool = new pg.Pool({ connectionString: process.env.PROVISIONING_DB_URL ?? process.env.DATABASE_URL });
   try { process.exitCode = (await run({ argv, pool })).exitCode; }

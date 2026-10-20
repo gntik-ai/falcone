@@ -1,11 +1,12 @@
 import { pathToFileURL } from 'node:url';
 import { kcAdmin as defaultKcAdmin, isWorkspaceClaimMapper } from '../apps/control-plane/kc-admin.mjs';
-import { ROLE, ROLLBACK_MARKER, parseArgs, preflight, cliMain, inspect, isBinding,
+import { ROLE, ROLLBACK_MARKER, restoredMarker, parseArgs, preflight, cliMain, inspect, isBinding,
   withRegistryLock, requireState, safeFailure, verifyDisabled } from './lib/workspace-service-accounts.mjs';
 
 async function migrate(kc, state) {
   const { realm, uuid, row, user, client, roles } = state;
-  if (state.complete && !client.attributes?.[ROLLBACK_MARKER]) return;
+  const recover = client.attributes?.[ROLLBACK_MARKER] === row.joined_workspace_id;
+  if (state.complete && !recover) return;
   let changed = false;
   let assignmentAttempted = false;
   try {
@@ -33,18 +34,19 @@ async function migrate(kc, state) {
     }
     const effective = (await kc.listEffectiveRealmRoles(realm, user.id)).map(role => role.name);
     requireState(effective.includes(ROLE) && roles.every(role => effective.includes(role)), 'effective-role-verification-failed');
-    if (client.enabled || client.attributes?.[ROLLBACK_MARKER] === row.joined_workspace_id) {
-      if (client.attributes?.[ROLLBACK_MARKER]) {
-        // Client PUT merges attributes: omission does not clear a key. Remove it
-        // explicitly and verify while disabled, before restoring token issuance.
-        await kc.setClientEnabled(realm, uuid, false, { ...client.attributes, [ROLLBACK_MARKER]: null });
+    if (client.enabled || recover) {
+      const expectedMarker = recover ? restoredMarker(row.joined_workspace_id) : client.attributes?.[ROLLBACK_MARKER];
+      if (recover) {
+        // Nonempty overwrite works even when Keycloak discards null attributes.
+        // This value records completion but never authorizes re-enabling.
+        await kc.setClientEnabled(realm, uuid, false, { ...client.attributes, [ROLLBACK_MARKER]: expectedMarker });
         const cleared = await kc.getClient(realm, uuid);
-        requireState(cleared?.enabled === false && cleared.attributes?.[ROLLBACK_MARKER] == null,
-          'rollback-marker-not-cleared');
+        requireState(cleared?.enabled === false && cleared.attributes?.[ROLLBACK_MARKER] === expectedMarker,
+          'rollback-marker-not-completed');
       }
       await kc.setClientEnabled(realm, uuid, true);
       const enabled = await kc.getClient(realm, uuid);
-      requireState(enabled?.enabled === true && enabled.attributes?.[ROLLBACK_MARKER] == null, 'client-enable-verification-failed');
+      requireState(enabled?.enabled === true && enabled.attributes?.[ROLLBACK_MARKER] === expectedMarker, 'client-enable-verification-failed');
     }
   } catch (error) {
     if (changed) {
@@ -52,7 +54,10 @@ async function migrate(kc, state) {
       // list API keys. Never remove any role that existed before this invocation.
       let disabled = false;
       try {
-        await kc.setClientEnabled(realm, uuid, false, client.attributes);
+        const attributes = client.enabled || client.attributes?.[ROLLBACK_MARKER] === row.joined_workspace_id
+          ? { ...client.attributes, [ROLLBACK_MARKER]: row.joined_workspace_id }
+          : client.attributes;
+        await kc.setClientEnabled(realm, uuid, false, attributes);
         await verifyDisabled(kc, state);
         disabled = true;
       } catch { /* Preserve binding and role if the disable could not be proved. */ }

@@ -79,3 +79,17 @@ for (const value of [undefined, [], [''], [' \t ']]) {
     assert.deepEqual(f.writes[0].patch.attributes.workspace_id, ['workspace-one']);
   });
 }
+
+for (const persisted of [undefined, [], [''], [' '], ['foreign'], ['workspace-one', 'foreign']]) {
+  test(`rebind rejects a discarded or incorrect persisted binding ${JSON.stringify(persisted)}`, async () => {
+    const f = fixture();
+    f.options.kcAdmin.updateUser = async (_realm, _id, patch) => {
+      f.writes.push(patch);
+      f.state.user.attributes.workspace_id = persisted;
+    };
+    const result = await runRebind({ ...f.options, argv: [...f.options.argv, '--apply'] });
+    assert.equal(result.exitCode, 9);
+    assert.equal(result.result.reason, 'workspace-binding-not-persisted');
+    assert.equal(result.result.message, undefined);
+  });
+}

@@ -52,9 +52,10 @@ export function fixture({ fail, failAt, afterCommit = false } = {}) {
     removeClientOptionalScope: async (_realm, _uuid, id) => step('remove-optional', true, () => { state.optional = state.optional.filter(scope => scope.id !== id); }),
     setClientEnabled: async (_realm, _uuid, enabled, attributes) => step(enabled ? 'enable' : 'disable', true, () => {
       state.client.enabled = enabled;
-      // Keycloak merges client attributes. Omitted keys survive; explicit null
-      // removes a key. User PUT has different (replacement) semantics.
+      // Model merging plus both possible null-update behaviours. Recovery must
+      // work even if nulls are discarded. User PUT replaces the attribute map.
       for (const [key, value] of Object.entries(attributes ?? {})) {
+        if (state.ignoreMarkerWrites && key === MARKER) continue;
         if (value === null) {
           if (!state.ignoreMarkerRemoval || key !== MARKER) delete state.client.attributes[key];
         } else state.client.attributes[key] = value;
