@@ -180,11 +180,12 @@ function postgresStore(pool) {
           lease_owner text, lease_expires_at timestamptz, lease_version bigint NOT NULL DEFAULT 0,
           PRIMARY KEY (tenant_id,workspace_id,batch_id),
           CHECK (idempotency_key_sha256 IS NULL OR idempotency_principal IS NOT NULL))`);
-        await client.query('ALTER TABLE workspace_llm_batches ADD COLUMN IF NOT EXISTS auth jsonb');
-        await client.query('ALTER TABLE workspace_llm_batches ADD COLUMN IF NOT EXISTS config_version text');
         // Ordinary rows retain #945's input hash and request-count constraints. Fence
         // metadata uses inert empty sentinels; it can never reach a provider or reconciler.
         await client.query('ALTER TABLE workspace_llm_batches ADD COLUMN IF NOT EXISTS cancel_fence boolean NOT NULL DEFAULT false');
+        // Append broker metadata after every legacy column, preserving positional inserts.
+        await client.query('ALTER TABLE workspace_llm_batches ADD COLUMN IF NOT EXISTS auth jsonb');
+        await client.query('ALTER TABLE workspace_llm_batches ADD COLUMN IF NOT EXISTS config_version text');
         await client.query('ALTER TABLE workspace_llm_batches ALTER COLUMN input_sha256 DROP NOT NULL');
         await client.query('ALTER TABLE workspace_llm_batches DROP CONSTRAINT IF EXISTS workspace_llm_batches_request_count_check');
         await client.query('ALTER TABLE workspace_llm_batches DROP CONSTRAINT IF EXISTS wlb_fence_input_check');

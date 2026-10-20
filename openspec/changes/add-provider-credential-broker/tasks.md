@@ -47,3 +47,23 @@ sandbox (`listen EPERM: operation not permitted 127.0.0.1`); PR CI must run them
 PostgreSQL coverage is skipped because `LLM_CONNECTIONS_TEST_DATABASE_URL` is absent
 and no PostgreSQL 17 is installed. Strict OpenSpec validation passes. No chart,
 workflow pin, deployment, dependency or lockfile changes are part of this follow-up.
+
+## CI repair evidence
+
+The published `http-idempotency` failure reproduced a fresh-schema column-order
+regression: broker columns preceded `cancel_fence`, so the existing positional
+duplicate insert assigned a boolean to `auth` (42804 instead of 23505). Append
+the nullable broker columns after all legacy columns to preserve that insert.
+The PostgreSQL test remains unchanged. Local integration runs skip because the
+test database URLs are absent; no PostgreSQL server is installed and Docker
+socket access is denied. CI must verify the migration on PostgreSQL 17.
+
+Before the image fix, `node tests/blackbox/flows-worker-dockerfile.test.mjs`
+failed both transitive-module checks because the image omitted `provider-auth.mjs`
+and `provider-credential-broker.mjs`. Add both to the existing COPY allow-list.
+All six checks now pass, including the actual build guard's missing-module
+rejection. The four-file CI image-contract selection, broker unit tests, broker
+executor tests and batch tests pass. No existing tests or CI gates were changed.
+The full `pnpm test:unit` run also encounters sandbox-only `listen EPERM` errors
+and missing chart files at the required sibling `../falcone-charts` path. These
+checks require the CI checkout layout and socket permissions.
