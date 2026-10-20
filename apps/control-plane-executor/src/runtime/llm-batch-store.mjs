@@ -10,7 +10,7 @@ export class BatchLeaseLost extends Error {
   constructor() { super('LLM batch lease lost'); this.code = 'LLM_BATCH_LEASE_LOST'; }
 }
 export function publicBatch(row) {
-  const { providerType, endpoint, secretRef, providerState, inputSha256, idempotencyPrincipal, idempotencyKeySha256,
+  const { providerType, endpoint, secretRef, auth, configVersion, providerState, inputSha256, idempotencyPrincipal, idempotencyKeySha256,
     leaseOwner, leaseExpiresAt, leaseVersion, cancelFence, ...safe } = row;
   return safe;
 }
@@ -110,7 +110,7 @@ export function createLlmBatchStore({ pool } = {}) {
 
 const snake = value => value.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
 const camel = value => value.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-const batchFields = ['tenantId', 'workspaceId', 'batchId', 'connectionId', 'providerType', 'endpoint', 'secretRef', 'model',
+const batchFields = ['tenantId', 'workspaceId', 'batchId', 'connectionId', 'providerType', 'endpoint', 'secretRef', 'auth', 'configVersion', 'model',
   'providerBatchId', 'providerState', 'status', 'cancelFence', 'requestCount', 'providerCounts', 'missingCount', 'inputSha256', 'idempotencyPrincipal', 'idempotencyKeySha256',
   'lastErrorCode', 'cancelRequestedAt', 'cancelAcknowledgedAt', 'expiresAt', 'endedAt', 'resultsAttempts', 'nextPollAt', 'createdAt', 'updatedAt', 'leaseOwner', 'leaseExpiresAt', 'leaseVersion'];
 const mutableFields = new Set(['providerBatchId', 'providerState', 'status', 'providerCounts', 'missingCount', 'idempotencyKeySha256',
@@ -180,6 +180,8 @@ function postgresStore(pool) {
           lease_owner text, lease_expires_at timestamptz, lease_version bigint NOT NULL DEFAULT 0,
           PRIMARY KEY (tenant_id,workspace_id,batch_id),
           CHECK (idempotency_key_sha256 IS NULL OR idempotency_principal IS NOT NULL))`);
+        await client.query('ALTER TABLE workspace_llm_batches ADD COLUMN IF NOT EXISTS auth jsonb');
+        await client.query('ALTER TABLE workspace_llm_batches ADD COLUMN IF NOT EXISTS config_version text');
         // Ordinary rows retain #945's input hash and request-count constraints. Fence
         // metadata uses inert empty sentinels; it can never reach a provider or reconciler.
         await client.query('ALTER TABLE workspace_llm_batches ADD COLUMN IF NOT EXISTS cancel_fence boolean NOT NULL DEFAULT false');

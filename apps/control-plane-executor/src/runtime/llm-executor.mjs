@@ -15,6 +15,8 @@
 // against an SSRF guard — at config-deploy time (reject 400, no DB write) AND re-validated at
 // request time (fail-closed for any pre-existing malicious row). The DEFAULT secretResolver is
 // the confined resolver, so a non-allow-listed env var is NEVER read.
+import { createCredentialBroker } from './provider-credential-broker.mjs';
+import { normalizeProviderAuth, identityProfile } from './provider-auth.mjs';
 import { randomUUID } from 'node:crypto';
 import { createLlmLedgerStore } from './llm-usage-store.mjs';
 import { createLlmBatchStore } from './llm-batch-store.mjs';
@@ -118,12 +120,15 @@ function providerKey(tenantId, workspaceId) {
 // Strip any plaintext secret a caller may have (mis)passed; persist only secretRef + config.
 function sanitizeProviderConfig(config = {}) {
   const { apiKey, secret, key, tenantId, ...safe } = config;
+  const auth = normalizeProviderAuth(safe.auth);
+  const brokered = auth && auth.mode !== 'apiKey';
   return {
     providerType: safe.providerType,
     endpoint: safe.endpoint,
     allowedModels: Array.isArray(safe.allowedModels) ? safe.allowedModels.map(String) : [],
     defaultModel: safe.defaultModel,
-    secretRef: safe.secretRef,
+    secretRef: brokered ? undefined : safe.secretRef,
+    ...(auth ? { auth } : {}),
   };
 }
 
@@ -140,6 +145,7 @@ function connectionRecord(workspaceId, config, connectionId, existing, isDefault
   validateConnection(config, connectionId);
   return {
     ...sanitizeProviderConfig(config),
+    ...(config.auth && config.auth.mode !== 'apiKey' ? { configVersion: randomUUID() } : {}),
     tenantId: config.tenantId ?? TENANT_SENTINEL, workspaceId, connectionId,
     displayName: config.displayName ?? null, isDefault,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
@@ -281,6 +287,8 @@ function createPostgresProviderStore(pool) {
         created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
         PRIMARY KEY (tenant_id, workspace_id, connection_id)
       )`);
+      await client.query('ALTER TABLE workspace_llm_connections ADD COLUMN IF NOT EXISTS auth jsonb');
+      await client.query('ALTER TABLE workspace_llm_connections ADD COLUMN IF NOT EXISTS auth_version text');
       await client.query(`CREATE TABLE IF NOT EXISTS workspace_llm_connection_models (
         tenant_id text NOT NULL, workspace_id text NOT NULL, connection_id text NOT NULL, model_id text NOT NULL,
         display_name text, capabilities jsonb, lifecycle jsonb, catalog_version text,
@@ -322,12 +330,12 @@ function createPostgresProviderStore(pool) {
         END IF;
         PERFORM pg_advisory_xact_lock(hashtext('workspace_llm_connections'), hashtext(json_build_array(NEW.tenant_id, NEW.workspace_id)::text));
         UPDATE workspace_llm_connections SET
-          provider_type=NEW.provider_type, endpoint=NEW.endpoint, allowed_models=NEW.allowed_models,
+          auth=NULL, auth_version=NULL, provider_type=NEW.provider_type, endpoint=NEW.endpoint, allowed_models=NEW.allowed_models,
           default_model=NEW.default_model, secret_ref=NEW.secret_ref, updated_at=NEW.updated_at
           WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id AND is_default;
         IF NOT FOUND THEN
           UPDATE workspace_llm_connections SET
-            provider_type=NEW.provider_type, endpoint=NEW.endpoint, allowed_models=NEW.allowed_models,
+            auth=NULL, auth_version=NULL, provider_type=NEW.provider_type, endpoint=NEW.endpoint, allowed_models=NEW.allowed_models,
             default_model=NEW.default_model, secret_ref=NEW.secret_ref, updated_at=NEW.updated_at, is_default=true
             WHERE tenant_id=NEW.tenant_id AND workspace_id=NEW.workspace_id AND connection_id='default';
           IF NOT FOUND THEN
@@ -357,6 +365,7 @@ function createPostgresProviderStore(pool) {
       providerType: row.provider_type ?? undefined, endpoint: row.endpoint ?? undefined,
       allowedModels: Array.isArray(row.allowed_models) ? row.allowed_models : [],
       defaultModel: row.default_model ?? undefined, secretRef: row.secret_ref ?? undefined,
+      ...(row.auth ? { auth: row.auth, configVersion: row.auth_version } : {}),
     };
   }
 
@@ -386,14 +395,14 @@ function createPostgresProviderStore(pool) {
       if (isDefault) await client.query('UPDATE workspace_llm_connections SET is_default=false WHERE tenant_id=$1 AND workspace_id=$2 AND is_default AND connection_id<>$3', [tenant, workspaceId, connectionId]);
       const displayName = mode === 'default' && config.displayName === undefined ? existing?.display_name : config.displayName;
       const values = [tenant, workspaceId, connectionId, displayName ?? null, safe.providerType ?? null, safe.endpoint ?? null,
-        JSON.stringify(safe.allowedModels), safe.defaultModel ?? null, safe.secretRef === undefined ? null : JSON.stringify(safe.secretRef), isDefault];
+        JSON.stringify(safe.allowedModels), safe.defaultModel ?? null, safe.secretRef === undefined ? null : JSON.stringify(safe.secretRef), isDefault, safe.auth ? JSON.stringify(safe.auth) : null, randomUUID()];
       const result = existing
         ? await client.query(`UPDATE workspace_llm_connections SET display_name=$4, provider_type=$5, endpoint=$6,
-            allowed_models=$7::jsonb, default_model=$8, secret_ref=$9::jsonb, is_default=$10, updated_at=now()
+            allowed_models=$7::jsonb, default_model=$8, secret_ref=$9::jsonb, is_default=$10, auth=$11::jsonb, auth_version=$12, updated_at=now()
             WHERE tenant_id=$1 AND workspace_id=$2 AND connection_id=$3 RETURNING *`, values)
         : await client.query(`INSERT INTO workspace_llm_connections
-            (tenant_id, workspace_id, connection_id, display_name, provider_type, endpoint, allowed_models, default_model, secret_ref, is_default)
-            VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10) RETURNING *`, values);
+            (tenant_id, workspace_id, connection_id, display_name, provider_type, endpoint, allowed_models, default_model, secret_ref, is_default, auth, auth_version)
+            VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10,$11::jsonb,$12) RETURNING *`, values);
       return rowToRecord(result.rows[0]);
     });
   }
@@ -526,6 +535,28 @@ export function createLlmExecutor(options = {}) {
     if (enforceEndpointGuard && endpoint != null && endpoint !== '') await assertEndpointAllowed(endpoint, endpointGuardOpts);
   }
 
+  const identityProfiles = options.identityProfiles ?? JSON.parse(guardEnv.LLM_IDENTITY_PROFILES ?? '{}');
+  const broker = createCredentialBroker({ fetchImpl, now: options.now, secretResolver, prefixes,
+    endpointOptions: endpointGuardOpts, identityProfiles, readTokenFile: options.readTokenFile,
+    skewSeconds: options.tokenSkewSeconds ?? Number(guardEnv.LLM_PROVIDER_TOKEN_SKEW_SECONDS ?? 60) });
+  async function credentials(config) {
+    if (!config.auth || config.auth.mode === 'apiKey') return { apiKey: await resolveSecretOrThrow(config), fetchImpl };
+    return broker.prepare(config);
+  }
+  async function validateAuth(workspaceId, config) {
+    const auth = normalizeProviderAuth(config.auth);
+    if (!auth || auth.mode === 'apiKey') {
+      await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
+      return;
+    }
+    const endpoint = auth.mode === 'workloadIdentity'
+      ? identityProfile(auth, config.tenantId, identityProfiles, 400).tokenEndpoint : auth.tokenEndpoint;
+    await assertEndpointAllowed(endpoint, endpointGuardOpts);
+    for (const ref of [auth.clientSecretRef, auth.refreshTokenRef].filter(Boolean)) {
+      await assertProviderSecretRefExists(ref, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
+    }
+  }
+
   async function resolveProviderOrThrow(workspaceId, tenantId) {
     const config = await providerStore.getProvider(workspaceId, tenantId);
     if (!config) throw clientError('No LLM provider configured for this workspace', 422, 'LLM_PROVIDER_MISSING');
@@ -571,9 +602,9 @@ export function createLlmExecutor(options = {}) {
     throw clientError('LLM provider secret could not be resolved', 500, 'LLM_PROVIDER_SECRET_UNRESOLVED');
   }
 
-  function backendFor(config) {
+  function backendFor(config, authorizedFetch = fetchImpl) {
     if (backendFactory) return backendFactory(config);
-    return httpLlmBackend({ providerType: config.providerType, fetchImpl });
+    return httpLlmBackend({ providerType: config.providerType, fetchImpl: authorizedFetch });
   }
 
   async function prepare(workspaceId, { tenantId, connectionId, model, responseFormat, promptCache, stream, maxTokens, batchItems } = {}) {
@@ -618,16 +649,18 @@ export function createLlmExecutor(options = {}) {
     // Re-validate the endpoint just before the outbound call (DNS-rebinding defense + fail-closed
     // for any malicious row persisted before this guard shipped).
     await assertEndpoint(config.endpoint);
-    const apiKey = await resolveSecretOrThrow(config);
-    return { config, chosen, apiKey, maxOutputTokens: capabilities?.maxOutputTokens, backend: batchItems ? undefined : backendFor(config) };
+    const credential = await credentials(config);
+    return { config, chosen, ...credential, maxOutputTokens: capabilities?.maxOutputTokens, backend: batchItems ? undefined : backendFor(config, credential.fetchImpl) };
   }
 
   // Config-deploy: confine the secretRef + SSRF-validate the endpoint BEFORE persisting, so a
   // rejected config (400) writes NO row. The store still strips any mis-passed plaintext key.
   async function setProvider(workspaceId, config = {}) {
-    await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
+    await validateAuth(workspaceId, config);
     if (config.endpoint !== undefined) await assertEndpoint(config.endpoint);
-    return providerStore.deployProvider(workspaceId, config);
+    const record = await providerStore.deployProvider(workspaceId, config);
+    broker.invalidate({ tenantId: config.tenantId ?? TENANT_SENTINEL, workspaceId });
+    return record;
   }
 
   function usageIdentity(config, model, tenantId, mode, invocation) {
@@ -692,7 +725,16 @@ export function createLlmExecutor(options = {}) {
 
   const batches = createLlmBatches({ store: batchStore, prepare, normalizeMessages, fetchImpl, now: options.now,
     driverResolver: options.batchDriverResolver, usageStore, intervalMs: options.batchPollIntervalMs,
-    async resolveSnapshot(row) { await assertEndpoint(row.endpoint); return resolveSecretOrThrow(row); },
+    async resolveSnapshot(row) {
+      await assertEndpoint(row.endpoint);
+      if (row.auth && row.auth.mode !== 'apiKey') {
+        let current;
+        try { current = await providerStore.getConnection(row.workspaceId, row.connectionId, row.tenantId); }
+        catch { throw adapterError('LLM_PROVIDER_AUTH_FAILED'); }
+        if (current.configVersion !== row.configVersion) throw adapterError('LLM_PROVIDER_AUTH_FAILED');
+      }
+      return credentials(row);
+    },
   });
   return {
     ...batches,
@@ -710,14 +752,16 @@ export function createLlmExecutor(options = {}) {
     // secretRef + SSRF-validates the endpoint before persisting (#659).
     setProvider,
     async createConnection(workspaceId, config = {}) {
-      await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
+      await validateAuth(workspaceId, config);
       await assertEndpoint(config.endpoint);
       return providerStore.createConnection(workspaceId, config);
     },
     async replaceConnection(workspaceId, connectionId, config = {}) {
-      await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
+      await validateAuth(workspaceId, config);
       await assertEndpoint(config.endpoint);
-      return providerStore.replaceConnection(workspaceId, connectionId, config);
+      const record = await providerStore.replaceConnection(workspaceId, connectionId, config);
+      broker.invalidate({ tenantId: config.tenantId ?? TENANT_SENTINEL, workspaceId, connectionId });
+      return record;
     },
     async refreshModels(workspaceId, connectionId, tenantId) {
       await providerStore.refreshModels(workspaceId, connectionId, tenantId, catalog);
@@ -728,11 +772,19 @@ export function createLlmExecutor(options = {}) {
       return listModels(workspaceId, connectionId, config.tenantId);
     },
     listModels,
-    deleteConnection: (workspaceId, connectionId, tenantId) => providerStore.deleteConnection(workspaceId, connectionId, tenantId),
+    async deleteConnection(workspaceId, connectionId, tenantId) {
+      const result = await providerStore.deleteConnection(workspaceId, connectionId, tenantId);
+      broker.invalidate({ tenantId: tenantId ?? TENANT_SENTINEL, workspaceId, connectionId });
+      return result;
+    },
     listConnections: (workspaceId, tenantId) => providerStore.listConnections(workspaceId, tenantId),
     getConnection: (workspaceId, connectionId, tenantId) => providerStore.getConnection(workspaceId, connectionId, tenantId),
     getProvider: (workspaceId, tenantId) => providerStore.getProvider(workspaceId, tenantId),
-    removeProvider: (workspaceId, tenantId) => providerStore.removeProvider(workspaceId, tenantId),
+    async removeProvider(workspaceId, tenantId) {
+      const result = await providerStore.removeProvider(workspaceId, tenantId);
+      broker.invalidate({ tenantId: tenantId ?? TENANT_SENTINEL, workspaceId });
+      return result;
+    },
     complete,
     completeStream,
     getUsage,
