@@ -665,8 +665,10 @@ export const kcAdmin = {
   async regenerateClientSecret(realm, clientUuid) {
     return (await kc('POST', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}/client-secret`)).json?.value ?? null;
   },
-  async setClientEnabled(realm, clientUuid, enabled) {
-    await kc('PUT', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}`, { enabled });
+  async setClientEnabled(realm, clientUuid, enabled, attributes) {
+    await kc('PUT', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}`, {
+      enabled, ...(attributes === undefined ? {} : { attributes }),
+    });
   },
   async deleteClient(realm, clientUuid) { try { await kc('DELETE', `/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(clientUuid)}`); } catch (e) { if (e.kcStatus !== 404) throw e; } },
 

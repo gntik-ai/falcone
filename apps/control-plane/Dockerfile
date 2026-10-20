@@ -91,6 +91,13 @@ COPY apps/control-plane/kc-admin.mjs              /repo/apps/control-plane/kc-ad
 COPY apps/control-plane/social-providers.mjs      /repo/apps/control-plane/social-providers.mjs
 COPY apps/control-plane/keycloak-public-base.mjs  /repo/apps/control-plane/keycloak-public-base.mjs
 COPY scripts/backfill-tenant-realm-audience.mjs    /repo/scripts/backfill-tenant-realm-audience.mjs
+COPY scripts/backfill-workspace-service-accounts.mjs /repo/scripts/backfill-workspace-service-accounts.mjs
+COPY scripts/rollback-workspace-service-accounts.mjs /repo/scripts/rollback-workspace-service-accounts.mjs
+COPY scripts/rebind-workspace-user.mjs             /repo/scripts/rebind-workspace-user.mjs
+COPY scripts/lib/workspace-service-accounts.mjs    /repo/scripts/lib/workspace-service-accounts.mjs
+COPY apps/control-plane/tenant-store.mjs           /repo/apps/control-plane/tenant-store.mjs
+COPY apps/control-plane/function-secret-refs.mjs   /repo/apps/control-plane/function-secret-refs.mjs
+COPY apps/control-plane/vault-secrets.mjs          /repo/apps/control-plane/vault-secrets.mjs
 
 # Source modules under apps/control-plane use repository-relative ../../packages imports.
 # The image flattens control-plane files into /app, so preserve that resolved absolute seam
