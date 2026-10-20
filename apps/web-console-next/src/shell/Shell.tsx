@@ -1,15 +1,15 @@
 import { LayoutDashboard } from 'lucide-react'
-import { Suspense, useState, useEffect, type ComponentPropsWithRef } from 'react'
+import { Suspense, useState, useEffect, useMemo, type ComponentProps, type ComponentPropsWithRef } from 'react'
 import { AppSidebar, AppTopbar } from '@gntik-ai/blocks'
 import { SidebarLayout, Breadcrumbs, WorkspaceSwitcher, LinkProvider, MobileNav, type NavGroup } from '@gntik-ai/ui'
-import { Outlet, useLocation, matchRoutes, type RouteObject } from 'react-router-dom'
+import { Link, Outlet, useLocation, matchRoutes, type RouteObject } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
 import { PermissionsProvider, usePermissions } from './permissions'
 import { ShellErrorBoundary } from './RouteState'
 import { StatusPage } from '../StatusPage'
 import { ConsoleContextProvider, useConsoleContext } from './context'
-import { pendingConsoleRoutes } from './routes'
+import { pendingConsoleRoutes, type PendingConsoleRoute } from './routes'
 import { useSession } from './session'
 import { AccountMenu } from './AccountMenu'
 import { navigation, navigationGroups } from './navigation'
@@ -19,17 +19,21 @@ import { buildBreadcrumbs } from './breadcrumbs'
 // Their root-relative href must not inherit /next/ from the new router basename.
 function LegacyLink(props: ComponentPropsWithRef<'a'>) { return <a {...props} /> }
 
-const shellRoutes: RouteObject[] = [{ path: '/console', children: pendingConsoleRoutes }]
-
-export function Shell() {
+export function Shell({ routes = pendingConsoleRoutes }: { routes?: PendingConsoleRoute[] }) {
+  const shellRoutes: RouteObject[] = [{ path: '/console', children: routes }]
   const location = useLocation()
   const matches = matchRoutes(shellRoutes, location) ?? []
   const routeWorkspaceId = matches.at(-1)?.params.workspaceId
   const platformGlobal = matches.some((match) => match.route.handle?.platformGlobal)
-  return <ConsoleContextProvider routeWorkspaceId={routeWorkspaceId}><PermissionsProvider><ShellContent platformGlobal={platformGlobal} /></PermissionsProvider></ConsoleContextProvider>
+  return <ConsoleContextProvider routeWorkspaceId={routeWorkspaceId}><PermissionsProvider><ShellContent platformGlobal={platformGlobal} routes={routes} /></PermissionsProvider></ConsoleContextProvider>
 }
 
-function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
+function ShellContent({ platformGlobal, routes }: { platformGlobal: boolean; routes: PendingConsoleRoute[] }) {
+  const linkComponent = useMemo(() => function ShellLink({ href, ...props }: ComponentPropsWithRef<'a'>) {
+    const matches = href?.startsWith('/console/') ? matchRoutes([{ path: '/console', children: routes }], href) : null
+    const route = matches?.at(-1)?.route as PendingConsoleRoute | undefined
+    return route?.migrated ? <Link {...props} to={href!}>{props.children as ComponentProps<typeof Link>['children']}</Link> : <LegacyLink {...props} href={href} />
+  }, [routes])
   const { t } = useTranslation('common')
   const { pathname } = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -50,7 +54,7 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
     }).map((item) => ({ label: t(`navigation.${item.key}`), href: item.path, icon: (props: { size?: number; 'aria-hidden'?: boolean; className?: string }) => <item.icon {...props} />, current: pathname === item.path || (!('exactActive' in item) && pathname.startsWith(item.path + '/')) }))
   })).filter((group) => group.items.length)
   const breadcrumbs = buildBreadcrumbs(pathname, t)
-  return <LinkProvider component={LegacyLink}>
+  return <LinkProvider component={linkComponent}>
     <SidebarLayout fullScreen className="console-shell" drawerOpen={false} sidebarLabel={t('shell.navigation')}
       sidebar={({ collapsed, closeDrawer }) => <>
         <AppSidebar collapsed={collapsed} workspaces={[]} user={null} usage={null} helpHref="" navLabel={t('shell.navigation')}
@@ -79,6 +83,6 @@ function ContextPanel() {
       currentId={context.activeWorkspaceId ?? ''} onSelect={(workspace) => context.selectWorkspace(workspace.id)} label={t('shell.workspace')}
       emptyText={t('shell.selectWorkspace')} />
     {permissions.isReadOnly && <span>{t('shell.readOnly')}</span>}
-    {context.error && <p role="status">{t('states.network.body')}</p>}
+    {context.error && <p role="status">{context.errorStatus === 403 ? t('states.forbidden.body') : t('states.network.body')}</p>}
   </section>
 }

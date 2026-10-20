@@ -1,6 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 import { startServer } from '../csp/server.mjs';
-import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
+import { sessionFor } from './fixtures/shell.ts';
+import { createParityNetwork } from './network.ts';
 
 export { expect };
 export const test = base.extend({
@@ -11,7 +12,7 @@ export const test = base.extend({
   }, { scope: 'worker' }],
   parity: [async ({ page, server, role, locale }, use) => {
     const requests = [], unmatched = [], faults = [];
-    let selected = {};
+    const fixtures = createParityNetwork(role);
     await page.clock.setFixedTime(new Date('2026-06-01T12:00:00Z'));
     await page.exposeBinding('__parityFault', (_, message) => { faults.push(message); });
     page.on('pageerror', (error) => faults.push(`pageerror: ${error.message}`));
@@ -37,25 +38,30 @@ export const test = base.extend({
     await page.route('**/v1/**', async (route) => {
       const request = route.request(), url = new URL(request.url());
       const method = request.method(), path = url.pathname;
+      if (url.origin !== server.origin) {
+        unmatched.push(`External request ${method} ${path}`);
+        await route.abort();
+        return;
+      }
       let body;
       try { body = request.postDataJSON() ?? undefined; } catch { body = request.postData(); }
       requests.push({ method, path: path + url.search, body });
-      const name = Object.keys(endpoints).find((key) => endpoints[key].method === method && endpoints[key].path === path);
-      if (url.origin !== server.origin || !name) {
+      const response = await fixtures.respond(method, path);
+      if (!response) {
         unmatched.push(`${method} ${path}${url.search}`);
         await route.fulfill({ status: 404, json: { error_msg: '404 Route Not Found' } });
         return;
       }
-      const response = responseFor(name, selected[name] ?? 'success', role);
       if (response.network) await route.abort('failed');
       else await route.fulfill({ status: response.status, json: response.body });
     });
-    const network = { requests, setVariants: (value) => { selected = value; } };
+    const network = { requests, registerEndpoints: fixtures.registerEndpoints, setVariants: fixtures.setVariants };
     const parity = {
       page, locale, role, network, faults,
-      async open(route, variants = {}) {
-        selected = variants;
+      async open(route, variants = {}, { waitForReady = true } = {}) {
+        fixtures.setVariants(variants);
         await page.goto(server.url(route.replace(/^\//, '')));
+        if (!waitForReady) return;
         await expect(page.locator('main')).toBeVisible();
         await expect(page.locator('main h1')).toBeVisible();
         await expect(page.locator('main section[aria-busy="true"]')).toHaveCount(0);

@@ -3,6 +3,7 @@ import { NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { Button } from '@gntik-ai/ui'
 import { useTranslation } from 'react-i18next'
 import { RouteState } from '../RouteState'
+import PageEndpoint from './PageEndpoint'
 
 const LazyDestination = lazy(async () => {
   await new Promise((resolve) => setTimeout(resolve, 500))
@@ -23,5 +24,6 @@ export default function FixtureRoutes() {
     <Route path="lazy" element={<LazyDestination />} />
     <Route path="throw" element={<Throw />} />
     <Route path="forbidden" element={<RouteState state="forbidden" />} />
+    <Route path="page-endpoint" element={<PageEndpoint />} />
   </Routes>
 }

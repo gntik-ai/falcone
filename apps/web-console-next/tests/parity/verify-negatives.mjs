@@ -14,6 +14,7 @@ function collect(suite) { specs.push(...(suite.specs ?? [])); for (const child o
 collect(report);
 const expected = new Map([
   ['unmatched request names method and path', /POST \/v1\/synthetic-unmatched/],
+  ['external API request is aborted', /External request GET \/v1\/synthetic-external/],
   ['runtime-health console.error', /runtime-health:.*synthetic-console-error/s],
   ['runtime-health pageerror', /runtime-health:.*synthetic-page-error/s],
   ['runtime-health unhandledrejection', /runtime-health:.*synthetic-rejection/s],

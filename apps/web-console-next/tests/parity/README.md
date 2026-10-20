@@ -43,3 +43,43 @@ in a follow-up, outside this harness change.
 
 CI initially reports an optional check. Before removing this job after making
 it required, the operator must first remove its branch-protection requirement.
+
+## Page endpoints and response scenarios
+
+A page manifest can declare optional `endpoints`, keyed by fixture name. Each
+entry has `method`, a root-relative API `path`, and `fixtures: { success, empty? }`
+containing synthetic response bodies. Register them once per test before opening
+the page, including tests using the eight-check helpers:
+
+```js
+test.beforeEach(async ({ parity }) => {
+  parity.network.registerEndpoints(manifest.endpoints ?? {});
+});
+```
+
+Shell endpoints remain available. Duplicate names or method/path pairs are
+rejected. Registration is local to the test and never makes unknown requests
+valid; the unmatched-request negative control registers a page fixture before
+issuing an unknown request. External requests, including `/v1/` requests, are
+aborted and fail teardown.
+
+`workspace_admin` and `workspace_viewer` are opt-in through each page manifest's
+`roles`; the existing shell matrix remains unchanged. `fixtures/page.ts` and
+`page-endpoints.spec.mjs` exercise these roles without migrating a page.
+
+Existing string variants still work. Each selected endpoint also accepts an
+object with optional `variant`, `delayMs`, and `sequence`, for example:
+
+```js
+await parity.open(manifest.route, {
+  page: { delayMs: 2000, sequence: ['500', 'success'] },
+}, { waitForReady: false });
+```
+
+The delay applies to every response. A sequence advances per matched request,
+then repeats its final response; opening a page or calling `setVariants` resets
+the sequence. Numeric HTTP variants return synthetic error envelopes and
+`network` aborts the request. These options also work for shell endpoints.
+`open` waits for readiness by default. Set `waitForReady: false` to observe the
+loading DOM before the delayed response, then assert the error, click the page's
+retry button and assert the data through public DOM locators.

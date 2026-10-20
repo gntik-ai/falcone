@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useHref, useLocation } from 'react-router-dom'
 import { consoleAuthConfig } from '@in-falcone/console-api/config'
 import {
   clearConsoleShellSession, ensureConsoleSession, readConsoleShellSession, storeProtectedRouteIntent,
@@ -9,11 +9,12 @@ import { terminateConsoleLoginSession } from '@in-falcone/console-api/auth'
 import { StatusPage } from '../StatusPage'
 
 const SessionContext = createContext<ConsoleShellSession | null>(null)
+export const SessionProvider = SessionContext.Provider
 export const useSession = () => useContext(SessionContext)
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const location = useLocation()
-  const routeIntent = location.pathname + location.search + location.hash
+  const routeIntent = useHref(location.pathname + location.search + location.hash)
   const [session, setSession] = useState<ConsoleShellSession | null>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => {

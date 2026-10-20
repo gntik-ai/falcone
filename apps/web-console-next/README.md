@@ -138,6 +138,26 @@ snapshot `{userId, tenantId, workspaceId, updatedAt}`. Only a workspace route
 parameter overrides the stored context. Platform-global routes hide context
 controls. The kit I18nProvider follows the app locale, including built-in labels.
 
+`Guard` and `RouteState` accept optional `denialTitle` and
+`denialDescription` strings for page-local translated denial copy. Omitted values
+keep `states.forbidden.*`. Context failures retain the boolean `error` and add
+`errorStatus`; only numeric 403 uses the forbidden notice, all other failures
+keep the network notice.
+
+Route metadata in `src/shell/routes.ts` has an optional `migrated` flag. Sidebar
+and mobile navigation use the router only for matching flagged targets; unmarked
+targets remain root-relative legacy anchors. No production route is flagged yet.
+AccountMenu has no route links. ProtectedRoute stores the router-generated href,
+including any basename, query and fragment, under the unchanged shared intent key.
+Restoring that intent after login belongs to the u1 login migration.
+
+For page tests, persist a synthetic session with `login()` from
+`tests/shell-support.ts`, then use `renderWithSession(<Page />)`. It supplies
+`useSession` synchronously without mounting ProtectedRoute, showing its loading
+state or calling `ensureConsoleSession`. Add a MemoryRouter inside the helper
+when the page needs router hooks. The parity endpoint extension is documented in
+[tests/parity/README.md](tests/parity/README.md).
+
 Run shell browser checks against a fixture build (synthetic sessions only):
 
 ```sh

@@ -1,6 +1,15 @@
 import { expect, vi } from 'vitest'
+import { createElement, type ReactNode } from 'react'
+import { render } from '@testing-library/react'
 import { buildConsoleLoginSessionFixture } from '@in-falcone/console-api/fixtures'
-import { persistConsoleShellSession } from '@in-falcone/console-api/session'
+import { persistConsoleShellSession, readConsoleShellSession } from '@in-falcone/console-api/session'
+import { SessionProvider } from '../src/shell/session'
+
+export function renderWithSession(children: ReactNode) {
+  const session = readConsoleShellSession()
+  if (!session) throw new Error('Persist a session with login() before rendering')
+  return render(createElement(SessionProvider, { value: session }, children))
+}
 
 export const tenantUrl = '/v1/tenants?page%5Bsize%5D=100&sort=displayName'
 export const workspaceUrl = (tenant: string) => `/v1/workspaces?page%5Bsize%5D=100&sort=displayName&filter%5BtenantId%5D=${tenant}`

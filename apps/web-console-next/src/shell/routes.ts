@@ -1,7 +1,8 @@
 export type GuardKind = 'superadmin' | 'observer' | 'secrets'
 
-interface PendingConsoleRoute {
+export interface PendingConsoleRoute {
   path: string
+  migrated?: boolean
   guard?: GuardKind
   handle?: { platformGlobal: boolean }
 }

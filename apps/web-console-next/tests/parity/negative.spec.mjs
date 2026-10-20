@@ -1,6 +1,7 @@
 // This suite is selected only by verify-negatives.mjs. Every case must fail.
 import { test, expect } from './harness.mjs';
 import manifest from './pages/overview.manifest.ts';
+import pageManifest from './fixtures/page.ts';
 import * as check from './checks.mjs';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -13,6 +14,7 @@ const seedText = async (page, text, attribute) => page.evaluate(({ text, attribu
 }, { text, attribute });
 
 test('unmatched request names method and path', async ({ parity }) => {
+  parity.network.registerEndpoints(pageManifest.endpoints);
   await parity.open(manifest.route);
   const result = await parity.page.evaluate(async () => {
     const res = await fetch('/v1/synthetic-unmatched', { method: 'POST' });
@@ -20,6 +22,10 @@ test('unmatched request names method and path', async ({ parity }) => {
   });
   expect(result).toEqual({ status: 404, body: { error_msg: '404 Route Not Found' } });
   // No explicit unmatched assertion: automatic teardown must fail this test.
+});
+test('external API request is aborted', async ({ parity }) => {
+  await parity.page.goto('https://synthetic.invalid/v1/synthetic-external').catch(() => {});
+  // Automatic teardown must reject external requests even under /v1/.
 });
 for (const fault of ['console.error', 'pageerror', 'unhandledrejection', 'securitypolicyviolation', 'React #426']) {
   test(`runtime-health ${fault}`, async ({ parity }) => {
