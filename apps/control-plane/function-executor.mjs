@@ -12,7 +12,7 @@
 import https from 'node:https';
 import http from 'node:http';
 import fs from 'node:fs';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { invocationPublicJwks, mintInvocationCredential } from './function-invocation-auth.mjs';
 
 const SA = '/var/run/secrets/kubernetes.io/serviceaccount';
@@ -133,21 +133,28 @@ function servicePath(name) {
   return `/apis/serving.knative.dev/v1/namespaces/${encodeURIComponent(NS)}/services/${encodeURIComponent(value)}`;
 }
 
+export const functionSecretName = (name) => `${name}-secrets`;
+
 export function buildFunctionKsvcManifest(
   name,
   source,
-  { tenantId, workspaceId, functionResourceId, memoryMb = 256, timeoutMs = 60000, secretEnv = [] } = {},
+  { tenantId, workspaceId, functionResourceId, memoryMb = 256, timeoutMs = 60000, secretEnv = [], secretRefs, rotateSecrets = false } = {},
 ) {
-  // Workspace secrets resolved from Vault (add-vault-secret-consumption, #612) are injected as plain
-  // env vars alongside FN_SRC. The values are read server-side at deploy from the caller's own
-  // tenant/workspace Vault path; only the names a function declares are injected.
+  // OpenBao values belong only in the owned Secret, never in workload specifications.
   if (typeof workspaceId !== 'string' || !workspaceId) throw new TypeError('workspaceId is required for Function invocation verification');
   // Workspace secrets cannot override verification configuration or import signing material.
-  if (!Array.isArray(secretEnv) || secretEnv.some((entry) => isReservedFunctionEnvName(entry?.name))) {
+  if (!Array.isArray(secretEnv) || [
+    ...secretEnv,
+    ...(secretRefs ?? []).map((ref) => ({ name: ref.env ?? ref.name })),
+  ].some((entry) => isReservedFunctionEnvName(entry?.name))) {
     throw Object.assign(new TypeError('Workspace secret env uses a reserved Function runtime name'), { statusCode: 400 });
   }
+  const secretEnvNames = (secretRefs ?? secretEnv).map(({ env, name: refName }) => env ?? refName);
   const env = [
-    ...secretEnv,
+    ...secretEnvNames.map((envName) => ({
+      name: envName,
+      valueFrom: { secretKeyRef: { name: functionSecretName(name), key: envName, optional: false } },
+    })),
     { name: 'FN_SRC', value: source },
     { name: 'FN_KSVC_NAME', value: name },
     { name: 'FN_TENANT_ID', value: tenantId },
@@ -170,6 +177,7 @@ export function buildFunctionKsvcManifest(
       template: {
         metadata: {
           annotations: {
+            ...(rotateSecrets ? { 'in-falcone.io/secret-rollout': randomUUID() } : {}),
             'autoscaling.knative.dev/min-scale': '0',
             'autoscaling.knative.dev/max-scale': '5',
           },
@@ -191,33 +199,142 @@ export function buildFunctionKsvcManifest(
   };
 }
 
-// Create or update the function's Knative Service (a code change -> new revision).
+function secretPath(name) {
+  servicePath(name); // Validate the Function name before constructing either resource path.
+  return `/api/v1/namespaces/${encodeURIComponent(NS)}/secrets/${functionSecretName(name)}`;
+}
+
+function verifiedMetadata(resource, labels) {
+  if (!hasFunctionOwnershipLabels(resource, labels)
+      || !resource?.metadata?.resourceVersion || !resource?.metadata?.uid) {
+    throw ownershipRetentionError('ownership_mismatch');
+  }
+  return resource.metadata;
+}
+
+function deleteOptions(metadata, propagationPolicy = 'Foreground') {
+  return { apiVersion: 'v1', kind: 'DeleteOptions', propagationPolicy,
+    preconditions: { uid: metadata.uid, resourceVersion: metadata.resourceVersion } };
+}
+
+export function buildFunctionSecretManifest(name, { tenantId, functionResourceId, secretEnv = [], serviceUid } = {}) {
+  const labels = buildFunctionOwnershipLabels({ tenantId, functionResourceId });
+  return {
+    apiVersion: 'v1', kind: 'Secret', type: 'Opaque',
+    metadata: { name: functionSecretName(name), namespace: NS, labels,
+      ...(serviceUid ? { ownerReferences: [{ apiVersion: 'serving.knative.dev/v1', kind: 'Service',
+        name, uid: serviceUid, controller: true }] } : {}) },
+    data: Object.fromEntries(secretEnv.map(({ name: key, value }) => [key, Buffer.from(String(value)).toString('base64')])),
+  };
+}
+
+async function deleteOwnedSecret(name, labels, request, verifyAbsence = false) {
+  const path = secretPath(name);
+  let existing;
+  try { existing = await request('GET', path); }
+  catch (error) { if (error.statusCode === 404) return; throw error; }
+  const metadata = verifiedMetadata(existing, labels);
+  // A projection is a leaf: background deletion avoids a foreground GC finalizer while
+  // still verifying absence before revocation succeeds. Custom finalizers remain fail-closed.
+  try { await request('DELETE', path, deleteOptions(metadata, 'Background')); }
+  catch (error) { if (error.statusCode !== 404) throw error; }
+  if (verifyAbsence) {
+    try { await request('GET', path); }
+    catch (error) { if (error.statusCode === 404) return; throw error; }
+    throw ownershipRetentionError('deletion_not_observed');
+  }
+}
+
+// Secret API errors may echo the request body (including base64 values). Never surface them.
+function projectionError(error) {
+  return Object.assign(new Error('Function secret projection could not be completed'), {
+    statusCode: error?.statusCode ?? 502, code: error?.code ?? 'FN_SECRET_PROJECTION_FAILED',
+    reason: error?.reason,
+  });
+}
+
+// OpenBao remains the source of truth; this Secret is a replaceable, owned projection.
 export async function deployKnativeService(name, source, opts = {}) {
   const { request = k8s, ...manifestOptions } = opts;
   const manifest = buildFunctionKsvcManifest(name, source, manifestOptions);
-  const expectedLabels = buildFunctionOwnershipLabels(manifestOptions);
+  const labels = buildFunctionOwnershipLabels(manifestOptions);
   const namedServicePath = servicePath(name);
-  try {
-    await request('POST', `/apis/serving.knative.dev/v1/namespaces/${encodeURIComponent(NS)}/services`, manifest);
-  } catch (e) {
-    if (e.statusCode !== 409) throw e;
-    // Never adopt or roll a same-named Service unless Kubernetes confirms both ownership labels.
-    // resourceVersion makes the subsequent patch fail if the verified object is replaced first.
-    const existing = await request('GET', namedServicePath);
-    if (!hasFunctionOwnershipLabels(existing, expectedLabels)
-      || typeof existing?.metadata?.resourceVersion !== 'string') {
-      throw Object.assign(
-        new Error('existing Knative Service ownership does not match this tenant and Function'),
-        { code: 'FN_RUNTIME_OWNERSHIP_MISMATCH', statusCode: 409 },
-      );
+  const namedSecretPath = secretPath(name);
+  const hasSecrets = manifestOptions.secretEnv?.length > 0;
+  let createdSecret = false;
+  let createdService = false;
+  let projected;
+  let previousSecret;
+  const bindProjection = async (service) => {
+    if (!hasSecrets) return;
+    const metadata = verifiedMetadata(projected, labels);
+    const serviceMetadata = verifiedMetadata(service, labels);
+    const ownerReferences = buildFunctionSecretManifest(name, { ...manifestOptions, serviceUid: serviceMetadata.uid }).metadata.ownerReferences;
+    if (metadata.ownerReferences?.length === 1
+        && metadata.ownerReferences[0].blockOwnerDeletion !== true
+        && Object.entries(ownerReferences[0]).every(([key, value]) => metadata.ownerReferences[0][key] === value)) {
+      return;
     }
-    await request('PATCH', namedServicePath, {
-      metadata: {
-        resourceVersion: existing.metadata?.resourceVersion,
-        labels: manifest.metadata.labels,
-      },
-      spec: manifest.spec,
+    projected = await request('PATCH', namedSecretPath, {
+      metadata: { resourceVersion: metadata.resourceVersion, ownerReferences },
     }, { contentType: 'application/merge-patch+json' });
+  };
+  try {
+    if (hasSecrets) {
+      const secret = buildFunctionSecretManifest(name, manifestOptions);
+      try {
+        projected = await request('POST', namedSecretPath.slice(0, namedSecretPath.lastIndexOf('/')), secret);
+        createdSecret = true;
+      } catch (error) {
+        if (error.statusCode !== 409) throw error;
+        const existing = await request('GET', namedSecretPath);
+        const metadata = verifiedMetadata(existing, labels);
+        previousSecret = existing;
+        // Full replacement prunes dropped keys; never merge data maps.
+        secret.metadata.resourceVersion = metadata.resourceVersion;
+        secret.metadata.ownerReferences = metadata.ownerReferences;
+        projected = await request('PUT', namedSecretPath, secret);
+      }
+    } else {
+      await deleteOwnedSecret(name, labels, request, true);
+    }
+    let service;
+    try {
+      service = await request('POST', `/apis/serving.knative.dev/v1/namespaces/${encodeURIComponent(NS)}/services`, manifest);
+      createdService = true;
+    } catch (error) {
+      if (error.statusCode !== 409) throw error;
+      const existing = await request('GET', namedServicePath);
+      if (!hasFunctionOwnershipLabels(existing, labels) || typeof existing?.metadata?.resourceVersion !== 'string') {
+        throw ownershipRetentionError('ownership_mismatch');
+      }
+      // An existing Service UID is known: bind the projection before any Service mutation.
+      await bindProjection(existing);
+      service = await request('PATCH', namedServicePath, {
+        metadata: { resourceVersion: existing.metadata.resourceVersion, labels: manifest.metadata.labels },
+        spec: manifest.spec,
+      }, { contentType: 'application/merge-patch+json' });
+    }
+    if (createdService && hasSecrets) {
+      if (!service?.metadata?.uid) service = await request('GET', namedServicePath);
+      await bindProjection(service);
+    }
+  } catch (error) {
+    try {
+      if (createdService) await deleteKnativeService(name, { ...manifestOptions, request, verifyAbsence: true });
+      else if (createdSecret) await deleteOwnedSecret(name, labels, request, true);
+      else if (previousSecret && projected) {
+        // A rejected Service update must not leave untracked new keys in an existing projection.
+        const live = await request('GET', namedSecretPath);
+        const metadata = verifiedMetadata(live, labels);
+        if (metadata.uid !== previousSecret.metadata.uid || metadata.resourceVersion !== projected.metadata?.resourceVersion) {
+          throw ownershipRetentionError('precondition_conflict');
+        }
+        await request('PUT', namedSecretPath, { ...previousSecret,
+          metadata: { ...previousSecret.metadata, resourceVersion: metadata.resourceVersion } });
+      }
+    } catch { throw projectionError({ statusCode: 502, code: 'FN_SECRET_CLEANUP_PENDING' }); }
+    throw projectionError(error);
   }
   return ksvcHost(name);
 }
@@ -233,6 +350,7 @@ export async function deleteKnativeService(
     existing = await request('GET', namedServicePath);
   } catch (error) {
     if (error.statusCode === 404) {
+      await deleteOwnedSecret(name, expectedLabels, request, verifyAbsence);
       return { deleted: false, retained: false, reason: 'not_found' };
     }
     throw error;
@@ -248,6 +366,8 @@ export async function deleteKnativeService(
     throw ownershipRetentionError('verification_incomplete');
   }
 
+  await deleteOwnedSecret(name, expectedLabels, request, verifyAbsence);
+
   // The named delete is not authorized by namespace+name alone: Kubernetes must match both the UID
   // and resourceVersion of the object whose tenant+Function labels were just verified. Replacement
   // or label mutation between GET and DELETE therefore fails closed instead of deleting by name.
@@ -256,7 +376,7 @@ export async function deleteKnativeService(
     await request('DELETE', namedServicePath, {
       apiVersion: 'v1',
       kind: 'DeleteOptions',
-      propagationPolicy: 'Background',
+      propagationPolicy: 'Foreground',
       preconditions: { uid, resourceVersion },
     });
   } catch (error) {
@@ -280,6 +400,116 @@ export async function deleteKnativeService(
     throw ownershipRetentionError('deletion_not_observed');
   }
   return { deleted, retained: false, reason: deleted ? 'deleted' : 'not_found' };
+}
+
+const descendantCollections = () => [
+  ['Configuration', `/apis/serving.knative.dev/v1/namespaces/${encodeURIComponent(NS)}/configurations`],
+  ['Revision', `/apis/serving.knative.dev/v1/namespaces/${encodeURIComponent(NS)}/revisions`],
+  ['Deployment', `/apis/apps/v1/namespaces/${encodeURIComponent(NS)}/deployments`],
+  ['ReplicaSet', `/apis/apps/v1/namespaces/${encodeURIComponent(NS)}/replicasets`],
+];
+
+const KNATIVE_USER_CONTAINER_ENV = new Set(['PORT', 'K_REVISION', 'K_CONFIGURATION']);
+
+function inlineEnvNames(resource, kind, userEnvNames = new Set()) {
+  const spec = resource?.spec?.template?.spec ?? resource?.spec;
+  const reconciled = kind === 'Deployment' || kind === 'ReplicaSet';
+  return [...new Set((spec?.containers ?? [])
+    .filter((container) => !reconciled || container.name !== 'queue-proxy')
+    .flatMap((container) => (container.env ?? [])
+    .filter((env) => Object.hasOwn(env, 'value') && !isReservedFunctionEnvName(env.name))
+    // Knative adds these literals only in reconciled pod templates. A name also present in
+    // an inline user template must still be checked for legacy secret material.
+    .filter((env) => !reconciled || !KNATIVE_USER_CONTAINER_ENV.has(env.name) || userEnvNames.has(env.name))
+    .map((env) => env.name)))];
+}
+
+// Selectors narrow reads; UID ancestry, rather than a selector alone, authorizes deletion.
+async function legacyFunctionObjects(name, opts) {
+  const { request = k8s } = opts;
+  const labels = buildFunctionOwnershipLabels(opts);
+  const service = await request('GET', servicePath(name));
+  const root = verifiedMetadata(service, labels);
+  const candidates = [];
+  for (const [kind, collection] of descendantCollections()) {
+    let next = '';
+    do {
+      const params = new URLSearchParams({ labelSelector: `serving.knative.dev/service=${name}`, limit: '200', ...(next ? { continue: next } : {}) });
+      const result = await request('GET', `${collection}?${params}`);
+      for (const resource of result.items ?? []) candidates.push({ kind, collection, resource });
+      next = result.metadata?.continue ?? '';
+    } while (next);
+  }
+  const owned = new Set([root.uid]);
+  let changed;
+  do {
+    changed = false;
+    for (const { resource } of candidates) {
+      if (!owned.has(resource.metadata?.uid) && resource.metadata?.ownerReferences?.some((ref) => owned.has(ref.uid))) {
+        owned.add(resource.metadata.uid); changed = true;
+      }
+    }
+  } while (changed);
+  const items = [{ kind: 'Service', collection: servicePath(name).slice(0, servicePath(name).lastIndexOf('/')), resource: service },
+    ...candidates.filter(({ resource }) => owned.has(resource.metadata?.uid))];
+  const userEnvNames = new Set();
+  for (const { kind, resource } of items) {
+    if (kind === 'Deployment' || kind === 'ReplicaSet') continue;
+    for (const envName of inlineEnvNames(resource, kind)) userEnvNames.add(envName);
+  }
+  return items.map((item) => ({ ...item, envNames: inlineEnvNames(item.resource, item.kind, userEnvNames) }))
+    .filter(({ envNames }) => envNames.length);
+}
+
+const legacyReport = (items) => items.map(({ kind, resource, envNames }) => ({ kind, name: resource.metadata.name, envNames }));
+
+// Namespace inventory is read-only and uses the existing Service list permission.
+// Secret values and user source never enter this operator report.
+export async function discoverInlineFunctionSecrets({ request = k8s } = {}) {
+  const functions = [];
+  let next = '';
+  do {
+    const params = new URLSearchParams({
+      labelSelector: Object.values(FUNCTION_OWNERSHIP_LABELS).join(','), limit: '200',
+      ...(next ? { continue: next } : {}),
+    });
+    const result = await request('GET', `/apis/serving.knative.dev/v1/namespaces/${encodeURIComponent(NS)}/services?${params}`);
+    for (const service of result.items ?? []) {
+      const labels = service.metadata?.labels ?? {};
+      const tenantId = labels[FUNCTION_OWNERSHIP_LABELS.tenant];
+      const resourceId = labels[FUNCTION_OWNERSHIP_LABELS.functionResource];
+      if (!tenantId || !resourceId) continue;
+      const name = service.metadata.name;
+      const report = await remediateFunctionSecrets(name, undefined, {
+        tenantId, functionResourceId: resourceId, request,
+      });
+      if (report.affected.length) functions.push({ tenantId, resourceId, name, affected: report.affected });
+    }
+    next = result.metadata?.continue ?? '';
+  } while (next);
+  return { dryRun: true, functions };
+}
+
+export async function pruneInlineFunctionRevisions(name, opts = {}) {
+  const request = opts.request ?? k8s;
+  const affected = await legacyFunctionObjects(name, opts);
+  for (const { kind, resource, collection } of affected) {
+    if (kind !== 'Revision') continue; // Revisions are immutable; foreground GC removes children.
+    if (!resource.metadata?.uid || !resource.metadata?.resourceVersion) throw ownershipRetentionError('verification_incomplete');
+    try { await request('DELETE', `${collection}/${encodeURIComponent(resource.metadata.name)}`, deleteOptions(resource.metadata)); }
+    catch (error) { if (error.statusCode !== 404) throw projectionError(error); }
+  }
+  return { affected: legacyReport(affected), pending: legacyReport(await legacyFunctionObjects(name, opts)) };
+}
+
+// Operator-triggered only. Dry runs report identifiers and env names, never literal values.
+export async function remediateFunctionSecrets(name, source, opts = {}) {
+  const { dryRun = true } = opts;
+  const affected = legacyReport(await legacyFunctionObjects(name, opts));
+  if (dryRun) return { dryRun: true, affected, pending: affected };
+  await deployKnativeService(name, source, { ...opts, rotateSecrets: true });
+  const result = await pruneInlineFunctionRevisions(name, opts);
+  return { dryRun: false, affected, pending: result.pending };
 }
 
 // Wait until the ksvc reports Ready (best-effort; invoke also tolerates cold start).

@@ -261,3 +261,19 @@ test('bbx-612-token-required: the client surfaces a Vault auth failure', async (
   } });
   await assert.rejects(() => noTok.writeSecret('t/w/k', { value: 'x' }), /vault write .* -> HTTP 403/);
 });
+
+import { buildFunctionKsvcManifest } from '../../apps/control-plane/function-executor.mjs';
+import { invocationFixture, installInvocationFixture } from '../helpers/function-invocation-fixture.mjs';
+test('bbx-970: OpenBao resolution reaches Function workload manifests only by reference', async (t) => {
+  installInvocationFixture(t, invocationFixture());
+  const s = store();
+  await s.set('ten-970', 'ws-970', 'api-key', 'workspace-secret-marker-970');
+  const secretEnv = await s.resolveEnv('ten-970', 'ws-970', [{ name: 'api-key', env: 'API_KEY' }]);
+  const manifest = buildFunctionKsvcManifest('fn-test-970', 'return 1', {
+    tenantId: 'ten-970', workspaceId: 'ws-970', functionResourceId: 'fn-970', secretEnv,
+  });
+  assert.equal(JSON.stringify(manifest).includes('workspace-secret-marker-970'), false);
+  assert.deepEqual(manifest.spec.template.spec.containers[0].env[0], {
+    name: 'API_KEY', valueFrom: { secretKeyRef: { name: 'fn-test-970-secrets', key: 'API_KEY', optional: false } },
+  });
+});

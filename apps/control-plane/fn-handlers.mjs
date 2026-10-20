@@ -6,9 +6,11 @@
 // match what ConsoleFunctionsPage consumes (FunctionAction / FunctionActivation /
 // FunctionInvocationAccepted / GatewayMutationAccepted).
 import { randomUUID } from 'node:crypto';
+import { withFunctionSecretLock } from './function-secret-lock.mjs';
+import { normalizeFunctionSecretRefs, functionSecretRefs } from './function-secret-refs.mjs';
 import * as store from './tenant-store.mjs';
-import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost, isReservedFunctionEnvName } from './function-executor.mjs';
-import { getSharedVaultStore, vaultStoreHealthSnapshot, secretEnvVarName } from './vault-secrets.mjs';
+import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost, isReservedFunctionEnvName, pruneInlineFunctionRevisions } from './function-executor.mjs';
+import { getSharedVaultStore, vaultStoreHealthSnapshot } from './vault-secrets.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { functionsDisabledResponse, knativeUnavailableResponse } from './knative-runtime.mjs';
 import { createRuntimeCleanupRepository } from './runtime-cleanup-repository.mjs';
@@ -55,7 +57,7 @@ const err = (statusCode, code, message) => ({ statusCode, body: { code, message 
 
 // OpenBao-backed workspace-secret store (add-vault-secret-consumption, #612). Null when OpenBao is not
 // configured (BAO_ADDR/BAO_TOKEN or compatible VAULT_* env unset) — the secrets API reports the backend disabled and
-// function deploys ignore secret refs, so default behaviour is unchanged.
+// deployments declaring secret refs fail closed with 501.
 const vaultStore = getSharedVaultStore();
 
 // Read-only process health for the same store used by secret routes.
@@ -77,32 +79,84 @@ async function ownedWorkspace(ctx, workspaceId) {
   return ws;
 }
 
-// Best-effort count of the workspace's deployed functions that reference `secretName` (the advisory
-// `resolvedRefCount` of FunctionWorkspaceSecret — used only for the pre-delete warning, never a
-// delete gate). Scans the existing fn_actions registry rows' declared secret refs
-// (`execution.secrets`, or a top-level `secrets`); a ref is a bare name or { name|secretName }.
-// Returns 0 when not cheaply computable (e.g. the kind fn_actions row does not persist secret refs)
-// — a conservative under-count is acceptable for an advisory signal.
+function lockedSecretOperation(ctx, ws, operation) {
+  return withFunctionSecretLock(ctx.pool, ws.tenant_id, ws.id,
+    (pool) => operation({ ...ctx, pool, functionSecretLockHeld: true }));
+}
+
+// Registry reads are tenant- and workspace-scoped; failures cannot silently under-count consumers.
+async function secretConsumers(ctx, ws, secretName) {
+  const rows = await (ctx.store ?? store).listFnActions(ctx.pool, ws.id, ws.tenant_id);
+  return rows.filter((r) => (!r.tenant_id || r.tenant_id === ws.tenant_id)
+    && (!r.workspace_id || r.workspace_id === ws.id)
+    && functionSecretRefs(r).some((ref) => (typeof ref === 'string' ? ref : ref?.name ?? ref?.secretName) === secretName));
+}
+
 async function resolvedRefCount(ctx, ws, secretName) {
-  try {
-    const st = ctx.store ?? store;
-    const rows = await st.listFnActions(ctx.pool, ws.id);
-    if (!Array.isArray(rows)) return 0;
-    let n = 0;
-    for (const r of rows) {
-      const refs = r?.execution?.secrets ?? r?.secrets ?? r?.parameters?.execution?.secrets ?? [];
-      if (!Array.isArray(refs)) continue;
-      for (const ref of refs) {
-        const name = typeof ref === 'string' ? ref : (ref?.name ?? ref?.secretName);
-        if (name === secretName) { n += 1; break; }
+  return (await secretConsumers(ctx, ws, secretName)).length;
+}
+
+function normalizedSecretRefs(row) {
+  return normalizeFunctionSecretRefs(functionSecretRefs(row));
+}
+
+async function resolveDeclaredFunctionSecrets(ctx, tenantId, workspaceId, refs) {
+  if (!refs.length) return { secretEnv: [] };
+  const vault = ctx.vaultStore ?? vaultStore;
+  if (!vault) return { error: err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)') };
+  let secretEnv;
+  try { secretEnv = await vault.resolveEnv(tenantId, workspaceId, refs); }
+  catch { return { error: err(502, 'SECRET_RESOLVE_FAILED', 'Workspace secrets could not be resolved.') }; }
+  if (secretEnv.length !== refs.length) return { error: err(400, 'SECRET_NOT_FOUND', 'A declared workspace secret is missing') };
+  return { secretEnv };
+}
+
+async function propagateSecret(ctx, ws, consumers, deletedName = null) {
+  const vault = ctx.vaultStore ?? vaultStore;
+  const pendingResources = [];
+  for (const row of consumers) {
+    if (!row.ksvc_name) continue; // Imported definitions have no materialized runtime.
+    try {
+      if (row.lifecycle_status === 'deletion_pending') {
+        await deleteKnativeService(row.ksvc_name, { tenantId: ws.tenant_id, functionResourceId: row.resource_id,
+          request: ctx.functionKubernetesRequest, verifyAbsence: true });
+        continue;
       }
+      const refs = normalizedSecretRefs(row);
+      const retained = refs.filter((ref) => ref.name !== deletedName);
+      const secretEnv = await vault.resolveEnv(ws.tenant_id, ws.id, retained);
+      await deployKnativeService(row.ksvc_name, row.source_code, {
+        tenantId: ws.tenant_id, workspaceId: ws.id, functionResourceId: row.resource_id,
+        memoryMb: row.memory_mb, timeoutMs: row.timeout_ms, secretEnv, secretRefs: refs,
+        rotateSecrets: true, request: ctx.functionKubernetesRequest,
+      });
+      const cleanup = await pruneInlineFunctionRevisions(row.ksvc_name, {
+        tenantId: ws.tenant_id, functionResourceId: row.resource_id, request: ctx.functionKubernetesRequest,
+      });
+      pendingResources.push(...cleanup.pending.map((item) => ({ resourceId: row.resource_id, ...item })));
+    } catch {
+      // Continue revoking other consumers; raw upstream exceptions can contain values.
+      pendingResources.push({ resourceId: row.resource_id, reason: 'projection_or_cleanup_failed' });
     }
-    return n;
-  } catch { return 0; }
+  }
+  if (pendingResources.length) {
+    throw Object.assign(new Error('Function secret propagation is pending'), {
+      affectedFunctions: consumers.map((row) => row.resource_id), pendingResources,
+    });
+  }
+}
+
+function secretMutationError(code, error) {
+  // Keep the existing backend-unavailable response without ever forwarding upstream messages.
+  // Propagation failures additionally report value-free, retryable cleanup obligations.
+  const message = error?.pendingResources
+    ? 'Workspace secret propagation could not be completed; retry the operation.' : 'vault unavailable';
+  return { statusCode: 502, body: { code, message,
+    ...(error?.pendingResources ? { affectedFunctions: error.affectedFunctions, pendingResources: error.pendingResources } : {}) } };
 }
 
 // Stamp the published FunctionWorkspaceSecret metadata onto a store meta object: tenantId/workspaceId
-// come from the VERIFIED workspace (never the body), resolvedRefCount is advisory. The store already
+// come from the VERIFIED workspace (never the body), resolvedRefCount counts persisted consumers. The store already
 // supplies { secretName, name (alias), timestamps, description? } and NEVER a value or KV version.
 function secretMetaOut(meta, ws, refCount) {
   return {
@@ -280,6 +334,7 @@ function actionExecutionOut(r) {
     entrypoint: r.entrypoint,
     runtime: r.runtime,
     parameters: jsonObject(r.parameters),
+    secrets: normalizedSecretRefs(r),
     limits: { timeoutMs: r.timeout_ms, memoryMb: r.memory_mb }
   };
 }
@@ -289,6 +344,7 @@ function versionExecutionOut(r) {
     entrypoint: r.entrypoint,
     runtime: r.runtime,
     parameters: jsonObject(r.parameters),
+    secrets: normalizedSecretRefs(r),
     environment: {},
     limits: { timeoutSeconds: Math.max(1, Math.ceil((Number(r.timeout_ms) || 60000) / 1000)), memoryMb: r.memory_mb },
     webAction: { enabled: false, requireAuthentication: true, rawHttpResponse: false }
@@ -360,7 +416,9 @@ function actionOut(r, latest, versionState = null, runtimeStatus = null) {
     execution: actionExecutionOut(r),
     source: sourceOut(r),
     activationPolicy: activationPolicyOut(),
-    secretReferences: [],
+    secretReferences: normalizedSecretRefs(r).map(({ name, env }) => ({
+      secretName: name, mountAlias: env, required: true,
+    })),
     unresolvedSecretRefs: 0,
     provisioning: { state: publicState },
     ...(runtimeStatus ? {
@@ -398,7 +456,7 @@ async function fnDeploy(ctx) {
   }
   // On update, the persisted Function determines the authorization workspace. A body.workspaceId
   // cannot move an existing Function or substitute a same-tenant workspace the caller does own.
-  const existing = actionId
+  let existing = actionId
     ? await st.getFnAction(ctx.pool, actionId, callerTenantId(ctx.identity))
     : null;
   if (actionId && !existing) return err(404, 'ACTION_NOT_FOUND', `action ${actionId} not found`);
@@ -418,14 +476,22 @@ async function fnDeploy(ctx) {
   if (!canMutateFunctionWorkspace(ctx.identity, ws)) {
     return err(403, 'FORBIDDEN', 'requires a write-capable role bound to this workspace');
   }
+  if (!ctx.functionSecretLockHeld) return lockedSecretOperation(ctx, ws, fnDeploy);
+  if (!actionId && typeof st.getFnActionByName === 'function') {
+    existing = await st.getFnActionByName(ctx.pool, ws.id, actionName, ws.tenant_id);
+  }
+  if (existing?.lifecycle_status === 'deletion_pending') return err(409, 'FUNCTION_CLEANUP_PENDING', 'Function cleanup must complete before deployment');
+  if (existing?.action_name && existing.action_name !== actionName) return err(400, 'VALIDATION_ERROR', 'Function actionName cannot change during redeployment');
   const code = b.source?.inlineCode ?? b.source?.code;
   if (!code) return err(400, 'VALIDATION_ERROR', 'source.inlineCode is required');
-  const secretRefs = b.execution?.secrets ?? b.secrets ?? [];
-  if (Array.isArray(secretRefs) && secretRefs.some((ref) => {
-    const name = typeof ref === 'string' ? ref : (ref?.name ?? ref?.secretName);
-    const envName = ref && typeof ref === 'object' && ref.env ? ref.env : secretEnvVarName(name);
-    return isReservedFunctionEnvName(envName);
-  })) {
+  const declared = b.execution?.secrets ?? b.secrets ?? b.secretReferences ?? [];
+  if (Array.isArray(declared) && declared.some((ref) => ref?.workspaceId && ref.workspaceId !== ws.id)) {
+    return err(403, 'FORBIDDEN', 'not authorized for this workspace');
+  }
+  let secretRefs;
+  try { secretRefs = normalizeFunctionSecretRefs(declared); }
+  catch { return err(400, 'VALIDATION_ERROR', 'Invalid workspace secret references'); }
+  if (secretRefs.some((ref) => isReservedFunctionEnvName(ref.env))) {
     return err(400, 'VALIDATION_ERROR', 'Workspace secret env name is reserved for Function runtime configuration; use a different env mapping');
   }
   // Ownership and validation precede dependency status, but the gate precedes secret resolution,
@@ -434,7 +500,7 @@ async function fnDeploy(ctx) {
     tenantId: ws.tenant_id, workspaceId: ws.id,
   });
   if (dependencyError) return dependencyError;
-  if (!actionId) {
+  if (!existing) {
     const decision = await checkDimensionQuota(ctx.pool, ws.tenant_id, 'max_functions',
       () => st.countTenantFunctions(ctx.pool, ws.tenant_id), ctx.quotaOptions);
     const denial = await quotaDenial(ctx, ws, decision, 'function.create');
@@ -446,16 +512,18 @@ async function fnDeploy(ctx) {
   const timeoutMs = Number(limits.timeoutMs) || 60000;
   // Per-(tenant, workspace) ksvc name so two tenants' same-named workspaces never
   // collide on a shared Knative Service (P0 ISO-FUNCTIONS).
-  const name = ksvcNameForWorkspace(ws, actionName);
-  // Resolve any declared workspace-secret references from OpenBao and inject them as env vars
-  // (add-vault-secret-consumption, #612). The values are read from THIS workspace's own KV path,
+  const name = existing?.ksvc_name ?? ksvcNameForWorkspace(ws, actionName);
+  // Resolve declared references from OpenBao for the owned Secret projection.
+  // Values are read from THIS workspace's own KV path,
   // so a function only ever sees its own tenant/workspace secrets.
-  let secretEnv = [];
-  if (Array.isArray(secretRefs) && secretRefs.length > 0) {
-    if (!vaultStore) return err(501, 'SECRETS_BACKEND_DISABLED', 'workspace secrets require the OpenBao backend (not configured)');
-    try { secretEnv = await vaultStore.resolveEnv(ws.tenant_id, ws.id, secretRefs); }
-    catch (e) { return err(502, 'SECRET_RESOLVE_FAILED', String(e.message ?? e)); }
-  }
+  const { secretEnv, error: resolutionError } = await resolveDeclaredFunctionSecrets(ctx, ws.tenant_id, ws.id, secretRefs);
+  if (resolutionError) return resolutionError;
+  const saveAction = () => st.upsertFnAction(ctx.pool, {
+    resourceId, workspaceId: ws.id, tenantId: ws.tenant_id, actionName,
+    runtime: b.execution?.runtime ?? 'nodejs:22', entrypoint: b.execution?.entrypoint ?? 'main',
+    sourceCode: code, parameters: b.execution?.parameters ?? null, memoryMb, timeoutMs,
+    ksvcName: name, createdBy: ctx.identity?.sub, secretRefs
+  });
   // Deploy/update the function's Knative Service (new revision on code change).
   try {
     await (ctx.deployKnativeService ?? deployKnativeService)(name, code, {
@@ -465,16 +533,26 @@ async function fnDeploy(ctx) {
       memoryMb,
       timeoutMs,
       secretEnv,
+      request: ctx.functionKubernetesRequest,
     });
   } catch (e) {
-    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_DEPLOY_FAILED', String(e.message ?? e));
+    if (e.code === 'FN_SECRET_CLEANUP_PENDING') {
+      // An unsuccessful update must not publish rejected code or turn a working
+      // Function into a deletion obligation. Its existing identity remains retryable.
+      if (existing) {
+        return err(502, 'FN_DEPLOY_FAILED', 'Function deployment failed; retry deployment to reconcile the owned secret projection.');
+      }
+      const rec = await saveAction();
+      const repository = ctx.runtimeCleanupRepository ?? createRuntimeCleanupRepository(ctx.pool);
+      const obligation = await repository.deferFunctionDeletion({ tenantId: ws.tenant_id, workspaceId: ws.id,
+        resourceId: rec.resource_id, runtimeResourceName: name, correlationId: ctx.callerContext?.correlationId ?? randomUUID() });
+      return { ...err(502, 'FN_DEPLOY_FAILED', 'Function deployment failed; owned runtime cleanup is pending.'),
+        body: { code: 'FN_DEPLOY_FAILED', message: 'Function deployment failed; retry cleanup through Function DELETE.',
+          status: 'cleanup_pending', resourceId: rec.resource_id, obligations: [obligation] } };
+    }
+    return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_DEPLOY_FAILED', 'Function runtime deployment could not be completed.');
   }
-  const rec = await st.upsertFnAction(ctx.pool, {
-    resourceId, workspaceId: ws.id, tenantId: ws.tenant_id, actionName,
-    runtime: b.execution?.runtime ?? 'nodejs:22', entrypoint: b.execution?.entrypoint ?? 'main',
-    sourceCode: code, parameters: b.execution?.parameters ?? null, memoryMb, timeoutMs,
-    ksvcName: name, createdBy: ctx.identity?.sub
-  });
+  const rec = await saveAction();
   return auditedFunctionOk(202, {
     requestId: randomUUID(), correlationId: ctx.callerContext?.correlationId ?? randomUUID(),
     family: 'functions', resourceType: 'function_action',
@@ -538,13 +616,15 @@ async function fnDelete(ctx) {
     return err(403, 'FORBIDDEN', 'requires a write-capable role bound to this workspace');
   }
 
+  if (!ctx.functionSecretLockHeld) return lockedSecretOperation(ctx, { id: r.workspace_id, tenant_id: r.tenant_id }, fnDelete);
+
   const runtime = runtimeFor(ctx);
   const correlationId = ctx.callerContext?.correlationId ?? randomUUID();
   if (!runtime.functionsEnabled) {
     return { statusCode: 501, body: functionsDisabledResponse(correlationId) };
   }
   const runtimeStatus = runtime.status();
-  if (!runtime.canServeWorkloads(runtimeStatus)) {
+  const deferCleanup = async () => {
     // One SQL statement marks the logical Function and inserts/reuses its durable cleanup
     // obligation. No Kubernetes request is attempted while the source-of-truth gate is closed.
     const repository = ctx.runtimeCleanupRepository ?? createRuntimeCleanupRepository(ctx.pool);
@@ -573,16 +653,22 @@ async function fnDelete(ctx) {
         state: runtimeStatus.state, reason: runtimeStatus.reason, result: 'deferred',
       },
     };
-  }
+  };
+  if (!runtime.canServeWorkloads(runtimeStatus)) return deferCleanup();
 
   if (r.ksvc_name) {
     try {
       await (ctx.deleteKnativeService ?? deleteKnativeService)(r.ksvc_name, {
         tenantId: r.tenant_id,
         functionResourceId: r.resource_id,
+        verifyAbsence: true,
+        ...(ctx.functionKubernetesRequest ? { request: ctx.functionKubernetesRequest } : {}),
       });
     } catch (e) {
-      return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_DELETE_FAILED', 'Function runtime cleanup could not be verified.');
+      if (e.code === 'FN_RUNTIME_OWNERSHIP_MISMATCH' && e.reason !== 'deletion_not_observed') {
+        return err(409, 'FN_DELETE_FAILED', 'Function runtime cleanup could not be verified.');
+      }
+      return deferCleanup();
     }
   }
 
@@ -751,6 +837,8 @@ async function fnRollback(ctx) {
     tenantId: r.tenant_id, workspaceId: r.workspace_id, resourceId: r.resource_id,
   });
   if (dependencyError) return dependencyError;
+  if (!ctx.functionSecretLockHeld) return lockedSecretOperation(ctx, { id: r.workspace_id, tenant_id: r.tenant_id }, fnRollback);
+  if (r.lifecycle_status === 'deletion_pending') return err(409, 'FUNCTION_CLEANUP_PENDING', 'Function cleanup must complete before rollback');
   const versionId = ctx.body?.versionId;
   if (typeof versionId !== 'string' || !/^fnv_[0-9a-z]+$/.test(versionId)) {
     return err(400, 'VALIDATION_ERROR', 'versionId is required and must match fnv_[0-9a-z]+');
@@ -766,6 +854,9 @@ async function fnRollback(ctx) {
     return err(409, 'VERSION_NOT_ELIGIBLE', 'rollback target must be a retained prior version');
   }
 
+  const refs = normalizedSecretRefs(target);
+  const { secretEnv, error: resolutionError } = await resolveDeclaredFunctionSecrets(ctx, r.tenant_id, r.workspace_id, refs);
+  if (resolutionError) return resolutionError;
   const deployName = r.ksvc_name ?? target.ksvc_name;
   if (deployName) {
     try {
@@ -775,10 +866,10 @@ async function fnRollback(ctx) {
         functionResourceId: r.resource_id,
         memoryMb: target.memory_mb,
         timeoutMs: target.timeout_ms,
-        secretEnv: []
+        secretEnv, secretRefs: refs, rotateSecrets: true, request: ctx.functionKubernetesRequest,
       });
     } catch (e) {
-      return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_ROLLBACK_DEPLOY_FAILED', String(e.message ?? e));
+      return err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'FN_ROLLBACK_DEPLOY_FAILED', 'Function runtime deployment could not be completed.');
     }
   }
 
@@ -848,7 +939,7 @@ async function secretSet(ctx) {
     const meta = await vault.set(ws.tenant_id, ws.id, name, value, description);
     const refCount = await resolvedRefCount(ctx, ws, name);
     return auditedSecretResult(ok(201, secretMetaOut(meta, ws, refCount)), ws);
-  } catch (e) { return auditedSecretResult(err(502, 'SECRET_WRITE_FAILED', String(e.message ?? e)), ws); }
+  } catch (e) { return auditedSecretResult(secretMutationError('SECRET_WRITE_FAILED', e), ws); }
 }
 
 // PUT /v1/functions/workspaces/{workspaceId}/secrets/{secretName}  { secretValue, description? }
@@ -868,6 +959,7 @@ async function secretReplace(ctx) {
   if (!canManageTenant(ctx.identity, ws.tenant_id)) {
     return scoped(err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin'));
   }
+  if (!ctx.functionSecretLockHeld) return lockedSecretOperation(ctx, ws, secretReplace);
   const name = ctx.params.secretName;
   const b = ctx.body ?? {};
   const value = b.secretValue ?? b.value;
@@ -881,10 +973,12 @@ async function secretReplace(ctx) {
     if (!(await vault.exists(ws.tenant_id, ws.id, name))) {
       return scoped(err(404, 'SECRET_NOT_FOUND', `secret ${name} not found`));
     }
+    const consumers = await secretConsumers(ctx, ws, name);
     const meta = await vault.replace(ws.tenant_id, ws.id, name, value, description);
-    const refCount = await resolvedRefCount(ctx, ws, name);
-    return scoped(ok(200, secretMetaOut(meta, ws, refCount)));
-  } catch (e) { return scoped(err(502, 'SECRET_WRITE_FAILED', String(e.message ?? e))); }
+    await propagateSecret(ctx, ws, consumers);
+    return scoped(ok(200, { ...secretMetaOut(meta, ws, consumers.length),
+      ...(consumers.length ? { affectedFunctions: consumers.map((r) => r.resource_id) } : {}) }));
+  } catch (e) { return scoped(secretMutationError('SECRET_WRITE_FAILED', e)); }
 }
 
 // GET /v1/functions/workspaces/{workspaceId}/secrets  → FunctionWorkspaceSecretCollection
@@ -927,15 +1021,24 @@ async function secretDelete(ctx) {
   if (!canManageTenant(ctx.identity, ws.tenant_id)) {
     return auditedSecretResult(err(403, 'FORBIDDEN', 'requires superadmin or tenant owner/admin'), ws);
   }
+  if (!ctx.functionSecretLockHeld) return lockedSecretOperation(ctx, ws, secretDelete);
   const name = ctx.params.secretName;
   if (!vault.validName(name)) return auditedSecretResult(err(400, 'VALIDATION_ERROR', 'secret name must match ^[a-z][a-z0-9_-]{0,62}$'), ws);
   try {
     if (!(await vault.exists(ws.tenant_id, ws.id, name))) {
       return auditedSecretResult(err(404, 'SECRET_NOT_FOUND', `secret ${name} not found`), ws);
     }
+    const consumers = await secretConsumers(ctx, ws, name);
+    // Revoke derived material first; a failed propagation leaves the source available for retry.
+    await propagateSecret(ctx, ws, consumers, name);
     await vault.delete(ws.tenant_id, ws.id, name);
-    return auditedSecretResult(ok(204, null), ws);
-  } catch (e) { return auditedSecretResult(err(502, 'SECRET_DELETE_FAILED', String(e.message ?? e)), ws); }
+    const result = ok(204, null);
+    if (consumers.length) result.headers = {
+      'x-falcone-affected-functions': JSON.stringify(consumers.map((r) => r.resource_id)),
+      'x-falcone-resolved-ref-count': String(consumers.length),
+    };
+    return auditedSecretResult(result, ws);
+  } catch (e) { return auditedSecretResult(secretMutationError('SECRET_DELETE_FAILED', e), ws); }
 }
 
 // ---- function definition export / import (#683, data-export-import-clone) ---
@@ -1015,6 +1118,9 @@ async function fnPackageDefinitionExport(ctx) {
 async function importDefinitions(ctx, { expectPackage = false } = {}) {
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  if (!ctx.functionSecretLockHeld) {
+    return lockedSecretOperation(ctx, ws, (locked) => importDefinitions(locked, { expectPackage }));
+  }
   // Trusted resource ownership for dispatch audit, never request bodies (#971).
   const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
   const bundle = ctx.body ?? {};

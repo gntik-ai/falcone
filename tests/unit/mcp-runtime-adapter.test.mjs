@@ -149,3 +149,16 @@ test('adapter invoke sends trusted JSON-RPC context, strips ownership arguments,
     (error) => error.code === 'MCP_RUNTIME_DELEGATED_CREDENTIAL_REQUIRED' && error.statusCode === 401,
   );
 });
+
+test('hosted MCP ignores workspace-secret consumption options and emits no secret values', async () => {
+  const bodies = [];
+  const adapter = createMcpRuntimeAdapter({ apiBase: 'https://k', token: 't', ca: 'ca', resolveRuntimeNamespace,
+    runtimeImage: 'img', runtimeImageDigest: 'sha256:abc', runtimeApiBaseUrl: 'http://executor.platform.svc.cluster.local:8080',
+    fetchImpl: async (_url, init) => { if (init.body) bodies.push(JSON.parse(init.body)); return { status: 201, ok: true, json: async () => ({}) }; },
+  });
+  await adapter.apply({ tenantId: 't', workspaceId: 'w', serverId: 's', version: 'v1', operation: 'publish', manifest,
+    secretEnv: [{ name: 'WORKSPACE_KEY', value: 'workspace-secret-marker-970' }], secrets: ['workspace-key'] });
+  assert.equal(JSON.stringify(bodies).includes('workspace-secret-marker-970'), false);
+  const workload = bodies.find((body) => body.kind === 'Service');
+  assert.equal(workload.spec.template.spec.containers[0].env.some((env) => env.name === 'WORKSPACE_KEY'), false);
+});

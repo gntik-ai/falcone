@@ -44,6 +44,8 @@ COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
      apps/control-plane/mongo-handlers.mjs apps/control-plane/pg-handlers.mjs \
      apps/control-plane/kafka-handlers.mjs \
      apps/control-plane/fn-handlers.mjs apps/control-plane/function-executor.mjs \
+     apps/control-plane/function-secret-lock.mjs apps/control-plane/function-secret-refs.mjs \
+     apps/control-plane/remediate-function-secrets.mjs \
      apps/control-plane/function-invocation-auth.mjs \
      apps/control-plane/application-handlers.mjs \
      apps/control-plane/vault-secrets.mjs apps/control-plane/secret-rotation-deps.mjs \
