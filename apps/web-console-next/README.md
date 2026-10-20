@@ -11,7 +11,7 @@ TypeScript parser, comparing full paths without loading the legacy React app.
 
 ```sh
 pnpm --filter @in-falcone/web-console-next typecheck
-pnpm --filter @in-falcone/web-console-next test
+SHELL_TEST_FIXTURES=true pnpm --filter @in-falcone/web-console-next test
 pnpm --filter @in-falcone/web-console-next lint:colours
 node scripts/validate-gntik-ui-pin.mjs
 VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next build
@@ -141,8 +141,10 @@ controls. The kit I18nProvider follows the app locale, including built-in labels
 Run shell browser checks against a fixture build (synthetic sessions only):
 
 ```sh
-SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/next/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
-VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
+for base in / /next/; do
+  SHELL_TEST_FIXTURES=true VITE_BASE_PATH="$base" VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
+  VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
+done
 ```
 
 The spec checks each lazy navigation mechanism from a fresh document, render
@@ -160,6 +162,10 @@ means false. No shipped route opts in yet. Sidebar and mobile links resolve the
 matching route through `navigation.ts`: only `migrated: true` uses the router
 Link, while all other hrefs remain root-relative legacy hand-offs. The account
 menu has no route links. Keep each page's migration marker with its route.
+Each target opts in independently: migrating `functions` leaves
+`functions/data` on the legacy console until that route opts in too. The mobile
+navigation tests exercise this boundary under `/next` and another basename,
+including closing the drawer after navigation without loading a new document.
 
 `Guard` accepts optional translated `denialTitle` and `denialDescription` props;
 `RouteState` accepts `title` and `description`. Omitted copy uses the existing

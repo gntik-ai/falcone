@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
+import { I18nProvider } from '@gntik-ai/ui'
 import * as sessionApi from '@in-falcone/console-api/session'
 import { Shell } from '../src/shell/Shell'
 import { pendingConsoleRoutes } from '../src/shell/routes'
@@ -89,6 +90,41 @@ test('sidebar uses the router for opted-in routes and root-relative legacy ancho
     expect(screen.getByLabelText('Current location')).toHaveTextContent('/console/overview')
     expect(window.location.href).toBe(documentLocation)
   } finally { pendingConsoleRoutes.pop() }
+})
+
+test.each(['/next', '/preview'])('mobile navigation respects route opt-in under %s and closes after router navigation', async (basename) => {
+  login(['tenant_owner'])
+  requests = strictFetch({})
+  const functions = pendingConsoleRoutes.find((route) => route.path === 'functions')!
+  const data = pendingConsoleRoutes.find((route) => route.path === 'functions/data')!
+  const originalFunctions = functions.migrated
+  const originalData = data.migrated
+  functions.migrated = true
+  data.migrated = false
+  try {
+    renderWithSession(<I18nProvider locale="es"><CurrentLocation /><Routes><Route path="/console" element={<Shell />}>
+      <Route path="quotas" element={<h1>Quotas test page</h1>} />
+      <Route path="functions" element={<h1>Migrated functions test page</h1>} />
+    </Route></Routes></I18nProvider>, { basename, route: `${basename}/console/quotas` })
+    // jsdom also exposes SidebarLayout's unused drawer trigger before MobileNav.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Abrir navegación' }).at(-1)!)
+    const drawer = await screen.findByRole('dialog')
+    const migrated = within(drawer).getByRole('link', { name: 'Funciones: administrar' })
+    expect(migrated).toHaveAttribute('href', `${basename}/console/functions`)
+    expect(within(drawer).getByRole('link', { name: 'Funciones: despliegue rápido' })).toHaveAttribute('href', '/console/functions/data')
+    expect(within(drawer).getByRole('link', { name: /Flujos/ })).toHaveAttribute('href', '/console/flows')
+    const documentLocation = window.location.href
+    expect(fireEvent.click(migrated)).toBe(false)
+    expect(await screen.findByRole('heading', { name: 'Migrated functions test page' })).toBeVisible()
+    expect(screen.getByLabelText('Current location')).toHaveTextContent('/console/functions')
+    expect(window.location.href).toBe(documentLocation)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  } finally {
+    if (originalFunctions === undefined) delete functions.migrated
+    else functions.migrated = originalFunctions
+    if (originalData === undefined) delete data.migrated
+    else data.migrated = originalData
+  }
 })
 
 test.each(['es', 'en'].flatMap((locale) => ['tenant', 'workspace'].flatMap((endpoint) =>

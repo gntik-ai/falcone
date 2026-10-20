@@ -8,10 +8,12 @@ all source files/directories used by the page for colour lint.
 Run from the workspace root:
 
 ```sh
-SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
 pnpm --filter @in-falcone/web-console-next parity:scan
 pnpm --filter @in-falcone/web-console-next parity:validate
-pnpm --filter @in-falcone/web-console-next test:parity
+for base in / /next/; do
+  SHELL_TEST_FIXTURES=true VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
+  VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next test:parity
+done
 ```
 
 `test:parity` first runs the shell under three roles and two locales, then runs
