@@ -13,7 +13,7 @@ import { checkBucketQuota, checkTenantByteQuota, tenantByteLimit, usageLimits, d
 import { quotaDenial } from './dimension-quota.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
 import { can } from './model-authz.mjs';
-import { canAccessWorkspace } from './workspace-authz.mjs';
+import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 import { isJsonBody } from './request-body.mjs';
 
 // Provider-neutral S3 endpoint/credentials (SeaweedFS S3 gateway port 8333, or any
@@ -368,7 +368,7 @@ function isSuperOrInternal(identity) {
 // Return the existing 404 shape before S3; request fields never grant workspace authority.
 function canReadWorkspaceBuckets(identity, rec) {
   // Preserve #973's model grants for legacy unmapped buckets, including owner/admin reads.
-  return canAccessWorkspace(identity, rec, ['bucket.read', 'bucket.write', 'bucket.admin'], { allowUnmapped: true });
+  return canAccessWorkspace(identity, rec, WORKSPACE_ACTIONS.bucket, { allowUnmapped: true });
 }
 function denyUnlessWorkspaceBucketReader(ctx, bucket, rec) {
   if (canReadWorkspaceBuckets(ctx.identity, rec)) return null;
@@ -680,7 +680,7 @@ async function storageWorkspaceUsage(ctx) {
   const workspaceId = ctx.params.workspaceId;
   const { ws, error } = await requireOwnedWorkspace(ctx);
   if (error) return error;
-  if (!canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, ['bucket.read', 'bucket.write', 'bucket.admin'])) {
+  if (!canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, WORKSPACE_ACTIONS.bucket)) {
     return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
   }
   const mapped = await (ctx.store ?? store).listBucketsForWorkspace(ctx.pool, workspaceId);
@@ -722,8 +722,7 @@ async function storageProvisionBucket(ctx) {
   if (error) return error;
   // Trusted resource ownership for dispatch audit, never request bodies (#971).
   const scoped = (result) => ({ ...result, auditScope: { tenantId: ws.tenant_id, workspaceId: ws.id } });
-  if (!canReadWorkspaceBuckets(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id })
-    || !can(ctx.identity, 'bucket.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
+  if (!can(ctx.identity, 'bucket.admin', { tenantId: ws.tenant_id, workspaceId: ws.id })) {
     return scoped(err(403, 'FORBIDDEN', 'caller may not administer buckets in this workspace'));
   }
   // Per-workspace bucket-count quota admission (#674). Count THIS workspace's buckets (the

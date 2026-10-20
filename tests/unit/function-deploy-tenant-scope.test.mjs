@@ -12,16 +12,16 @@
  * deployed attacker code into the victim's Knative namespace. A tenant-B caller could create — or
  * via the upsert's ON CONFLICT ... DO UPDATE, OVERWRITE — a function inside tenant A's workspace.
  * The fix gates the resolved workspace via the existing ownedWorkspace(ctx, workspaceId) helper
- * (404 for foreign/unknown workspace, no existence oracle; superadmin bypass preserved) BEFORE any
+ * (403 for foreign/unknown workspace, no existence oracle; superadmin bypass preserved) BEFORE any
  * write or Knative deploy — the same pattern used by fnInventory/fnListActions (#784).
  *
  * Each test is RED on the current (broken) code and GREEN after the fix.
  *
- * bbx-fn-deploy-scope-01: Tenant B POST-creates into Tenant A's workspace     → 404, no write, no deploy
- * bbx-fn-deploy-scope-02: Tenant B PATCH-updates into Tenant A's workspace    → 404, no write, no deploy
+ * bbx-fn-deploy-scope-01: Tenant B POST-creates into Tenant A's workspace     → 403, no write, no deploy
+ * bbx-fn-deploy-scope-02: Tenant B PATCH-updates into Tenant A's workspace    → 403, no write, no deploy
  * bbx-fn-deploy-scope-03: Tenant A POST-creates into its own workspace        → 202, write + deploy happen
  * bbx-fn-deploy-scope-04: Superadmin POST-creates into Tenant A's workspace   → 202 (cross-tenant bypass)
- * bbx-fn-deploy-scope-05: Tenant B POST targets an unknown workspace          → 404 (uniform, no oracle)
+ * bbx-fn-deploy-scope-05: Tenant B POST targets an unknown workspace          → 403 (uniform, no oracle)
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -152,15 +152,15 @@ function ctx(identity, body, { inserts = [], deploys = [], params = {} } = {}) {
 }
 
 // ===========================================================================
-// bbx-fn-deploy-scope-01: Tenant B POST-creates into Tenant A's workspace → 404, no write, no deploy
+// bbx-fn-deploy-scope-01: Tenant B POST-creates into Tenant A's workspace → 403, no write, no deploy
 // ===========================================================================
-test('bbx-fn-deploy-scope-01: fnDeploy cross-tenant CREATE (POST) returns 404 with no write and no deploy', async () => {
+test('bbx-fn-deploy-scope-01: fnDeploy cross-tenant CREATE (POST) returns 403 with no write and no deploy', async () => {
   const inserts = [];
   const deploys = [];
   const body = { workspaceId: 'ws-a', actionName: 'evil', source: { inlineCode: 'function main(){/*MARKER-EVIL*/}' } };
   const result = await FN_HANDLERS.fnDeploy(ctx(IDENTITY_B, body, { inserts, deploys }));
-  assert.equal(result.statusCode, 404,
-    `expected 404 for cross-tenant deploy, got ${result.statusCode} (body: ${JSON.stringify(result.body)})`);
+  assert.equal(result.statusCode, 403,
+    `expected 403 for cross-tenant deploy, got ${result.statusCode} (body: ${JSON.stringify(result.body)})`);
   assert.ok(result.body?.code, 'response must include an error code');
   assert.equal(inserts.length, 0, 'must not write an fn_actions row for a foreign workspace');
   assert.equal(deploys.length, 0, 'must not deploy a Knative service for a foreign workspace');
@@ -169,15 +169,15 @@ test('bbx-fn-deploy-scope-01: fnDeploy cross-tenant CREATE (POST) returns 404 wi
 });
 
 // ===========================================================================
-// bbx-fn-deploy-scope-02: Tenant B PATCH-updates into Tenant A's workspace → 404, no write, no deploy
+// bbx-fn-deploy-scope-02: Tenant B PATCH-updates into Tenant A's workspace → 403, no write, no deploy
 // ===========================================================================
-test('bbx-fn-deploy-scope-02: fnDeploy cross-tenant UPDATE (PATCH) returns 404 with no write and no deploy', async () => {
+test('bbx-fn-deploy-scope-02: fnDeploy cross-tenant UPDATE (PATCH) returns 403 with no write and no deploy', async () => {
   const inserts = [];
   const deploys = [];
   const body = { workspaceId: 'ws-a', actionName: 'evil', source: { inlineCode: 'MARKER-EVIL' } };
   const result = await FN_HANDLERS.fnDeploy(ctx(IDENTITY_B, body, { inserts, deploys, params: { actionId: 'fn_aaaaaaaaaaaa' } }));
-  assert.equal(result.statusCode, 404,
-    `expected 404 for cross-tenant update, got ${result.statusCode} (body: ${JSON.stringify(result.body)})`);
+  assert.equal(result.statusCode, 403,
+    `expected 403 for cross-tenant update, got ${result.statusCode} (body: ${JSON.stringify(result.body)})`);
   assert.ok(result.body?.code, 'response must include an error code');
   assert.equal(inserts.length, 0, 'must not write an fn_actions row for a foreign workspace');
   assert.equal(deploys.length, 0, 'must not deploy a Knative service for a foreign workspace');
@@ -215,15 +215,15 @@ test('bbx-fn-deploy-scope-04: fnDeploy superadmin cross-tenant CREATE is denied 
 });
 
 // ===========================================================================
-// bbx-fn-deploy-scope-05: Tenant B POST targets an unknown workspace → 404 (uniform, no oracle)
+// bbx-fn-deploy-scope-05: Tenant B POST targets an unknown workspace → 403 (uniform, no oracle)
 // ===========================================================================
-test('bbx-fn-deploy-scope-05: fnDeploy targeting an unknown workspace returns the same 404 (no existence oracle)', async () => {
+test('bbx-fn-deploy-scope-05: fnDeploy targeting an unknown workspace returns the same 403 (no existence oracle)', async () => {
   const inserts = [];
   const deploys = [];
   const body = { workspaceId: 'ws-missing', actionName: 'evil', source: { inlineCode: 'MARKER-EVIL' } };
   const result = await FN_HANDLERS.fnDeploy(ctx(IDENTITY_B, body, { inserts, deploys }));
-  assert.equal(result.statusCode, 404,
-    `expected uniform 404 for an unknown workspace, got ${result.statusCode} (body: ${JSON.stringify(result.body)})`);
+  assert.equal(result.statusCode, 403,
+    `expected uniform 403 for an unknown workspace, got ${result.statusCode} (body: ${JSON.stringify(result.body)})`);
   assert.equal(inserts.length, 0, 'must not write an fn_actions row for an unknown workspace');
   assert.equal(deploys.length, 0, 'must not deploy a Knative service for an unknown workspace');
 });

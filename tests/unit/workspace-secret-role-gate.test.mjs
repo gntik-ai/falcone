@@ -1,25 +1,9 @@
 // Role gate on Workspace Secret mutations (GitHub issue #798, bug/security, high).
 //
-// A read-only `tenant_viewer` and a non-admin `tenant_developer` (both resolve to the verified
-// identity actorType `tenant_member`) could create/replace/delete Workspace Secrets in their own
-// tenant — including the production workspace — because the secret write handlers only enforced the
-// `ownedWorkspace` tenant/isolation check (cross-tenant → 404) and performed NO role check before
-// writing to the OpenBao vault store. The fix adds the existing coarse `canManageTenant` tenant-admin
-// gate (the same gate every other privileged CP write uses) to `secretSet` / `secretReplace` /
-// `secretDelete` ONLY, placed AFTER the 404 so cross-tenant access stays 404 (no existence leak) and
-// own-tenant-non-admin becomes 403 — persisting/deleting nothing.
-//
-// These tests drive the PUBLIC FN_HANDLERS surface of the kind control-plane directly with the repo's
-// DI seams (ctx.store + ctx.vaultStore), mirroring tests/blackbox/console-workspace-secrets.test.mjs
-// but with a SIMPLE recording fake vault store so we can assert the vault write methods are NEVER
-// called when the gate denies. No DB, no real OpenBao — deterministic, isolated, self-contained.
-//
-//   uc-798-viewer-denied      tenant_viewer  → POST/PUT/DELETE secrets = 403, vault never written
-//   uc-798-developer-denied   tenant_developer (also tenant_member) → 403, vault never written
-//   uc-798-owner-allowed      tenant_owner  → create 201 / replace 200 / delete 204 (legit preserved)
-//   uc-798-superadmin-allowed superadmin    → create 201 / replace 200 / delete 204 (legit preserved)
-//   uc-798-reads-open         tenant_member → GET list / GET by-name still 200 (reads NOT gated)
-//   uc-798-cross-tenant-404   tenant_member of another tenant → 404 WORKSPACE_NOT_FOUND (404 > 403)
+// #798 keeps the tenant-admin write gate after workspace visibility. #1141 adds verified
+// workspace authority for reads and writes: unbound members get 404, bound members
+// can read metadata but still get 403 on mutations. Test the exported handlers with
+// recording vault/store boundaries, including production and cross-tenant denials.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -44,10 +28,7 @@ function recordingVault({ exists = false } = {}) {
   };
 }
 
-// Fake Postgres store: the workspace always resolves to tenant 'acme' (a fixed owner). ownedWorkspace
-// then denies any caller whose verified tenantId !== 'acme' (cross-tenant → null → 404), and admits
-// callers of 'acme' plus platform callers (superadmin/internal, callerTenantId → null) — exactly the
-// rows the role gate must then further filter by role.
+// Persisted workspace ownership, independent of request or identity workspace claims.
 const fakeStore = {
   async getWorkspace(_pool, id) { return { id, tenant_id: 'acme' }; },
   async listFnActions() { return []; }, // kind fn_actions row does not persist secret refs → refCount 0
@@ -55,11 +36,11 @@ const fakeStore = {
 
 // Verified identities (as produced by the CP JWT verifier). tenant_viewer/tenant_developer both map
 // to actorType 'tenant_member'; tenant_owner/tenant_admin map to 'tenant_owner'.
-const VIEWER = { actorType: 'tenant_member', tenantId: 'acme', sub: 'u1' };       // read-only
-const DEVELOPER = { actorType: 'tenant_member', tenantId: 'acme', sub: 'u-dev' }; // non-admin developer
-const OWNER = { actorType: 'tenant_owner', tenantId: 'acme', sub: 'u2' };
+const VIEWER = { actorType: 'tenant_member', tenantId: 'acme', roles: ['tenant_viewer'], workspaceIds: [], sub: 'u1' };       // read-only
+const DEVELOPER = { actorType: 'tenant_member', tenantId: 'acme', roles: ['tenant_developer'], workspaceIds: [], sub: 'u-dev' }; // non-admin developer
+const OWNER = { actorType: 'tenant_owner', tenantId: 'acme', roles: ['tenant_owner'], sub: 'u2' };
 const SUPERADMIN = { actorType: 'superadmin', tenantId: null, sub: 'u3' };
-const CROSS_TENANT_VIEWER = { actorType: 'tenant_member', tenantId: 'globex', sub: 'u4' };
+const CROSS_TENANT_VIEWER = { actorType: 'tenant_member', tenantId: 'globex', roles: ['tenant_viewer'], workspaceIds: ['prod-ws'], sub: 'u4' };
 
 function ctx({ identity, vault, params = {}, body = {} }) {
   return { pool: {}, store: fakeStore, vaultStore: vault, identity, params, body, callerContext: { correlationId: 'corr-798' } };
@@ -70,7 +51,7 @@ function ctx({ identity, vault, params = {}, body = {} }) {
 const PROD_WS = 'prod-ws';
 
 // ---- non-owner tenant_member is DENIED on every write path, and nothing is persisted -------------
-for (const [label, identity] of [['viewer', VIEWER], ['developer', DEVELOPER]]) {
+for (const [label, identity] of [['viewer', { ...VIEWER, workspaceIds: [PROD_WS] }], ['developer', { ...DEVELOPER, workspaceIds: [PROD_WS] }]]) {
   test(`uc-798-${label}-denied: secretSet (create) on production → 403 and the vault is never written`, async () => {
     const vault = recordingVault({ exists: false });
     const res = await FN_HANDLERS.secretSet(ctx({ identity, vault, params: { workspaceId: PROD_WS }, body: { secretName: 'db_password', secretValue: 'pwned' } }));
@@ -117,15 +98,15 @@ for (const [label, identity] of [['owner', OWNER], ['superadmin', SUPERADMIN]]) 
   });
 }
 
-// ---- reads stay open to a tenant_member: the role gate must NOT touch list/get -------------------
-test('uc-798-reads-open: a tenant_member can still GET the secret list and GET a secret by name (200)', async () => {
+// ---- bound members can read metadata without tenant-admin mutation authority -------------------
+test('uc-798-reads-open: a bound tenant_viewer can still GET the secret list and GET a secret by name (200)', async () => {
   const listVault = recordingVault();
-  const list = await FN_HANDLERS.secretList(ctx({ identity: VIEWER, vault: listVault, params: { workspaceId: PROD_WS } }));
-  assert.equal(list.statusCode, 200, 'reads are not gated by role');
+  const list = await FN_HANDLERS.secretList(ctx({ identity: { ...VIEWER, workspaceIds: [PROD_WS] }, vault: listVault, params: { workspaceId: PROD_WS } }));
+  assert.equal(list.statusCode, 200, 'bound readers need no admin role');
 
   const getVault = recordingVault();
-  const get = await FN_HANDLERS.secretGet(ctx({ identity: VIEWER, vault: getVault, params: { workspaceId: PROD_WS, secretName: 'existing' } }));
-  assert.equal(get.statusCode, 200, 'reads are not gated by role');
+  const get = await FN_HANDLERS.secretGet(ctx({ identity: { ...VIEWER, workspaceIds: [PROD_WS] }, vault: getVault, params: { workspaceId: PROD_WS, secretName: 'existing' } }));
+  assert.equal(get.statusCode, 200, 'bound readers need no admin role');
 });
 
 // ---- isolation preserved: 404 wins over 403 for a cross-tenant member (no own-vs-other leak) ------
@@ -136,3 +117,17 @@ test('uc-798-cross-tenant-404: a tenant_member of another tenant → 404 WORKSPA
   assert.equal(res.body.code, 'WORKSPACE_NOT_FOUND');
   assert.deepEqual(vault.calls, [], 'nothing is written for a cross-tenant caller');
 });
+
+for (const identity of [VIEWER, DEVELOPER, { ...VIEWER, workspaceIds: ['dev-ws'] },
+  { actorType: 'tenant_owner', tenantId: 'acme' }]) {
+  test(`unbound/wrong-workspace secret access is concealed: ${JSON.stringify(identity)}`, async () => {
+    for (const handler of ['secretSet', 'secretReplace', 'secretDelete', 'secretList', 'secretGet']) {
+      const vault = recordingVault({ exists: true });
+      const res = await FN_HANDLERS[handler](ctx({ identity, vault,
+        params: { workspaceId: PROD_WS, secretName: 'existing' },
+        body: { secretName: 'existing', secretValue: 'v', workspaceId: PROD_WS } }));
+      assert.deepEqual(res, { statusCode: 404, body: { code: 'WORKSPACE_NOT_FOUND', message: 'workspace prod-ws not found' } }, handler);
+      assert.deepEqual(vault.calls, [], 'denial must precede vault reads and writes');
+    }
+  });
+}

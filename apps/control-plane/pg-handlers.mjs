@@ -9,7 +9,7 @@
 import pg from 'pg';
 import * as store from './tenant-store.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
-import { canAccessWorkspace } from './workspace-authz.mjs';
+import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 import { withPostgresSsl } from './transport-security.mjs';
 
 const { Client } = pg;
@@ -29,7 +29,7 @@ async function assertDbScope(ctx) {
   const db = D(ctx.params.db);
   const map = await (ctx.store ?? store).databaseWorkspaceMap(ctx.pool);
   const owningTenant = map[db]?.tenant_id ?? null;
-  if (!canAccessWorkspace(ctx.identity, map[db], ['database.read', 'database.write', 'database.admin'])
+  if (!canAccessWorkspace(ctx.identity, map[db], WORKSPACE_ACTIONS.database)
     || !canManageTenant(ctx?.identity, owningTenant)) {
     return err(404, 'PG_DATABASE_NOT_FOUND', `database ${db} not found`);
   }
@@ -59,7 +59,7 @@ async function pgListDatabases(ctx) {
   const map = await (ctx.store ?? store).databaseWorkspaceMap(ctx.pool);
   const platform = ctx.identity?.actorType === 'superadmin' || ctx.identity?.actorType === 'internal';
   const allowed = new Set(Object.entries(map).filter(([, row]) => canAccessWorkspace(ctx.identity, row,
-    ['database.read', 'database.write', 'database.admin'])).map(([name]) => name));
+    WORKSPACE_ACTIONS.database)).map(([name]) => name));
   if (!platform && allowed.size === 0) return ok(200, coll([]));
   const { rows } = await ctx.pool.query(
     `SELECT d.datname, r.rolname AS owner
@@ -235,7 +235,7 @@ function quoteIdent(name) {
 // mismatch (no existence leak). Returns { ws, database } or { error }.
 async function ownedWorkspaceDb(ctx) {
   const ws = await (ctx.store ?? store).getWorkspace(ctx.pool, ctx.params.workspaceId);
-  if (!ws || !canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, ['database.read', 'database.write', 'database.admin'])
+  if (!ws || !canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, WORKSPACE_ACTIONS.database)
     || !canManageTenant(ctx.identity, ws.tenant_id)) {
     return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
   }

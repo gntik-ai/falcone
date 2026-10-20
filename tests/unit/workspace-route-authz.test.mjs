@@ -65,8 +65,8 @@ for (const route of addressed) {
         result = {};
         await handler(ctx, { writeHead: status => { result.statusCode = status; }, end: body => { result.body = JSON.parse(body); } });
       } else result = await handler(ctx);
-      // #973's workspace bucket APIs intentionally retain their exact 403 shape.
-      const legacy = ['storageListWorkspaceBuckets', 'storageProvisionBucket'].includes(route.localHandler);
+      // Existing workspace bucket and Function workspace APIs retain their uniform 403 shape.
+      const legacy = ['storageListWorkspaceBuckets', 'storageProvisionBucket', 'fnInventory', 'fnListActions', 'fnDeploy'].includes(route.localHandler);
       assert.equal(result.statusCode, legacy ? 403 : 404, `${role}: ${JSON.stringify(result.body)}`);
       assert.ok(legacy ? result.body.code === 'FORBIDDEN' : /NOT_FOUND$/.test(result.body.code));
       assert.equal(connections, 0);

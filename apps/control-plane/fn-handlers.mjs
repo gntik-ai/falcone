@@ -12,7 +12,7 @@ import * as store from './tenant-store.mjs';
 import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost, isReservedFunctionEnvName, pruneInlineFunctionRevisions } from './function-executor.mjs';
 import { getSharedVaultStore, vaultStoreHealthSnapshot } from './vault-secrets.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
-import { canAccessWorkspace } from './workspace-authz.mjs';
+import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 import { functionsDisabledResponse, knativeUnavailableResponse } from './knative-runtime.mjs';
 import { createRuntimeCleanupRepository } from './runtime-cleanup-repository.mjs';
 import { recordKnativeDependencyEvent } from './metrics-registry.mjs';
@@ -78,7 +78,7 @@ async function ownedWorkspace(ctx, workspaceId) {
   const t = callerTenantId(ctx.identity);
   if (t && ws.tenant_id !== t) return null;
   if (!canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id },
-    ['function.read', 'function.invoke', 'function.deploy', 'function.admin'])) return null;
+    WORKSPACE_ACTIONS.function)) return null;
   return ws;
 }
 
@@ -227,7 +227,6 @@ export function canMutateFunctionWorkspace(identity, workspace) {
 const FUNCTION_READ_ROLES = new Set([
   'workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_operator',
   'workspace_viewer', 'workspace_auditor', 'service_account', 'developer_external',
-  'workspace_service_account',
 ]);
 const FUNCTION_PLATFORM_READ_ROLES = new Set([
   'platform_operator', 'platform_auditor', 'platform_admin', 'superadmin',
@@ -235,7 +234,6 @@ const FUNCTION_PLATFORM_READ_ROLES = new Set([
 const FUNCTION_INVOKE_ROLES = new Set([
   'workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_operator',
   'service_account', 'developer_external',
-  'workspace_service_account',
 ]);
 export function canAccessFunctionWorkspace(identity, workspace, mode = 'read') {
   if (!identity || !workspace?.id || !workspace?.tenant_id) return false;
@@ -244,7 +242,7 @@ export function canAccessFunctionWorkspace(identity, workspace, mode = 'read') {
     && [...roles].some((role) => FUNCTION_PLATFORM_READ_ROLES.has(role));
   if (mode === 'read' && trustedPlatformReader) return true;
   if (identity.tenantId !== workspace.tenant_id) return false;
-  const actions = mode === 'invoke' ? ['function.invoke', 'function.admin'] : ['function.read', 'function.invoke', 'function.deploy', 'function.admin'];
+  const actions = mode === 'invoke' ? WORKSPACE_ACTIONS.functionInvoke : WORKSPACE_ACTIONS.function;
   if (!canAccessWorkspace(identity, { tenant_id: workspace.tenant_id, workspace_id: workspace.id }, actions)) return false;
   if (mode === 'read' && (roles.has('tenant_owner') || roles.has('tenant_admin'))) return true;
   const allowed = mode === 'invoke' ? FUNCTION_INVOKE_ROLES : FUNCTION_READ_ROLES;
@@ -455,7 +453,7 @@ async function fnDeploy(ctx) {
     ? await ownedWorkspace(ctx, b.workspaceId)
     : null;
   if (actionId && b.workspaceId != null && !requestedWorkspace) {
-    return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${b.workspaceId} not found`);
+    return err(403, 'FORBIDDEN', 'not authorized for this workspace');
   }
   // On update, the persisted Function determines the authorization workspace. A body.workspaceId
   // cannot move an existing Function or substitute a same-tenant workspace the caller does own.
@@ -471,11 +469,11 @@ async function fnDeploy(ctx) {
   }
   // Tenant isolation (#869, the write twin of #784): resolve + own-check the workspace BEFORE any
   // write or Knative deploy side effect. Missing, foreign and unbound workspaces
-  // share a 404 envelope. The separate mutation-role gate remains mandatory.
+  // retain the documented uniform 403 envelope. The mutation-role gate remains mandatory.
   const ws = requestedWorkspace?.id === workspaceId
     ? requestedWorkspace
     : await ownedWorkspace(ctx, workspaceId);
-  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
+  if (!ws) return err(403, 'FORBIDDEN', 'not authorized for this workspace');
   if (!canMutateFunctionWorkspace(ctx.identity, ws)) {
     return err(403, 'FORBIDDEN', 'requires a write-capable role bound to this workspace');
   }
@@ -567,10 +565,10 @@ async function fnDeploy(ctx) {
 async function fnInventory(ctx) {
   const st = ctx.store ?? store;
   // Resolve verified workspace authority before registry or runtime reads. Missing,
-  // foreign and unbound workspaces have one 404 envelope; the registry's tenant
+  // foreign and unbound workspaces retain one uniform 403 envelope; the registry's tenant
   // predicate remains defense in depth.
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
-  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  if (!ws) return err(403, 'FORBIDDEN', 'not authorized for this workspace');
   const rows = await st.listFnActions(ctx.pool, ws.id, callerTenantId(ctx.identity));
   const runtimeStatus = runtimeFor(ctx).status();
   const actions = [];
@@ -588,7 +586,7 @@ async function fnInventory(ctx) {
 async function fnListActions(ctx) {
   const st = ctx.store ?? store;
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
-  if (!ws) return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
+  if (!ws) return err(403, 'FORBIDDEN', 'not authorized for this workspace');
   const rows = await st.listFnActions(ctx.pool, ws.id, callerTenantId(ctx.identity));
   const runtimeStatus = runtimeFor(ctx).status();
   const items = [];

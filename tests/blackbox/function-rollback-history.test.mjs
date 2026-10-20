@@ -652,7 +652,7 @@ test('bbx-933-src-fn-mutation-deny-14: non-workspace roles are denied before Kna
 
   assert.deepEqual(observed, Object.fromEntries(
     Object.keys(denied).map((name) => [name, {
-      statusCode: name === 'platform_operator' ? 404 : 403,
+      statusCode: 403,
       disclosedDependency: false,
       persistedActions: 0,
     }]),

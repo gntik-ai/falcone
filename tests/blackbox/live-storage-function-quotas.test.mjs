@@ -206,7 +206,7 @@ test('function PATCH skips quota and foreign ownership precedes evaluation', asy
   assert.deepEqual(effects(), { deploys: 1, writes: 1 });
   const foreignCall = functionCtx(pool, { ownerTenant: 'tenant-b' });
   foreignCall.ctx.quotaOptions.load = () => assert.fail('ownership must precede quota');
-  assert.equal((await FN_HANDLERS.fnDeploy(foreignCall.ctx)).statusCode, 404);
+  assert.equal((await FN_HANDLERS.fnDeploy(foreignCall.ctx)).statusCode, 403);
   assert.deepEqual(foreignCall.effects(), { deploys: 0, writes: 0 });
   assert.equal(pool.logs.length, 0);
 });

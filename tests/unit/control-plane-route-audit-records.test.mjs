@@ -9,7 +9,7 @@ const routeFor = (name) => routes.find((route) => route.localHandler === name);
 
 test('#971: secret replacement records its trusted owning tenant without bodies', async () => {
   for (const actorType of ['tenant_admin', 'superadmin']) {
-    const ctx = { identity: { sub: 'actor', actorType, tenantId: actorType === 'superadmin' ? null : 'tenant-a' }, params: { workspaceId: 'ws-a' }, body: { tenantId: 'spoofed', value: 'secret-value' } };
+    const ctx = { identity: { sub: 'actor', actorType, roles: [actorType], tenantId: actorType === 'superadmin' ? null : 'tenant-a' }, params: { workspaceId: 'ws-a' }, body: { tenantId: 'spoofed', value: 'secret-value' } };
     const result = { statusCode: 200, body: { value: 'secret-value' }, auditScope: { tenantId: 'tenant-a', workspaceId: 'ws-a' } };
     const event = auditEventForRoute(routeFor('secretReplace'), ctx, result);
     assert.ok(event, 'secret replacement must produce an audit event');
@@ -55,7 +55,7 @@ test('#971: real secretReplace returns the workspace scope for tenant admin and 
   const { FN_HANDLERS } = await import('../../apps/control-plane/fn-handlers.mjs');
   for (const actorType of ['tenant_admin', 'superadmin']) {
     const ctx = {
-      identity: { sub: 'actor', actorType, tenantId: actorType === 'superadmin' ? null : 'tenant-a' },
+      identity: { sub: 'actor', actorType, roles: [actorType], tenantId: actorType === 'superadmin' ? null : 'tenant-a' },
       params: { workspaceId: 'ws-a', secretName: 'password' }, body: { value: 'secret-value', tenantId: 'spoofed' },
       pool: {}, store: { getWorkspace: async () => ({ id: 'ws-a', tenant_id: 'tenant-a' }), listFnActions: async () => [] },
       vaultStore: { validName: () => true, exists: async () => true, replace: async () => ({ secretName: 'password' }) }

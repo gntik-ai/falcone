@@ -128,6 +128,6 @@ test('fnDeploy preserves workspace authorization before reserved secret validati
     body: { workspaceId: 'ws-foreign', actionName: 'hello', source: { inlineCode: 'function main(){}' }, secrets: ['fn-src'] },
     store: { getWorkspace: async () => ({ id: 'ws-foreign', tenant_id: 'tenant-b' }) },
   }));
-  assert.equal(result.statusCode, 404);
-  assert.equal(result.body.code, 'WORKSPACE_NOT_FOUND');
+  assert.equal(result.statusCode, 403);
+  assert.equal(result.body.code, 'FORBIDDEN');
 });

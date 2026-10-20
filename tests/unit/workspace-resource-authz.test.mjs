@@ -27,7 +27,7 @@ test('development caller cannot list production functions or trigger runtime rea
   ctx.store.listFnActions = async () => { throw new Error('function registry read after denial'); };
   for (const name of ['fnInventory', 'fnListActions']) {
     const result = await FN_HANDLERS[name](ctx);
-    assert.deepEqual(result, { statusCode: 404, body: { code: 'WORKSPACE_NOT_FOUND', message: 'workspace ws2 not found' } });
+    assert.deepEqual(result, { statusCode: 403, body: { code: 'FORBIDDEN', message: 'not authorized for this workspace' } });
   }
 });
 
@@ -45,7 +45,7 @@ test('an unbound function deployment is hidden before locks or Knative', async (
   const ctx = context(caller('tenant_developer'));
   ctx.body.actionName = 'production';
   const result = await FN_HANDLERS.fnDeploy(ctx);
-  assert.deepEqual(result, { statusCode: 404, body: { code: 'WORKSPACE_NOT_FOUND', message: 'workspace ws2 not found' } });
+  assert.deepEqual(result, { statusCode: 403, body: { code: 'FORBIDDEN', message: 'not authorized for this workspace' } });
 });
 
 test('storage usage denies a development binding before bucket enumeration or S3', async () => {
@@ -72,8 +72,8 @@ test('bound readers and verified tenant administrators retain realtime and funct
   }
 });
 
-test('a model-authorized production service account can invoke its Function', async () => {
-  const ctx = context(caller('workspace_service_account', ['ws2']));
+test('a bound production workspace operator can invoke its Function', async () => {
+  const ctx = context(caller('workspace_operator', ['ws2']));
   ctx.params.actionId = 'fn_prod';
   ctx.store.getFnAction = async () => ({ resource_id: 'fn_prod', workspace_id: 'ws2', tenant_id: 'tenant-t', ksvc_name: 'fn-prod' });
   let probes = 0, invocations = 0, activations = 0;
@@ -94,5 +94,36 @@ test('foreign and unmapped realtime workspaces are hidden even with matching bin
     ctx.store.getWorkspace = async () => record;
     ctx.pool.query = async () => { throw new Error('realtime data after denial'); };
     assert.equal((await REALTIME_HANDLERS.getWorkspaceRealtime(ctx)).statusCode, 404);
+  }
+});
+
+test('workspace service account roles gain no new Function read or invoke permissions', async () => {
+  const ctx = context(caller('workspace_service_account', ['ws2']));
+  ctx.params.actionId = 'fn_prod';
+  ctx.store.getFnAction = async () => ({ resource_id: 'fn_prod', workspace_id: 'ws2', tenant_id: 'tenant-t', ksvc_name: 'fn-prod' });
+  ctx.store.latestFnActivation = async () => null;
+  ctx.store.getFnActionVersionSummary = async () => ({});
+  ctx.knativeRuntime = { status: () => ({ state: 'ready' }), canServeWorkloads: () => true };
+  for (const handler of ['fnActionDetail', 'fnInvoke']) {
+    assert.deepEqual(await FN_HANDLERS[handler](ctx), {
+      statusCode: 404, body: { code: 'ACTION_NOT_FOUND', message: 'action fn_prod not found' },
+    });
+  }
+});
+
+test('function workspace denials preserve the uniform documented envelope', async () => {
+  for (const record of [null, { id: 'ws2', tenant_id: 'foreign' }, ws]) {
+    const ctx = context(caller('tenant_viewer'));
+    ctx.store.getWorkspace = async () => record;
+    ctx.body.actionName = 'orders';
+    for (const handler of ['fnInventory', 'fnListActions', 'fnDeploy']) {
+      assert.deepEqual(await FN_HANDLERS[handler](ctx), {
+        statusCode: 403, body: { code: 'FORBIDDEN', message: 'not authorized for this workspace' },
+      }, handler);
+    }
+    ctx.params.actionId = 'fn_prod';
+    assert.deepEqual(await FN_HANDLERS.fnDeploy(ctx), {
+      statusCode: 403, body: { code: 'FORBIDDEN', message: 'not authorized for this workspace' },
+    });
   }
 });

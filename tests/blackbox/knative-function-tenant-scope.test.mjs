@@ -300,12 +300,20 @@ test('#1083: trusted platform readers and same-tenant read roles receive the pag
   const tenant = ['tenant_owner', 'tenant_admin'].map((role) => ({ ...IDENTITY_A, roles: [role] }));
   const workspace = [
     'workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_operator',
-    'workspace_viewer', 'workspace_auditor', 'workspace_service_account',
+    'workspace_viewer', 'workspace_auditor',
   ].map((role) => ({ ...IDENTITY_A, roles: [role], workspaceId: 'ws-a', workspaceIds: ['ws-a'] }));
   for (const identity of [...platform, ...tenant, ...workspace]) {
     const result = await FN_HANDLERS.fnActivations(ctx(identity));
     assert.equal(result.statusCode, 200, identity.roles[0]);
     assert.deepEqual(result.body.page, { size: 50, total: 1 });
     assert.equal(result.body.items[0].activationId, ACT_A.activation_id);
+  }
+});
+
+
+test('service-account roles do not acquire new function activation visibility', async () => {
+  for (const role of ['workspace_service_account', 'service_account', 'developer_external']) {
+    const result = await FN_HANDLERS.fnActivations(ctx({ ...IDENTITY_A, roles: [role], workspaceIds: ['ws-a'] }));
+    assert.deepEqual(result, { statusCode: 404, body: { code: 'ACTION_NOT_FOUND', message: 'action fn_aaaaaaaaaaaa not found' } });
   }
 });

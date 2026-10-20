@@ -33,7 +33,7 @@ import {
 } from './webhook-db.mjs';
 import { getWorkspace } from './tenant-store.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
-import { canAccessWorkspace } from './workspace-authz.mjs';
+import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 import {
   configureWebhookRuntimeKeyContext,
   requireWebhookRuntimeKeyContext,
@@ -81,7 +81,7 @@ export async function webhookManage(ctx, deps = {}) {
     const ws = await resolveWorkspace(ctx.pool, ctx.params.workspaceId);
     const platformCaller = identity.actorType === 'superadmin' || identity.actorType === 'internal';
     if (!ws || (!platformCaller && (identity.tenantId == null || identity.tenantId !== ws.tenant_id))
-      || !canAccessWorkspace(identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, ['topic.read', 'topic.publish', 'topic.consume', 'topic.admin'])) {
+      || !canAccessWorkspace(identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, WORKSPACE_ACTIONS.webhook)) {
       return { statusCode: 404, body: { code: 'NOT_FOUND', message: 'workspace not found' } };
     }
     const idx = path.indexOf('/webhooks');

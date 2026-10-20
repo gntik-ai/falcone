@@ -12,8 +12,12 @@ SHALL require model authority for the family action set, or a verified tenant-ti
 role and an explicit matching identity.workspaceIds binding. Existing action and
 owner/admin structural checks SHALL remain additional requirements.
 
-Denied addressed resources SHALL use resource-specific not-found envelopes before
-any downstream side effect or connection. Collection APIs SHALL omit unauthorized
+Denied addressed resources SHALL use their existing resource-specific envelopes
+before any downstream side effect or connection. Function inventory, action-list
+and create/update workspace resolution SHALL retain the existing uniform 403
+FORBIDDEN for absent, foreign and unauthorized workspaces; these routes had no
+workspace 404 contract. Function secrets and action/activation routes SHALL retain
+their existing not-found envelopes. Collection APIs SHALL omit unauthorized
 resources. Missing/null workspace mappings SHALL fail closed for non-platform
 callers, except the explicitly preserved #973 storage owner/admin compatibility.
 Request body, query, path and x-* headers SHALL NOT grant workspace authority.
@@ -22,7 +26,7 @@ Request body, query, path and x-* headers SHALL NOT grant workspace authority.
 
 - **WHEN** an unbound tenant_viewer/tenant_developer or a ws1-bound caller requests
   an in-scope resource in ws2 of the same tenant
-- **THEN** the resource returns its not-found envelope without Knative, Kafka,
+- **THEN** the resource returns its existing denial envelope without Knative, Kafka,
   PostgreSQL/MongoDB data connection, webhook action or S3 work
 - **AND** correct workspace identifiers in request fields do not change the decision
 
@@ -37,7 +41,7 @@ Request body, query, path and x-* headers SHALL NOT grant workspace authority.
 
 - **WHEN** a non-platform identity requests a foreign resource or one lacking
   a tenant/workspace mapping
-- **THEN** it receives the same not-found shape as an absent resource
+- **THEN** it receives the same denial shape as an absent resource
 - **AND** existing validation that precedes authorization retains precedence
 
 #### Scenario: Shared MongoDB names do not merge workspace authority
@@ -46,6 +50,21 @@ Request body, query, path and x-* headers SHALL NOT grant workspace authority.
   bound only to ws1
 - **THEN** metadata counts include only ws1 documents stamped with its tenant/workspace
 - **AND** a database registered only to ws2 is denied before a MongoDB connection
+
+#### Scenario: Verified tenant administrators retain metadata visibility
+
+- **WHEN** a verified tenant_owner/tenant_admin requests metadata for a mapped database
+- **THEN** counts include all documents stamped with that tenantId, including legacy
+  documents without workspaceId, without counting a document once per mapping
+- **AND** other tenants' documents remain excluded
+- **AND** an unregistered database remains denied before connection
+
+#### Scenario: Existing Function role and binding contracts remain bounded
+
+- **WHEN** a workspace_service_account has a binding and model grant
+- **THEN** no new Function read/invoke role grant is introduced by this change
+- **AND** a singular identity.workspaceId without matching identity.workspaceIds
+  no longer establishes Function read/invoke authority
 
 #### Scenario: Storage compatibility remains pinned
 

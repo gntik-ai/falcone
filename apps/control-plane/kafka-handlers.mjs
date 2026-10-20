@@ -13,7 +13,7 @@ import { Kafka, logLevel } from 'kafkajs';
 import * as store from './tenant-store.mjs';
 import { resolveKafkaSecurity } from './transport-security.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
-import { canAccessWorkspace } from './workspace-authz.mjs';
+import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 import { can } from './model-authz.mjs';
 import { checkDimensionQuota, quotaDenial } from './dimension-quota.mjs';
 
@@ -184,7 +184,7 @@ async function resolveOwnedWorkspace(ctx) {
   if (!ws) return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
   const scope = callerTenantScope(ctx.identity);
   if ((scope != null && ws.tenant_id !== scope)
-    || !canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, ['topic.read', 'topic.publish', 'topic.consume', 'topic.admin'])) {
+    || !canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, WORKSPACE_ACTIONS.topic)) {
     return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
   }
   return { ws };
@@ -421,7 +421,7 @@ async function resolveTopic(ctx) {
   // a tenant could read/publish/consume another tenant's topic (P0 ISO-EVENTS).
   const scope = callerTenantScope(ctx.identity);
   if ((scope != null && t.tenant_id !== scope)
-    || !canAccessWorkspace(ctx.identity, t, ['topic.read', 'topic.publish', 'topic.consume', 'topic.admin'])) {
+    || !canAccessWorkspace(ctx.identity, t, WORKSPACE_ACTIONS.topic)) {
     return { error: err(404, 'TOPIC_NOT_FOUND', `topic ${ctx.params.topicId} not found`) };
   }
   return { t };

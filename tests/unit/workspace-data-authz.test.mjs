@@ -80,3 +80,28 @@ test('MongoDB metadata counts only documents in the bound workspace of a shared 
   assert.equal(result.body.collectionName, 'orders');
   assert.equal(result.body.documentCount, 1);
 });
+
+test('verified tenant administrators keep tenant-wide MongoDB metadata counts including legacy documents', async () => {
+  for (const role of ['tenant_owner', 'tenant_admin']) {
+    const request = ctx();
+    request.identity = { actorType: role, roles: [role], tenantId: 'T' };
+    request.store.mongoDatabaseWorkspaceMappings = async () => ['ws1', 'ws2'].map(workspace_id => ({ tenant_id: 'T', workspace_id, database_name: 'production' }));
+    const documents = [
+      { tenantId: 'T', workspaceId: 'ws1' }, { tenantId: 'T', workspaceId: 'ws2' },
+      { tenantId: 'T' }, { tenantId: 'foreign', workspaceId: 'ws2' },
+    ];
+    request.mongoClient = { db: () => ({
+      admin: () => ({ listDatabases: async () => ({ databases: [{ name: 'production' }] }) }),
+      listCollections: () => ({ toArray: async () => [{ name: 'orders', type: 'collection' }] }),
+      collection: () => ({ countDocuments: async filter => documents.filter(doc =>
+        Object.entries(filter).every(([key, value]) => doc[key] === value)).length }),
+    }) };
+    assert.equal((await MONGO_HANDLERS.mongoListDatabases(request)).body.items[0].stats.documents, 3, role);
+    assert.equal((await MONGO_HANDLERS.mongoListCollections(request)).body.items[0].documentCount, 3, role);
+    assert.equal((await MONGO_HANDLERS.mongoCollectionDetail(request)).body.documentCount, 3, role);
+    // Tenant-wide visibility does not establish ownership for an unmapped database.
+    request.store.mongoDatabaseWorkspaceMappings = async () => [];
+    request.mongoClient.db = () => { throw new Error('MongoDB reached without registered ownership'); };
+    assert.equal((await MONGO_HANDLERS.mongoCollectionDetail(request)).statusCode, 404);
+  }
+});

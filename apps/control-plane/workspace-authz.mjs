@@ -3,6 +3,23 @@ import model from '../../packages/internal-contracts/src/authorization-model.jso
 
 const TENANT_ROLES = new Set(model.permission_matrix.tenant.map(({ role }) => role));
 
+const DATABASE_ACTIONS = Object.freeze(['database.read', 'database.write', 'database.admin']);
+const TOPIC_ACTIONS = Object.freeze(['topic.read', 'topic.publish', 'topic.consume', 'topic.admin']);
+
+// Visibility accepts any existing model action for a family; handlers still enforce
+// their operation-specific action/structural checks. Realtime describes database
+// change streams, and webhooks deliver topic events, so they use those existing
+// model capabilities rather than introducing new permissions in #1141.
+export const WORKSPACE_ACTIONS = Object.freeze({
+  function: Object.freeze(['function.read', 'function.invoke', 'function.deploy', 'function.admin']),
+  functionInvoke: Object.freeze(['function.invoke', 'function.admin']),
+  database: DATABASE_ACTIONS,
+  realtime: DATABASE_ACTIONS,
+  topic: TOPIC_ACTIONS,
+  webhook: TOPIC_ACTIONS,
+  bucket: Object.freeze(['bucket.read', 'bucket.write', 'bucket.admin']),
+});
+
 // Authority comes only from verified identity and persisted scope. Callers keep
 // their resource-specific not-found response and any additional action/role gate.
 export function canAccessWorkspace(identity, record, actions, { allowUnmapped = false } = {}) {

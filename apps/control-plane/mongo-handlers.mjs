@@ -9,7 +9,7 @@
 import { MongoClient, ObjectId } from 'mongodb';
 import * as store from './tenant-store.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
-import { canAccessWorkspace } from './workspace-authz.mjs';
+import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 import { resolveMongoTls } from './transport-security.mjs';
 import { checkDimensionQuota, quotaDenial } from './dimension-quota.mjs';
 
@@ -39,26 +39,33 @@ const mc = async (ctx) => ctx?.mongoClient ?? client();
 export const mongoClient = () => client();
 
 // FerretDB names can be shared across tenants/workspaces. Resolve registered
-// scope before connecting, then count only documents stamped with an authorized
-// tenant/workspace pair; names and tenant-only document ownership grant no access.
+// scope before connecting, then count only authorized documents. Verified tenant
+// administrators retain tenant-wide counts, including legacy tenant-only documents,
+// after the mapping gate passes.
 async function authorizedMongoMappings(ctx, db) {
   if (ctx.identity?.actorType === 'superadmin' || ctx.identity?.actorType === 'internal') return null;
   const rows = await (ctx.store ?? store).mongoDatabaseWorkspaceMappings(ctx.pool);
   return rows.filter((row) => (!db || row.database_name === db)
-    && canAccessWorkspace(ctx.identity, row, ['database.read', 'database.write', 'database.admin']));
+    && canAccessWorkspace(ctx.identity, row, WORKSPACE_ACTIONS.database));
 }
 
-async function tenantCollectionCount(c, db, col, scope) {
+async function tenantCollectionCount(c, db, col, scope, identity) {
+  // Ownership has already passed the mapping gate. Tenant administrators keep the
+  // existing tenant-wide metadata view; ordinary callers need workspace stamps.
+  if (identity?.tenantId && Array.isArray(identity.roles)
+    && identity.roles.some((role) => role === 'tenant_owner' || role === 'tenant_admin')) {
+    return c.db(db).collection(col).countDocuments({ tenantId: identity.tenantId });
+  }
   let count = 0;
   for (const row of scope.filter((row) => row.database_name === db)) {
     count += await c.db(db).collection(col).countDocuments({ tenantId: row.tenant_id, workspaceId: row.workspace_id });
   }
   return count;
 }
-async function dbHasTenantData(c, db, scope) {
+async function dbHasTenantData(c, db, scope, identity) {
   const cols = (await c.db(db).listCollections().toArray()).filter((x) => x.type === 'collection');
   for (const x of cols) {
-    if (await tenantCollectionCount(c, db, x.name, scope) > 0) return true;
+    if (await tenantCollectionCount(c, db, x.name, scope, identity) > 0) return true;
   }
   return false;
 }
@@ -102,7 +109,7 @@ async function mongoListDatabases(ctx) {
       // and report a tenant-scoped document count (no cross-tenant volume leak).
       const cols = (await c.db(d.name).listCollections().toArray()).filter((x) => x.type === 'collection');
       let documents = 0;
-      for (const x of cols) documents += await tenantCollectionCount(c, d.name, x.name, scope);
+      for (const x of cols) documents += await tenantCollectionCount(c, d.name, x.name, scope, ctx.identity);
       if (documents === 0) continue;
       items.push({ databaseName: d.name, stats: { documents } });
       continue;
@@ -128,7 +135,7 @@ async function mongoListCollections(ctx) {
     let documentCount, estimatedSize;
     if (scope != null) {
       // Tenant-scoped count; hide collections this tenant has no documents in.
-      documentCount = await tenantCollectionCount(c, db, x.name, scope);
+      documentCount = await tenantCollectionCount(c, db, x.name, scope, ctx.identity);
       if (documentCount === 0) continue;
     } else {
       try { const cs = await c.db(db).command({ collStats: x.name }); documentCount = cs.count; estimatedSize = cs.size; } catch { /* ignore */ }
@@ -155,7 +162,7 @@ async function mongoCollectionDetail(ctx) {
   if (scope != null) {
     // A collection with no documents for the caller's tenant is reported as
     // not-found — no cross-tenant existence leak.
-    documentCount = await tenantCollectionCount(c, db, col, scope);
+    documentCount = await tenantCollectionCount(c, db, col, scope, ctx.identity);
     if (documentCount === 0) return err(404, 'COLLECTION_NOT_FOUND', `collection ${col} not found`);
   } else {
     try { const cs = await c.db(db).command({ collStats: col }); documentCount = cs.count; estimatedSize = cs.size; } catch { /* ignore */ }
@@ -179,7 +186,7 @@ async function mongoIndexes(ctx) {
   if (!exists.length) return err(404, 'COLLECTION_NOT_FOUND', `collection ${col} not found`);
   // Tenant callers may only inspect indexes of a collection they have data in —
   // otherwise the collection is reported as not-found (no cross-tenant schema leak).
-  if (scope != null && await tenantCollectionCount(c, db, col, scope) === 0) {
+  if (scope != null && await tenantCollectionCount(c, db, col, scope, ctx.identity) === 0) {
     return err(404, 'COLLECTION_NOT_FOUND', `collection ${col} not found`);
   }
   const idx = await c.db(db).collection(col).indexes();
@@ -199,7 +206,7 @@ async function mongoViews(ctx) {
   if (scope?.length === 0) return err(404, 'DATABASE_NOT_FOUND', `database ${db} not found`);
   const c = await mc(ctx);
   // Don't enumerate views of a database the caller's tenant has no data in.
-  if (scope != null && !(await dbHasTenantData(c, db, scope))) return ok(200, { items: [], page: { total: 0 } });
+  if (scope != null && !(await dbHasTenantData(c, db, scope, ctx.identity))) return ok(200, { items: [], page: { total: 0 } });
   const views = await c.db(db).listCollections({ type: 'view' }).toArray();
   const items = views.map((v) => ({ viewName: v.name, viewOn: v.options?.viewOn, pipeline: v.options?.pipeline ?? [] }));
   return ok(200, { items, page: { total: items.length } });
@@ -209,11 +216,8 @@ async function mongoDocuments(ctx) {
   const db = D(ctx.params.db); const col = C(ctx.params.col);
   // Enforce the caller owns the workspace (404 cross-tenant, no existence leak) and
   // derive the tenant scope for the documents from the workspace's owning tenant.
-  const ws = await (ctx.store ?? store).getWorkspace(ctx.pool, ctx.params.workspaceId);
-  if (!ws || !canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, ['database.read', 'database.write', 'database.admin'])
-    || !canManageTenant(ctx.identity, ws.tenant_id)) {
-    return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`);
-  }
+  const { error, ws } = await ownedWorkspaceForData(ctx);
+  if (error) return error;
   const limit = Number(ctx.query['page[size]'] ?? 20) || 20;
   const skip = ctx.query['page[after]'] ? Number(ctx.query['page[after]']) || 0 : 0;
   const c = await mc(ctx);
@@ -245,7 +249,7 @@ const MONGO_IO_MAX_DOCS = (() => { const n = Number(process.env.MONGO_IO_MAX_DOC
 // workspace row so the caller can derive the canonical tenantId + workspaceId stamp.
 async function ownedWorkspaceForData(ctx) {
   const ws = await (ctx.store ?? store).getWorkspace(ctx.pool, ctx.params.workspaceId);
-  if (!ws || !canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, ['database.read', 'database.write', 'database.admin'])
+  if (!ws || !canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, WORKSPACE_ACTIONS.database)
     || !canManageTenant(ctx.identity, ws.tenant_id)) {
     return { error: err(404, 'WORKSPACE_NOT_FOUND', `workspace ${ctx.params.workspaceId} not found`) };
   }

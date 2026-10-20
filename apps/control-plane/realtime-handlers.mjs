@@ -1,6 +1,6 @@
 import * as store from './tenant-store.mjs';
 import { callerTenantScope } from './tenant-scope.mjs';
-import { canAccessWorkspace } from './workspace-authz.mjs';
+import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 
 const ok = (statusCode, body) => ({ statusCode, body });
 const err = (statusCode, code, message) => ({ statusCode, body: { code, message } });
@@ -96,7 +96,7 @@ export async function getWorkspaceRealtime(ctx) {
   }
   const ws = await st.getWorkspace(ctx.pool, workspaceId);
   if (!ws || (scope != null && ws.tenant_id !== scope)
-    || !canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, ['database.read', 'database.write', 'database.admin'])) {
+    || !canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, WORKSPACE_ACTIONS.realtime)) {
     return err(404, 'WORKSPACE_NOT_FOUND', `workspace ${workspaceId} not found`);
   }
 
