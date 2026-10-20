@@ -34,7 +34,7 @@ COPY apps/control-plane/server.mjs apps/control-plane/routes.mjs \
      apps/control-plane/workspace-iam-client-handlers.mjs apps/control-plane/workspace-iam-context.mjs \
      apps/control-plane/saga.mjs apps/control-plane/dataplane.mjs \
      apps/control-plane/schema-retry.mjs apps/control-plane/tenant-scope.mjs \
-     apps/control-plane/model-authz.mjs \
+     apps/control-plane/model-authz.mjs apps/control-plane/workspace-authz.mjs \
      apps/control-plane/governance-schema.mjs apps/control-plane/workspace-quota.mjs \
      apps/control-plane/dimension-quota.mjs apps/control-plane/product-quota.mjs \
      apps/control-plane/metrics-handlers.mjs apps/control-plane/metrics-registry.mjs \

@@ -9,7 +9,7 @@
 import pg from 'pg';
 import * as store from './tenant-store.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
-import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
+import { canAccessWorkspace, isPlatformIdentity, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 import { withPostgresSsl } from './transport-security.mjs';
 
 const { Client } = pg;
@@ -57,7 +57,7 @@ async function withDb(database, fn, injectedClient = null) {
 // (superadmin/internal) still see the full cluster. (#551 ISO-PG-META)
 async function pgListDatabases(ctx) {
   const map = await (ctx.store ?? store).databaseWorkspaceMap(ctx.pool);
-  const platform = ctx.identity?.actorType === 'superadmin' || ctx.identity?.actorType === 'internal';
+  const platform = isPlatformIdentity(ctx.identity);
   const allowed = new Set(Object.entries(map).filter(([, row]) => canAccessWorkspace(ctx.identity, row,
     WORKSPACE_ACTIONS.database)).map(([name]) => name));
   if (!platform && allowed.size === 0) return ok(200, coll([]));

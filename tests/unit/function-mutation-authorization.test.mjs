@@ -157,26 +157,44 @@ const MUTATIONS = [
 test('function-mutation-auth-01: viewer and wrong-workspace claims are denied before runtime disclosure or side effects', async () => {
   const deniedIdentities = [
     {
-      ...WORKSPACE_DEVELOPER,
-      sub: 'viewer-a',
-      actorType: 'tenant_member',
-      roles: ['workspace_viewer'],
+      identity: {
+        ...WORKSPACE_DEVELOPER,
+        sub: 'viewer-a',
+        actorType: 'tenant_member',
+        roles: ['workspace_viewer'],
+      },
+      expected: {
+        create: [403, 'FORBIDDEN', 'requires a write-capable role bound to this workspace'],
+        update: [403, 'FORBIDDEN', 'requires a write-capable role bound to this workspace'],
+        invoke: [404, 'ACTION_NOT_FOUND', 'action fn-a not found'],
+        delete: [403, 'FORBIDDEN', 'requires a write-capable role bound to this workspace'],
+        rollback: [403, 'FORBIDDEN', 'requires a write-capable role bound to this workspace'],
+      },
     },
     {
-      ...WORKSPACE_DEVELOPER,
-      sub: 'developer-other-workspace',
-      workspaceId: 'ws-b',
-      workspaceIds: ['ws-b'],
+      identity: {
+        ...WORKSPACE_DEVELOPER,
+        sub: 'developer-other-workspace',
+        workspaceId: 'ws-b',
+        workspaceIds: ['ws-b'],
+      },
+      expected: {
+        create: [403, 'FORBIDDEN', 'not authorized for this workspace'],
+        update: [403, 'FORBIDDEN', 'not authorized for this workspace'],
+        invoke: [404, 'ACTION_NOT_FOUND', 'action fn-a not found'],
+        delete: [404, 'ACTION_NOT_FOUND', 'action fn-a not found'],
+        rollback: [404, 'ACTION_NOT_FOUND', 'action not found'],
+      },
     },
   ];
 
-  for (const identity of deniedIdentities) {
+  for (const { identity, expected } of deniedIdentities) {
     for (const mutation of MUTATIONS) {
       const { ctx, calls } = context(identity, { ready: false, ...mutation.input });
       const result = await mutation.run(ctx);
 
-      assert.ok([403, 404].includes(result.statusCode), `${mutation.name} must deny ${identity.sub}`);
-      assert.ok(['FORBIDDEN', 'ACTION_NOT_FOUND', 'WORKSPACE_NOT_FOUND'].includes(result.body.code));
+      assert.deepEqual([result.statusCode, result.body.code, result.body.message], expected[mutation.name],
+        `${mutation.name} must retain its denial envelope for ${identity.sub}`);
       assert.equal(
         calls.some(({ kind }) => kind === 'runtime-status'),
         false,

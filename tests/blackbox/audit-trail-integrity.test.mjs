@@ -228,7 +228,7 @@ test('bbx-audit-secret-handlers: secret-access handlers are auditable', () => {
 // Resolved workspace-secret scope (#974). Only the persistence/vault boundaries are faked;
 // the real handlers and writer must attribute bodyless, collection, and error responses.
 const SECRET_ADMIN = { actorType: 'superadmin', sub: 'platform-admin' };
-const SECRET_OWNER = { actorType: 'tenant_owner', sub: 'owner', tenantId: 'ten-a' };
+const SECRET_OWNER = { actorType: 'tenant_owner', roles: ['tenant_owner'], sub: 'owner', tenantId: 'ten-a' };
 const SECRET_META = { secretName: 'api_key', name: 'api_key', timestamps: { createdAt: null, updatedAt: null } };
 const SECRET_META_BODY = '{"secretName":"api_key","name":"api_key","tenantId":"ten-a","workspaceId":"ws-a","resolvedRefCount":0,"timestamps":{"createdAt":null,"updatedAt":null}}';
 
@@ -393,7 +393,9 @@ test('bbx-974-isolation: a foreign workspace never supplies audit scope or leaks
 
 test('bbx-974-denied: own-tenant forbidden mutations retain resolved scope and existing role-gate response', async () => {
   for (const handler of ['secretSet', 'secretDelete']) {
-    const ctx = secretContext({ identity: { actorType: 'tenant_member', sub: 'member', tenantId: 'ten-a' } });
+    const ctx = secretContext({ identity: {
+      actorType: 'tenant_member', roles: ['tenant_developer'], workspaceIds: ['ws-a'], sub: 'member', tenantId: 'ten-a',
+    } });
     const result = await FN_HANDLERS[handler](ctx);
     assert.equal(result.statusCode, 403);
     assert.equal(JSON.stringify(result.body), '{"code":"FORBIDDEN","message":"requires superadmin or tenant owner/admin"}');

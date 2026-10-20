@@ -9,7 +9,7 @@
 import { MongoClient, ObjectId } from 'mongodb';
 import * as store from './tenant-store.mjs';
 import { callerTenantScope, canManageTenant } from './tenant-scope.mjs';
-import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
+import { canAccessWorkspace, hasVerifiedTenantAdminRole, isPlatformIdentity, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 import { resolveMongoTls } from './transport-security.mjs';
 import { checkDimensionQuota, quotaDenial } from './dimension-quota.mjs';
 
@@ -43,7 +43,7 @@ export const mongoClient = () => client();
 // administrators retain tenant-wide counts, including legacy tenant-only documents,
 // after the mapping gate passes.
 async function authorizedMongoMappings(ctx, db) {
-  if (ctx.identity?.actorType === 'superadmin' || ctx.identity?.actorType === 'internal') return null;
+  if (isPlatformIdentity(ctx.identity)) return null;
   const rows = await (ctx.store ?? store).mongoDatabaseWorkspaceMappings(ctx.pool);
   return rows.filter((row) => (!db || row.database_name === db)
     && canAccessWorkspace(ctx.identity, row, WORKSPACE_ACTIONS.database));
@@ -52,8 +52,7 @@ async function authorizedMongoMappings(ctx, db) {
 async function tenantCollectionCount(c, db, col, scope, identity) {
   // Ownership has already passed the mapping gate. Tenant administrators keep the
   // existing tenant-wide metadata view; ordinary callers need workspace stamps.
-  if (identity?.tenantId && Array.isArray(identity.roles)
-    && identity.roles.some((role) => role === 'tenant_owner' || role === 'tenant_admin')) {
+  if (identity?.tenantId && hasVerifiedTenantAdminRole(identity)) {
     return c.db(db).collection(col).countDocuments({ tenantId: identity.tenantId });
   }
   let count = 0;

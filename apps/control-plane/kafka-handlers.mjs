@@ -207,7 +207,7 @@ async function resolveWorkspaceTopic(ctx) {
   const rw = await resolveOwnedWorkspace(ctx); if (rw.error) return rw;
   const topicName = slug(decodeRouteParam(ctx.params.topic));
   if (!topicName) return { error: err(404, 'TOPIC_NOT_FOUND', 'topic not found') };
-  const topics = await getStore().listTopicsForWorkspace(ctx.pool, rw.ws.id);
+  const topics = await (ctx.store ?? getStore()).listTopicsForWorkspace(ctx.pool, rw.ws.id);
   const t = topics.find((row) => row.topic_name === topicName);
   if (!t) return { error: err(404, 'TOPIC_NOT_FOUND', `topic ${topicName} not found`) };
   return { ws: rw.ws, t };
@@ -351,7 +351,7 @@ async function consumeTopicMessages(t, { maxMessages = 10, timeoutMs = 3000 } = 
 // GET /v1/events/workspaces/{workspaceId}/topics
 async function eventsListTopics(ctx) {
   const rw = await resolveOwnedWorkspace(ctx); if (rw.error) return rw.error;
-  const topics = await getStore().listTopicsForWorkspace(ctx.pool, rw.ws.id);
+  const topics = await (ctx.store ?? getStore()).listTopicsForWorkspace(ctx.pool, rw.ws.id);
   return ok(200, { items: topics.map(topicResponseRecord) });
 }
 
@@ -359,7 +359,7 @@ async function eventsListTopics(ctx) {
 async function eventsInventory(ctx) {
   const r = await resolveOwnedWorkspace(ctx); if (r.error) return r.error;
   const workspaceId = ctx.params.workspaceId;
-  const topics = await getStore().listTopicsForWorkspace(ctx.pool, workspaceId);
+  const topics = await (ctx.store ?? getStore()).listTopicsForWorkspace(ctx.pool, workspaceId);
   let byName = {};
   if (topics.length) {
     try {
@@ -393,7 +393,7 @@ async function eventsProvisionTopic(ctx) {
   const topicName = slug(ctx.body?.name);
   if (!topicName) return scoped(err(400, 'VALIDATION_ERROR', 'topic name is required'));
   const decision = await checkDimensionQuota(ctx.pool, ws.tenant_id, 'max_kafka_topics',
-    () => getStore().countTenantTopics(ctx.pool, ws.tenant_id), ctx.quotaOptions);
+    () => (ctx.store ?? getStore()).countTenantTopics(ctx.pool, ws.tenant_id), ctx.quotaOptions);
   const denial = await quotaDenial(ctx, ws, decision, 'topic.create');
   if (denial) return scoped(denial);
   const partitions = Number(ctx.body?.partitions ?? 1) || 1;
@@ -406,7 +406,7 @@ async function eventsProvisionTopic(ctx) {
       (a) => a.createTopics({ topics: [{ topic: physical, numPartitions: partitions, replicationFactor: 1 }], waitForLeaders: true }),
       { treatTopicAlreadyExistsAfterRecoveryAsSuccess: true }
     );
-    const rec = await getStore().insertTopic(ctx.pool, { id: resourceId, workspaceId: ws.id, tenantId: ws.tenant_id, topicName, physicalTopicName: physical, partitions });
+    const rec = await (ctx.store ?? getStore()).insertTopic(ctx.pool, { id: resourceId, workspaceId: ws.id, tenantId: ws.tenant_id, topicName, physicalTopicName: physical, partitions });
     return scoped(ok(201, { resourceId: rec.id, topic: rec.topic_name, topicName: rec.topic_name, physicalTopicName: rec.physical_topic_name, partitionCount: partitions, partitions, status: 'active' }));
   } catch (e) {
     return scoped(err(e.statusCode && e.statusCode < 500 ? e.statusCode : 502, 'TOPIC_PROVISION_FAILED', String(e.message ?? e)));

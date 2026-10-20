@@ -20,14 +20,23 @@ export const WORKSPACE_ACTIONS = Object.freeze({
   bucket: Object.freeze(['bucket.read', 'bucket.write', 'bucket.admin']),
 });
 
+export function isPlatformIdentity(identity) {
+  return identity?.actorType === 'superadmin' || identity?.actorType === 'internal';
+}
+
+export function hasVerifiedTenantAdminRole(identity) {
+  return Array.isArray(identity?.roles)
+    && identity.roles.some((role) => role === 'tenant_owner' || role === 'tenant_admin');
+}
+
 // Authority comes only from verified identity and persisted scope. Callers keep
 // their resource-specific not-found response and any additional action/role gate.
 export function canAccessWorkspace(identity, record, actions, { allowUnmapped = false } = {}) {
   if (!identity) return false;
-  if (identity.actorType === 'superadmin' || identity.actorType === 'internal') return true;
+  if (isPlatformIdentity(identity)) return true;
   if (!record || (!allowUnmapped && (!record.tenant_id || !record.workspace_id))) return false;
   if (record.tenant_id && identity.tenantId === record.tenant_id
-    && Array.isArray(identity.roles) && identity.roles.some((role) => role === 'tenant_owner' || role === 'tenant_admin')) return true;
+    && hasVerifiedTenantAdminRole(identity)) return true;
   const scope = { tenantId: record.tenant_id, workspaceId: record.workspace_id };
   if (actions.some((action) => can(identity, action, scope))) return true;
   return Boolean(record.tenant_id && identity.tenantId === record.tenant_id && record.workspace_id
