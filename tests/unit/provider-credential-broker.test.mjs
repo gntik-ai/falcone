@@ -123,6 +123,79 @@ test('an OAuth error is rejected even with HTTP 200 and an access_token field', 
   await assert.rejects(broker.prepare(config), { statusCode: 424, code: 'LLM_PROVIDER_AUTH_FAILED', retryable: false });
 });
 
+test('transient token endpoint failures are retryable, redacted and evicted', async () => {
+  for (const [failure, code, statusCode] of [
+    [() => { throw new Error('client-sentinel'); }, 'LLM_PROVIDER_UNAVAILABLE', 503],
+    [() => new Response('refresh-sentinel', { status: 503 }), 'LLM_PROVIDER_UNAVAILABLE', 503],
+    [() => new Response('access-sentinel'), 'LLM_PROVIDER_RESPONSE_INVALID', 502],
+  ]) {
+    let calls = 0;
+    const broker = createCredentialBroker({ ...options, fetchImpl: async () => ++calls === 1 ? failure() : token() });
+    await assert.rejects(broker.prepare(config), error => error.code === code && error.statusCode === statusCode
+      && error.retryable === true && !JSON.stringify(error).includes('sentinel') && !error.message.includes('sentinel'));
+    assert.equal((await broker.prepare(config)).apiKey, 'access-sentinel');
+    assert.equal(calls, 2);
+  }
+});
+
+test('superseded connection versions are evicted while already prepared requests keep their bearer', async () => {
+  let exchanges = 0;
+  const sent = [];
+  const broker = createCredentialBroker({ ...options, fetchImpl: async (url, init) => {
+    if (url === config.auth.tokenEndpoint) return token(`access-${++exchanges}`);
+    sent.push(new Headers(init.headers).get('authorization'));
+    return new Response('ok');
+  } });
+  const original = await broker.prepare(config);
+  await broker.prepare({ ...config, configVersion: 'two' });
+  assert.equal((await broker.prepare(config)).apiKey, 'access-3');
+  await original.fetchImpl('https://provider.example.test');
+  assert.deepEqual(sent, ['Bearer access-1']);
+});
+
+test('a hung token exchange is aborted after 30 seconds for all refresh waiters', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  for (const stage of ['headers', 'body']) {
+    let started;
+    const entered = new Promise(resolve => { started = resolve; });
+    let signal;
+    const broker = createCredentialBroker({ ...options, fetchImpl: async (url, init) => {
+      signal = init.signal;
+      started();
+      if (!signal) throw new Error('exchange has no deadline');
+      if (stage === 'body') return new Response(new ReadableStream({
+        start(controller) { signal.addEventListener('abort', () => controller.error(signal.reason), { once: true }); },
+      }));
+      return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+    } });
+    const pending = Promise.all([broker.prepare(config), broker.prepare(config)]);
+    pending.catch(() => {});
+    await entered;
+    assert.ok(signal instanceof AbortSignal, 'token exchange must have an abort signal');
+    t.mock.timers.tick(30_000);
+    assert.equal(signal.aborted, true);
+    await assert.rejects(pending, { statusCode: 503, code: 'LLM_PROVIDER_UNAVAILABLE', retryable: true });
+  }
+});
+
+test('token responses larger than 64 KiB are cancelled, redacted and never cached', async () => {
+  let calls = 0;
+  let cancelled = false;
+  const broker = createCredentialBroker({ ...options, fetchImpl: async () => {
+    if (++calls > 1) return token();
+    return new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode(JSON.stringify({ access_token: 'access-sentinel'.repeat(6000), expires_in: 120 }))); },
+      cancel() { cancelled = true; },
+      pull(controller) { controller.close(); },
+    }, { highWaterMark: 0 }));
+  } });
+  await assert.rejects(broker.prepare(config), error => error.code === 'LLM_PROVIDER_RESPONSE_INVALID'
+    && error.retryable === true && !error.message.includes('sentinel'));
+  assert.equal(cancelled, true);
+  assert.equal((await broker.prepare(config)).apiKey, 'access-sentinel');
+  assert.equal(calls, 2);
+});
+
 test('each retry rechecks the caller fence before sending provider credentials', async () => {
   let exchanges = 0;
   let sends = 0;

@@ -16,8 +16,9 @@
 // request time (fail-closed for any pre-existing malicious row). The DEFAULT secretResolver is
 // the confined resolver, so a non-allow-listed env var is NEVER read.
 import { createCredentialBroker } from './provider-credential-broker.mjs';
-import { normalizeProviderAuth, identityProfile } from './provider-auth.mjs';
+import { normalizeProviderAuth, identityProfile, isBrokeredAuth } from './provider-auth.mjs';
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { createLlmLedgerStore } from './llm-usage-store.mjs';
 import { createLlmBatchStore } from './llm-batch-store.mjs';
 import { createLlmBatches } from './llm-batches.mjs';
@@ -121,7 +122,7 @@ function providerKey(tenantId, workspaceId) {
 function sanitizeProviderConfig(config = {}) {
   const { apiKey, secret, key, tenantId, ...safe } = config;
   const auth = normalizeProviderAuth(safe.auth);
-  const brokered = auth && auth.mode !== 'apiKey';
+  const brokered = isBrokeredAuth(auth);
   return {
     providerType: safe.providerType,
     endpoint: safe.endpoint,
@@ -145,7 +146,7 @@ function connectionRecord(workspaceId, config, connectionId, existing, isDefault
   validateConnection(config, connectionId);
   return {
     ...sanitizeProviderConfig(config),
-    ...(config.auth && config.auth.mode !== 'apiKey' ? { configVersion: randomUUID() } : {}),
+    ...(isBrokeredAuth(config.auth) ? { configVersion: randomUUID() } : {}),
     tenantId: config.tenantId ?? TENANT_SENTINEL, workspaceId, connectionId,
     displayName: config.displayName ?? null, isDefault,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
@@ -365,7 +366,10 @@ function createPostgresProviderStore(pool) {
       providerType: row.provider_type ?? undefined, endpoint: row.endpoint ?? undefined,
       allowedModels: Array.isArray(row.allowed_models) ? row.allowed_models : [],
       defaultModel: row.default_model ?? undefined, secretRef: row.secret_ref ?? undefined,
-      ...(row.auth ? { auth: row.auth, configVersion: row.auth_version } : {}),
+      // Brokered writes always clear secret_ref. A previous registry image can
+      // restore an API-key ref without knowing about the additive auth columns.
+      // Honor that write rather than silently using its stale broker metadata.
+      ...(row.auth && (!isBrokeredAuth(row.auth) || !row.secret_ref) ? { auth: row.auth, configVersion: row.auth_version } : {}),
     };
   }
 
@@ -540,12 +544,12 @@ export function createLlmExecutor(options = {}) {
     endpointOptions: endpointGuardOpts, identityProfiles, readTokenFile: options.readTokenFile,
     skewSeconds: options.tokenSkewSeconds ?? Number(guardEnv.LLM_PROVIDER_TOKEN_SKEW_SECONDS ?? 60) });
   async function credentials(config) {
-    if (!config.auth || config.auth.mode === 'apiKey') return { apiKey: await resolveSecretOrThrow(config), fetchImpl };
+    if (!isBrokeredAuth(config.auth)) return { apiKey: await resolveSecretOrThrow(config), fetchImpl };
     return broker.prepare(config);
   }
   async function validateAuth(workspaceId, config) {
     const auth = normalizeProviderAuth(config.auth);
-    if (!auth || auth.mode === 'apiKey') {
+    if (!isBrokeredAuth(auth)) {
       await assertProviderSecretRefExists(config.secretRef, { tenantId: config.tenantId, workspaceId, workspaceSecretStore: options.workspaceSecretStore, prefixes });
       return;
     }
@@ -727,11 +731,15 @@ export function createLlmExecutor(options = {}) {
     driverResolver: options.batchDriverResolver, usageStore, intervalMs: options.batchPollIntervalMs,
     async resolveSnapshot(row) {
       await assertEndpoint(row.endpoint);
-      if (row.auth && row.auth.mode !== 'apiKey') {
+      if (isBrokeredAuth(row.auth)) {
         let current;
         try { current = await providerStore.getConnection(row.workspaceId, row.connectionId, row.tenantId); }
         catch { throw adapterError('LLM_PROVIDER_AUTH_FAILED'); }
-        if (current.configVersion !== row.configVersion) throw adapterError('LLM_PROVIDER_AUTH_FAILED');
+        if (current.endpoint !== row.endpoint || current.providerType !== row.providerType
+          || !isDeepStrictEqual(current.auth, row.auth)) throw adapterError('LLM_PROVIDER_AUTH_FAILED');
+        // Keep the paid batch's model snapshot, but acquire credentials under the
+        // latest version after unrelated connection edits (including on replicas).
+        return credentials({ ...row, configVersion: current.configVersion });
       }
       return credentials(row);
     },

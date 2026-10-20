@@ -1,10 +1,9 @@
 // Tokens live only in this process. Adapters remain pure protocol translators.
 import { readFile } from 'node:fs/promises';
-import { clientError } from './errors.mjs';
 import { identityProfile, normalizeProviderAuth } from './provider-auth.mjs';
 import { createHash } from 'node:crypto';
 import { assertEndpointAllowed, assertSecretRefAllowed } from './byok-provider-guard.mjs';
-import { adapterError } from './llm-adapters/contract.mjs';
+import { AdapterError, adapterError } from './llm-adapters/contract.mjs';
 
 const authFailed = () => adapterError('LLM_PROVIDER_AUTH_FAILED');
 export function createCredentialBroker({ fetchImpl = globalThis.fetch, now = Date.now, secretResolver,
@@ -14,12 +13,48 @@ export function createCredentialBroker({ fetchImpl = globalThis.fetch, now = Dat
   const keyFor = config => JSON.stringify([config.tenantId, config.workspaceId, config.connectionId,
     config.configVersion ?? null,
     createHash('sha256').update(JSON.stringify({ auth: config.auth, endpoint: config.endpoint, providerType: config.providerType })).digest('hex')]);
+  async function exchange(endpoint, body) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    timeout.unref?.();
+    try {
+      let response;
+      try {
+        response = await fetchImpl(endpoint, { method: 'POST', redirect: 'error', signal: controller.signal,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
+      } catch { throw adapterError('LLM_PROVIDER_UNAVAILABLE'); }
+      if (response.status >= 500) {
+        void response.body?.cancel().catch(() => {});
+        throw adapterError('LLM_PROVIDER_UNAVAILABLE');
+      }
+      let json;
+      try {
+        const chunks = [];
+        let size = 0;
+        for await (const chunk of response.body) {
+          size += chunk.byteLength;
+          if (size > 64 * 1024) throw new Error('Token response too large');
+          chunks.push(chunk);
+        }
+        json = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      }
+      catch { throw adapterError(controller.signal.aborted ? 'LLM_PROVIDER_UNAVAILABLE' : 'LLM_PROVIDER_RESPONSE_INVALID'); }
+      return { response, json };
+    } finally { clearTimeout(timeout); }
+  }
   async function prepare(config) {
     const auth = normalizeProviderAuth(config.auth);
     const profile = auth.mode === 'workloadIdentity' ? identityProfile(auth, config.tenantId, identityProfiles) : undefined;
     assertSecretRefAllowed(auth.clientSecretRef, prefixes);
     assertSecretRefAllowed(auth.refreshTokenRef, prefixes);
     const key = keyFor(config);
+    // Prune expired credentials on activity and discard superseded versions.
+    // Existing prepared requests retain their entry without retaining it in cache.
+    for (const [oldKey, oldEntry] of cache) {
+      const [tenant, workspace, connection] = JSON.parse(oldKey);
+      if ((!oldEntry.pending && oldEntry.expiresAt <= now())
+        || (oldKey !== key && tenant === config.tenantId && workspace === config.workspaceId && connection === config.connectionId)) cache.delete(oldKey);
+    }
     let entry = cache.get(key);
     const cached = Boolean(entry && !entry.pending && entry.expiresAt - now() >= skewSeconds * 1000);
     if (!entry || (!entry.pending && entry.expiresAt - now() < skewSeconds * 1000)) {
@@ -33,14 +68,14 @@ export function createCredentialBroker({ fetchImpl = globalThis.fetch, now = Dat
             const value = await secretResolver(ref, config);
             if (typeof value === 'string' && value.length) return value;
           } catch { /* Do not expose resolver failures. */ }
-          throw clientError('LLM provider secret could not be resolved', 500, 'LLM_PROVIDER_SECRET_UNRESOLVED');
+          throw adapterError('LLM_PROVIDER_SECRET_UNRESOLVED');
         };
         const body = new URLSearchParams();
         if (profile) {
           let assertion;
           try { assertion = (await readTokenFile(profile.tokenFile ?? '/var/run/secrets/falcone/llm-identity/token')).trim(); }
           catch { /* Fixed error below. */ }
-          if (!assertion) throw clientError('LLM provider secret could not be resolved', 500, 'LLM_PROVIDER_SECRET_UNRESOLVED');
+          if (!assertion) throw adapterError('LLM_PROVIDER_SECRET_UNRESOLVED');
           if (profile.grantType === 'jwt-bearer') {
             body.set('grant_type', 'urn:ietf:params:oauth:grant-type:jwt-bearer');
             body.set('assertion', assertion);
@@ -63,9 +98,7 @@ export function createCredentialBroker({ fetchImpl = globalThis.fetch, now = Dat
         }
         if (auth.audience) body.set('audience', auth.audience);
         if (auth.scopes?.length) body.set('scope', auth.scopes.join(' '));
-        const response = await fetchImpl(endpoint, { method: 'POST', redirect: 'error',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
-        const json = await response.json();
+        const { response, json } = await exchange(endpoint, body);
         if (!response.ok || !json || json.error !== undefined
           || typeof json.access_token !== 'string' || !json.access_token || /[\r\n]/.test(json.access_token)
           || (json.token_type !== undefined && String(json.token_type).toLowerCase() !== 'bearer')
@@ -79,7 +112,7 @@ export function createCredentialBroker({ fetchImpl = globalThis.fetch, now = Dat
     try { await entry.pending; }
     catch (error) {
       if (cache.get(key) === entry) cache.delete(key);
-      if (error.code === 'LLM_PROVIDER_SECRET_UNRESOLVED') throw error;
+      if (error instanceof AdapterError) throw error;
       throw authFailed();
     }
     entry.pending = null;

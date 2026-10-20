@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLlmExecutor } from '../../apps/control-plane-executor/src/runtime/llm-executor.mjs';
+import { createLlmExecutor, createLlmProviderStore } from '../../apps/control-plane-executor/src/runtime/llm-executor.mjs';
 
 const auth = { mode: 'oauth2', grantType: 'client_credentials', tokenEndpoint: 'https://tokens.example.test/oauth', clientId: 'client', clientSecretRef: { name: 'BYOK_CLIENT' } };
 const config = { tenantId: 'tenant-a', connectionId: 'oauth', providerType: 'openai', endpoint: 'https://provider.example.test/v1/chat/completions', allowedModels: ['model-a'], defaultModel: 'model-a', auth };
@@ -62,18 +62,21 @@ test('config routes reject blocked token endpoints, secret refs and tenant profi
 
 test('revoked grants and freshly rejected tokens fail streams before SSE headers with fixed errors', async () => {
   const { withLlmServer, singular } = await import('./helpers/llm-connections.mjs');
-  for (const revoked of [true, false]) {
-    await withLlmServer(async request => {
+  for (const failure of ['invalid_grant', 401, 403]) {
+    const logs = [];
+    await withLlmServer(async (request, executor) => {
       assert.equal((await request('PUT', singular, config)).status, 200);
       const response = await request('POST', '/v1/workspaces/shared/llm/completions', { prompt: 'hello', stream: true });
       assert.equal(response.status, 424, JSON.stringify(response));
       assert.equal(response.body.code, 'LLM_PROVIDER_AUTH_FAILED');
       assert.doesNotMatch(response.headers['content-type'], /event-stream/);
-      assert.doesNotMatch(JSON.stringify(response), /sentinel/);
-    }, { backendFactory: undefined, fetchImpl: async url => url === auth.tokenEndpoint
-      ? revoked ? Response.json({ error: 'invalid_grant', error_description: 'refresh-sentinel' }, { status: 400 })
+      assert.doesNotMatch(JSON.stringify({ response, logs, rows: await executor.listConnections('shared', 'tenant-a'),
+        ledger: await executor.getLedger('shared', { tenantId: 'tenant-a' }) }), /sentinel/);
+    }, { backendFactory: undefined, logger: { error: (...args) => logs.push(args), info: (...args) => logs.push(args), warn: (...args) => logs.push(args) },
+      fetchImpl: async url => url === auth.tokenEndpoint
+      ? failure === 'invalid_grant' ? Response.json({ error: 'invalid_grant', error_description: 'refresh-sentinel' }, { status: 400 })
         : Response.json({ access_token: 'access-sentinel', expires_in: 3600 })
-      : new Response('access-sentinel', { status: 401 }) });
+      : new Response('access-sentinel', { status: failure }) });
   }
 });
 
@@ -83,6 +86,50 @@ test('stored identity profile is rechecked against the verified tenant before an
   await executor.providerStore.createConnection('workspace', { ...config, auth: { mode: 'workloadIdentity', profile: 'unknown' } });
   await assert.rejects(executor.complete('workspace', input), { statusCode: 422, code: 'LLM_IDENTITY_PROFILE_NOT_ALLOWED' });
   assert.equal(calls, 0);
+});
+
+test('an old registry writer restoring secret_ref switches a brokered row back to API-key auth', async () => {
+  let storedAuth = auth;
+  // DB boundary: the previous image's item UPDATE replaces secret_ref but does
+  // not mention auth/auth_version. Its resulting row is a valid API-key write.
+  const providerStore = createLlmProviderStore({ pool: { query: async () => ({ rows: [{
+    tenant_id: 'tenant-a', workspace_id: 'workspace', connection_id: 'oauth', is_default: true,
+    provider_type: 'openai', endpoint: config.endpoint, allowed_models: ['model-a'], default_model: 'model-a',
+    secret_ref: { name: 'BYOK_RESTORED' }, auth: storedAuth, auth_version: 'stale-broker-version',
+  }] }) } });
+  let exchanges = 0;
+  const executor = createLlmExecutor({ ...opts, providerStore, secretResolver: async ref => {
+    assert.deepEqual(ref, { name: 'BYOK_RESTORED' });
+    return 'restored-key-sentinel';
+  }, fetchImpl: async (url, init) => {
+    if (url === auth.tokenEndpoint) { exchanges++; return Response.json({ access_token: 'stale-access-sentinel', expires_in: 3600 }); }
+    assert.equal(new Headers(init.headers).get('authorization'), 'Bearer restored-key-sentinel');
+    return success();
+  } });
+  assert.equal((await executor.getConnection('workspace', 'oauth', 'tenant-a')).auth, undefined);
+  assert.equal((await executor.complete('workspace', input)).content, 'hello');
+  assert.equal(exchanges, 0);
+  storedAuth = { mode: 'apiKey' };
+  assert.deepEqual((await executor.getConnection('workspace', 'oauth', 'tenant-a')).auth, storedAuth);
+});
+
+test('a secret missing during cached-token 401 recovery retains the fixed 500 error before streaming', async () => {
+  let secretAvailable = true;
+  let sends = 0;
+  let exchanges = 0;
+  const executor = createLlmExecutor({ ...opts,
+    secretResolver: async () => { if (!secretAvailable) throw new Error('client-sentinel'); return 'client-sentinel'; },
+    fetchImpl: async url => {
+      if (url === auth.tokenEndpoint) { exchanges++; return Response.json({ access_token: 'access-sentinel', expires_in: 3600 }); }
+      return ++sends === 1 ? success() : new Response('access-sentinel', { status: 401 });
+    } });
+  await executor.createConnection('workspace', config);
+  await executor.complete('workspace', input);
+  secretAvailable = false;
+  await assert.rejects(executor.completeStream('workspace', input).next(), error => error.statusCode === 500
+    && error.code === 'LLM_PROVIDER_SECRET_UNRESOLVED' && !error.message.includes('sentinel'));
+  assert.equal(exchanges, 1);
+  assert.equal(sends, 2);
 });
 
 test('brokered batches use bearer for submission and polling without persisting credentials', async () => {
@@ -117,6 +164,40 @@ test('another replica never reuses a token under an older connection version', a
   await first.replaceConnection('workspace', 'oauth', config);
   await second.complete('workspace', input);
   assert.equal(exchanges, 2);
+});
+
+test('brokered batch polling, results and cancellation survive metadata edits on another replica', async () => {
+  let now = 0;
+  let exchanges = 0;
+  const calls = [];
+  let ended = false;
+  const batchConfig = { ...config, providerType: 'anthropic', endpoint: 'https://provider.example.test/v1/messages' };
+  const options = { ...opts, now: () => now, fetchImpl: async (url, init) => {
+    if (url === auth.tokenEndpoint) return Response.json({ access_token: `access-${++exchanges}`, expires_in: 3600 });
+    calls.push({ url, method: init.method, bearer: new Headers(init.headers).get('authorization') });
+    if (url.endsWith('/results')) return new Response(JSON.stringify({ custom_id: 'one', result: { type: 'succeeded', message: {
+      type: 'message', model: 'model-a', content: [{ type: 'text', text: 'paid result' }], stop_reason: 'end_turn',
+      usage: { input_tokens: 2, output_tokens: 1 },
+    } } }) + '\n');
+    return Response.json({ type: 'message_batch', id: 'remote-batch', processing_status: ended ? 'ended' : 'in_progress',
+      request_counts: { processing: ended ? 0 : 1, succeeded: ended ? 1 : 0, errored: 0, canceled: 0, expired: 0 } });
+  } };
+  const first = createLlmExecutor(options);
+  await first.createConnection('workspace', batchConfig);
+  const second = createLlmExecutor({ ...options, providerStore: first.providerStore, batchStore: first.batchStore, usageStore: first.usageStore });
+  const id = (await second.submitBatch('workspace', { items: [{ customId: 'one', prompt: 'hello' }] }, input)).body.batchId;
+  await first.replaceConnection('workspace', 'oauth', { ...batchConfig, displayName: 'Renamed', allowedModels: ['another-model'], defaultModel: 'another-model' });
+  now = 60_000;
+  await second.reconcileBatches();
+  assert.equal(calls.length, 2, 'the paid batch must still be polled');
+  assert.equal(exchanges, 2, 'a metadata PUT must not reuse the old-version token');
+  assert.equal(calls[1].bearer, 'Bearer access-2');
+  await second.cancelBatch('workspace', id, input);
+  assert.ok(calls.some(call => call.url.endsWith('/cancel')), 'the paid batch must remain cancellable');
+  ended = true;
+  now += 60_000;
+  await second.reconcileBatches();
+  assert.equal((await second.listBatchItems('workspace', id, input)).items[0].content, 'paid result');
 });
 
 test('Anthropic and Gemini brokered requests use bearer instead of native key headers', async () => {

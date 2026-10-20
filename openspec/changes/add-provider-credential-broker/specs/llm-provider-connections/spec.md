@@ -48,6 +48,20 @@ response formats are implied.
 - THEN it SHALL be discarded, the cache cleared, and the request failed with 424
   `LLM_PROVIDER_AUTH_FAILED`. Rotation and OpenBao writeback are unsupported.
 
+#### Scenario: Transient identity-provider failure
+
+- WHEN the token endpoint is unavailable, returns 5xx, or exceeds a 30-second
+  exchange deadline (including response body consumption)
+- THEN the executor SHALL evict the entry and return retryable 503
+  `LLM_PROVIDER_UNAVAILABLE` with a fixed message.
+- WHEN the endpoint returns an unreadable JSON response or more than 64 KiB
+- THEN the executor SHALL return retryable 502 `LLM_PROVIDER_RESPONSE_INVALID`
+  without retaining the response or emitting its contents.
+- AND request-time endpoint confinement failures SHALL remain non-retryable 424
+  `LLM_PROVIDER_AUTH_FAILED`; configuration-time failures SHALL remain 400.
+- AND an unresolved secret during a cached-token 401 recovery SHALL retain 500
+  `LLM_PROVIDER_SECRET_UNRESOLVED` rather than becoming a provider network error.
+
 ### Requirement: Credential confinement and identity isolation
 
 Token endpoints SHALL pass assertEndpointAllowed at configuration write and again
@@ -66,14 +80,38 @@ tokens and service-account assertions SHALL never be retained in the token cache
 No token/secret value SHALL enter connection rows, batch snapshots, responses,
 usage records, audit records, logs or error messages.
 
+#### Scenario: Configuration rejected before persistence
+
+- WHEN a token endpoint or secret reference fails confinement at configuration time
+- THEN the write SHALL return 400 and SHALL NOT write a connection row.
+- WHEN a workload profile does not allow the verified tenant
+- THEN writes SHALL return 400 `LLM_IDENTITY_PROFILE_NOT_ALLOWED`, and requests
+  against already-stored rows SHALL return 422 without any token exchange.
+
+#### Scenario: Secret values remain confined during failures
+
+- WHEN a revoked grant, rejected bearer, or missing projected token fails a request
+- THEN responses, persisted rows, usage records and captured logs SHALL contain
+  only configuration references and fixed errors, never credential values.
+
 ### Requirement: Cache identity and rollout
 
 Cache keys SHALL include tenant, workspace, connection and configuration version.
 PUT and DELETE SHALL evict local entries; other replicas SHALL read the new
 version and SHALL NOT reuse a token acquired under an older version. Brokered
 batch snapshots SHALL carry only auth configuration and version, and fail closed
-if the connection has since changed or disappeared. Existing API-key batch
-snapshot behavior SHALL remain unchanged.
+if the connection's auth, endpoint or provider type has changed, or it has
+disappeared. Existing API-key batch snapshot behavior SHALL remain unchanged.
+
+#### Scenario: Metadata edits preserve paid batches
+
+- WHEN a brokered batch's connection receives a display name, model allow-list,
+  default model or default-selection edit
+- THEN polling, result ingestion and cancellation SHALL retain the batch snapshot
+  and SHALL acquire credentials under the connection's current version.
+- AND credentials cached under a previous version SHALL NOT be reused.
+- AND cache activity SHALL prune expired entries and superseded connection versions
+  without aborting requests already prepared with an older bearer.
 
 #### Scenario: Worker before and after migration
 
@@ -85,7 +123,12 @@ snapshot behavior SHALL remain unchanged.
   their API-key configuration, and migration SHALL remain idempotent.
 - WHEN an old executor reads a non-API-key connection
 - THEN its secret_ref SHALL be null so its confined resolver fails closed before
-  provider I/O. Old-executor legacy writes SHALL switch the row to API-key mode.
+  provider I/O.
+- WHEN an old executor writes a valid API-key secret_ref through the legacy table
+  or the immediately previous registry's item PUT
+- THEN new readers SHALL treat that connection as API-key mode. Registry writes
+  may leave stale additive auth columns in the database; a restored secret_ref
+  SHALL take precedence because all brokered writes clear secret_ref.
 
 Tokens are cached per replica, never in PostgreSQL. Revocation cannot be detected
 until refresh or provider rejection; the worst-case lag is the provider token TTL.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createLlmProviderStore, createLlmExecutor } from '../../apps/control-plane-executor/src/runtime/llm-executor.mjs';
 import { createConfinedSecretResolver } from '../../apps/control-plane-executor/src/runtime/byok-provider-guard.mjs';
-import { oldExecutorUpsert } from './fixtures/llm-old-executor-upsert.mjs';
+import { oldExecutorUpsert, oldRegistryItemUpdate } from './fixtures/llm-old-executor-upsert.mjs';
 
 const config = { tenantId: 'tenant', providerType: 'openai', endpoint: 'https://provider.example.test/v1/chat/completions', allowedModels: ['model-a'], defaultModel: 'model-a', secretRef: { name: 'BYOK_CLIENT' } };
 const auth = { mode: 'oauth2', grantType: 'client_credentials', tokenEndpoint: 'https://tokens.example.test/oauth', clientId: 'client', clientSecretRef: { name: 'BYOK_CLIENT' } };
@@ -48,6 +48,18 @@ test('Postgres 17: additive nullable auth, API-key compatibility, version fencin
     // closed before provider I/O, even if a caller supplied an API-key ref on write.
     const oldProjection = (await pool.query(`SELECT tenant_id,workspace_id,provider_type,endpoint,allowed_models,default_model,secret_ref FROM workspace_llm_connections WHERE workspace_id='brokered' AND is_default`)).rows[0];
     assert.equal(await createConfinedSecretResolver({ env: { BYOK_CLIENT: 'client-sentinel' } })(oldProjection.secret_ref), null);
+
+    // The immediately previous registry image's item PUT knows neither new
+    // column. New readers must honor the restored API-key ref, despite stale auth.
+    await pool.query(oldRegistryItemUpdate, ['tenant', 'brokered', 'oauth', 'Restored API key', 'openai', config.endpoint,
+      '["model-a"]', 'model-a', JSON.stringify(config.secretRef), true]);
+    const restored = await store.getConnection('brokered', 'oauth', 'tenant');
+    assert.equal(restored.auth, undefined);
+    assert.equal(restored.configVersion, undefined);
+    assert.deepEqual(restored.secretRef, config.secretRef);
+    // Ensure the compatibility assertion actually exercises stale broker columns.
+    assert.deepEqual((await pool.query("SELECT auth FROM workspace_llm_connections WHERE workspace_id='brokered' AND connection_id='oauth'")).rows[0].auth, auth);
+    await store.replaceConnection('brokered', 'oauth', { ...config, auth });
 
     // Verbatim old-image upsert still switches a row to API-key authentication.
     await pool.query(oldExecutorUpsert, ['tenant', 'brokered', 'openai', config.endpoint, '["model-a"]', 'model-a', JSON.stringify(config.secretRef)]);

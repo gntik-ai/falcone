@@ -1,6 +1,7 @@
 // Submission orchestration is shared by all batch drivers.
 import { createLlmBatchReconciler, batchPollInterval } from './llm-batch-reconciler.mjs';
 import { createHash, randomUUID } from 'node:crypto';
+import { isBrokeredAuth } from './provider-auth.mjs';
 import { clientError } from './errors.mjs';
 import { publicBatch } from './llm-batch-store.mjs';
 import { resolveBatchDriver, resolveLlmAdapter } from './llm-adapters/registry.mjs';
@@ -66,7 +67,7 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
     const timestamp = new Date(now()).toISOString();
     const inserted = await store.insert({ tenantId: tenantId ?? '_', workspaceId, batchId,
       connectionId: config.connectionId, providerType: config.providerType, endpoint: config.endpoint, secretRef: config.secretRef ?? {},
-      ...(config.auth && config.auth.mode !== 'apiKey' ? { auth: config.auth, configVersion: config.configVersion } : {}),
+      ...(isBrokeredAuth(config.auth) ? { auth: config.auth, configVersion: config.configVersion } : {}),
       model: chosen, providerBatchId: null, providerState: {}, status: 'submitting', cancelFence: false, requestCount: input.items.length,
       providerCounts: {}, missingCount: 0, inputSha256, idempotencyPrincipal: hash ? principal : null, idempotencyKeySha256: hash,
       lastErrorCode: null, cancelRequestedAt: null, cancelAcknowledgedAt: null, expiresAt: null, endedAt: null,
@@ -108,7 +109,7 @@ export function createLlmBatches({ store, prepare, normalizeMessages, fetchImpl,
     let initialCredential = credential;
     const transport = createLlmTransport({ adapter: resolveLlmAdapter(providerType), fetchImpl: async (url, init) => {
       const row = getRow();
-      if (!row.auth || row.auth.mode === 'apiKey') return (fetchImpl ?? globalThis.fetch)(url, init);
+      if (!isBrokeredAuth(row.auth)) return (fetchImpl ?? globalThis.fetch)(url, init);
       await store.assertLease(row);
       const current = initialCredential ?? await resolveSnapshot(row);
       initialCredential = undefined;
