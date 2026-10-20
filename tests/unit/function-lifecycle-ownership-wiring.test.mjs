@@ -20,7 +20,7 @@ import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
 const NOW = '2026-08-07T10:00:00.000Z';
 const WS = { id: 'ws-a', tenant_id: 'tenant-a', slug: 'app', created_at: NOW };
 const OWNER = {
-  sub: 'dev-a', tenantId: 'tenant-a', workspaceId: 'ws-a', actorType: 'tenant_owner',
+  sub: 'dev-a', tenantId: 'tenant-a', workspaceId: 'ws-a', workspaceIds: ['ws-a'], actorType: 'tenant_owner',
   roles: ['workspace_owner'], scopes: [],
 };
 const READY_RUNTIME = {

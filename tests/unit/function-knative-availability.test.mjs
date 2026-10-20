@@ -12,7 +12,7 @@ const ACTION = {
   version: 1, lifecycle_status: 'active', created_at: NOW, updated_at: NOW,
 };
 const IDENTITY = {
-  sub: 'developer-a', tenantId: 'tenant-a', workspaceId: 'ws-a', actorType: 'tenant_owner',
+  sub: 'developer-a', tenantId: 'tenant-a', workspaceId: 'ws-a', workspaceIds: ['ws-a'], actorType: 'tenant_owner',
   roles: ['workspace_owner'], scopes: [],
 };
 const UNAVAILABLE = {

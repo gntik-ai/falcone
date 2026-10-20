@@ -19,6 +19,7 @@ const OWNER = {
   sub: 'user_alpha_owner',
   tenantId: TENANT_ID,
   workspaceId: WORKSPACE_ID,
+  workspaceIds: [WORKSPACE_ID],
   actorType: 'workspace_owner',
   roles: ['workspace_owner']
 };
@@ -26,8 +27,9 @@ const MEMBER = {
   sub: 'user_alpha_member',
   tenantId: TENANT_ID,
   workspaceId: WORKSPACE_ID,
+  workspaceIds: [WORKSPACE_ID],
   actorType: 'tenant_member',
-  roles: ['tenant_member']
+  roles: ['workspace_viewer']
 };
 const WRONG_WORKSPACE_OWNER = {
   sub: 'user_alpha_other_workspace_owner',
@@ -588,6 +590,7 @@ test('bbx-933-src-fn-mutation-roles-13: target-bound workspace owner/admin/devel
         sub: `user_${role}`,
         tenantId: TENANT_ID,
         workspaceId: WORKSPACE_ID,
+        workspaceIds: [WORKSPACE_ID],
         actorType: role,
         roles: [role],
       },

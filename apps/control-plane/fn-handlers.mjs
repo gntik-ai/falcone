@@ -12,6 +12,7 @@ import * as store from './tenant-store.mjs';
 import { deployKnativeService, deleteKnativeService, invokeKnative, waitKsvcReady, ksvcNameForWorkspace, ksvcHost, isReservedFunctionEnvName, pruneInlineFunctionRevisions } from './function-executor.mjs';
 import { getSharedVaultStore, vaultStoreHealthSnapshot } from './vault-secrets.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
+import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 import { functionsDisabledResponse, knativeUnavailableResponse } from './knative-runtime.mjs';
 import { createRuntimeCleanupRepository } from './runtime-cleanup-repository.mjs';
 import { recordKnativeDependencyEvent } from './metrics-registry.mjs';
@@ -65,8 +66,8 @@ export function secretBackendHealth() {
   return vaultStoreHealthSnapshot(vaultStore);
 }
 
-// Resolve the caller's workspace, returning null on cross-tenant access (no existence leak) so a
-// secret read/write can never reach another tenant's workspace. Superadmin/internal may operate
+// Resolve the caller's workspace, returning null without verified workspace authority so a
+// secret read/write cannot reach an unauthorized workspace. Superadmin/internal may operate
 // cross-tenant (callerTenantId → null). The Postgres store is taken from ctx.store ?? store so tests
 // can inject a fake (repo DI seam, parity with b-handlers.mjs).
 async function ownedWorkspace(ctx, workspaceId) {
@@ -76,6 +77,8 @@ async function ownedWorkspace(ctx, workspaceId) {
   if (!ws) return null;
   const t = callerTenantId(ctx.identity);
   if (t && ws.tenant_id !== t) return null;
+  if (!canAccessWorkspace(ctx.identity, { tenant_id: ws.tenant_id, workspace_id: ws.id },
+    WORKSPACE_ACTIONS.function)) return null;
   return ws;
 }
 
@@ -232,10 +235,6 @@ const FUNCTION_INVOKE_ROLES = new Set([
   'workspace_owner', 'workspace_admin', 'workspace_developer', 'workspace_operator',
   'service_account', 'developer_external',
 ]);
-function hasFunctionWorkspaceClaim(identity, workspaceId) {
-  return new Set([identity?.workspaceId, ...(identity?.workspaceIds ?? [])].filter(Boolean).map(String))
-    .has(String(workspaceId));
-}
 export function canAccessFunctionWorkspace(identity, workspace, mode = 'read') {
   if (!identity || !workspace?.id || !workspace?.tenant_id) return false;
   const roles = new Set(Array.isArray(identity.roles) ? identity.roles : []);
@@ -243,9 +242,11 @@ export function canAccessFunctionWorkspace(identity, workspace, mode = 'read') {
     && [...roles].some((role) => FUNCTION_PLATFORM_READ_ROLES.has(role));
   if (mode === 'read' && trustedPlatformReader) return true;
   if (identity.tenantId !== workspace.tenant_id) return false;
+  const actions = mode === 'invoke' ? WORKSPACE_ACTIONS.functionInvoke : WORKSPACE_ACTIONS.function;
+  if (!canAccessWorkspace(identity, { tenant_id: workspace.tenant_id, workspace_id: workspace.id }, actions)) return false;
   if (mode === 'read' && (roles.has('tenant_owner') || roles.has('tenant_admin'))) return true;
   const allowed = mode === 'invoke' ? FUNCTION_INVOKE_ROLES : FUNCTION_READ_ROLES;
-  return [...roles].some((role) => allowed.has(role)) && hasFunctionWorkspaceClaim(identity, workspace.id);
+  return [...roles].some((role) => allowed.has(role));
 }
 
 function functionVisible(ctx, row, mode = 'read') {
@@ -460,15 +461,15 @@ async function fnDeploy(ctx) {
     ? await st.getFnAction(ctx.pool, actionId, callerTenantId(ctx.identity))
     : null;
   if (actionId && !existing) return err(404, 'ACTION_NOT_FOUND', `action ${actionId} not found`);
+  if (existing && !functionVisible(ctx, existing)) return err(404, 'ACTION_NOT_FOUND', `action ${actionId} not found`);
   const workspaceId = existing?.workspace_id ?? b.workspaceId ?? ctx.params.workspaceId;
   if (!workspaceId) return err(400, 'VALIDATION_ERROR', 'workspaceId and actionName are required');
   if (existing && b.workspaceId != null && String(b.workspaceId) !== String(existing.workspace_id)) {
     return err(403, 'FORBIDDEN', 'not authorized for this workspace');
   }
   // Tenant isolation (#869, the write twin of #784): resolve + own-check the workspace BEFORE any
-  // write or Knative deploy side effect. ownedWorkspace returns null for a foreign or unknown
-  // workspace (no existence oracle) → 403; the check is skipped for superadmin/internal callers
-  // (callerTenantId → null), preserving the cross-tenant deploy bypass.
+  // write or Knative deploy side effect. Missing, foreign and unbound workspaces
+  // retain the documented uniform 403 envelope. The mutation-role gate remains mandatory.
   const ws = requestedWorkspace?.id === workspaceId
     ? requestedWorkspace
     : await ownedWorkspace(ctx, workspaceId);
@@ -563,11 +564,9 @@ async function fnDeploy(ctx) {
 // GET /v1/functions/workspaces/{workspaceId}/inventory
 async function fnInventory(ctx) {
   const st = ctx.store ?? store;
-  // Tenant isolation (#784): resolve + own-check the workspace before listing. ownedWorkspace returns
-  // null for a foreign or unknown workspace (the caller's tenant does not own it) → 403, with no body
-  // that distinguishes "not yours" from "does not exist" (no existence oracle). For superadmin/internal
-  // callers callerTenantId is null, so the ownership check is skipped and the workspace IS returned,
-  // preserving the cross-tenant read. The tenant predicate on listFnActions is defense-in-depth.
+  // Resolve verified workspace authority before registry or runtime reads. Missing,
+  // foreign and unbound workspaces retain one uniform 403 envelope; the registry's tenant
+  // predicate remains defense in depth.
   const ws = await ownedWorkspace(ctx, ctx.params.workspaceId);
   if (!ws) return err(403, 'FORBIDDEN', 'not authorized for this workspace');
   const rows = await st.listFnActions(ctx.pool, ws.id, callerTenantId(ctx.identity));
@@ -829,7 +828,7 @@ async function fnVersions(ctx) {
 async function fnRollback(ctx) {
   const st = ctx.store ?? store;
   const r = await st.getFnAction(ctx.pool, ctx.params.actionId, callerTenantId(ctx.identity));
-  if (!r) return err(404, 'ACTION_NOT_FOUND', 'action not found');
+  if (!functionVisible(ctx, r)) return err(404, 'ACTION_NOT_FOUND', 'action not found');
   if (!canMutateFunctionWorkspace(ctx.identity, { id: r.workspace_id, tenant_id: r.tenant_id })) {
     return err(403, 'FORBIDDEN', 'requires a write-capable role bound to this workspace');
   }
@@ -1094,9 +1093,9 @@ function exportBundle(ws, rows) {
 
 // GET /v1/functions/actions/{resourceId}/definition-export — export ONE owned action.
 async function fnDefinitionExport(ctx) {
-  const row = await store.getFnAction(ctx.pool, ctx.params.resourceId, callerTenantId(ctx.identity));
-  if (!row) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.resourceId} not found`);
-  const ws = await store.getWorkspace(ctx.pool, row.workspace_id);
+  const row = await (ctx.store ?? store).getFnAction(ctx.pool, ctx.params.resourceId, callerTenantId(ctx.identity));
+  if (!functionVisible(ctx, row)) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.resourceId} not found`);
+  const ws = await ownedWorkspace(ctx, row.workspace_id);
   if (!ws) return err(404, 'ACTION_NOT_FOUND', `action ${ctx.params.resourceId} not found`);
   return ok(200, exportBundle(ws, [row]));
 }

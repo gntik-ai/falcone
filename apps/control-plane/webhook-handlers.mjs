@@ -33,6 +33,7 @@ import {
 } from './webhook-db.mjs';
 import { getWorkspace } from './tenant-store.mjs';
 import { canManageTenant } from './tenant-scope.mjs';
+import { canAccessWorkspace, WORKSPACE_ACTIONS } from './workspace-authz.mjs';
 import {
   configureWebhookRuntimeKeyContext,
   requireWebhookRuntimeKeyContext,
@@ -64,33 +65,8 @@ function pathnameOf(url) {
  * @returns {Promise<{statusCode:number, body:any}>}
  */
 export async function webhookManage(ctx, deps = {}) {
-  const main = await loadMain();
   const buildDb = deps.buildDb ?? buildWebhookDb;
-  const resolveWorkspace = deps.getWorkspace ?? getWorkspace;
-  let keyContext = deps.keyContext;
-  try {
-    keyContext ??= requireWebhookRuntimeKeyContext();
-  } catch {
-    return { statusCode: 503, body: { code: 'WEBHOOK_KEY_UNAVAILABLE', message: 'Webhook key lifecycle is not ready' } };
-  }
-  try {
-    assertWebhookDatabasePoolBoundary(
-      ctx.webhookRuntimePool,
-      ctx.webhookWritePool,
-      { controlPlanePool: ctx.pool },
-    );
-  } catch (caught) {
-    const code = caught?.code === 'WEBHOOK_DATABASE_PRINCIPALS_INVALID'
-      ? 'WEBHOOK_DATABASE_PRINCIPALS_INVALID'
-      : 'WEBHOOK_DATABASE_PRINCIPALS_REQUIRED';
-    return {
-      statusCode: 503,
-      body: {
-        code,
-        message: 'Webhook database principal configuration is unavailable',
-      },
-    };
-  }
+  const resolveWorkspace = deps.getWorkspace ?? ctx.store?.getWorkspace ?? getWorkspace;
   const identity = ctx.identity ?? {};
   let path = pathnameOf(ctx.req?.url);
   let workspaceId = identity.workspaceId ?? null;
@@ -104,7 +80,8 @@ export async function webhookManage(ctx, deps = {}) {
   if (ctx.params?.workspaceId) {
     const ws = await resolveWorkspace(ctx.pool, ctx.params.workspaceId);
     const platformCaller = identity.actorType === 'superadmin' || identity.actorType === 'internal';
-    if (!ws || (!platformCaller && (identity.tenantId == null || identity.tenantId !== ws.tenant_id))) {
+    if (!ws || (!platformCaller && (identity.tenantId == null || identity.tenantId !== ws.tenant_id))
+      || !canAccessWorkspace(identity, { tenant_id: ws.tenant_id, workspace_id: ws.id }, WORKSPACE_ACTIONS.webhook)) {
       return { statusCode: 404, body: { code: 'NOT_FOUND', message: 'workspace not found' } };
     }
     const idx = path.indexOf('/webhooks');
@@ -117,12 +94,26 @@ export async function webhookManage(ctx, deps = {}) {
     path = '/v1/webhooks' + (idx >= 0 ? path.slice(idx + '/webhooks'.length) : '');
   }
 
+  let keyContext = deps.keyContext;
+  try {
+    keyContext ??= requireWebhookRuntimeKeyContext();
+  } catch {
+    return { statusCode: 503, body: { code: 'WEBHOOK_KEY_UNAVAILABLE', message: 'Webhook key lifecycle is not ready' } };
+  }
+  try {
+    assertWebhookDatabasePoolBoundary(ctx.webhookRuntimePool, ctx.webhookWritePool, { controlPlanePool: ctx.pool });
+  } catch (caught) {
+    const code = caught?.code === 'WEBHOOK_DATABASE_PRINCIPALS_INVALID'
+      ? 'WEBHOOK_DATABASE_PRINCIPALS_INVALID' : 'WEBHOOK_DATABASE_PRINCIPALS_REQUIRED';
+    return { statusCode: 503, body: { code, message: 'Webhook database principal configuration is unavailable' } };
+  }
   if (/^\/v1\/webhooks\/subscriptions(?:\/|$)/.test(path)
       && (typeof tenantId !== 'string' || tenantId.length === 0
         || typeof workspaceId !== 'string' || workspaceId.length === 0)) {
     return { statusCode: 400, body: { code: 'WEBHOOK_SCOPE_REQUIRED', message: 'Webhook tenant and workspace scope are required' } };
   }
 
+  const main = await loadMain();
   const result = await main({
     db: buildDb(ctx.webhookRuntimePool, { writePool: ctx.webhookWritePool }),
     kafka: null, // audit events are best-effort; the action no-ops when kafka is absent

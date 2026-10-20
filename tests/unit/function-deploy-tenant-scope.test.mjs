@@ -109,6 +109,7 @@ const IDENTITY_A = {
   sub: 'user-a-1',
   tenantId: 'tenant-a',
   workspaceId: 'ws-a',
+  workspaceIds: ['ws-a'],
   actorType: 'tenant_owner',
   roles: ['workspace_owner'],
   scopes: [],

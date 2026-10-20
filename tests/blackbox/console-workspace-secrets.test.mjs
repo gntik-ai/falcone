@@ -117,7 +117,7 @@ function fakeStore() {
   };
 }
 
-function ctx({ vault = vaultStore(), identity = { actorType: 'tenant_owner', tenantId: 'ten-1', sub: 'owner-1' }, params = {}, body = {} } = {}) {
+function ctx({ vault = vaultStore(), identity = { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: 'ten-1', sub: 'owner-1' }, params = {}, body = {} } = {}) {
   return { pool: {}, store: fakeStore(), vaultStore: vault, identity, params, body, callerContext: { correlationId: 'corr-1' } };
 }
 
@@ -281,7 +281,7 @@ test('bbx-723-validate: bad name / empty value / over-length value → 400 / 400
 
 test('bbx-723-disabled: every op → 501 SECRETS_BACKEND_DISABLED when no backend is configured', async () => {
   const noVault = { vaultStore: null }; // ctx.vaultStore ?? vaultStore → null in the test env
-  const base = { store: fakeStore(), pool: {}, identity: { actorType: 'tenant_owner', tenantId: 'ten-1' }, params: { workspaceId: 'ws-1', secretName: 'x' }, body: { secretName: 'x', secretValue: 'v' } };
+  const base = { store: fakeStore(), pool: {}, identity: { actorType: 'tenant_owner', roles: ['tenant_owner'], tenantId: 'ten-1' }, params: { workspaceId: 'ws-1', secretName: 'x' }, body: { secretName: 'x', secretValue: 'v' } };
   for (const fn of ['secretSet', 'secretReplace', 'secretList', 'secretGet', 'secretDelete']) {
     const res = await FN_HANDLERS[fn]({ ...base, ...noVault });
     assert.equal(res.statusCode, 501, `${fn} → 501 when the backend is disabled`);

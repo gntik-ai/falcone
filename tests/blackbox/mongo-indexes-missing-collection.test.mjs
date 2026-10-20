@@ -24,7 +24,7 @@ import { MONGO_HANDLERS } from '../../apps/control-plane/mongo-handlers.mjs';
 
 const EXISTING = new Set(['records']);
 const DOCS = [
-  { _id: '1', tenantId: 'tenant-a', secret: 'ACME_PRIVATE' },
+  { _id: '1', tenantId: 'tenant-a', workspaceId: 'ws-a', secret: 'ACME_PRIVATE' },
   { _id: '2', tenantId: 'tenant-b', secret: 'GLOBEX_PRIVATE' },
 ];
 
@@ -58,7 +58,7 @@ const IDENTITY_A = { sub: 'user-a', tenantId: 'tenant-a', workspaceId: 'ws-a', a
 const IDENTITY_SA = { sub: 'sa', tenantId: null, workspaceId: null, actorType: 'superadmin', roles: ['superadmin'], scopes: [] };
 
 function ctx(identity, col) {
-  return { pool: {}, mongoClient: fakeMongo(), params: { db: 'appdb', col }, query: {}, body: {}, identity };
+  return { pool: {}, store: { mongoDatabaseWorkspaceMappings: async () => [{ database_name: 'appdb', tenant_id: 'tenant-a', workspace_id: 'ws-a' }] }, mongoClient: fakeMongo(), params: { db: 'appdb', col }, query: {}, body: {}, identity };
 }
 
 test('bbx-mongo-index-01: tenant-scoped caller, missing collection → 404 (not 500/throw)', async () => {

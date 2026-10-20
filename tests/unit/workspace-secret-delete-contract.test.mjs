@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
 
-const OWNER = { actorType: 'tenant_owner', tenantId: 'acme', sub: 'owner-1' };
+const OWNER = { actorType: 'tenant_owner', tenantId: 'acme', roles: ['tenant_owner'], sub: 'owner-1' };
 
 const fakeStore = {
   async getWorkspace(_pool, id) { return { id, tenant_id: 'acme' }; },

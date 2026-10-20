@@ -49,7 +49,7 @@ test('definition and package import preserve deployed secret consumers through r
     const api = cluster({ knative: true });
     const ctx = {
       pool: database(), identity: { actorType: 'tenant_owner', tenantId: ws.tenant_id,
-        workspaceId: ws.id, roles: ['workspace_owner'], sub: 'owner' },
+        workspaceId: ws.id, workspaceIds: [ws.id], roles: ['workspace_owner'], sub: 'owner' },
       params: { workspaceId: ws.id, secretName: 'api-key' },
       knativeRuntime: { functionsEnabled: true, status: () => ({ state: 'ready' }), canServeWorkloads: () => true },
       quotaOptions: { resolveEffectiveLimits: async () => ({ max_functions: null }) },
@@ -115,7 +115,7 @@ test('an import started before deployment cannot overwrite the newly deployed se
   };
   const ctx = {
     pool, identity: { actorType: 'tenant_owner', tenantId: ws.tenant_id,
-      workspaceId: ws.id, roles: ['workspace_owner'], sub: 'owner' },
+      workspaceId: ws.id, workspaceIds: [ws.id], roles: ['workspace_owner'], sub: 'owner' },
     params: { workspaceId: ws.id, secretName: 'api-key' },
     knativeRuntime: { functionsEnabled: true, status: () => ({ state: 'ready' }), canServeWorkloads: () => true },
     quotaOptions: { resolveEffectiveLimits: async () => ({ max_functions: null }) },

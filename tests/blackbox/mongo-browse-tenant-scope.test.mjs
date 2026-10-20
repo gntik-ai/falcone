@@ -59,6 +59,12 @@ function resolveWorkspace(idOrSlug) {
 
 function fakePool() {
   const query = async (sql, params = []) => {
+    if (sql.includes('FROM workspace_mongo_databases')) {
+      return { rows: [
+        ...[WS_A, WS_A2].map(ws => ({ database_name: 'appdb', tenant_id: ws.tenant_id, workspace_id: ws.id })),
+        { database_name: 'appdb', tenant_id: 'tenant-c', workspace_id: 'ws-c' },
+      ] };
+    }
     if (sql.includes('FROM workspaces')) {
       const ws = resolveWorkspace(params[0]);
       return { rows: ws ? [ws] : [] };

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FN_HANDLERS } from '../../apps/control-plane/fn-handlers.mjs';
 const ws = { id: 'ws-a', tenant_id: 'tenant-a', slug: 'app' };
-const owner = { actorType: 'tenant_owner', tenantId: 'tenant-a', roles: ['workspace_owner'], workspaceId: ws.id, sub: 'owner' };
+const owner = { actorType: 'tenant_owner', tenantId: 'tenant-a', roles: ['workspace_owner'], workspaceId: ws.id, workspaceIds: [ws.id], sub: 'owner' };
 const runtime = { functionsEnabled: true, status: () => ({ state: 'ready' }), canServeWorkloads: () => true };
 const refs = [{ name: 'api-key', env: 'API_KEY' }];
 const row = { resource_id: 'fn-a', tenant_id: ws.tenant_id, workspace_id: ws.id, ksvc_name: 'fn-app', secret_refs: refs, source_code: 'return 1' };

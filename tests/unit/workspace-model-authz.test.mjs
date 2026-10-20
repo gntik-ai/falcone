@@ -83,7 +83,8 @@ for (const role of roles) for (const scope of contexts) {
     const result = await LOCAL_HANDLERS.eventsProvisionTopic(context);
     const admin = ['tenant_owner', 'tenant_admin', 'workspace_admin'].includes(role);
     const readable = (role.startsWith('tenant_') ? scope.tenantRead : scope.workspaceRead) === 200;
-    const expected = scope.tenantId !== workspace.tenant_id ? 404 : admin && readable ? 201 : 403;
+    const visible = ['tenant_owner', 'tenant_admin'].includes(role) || scope.workspaceRead === 200;
+    const expected = scope.tenantId !== workspace.tenant_id || !visible ? 404 : admin && readable ? 201 : 403;
     assert.equal(result.statusCode, expected);
     if (expected === 201) assert.equal(result.body.topicName, 'orders');
     else assert.equal(result.body.code, expected === 404 ? 'WORKSPACE_NOT_FOUND' : 'FORBIDDEN');
