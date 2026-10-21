@@ -142,6 +142,23 @@ snapshot `{userId, tenantId, workspaceId, updatedAt}`. Only a workspace route
 parameter overrides the stored context. Platform-global routes hide context
 controls. The kit I18nProvider follows the app locale, including built-in labels.
 
+Only this app opts in to session invalidation when an authenticated request still
+returns 401 after the shared client's existing refresh and single retry. The
+bootstrap call to `setConsoleSessionRetry401Invalidation(true)` in `src/main.tsx`
+is the kill switch: remove it to restore the previous retry-401 behavior. No
+additional refresh is made. Concurrent retry 401s clear local session state and
+emit one invalidation event until another session is persisted. ProtectedRoute
+then saves the full basename, path, query and fragment and navigates to the
+configured login path; login remains outside ProtectedRoute. The expired-session
+hint matches refresh failure. Other errors retain their existing handling.
+
+This also applies to mutating requests, so unsaved page state is lost on redirect,
+including when a backend uses 401 for a non-session reason. Clearing the shared
+sessionStorage key under `/next/` signs the same tab out of the legacy console as
+well; the legacy app itself does not opt in. Roll back by removing the bootstrap
+call or reverting the change. Verify `/next/` and legacy `/` on staging before
+cutting any `falcone v*` release; unblock #1223 only after that verification.
+
 Run shell browser checks against a fixture build (synthetic sessions only):
 
 ```sh
@@ -176,6 +193,7 @@ including closing the drawer after navigation without loading a new document.
 `states.forbidden` resources. Tenant/workspace context failures retain numeric
 HTTP status: exactly 403 displays `states.forbidden.body`; other and unknown
 failures display `states.network.body`.
+Retry 401s under ProtectedRoute instead end the session as described above.
 
 `ProtectedRoute` uses the router's basename when storing pathname, query and
 fragment as the shared protected intent. Restoring that intent after sign-in

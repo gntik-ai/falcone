@@ -12,6 +12,14 @@ const CONSOLE_SESSION_INVALIDATED_EVENT = 'in-falcone:console-session-invalidate
 const ACCESS_TOKEN_REFRESH_WINDOW_MS = 60_000
 
 let inFlightSessionRefresh: Promise<ConsoleShellSession | null> | null = null
+let retry401InvalidationEnabled = false
+let retry401Invalidated = false
+
+// Opt in once at app bootstrap. Disabled by default for existing consumers.
+export function setConsoleSessionRetry401Invalidation(enabled: boolean): void {
+  retry401InvalidationEnabled = enabled
+  if (!enabled) retry401Invalidated = false
+}
 
 export interface ConsoleShellSession {
   sessionId: string
@@ -47,6 +55,7 @@ export function persistConsoleShellSession(session: ConsoleLoginSession, tenantI
   }
 
   writeStorage(CONSOLE_SHELL_SESSION_STORAGE_KEY, snapshot)
+  retry401Invalidated = false
 }
 
 export function readConsoleShellSession(): ConsoleShellSession | null {
@@ -248,7 +257,15 @@ export async function requestConsoleSessionJson<T>(
       throw error
     }
 
-    return performAuthenticatedRequest<T>(url, options, refreshedAccessToken)
+    try {
+      return await performAuthenticatedRequest<T>(url, options, refreshedAccessToken)
+    } catch (retryError) {
+      if (retry401InvalidationEnabled && (retryError as ApiError).status === 401 && !retry401Invalidated) {
+        retry401Invalidated = true
+        clearUnusableConsoleShellSession()
+      }
+      throw retryError
+    }
   }
 }
 

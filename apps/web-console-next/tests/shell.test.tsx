@@ -1,19 +1,127 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { ensureConsoleSession, persistConsoleShellSession, readConsoleAuthStatusHint, readConsoleShellSession, readProtectedRouteIntent } from '@in-falcone/console-api/session'
+import { ensureConsoleSession, persistConsoleShellSession, readConsoleAuthStatusHint, readConsoleShellSession, readProtectedRouteIntent, requestConsoleSessionJson, subscribeConsoleSessionInvalidated } from '@in-falcone/console-api/session'
 import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
 import { App } from '../src/App'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
 import { changeLocale } from '../src/i18n'
-import { StrictMode } from 'react'
-function open(path: string) {
-  return render(<MemoryRouter initialEntries={[path]}><CurrentLocation /><App /></MemoryRouter>)
+import { StrictMode, useEffect, useState } from 'react'
+import { consoleAuthConfig } from '@in-falcone/console-api/config'
+import { ProtectedRoute } from '../src/shell/session'
+import { Shell } from '../src/shell/Shell'
+import { ErrorPanel } from '@gntik-ai/blocks'
+function open(path: string, basename = '/') {
+  return render(<MemoryRouter basename={basename} initialEntries={[path]}><CurrentLocation /><App /></MemoryRouter>)
 }
 function CurrentLocation() {
   const { pathname, search, hash } = useLocation()
   return <output aria-label="Current location">{pathname}{search}{hash}</output>
 }
+
+const refreshUrl = '/v1/auth/login-sessions/synthetic-session/refresh'
+const sessionKey = 'in-falcone.console-shell-session'
+const expiredHint = {
+  statusView: 'login', title: 'Tu sesión ha expirado', message: 'Vuelve a autenticarte para continuar en la consola.'
+}
+
+test.each(['/', '/next/'].flatMap(base =>
+  ['retry-401', 'refresh-rejected', 'retry-200'].map(scenario => ({ base, scenario }))
+))('$base shell handles $scenario without an additional refresh', async ({ base, scenario }) => {
+  const setupRequests = () => {
+    const refreshed = login()
+    refreshed.tokenSet!.accessToken = 'synthetic-refreshed-access'
+    let gets = 0
+    return strictFetch({
+      [`GET ${tenantUrl}`]: () => {
+        gets++
+        return gets === 1 || scenario !== 'retry-200'
+          ? Response.json({ code: 'UNAUTHORIZED', message: 'Synthetic 401 error' }, { status: 401 })
+          : Response.json({ items: [] })
+      },
+      [`POST ${refreshUrl}`]: () => scenario === 'refresh-rejected'
+        ? Response.json({ code: 'REFRESH_REJECTED' }, { status: 400 })
+        : Response.json(refreshed)
+    })
+  }
+  // Compare the shell with the shared client's own refresh count using identical responses.
+  const direct = setupRequests()
+  const result = requestConsoleSessionJson(tenantUrl)
+  if (scenario === 'retry-200') await result
+  else await expect(result).rejects.toMatchObject({ status: 401 })
+  direct.verify()
+  const directRefreshes = direct.mock.mock.calls.filter(([url]) => url === refreshUrl).length
+
+  requests = setupRequests()
+  const path = `${base}console/overview?filter=active#details`
+  open(path, base.replace(/\/$/, '') || '/')
+  if (scenario === 'retry-200') {
+    expect(await screen.findByRole('heading', { name: 'Resumen' })).toBeVisible()
+    await waitFor(() => expect(readConsoleShellSession()?.tokenSet?.accessToken).toBe('synthetic-refreshed-access'))
+    await waitFor(() => expect(screen.getByLabelText('Contexto activo')).toHaveAttribute('aria-busy', 'false'))
+    expect(screen.getByLabelText('Current location').textContent).toBe('/console/overview?filter=active#details')
+    expect(readProtectedRouteIntent()).toBeNull()
+  } else {
+    expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
+    expect(screen.getByLabelText('Current location').textContent).toBe(consoleAuthConfig.loginPath)
+    expect(sessionStorage.getItem(sessionKey)).toBeNull()
+    expect(readConsoleAuthStatusHint()).toEqual(expiredHint)
+    expect(readProtectedRouteIntent()).toBe(path)
+  }
+  expect(requests.mock.mock.calls.filter(([, init]) => init?.method === 'GET')).toHaveLength(scenario === 'refresh-rejected' ? 1 : 2)
+  expect(requests.mock.mock.calls.filter(([url]) => url === refreshUrl)).toHaveLength(directRefreshes)
+  expect(directRefreshes).toBe(1)
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(screen.queryByText(/Synthetic 401 error|Comprueba tu conexión|Check your connection|^401$/)).not.toBeInTheDocument()
+})
+
+function GuardedRequestPage() {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    void requestConsoleSessionJson('/v1/test-page').catch(() => setFailed(true))
+  }, [])
+  return failed ? <ErrorPanel title="401" message="Synthetic page request failure" /> : <h1>Guarded request page</h1>
+}
+
+test.each(['/', '/next/'])('%s concurrent shell context and page retry 401s navigate once', async base => {
+  const refreshed = login()
+  refreshed.tokenSet!.accessToken = 'synthetic-refreshed-access'
+  const unauthorized = () => Response.json({ code: 'RETRY_401' }, { status: 401 })
+  requests = strictFetch({
+    [`GET ${tenantUrl}`]: unauthorized,
+    'GET /v1/test-page': unauthorized,
+    [`POST ${refreshUrl}`]: refreshed
+  })
+  const invalidated = vi.fn()
+  const navigated = vi.fn()
+  const remove = vi.spyOn(Storage.prototype, 'removeItem')
+  const unsubscribe = subscribeConsoleSessionInvalidated(invalidated)
+  function NavigationRecorder() {
+    const location = useLocation()
+    useEffect(() => { navigated(location.pathname) }, [location.key])
+    return null
+  }
+  try {
+    render(<MemoryRouter basename={base.replace(/\/$/, '') || '/'} initialEntries={[`${base}console/overview?x=1#s`]}>
+      <NavigationRecorder /><Routes>
+        <Route path="/console" element={<ProtectedRoute><Shell /></ProtectedRoute>}>
+          <Route path="overview" element={<GuardedRequestPage />} />
+        </Route>
+        <Route path={consoleAuthConfig.loginPath} element={<h1>Configured login</h1>} />
+      </Routes>
+    </MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'Configured login' })).toBeVisible()
+    expect(requests.mock.mock.calls.filter(([url]) => url === tenantUrl)).toHaveLength(2)
+    expect(requests.mock.mock.calls.filter(([url]) => url === '/v1/test-page')).toHaveLength(2)
+    expect(requests.mock.mock.calls.filter(([url]) => url === refreshUrl)).toHaveLength(1)
+    expect(invalidated).toHaveBeenCalledTimes(1)
+    expect(remove.mock.calls.filter(([key]) => key === sessionKey)).toHaveLength(1)
+    expect(navigated.mock.calls.filter(([path]) => path === consoleAuthConfig.loginPath)).toHaveLength(1)
+    expect(readProtectedRouteIntent()).toBe(`${base}console/overview?x=1#s`)
+    expect(screen.queryByText('401')).not.toBeInTheDocument()
+    expect(screen.queryByText('Synthetic page request failure')).not.toBeInTheDocument()
+  } finally { unsubscribe() }
+})
 
 test('a protected route preserves its query and requires login', async () => {
   sessionStorage.clear()
