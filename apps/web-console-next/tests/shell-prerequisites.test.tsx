@@ -143,7 +143,19 @@ test.each(['es', 'en'].flatMap((locale) => ['tenant', 'workspace'].flatMap((endp
     [`GET ${workspaceUrl('t1')}`]: fail,
     'POST /v1/auth/login-sessions/synthetic-session/refresh': session,
   })
-  renderWithSession(<Routes><Route path="/console" element={<Shell />}><Route path="overview" element={<h1>Context test page</h1>} /></Route></Routes>)
+  const shell = <Route path="/console" element={status === 401 ? <ProtectedRoute><Shell /></ProtectedRoute> : <Shell />}>
+    <Route path="overview" element={<h1>Context test page</h1>} />
+  </Route>
+  if (status === 401) {
+    render(<MemoryRouter initialEntries={['/console/overview']}><Routes>
+      {shell}
+      <Route path={consoleAuthConfig.loginPath} element={<h1>Configured login</h1>} />
+    </Routes></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'Configured login' })).toBeVisible()
+    expect(screen.queryByText(/Comprueba tu conexión|Check your connection/)).not.toBeInTheDocument()
+    return
+  }
+  renderWithSession(<Routes>{shell}</Routes>)
   const expected = status === 403
     ? locale === 'es' ? 'No tienes permiso para ver esta página.' : 'You do not have permission to view this page.'
     : locale === 'es' ? 'Comprueba tu conexión e inténtalo de nuevo.' : 'Check your connection and try again.'

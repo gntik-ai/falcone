@@ -1,0 +1,12 @@
+- [x] Verify clean assigned worktree, branch and immutable base 00451d54.
+- [x] Reproduce the actual shell retry-401 symptom at both basenames before source changes.
+- [x] Add the opt-in retry handler and idempotent local invalidation helper.
+- [x] Register only from the next-console bootstrap; preserve refresh and retry logic.
+- [x] Test the public request API and guarded shell at both basenames, including concurrency.
+- [x] Update only the authorized existing 401 expectations and document the public exports.
+- [x] Run API (48 passed), next-console (144 passed, 3 existing skips), legacy (1400 passed), typecheck and i18n checks.
+- [x] Build at `/` and `/next/`; check namespace chunks, dist assets, unchanged legacy diff and no added skips or page refresh imports.
+- [x] Prepare one local commit with the confirmed cause and red reproduction: from apps/web-console-next, `node node_modules/vitest/vitest.mjs run tests/auth-guard.test.tsx` failed at both basenames before source changes because no login heading appeared. The retry rejection escaped without invalidation.
+- [ ] CI: rerun browser parity (Chromium executable absent) and browser shell (listen EPERM on 127.0.0.1); both were attempted and are sandbox-skipped.
+- [ ] Operator: obtain R3 human approval and both providers before merge.
+- [ ] Operator: verify next-console scenarios and unchanged legacy behavior on staging before release.
