@@ -5,7 +5,9 @@ export interface EndpointResponse { status?: number; body?: unknown; network?: b
 export interface PageEndpoint {
   method: string
   path: string
-  fixtures: Record<string, EndpointResponse | ((role: Role) => EndpointResponse)>
+  // Match a flat body discriminator; overlapping endpoint registrations still fail closed.
+  requestBody?: Record<string, string>
+  fixtures: Record<string, EndpointResponse | EndpointResponse[] | ((role: Role, body?: unknown) => EndpointResponse)>
 }
 export type EndpointVariant = string | { variant?: string; delayMs?: number }
 export type EndpointVariants = Record<string, EndpointVariant | EndpointVariant[]>

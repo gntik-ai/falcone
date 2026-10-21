@@ -1,0 +1,15 @@
+.operation-detail { overflow-wrap: anywhere; }
+.operation-metadata dl { display: grid; }
+.operation-metadata dl > div { min-width: 0; }
+.operation-metadata dd > span { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.operation-logs th, .operation-logs td { white-space: normal; overflow-wrap: anywhere; }
+.operation-logs th:first-child { width: 28%; }
+.operation-logs th:last-child { width: 25%; }
+@media (min-width: 768px) {
+  .operation-metadata dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.operation-detail h1 { white-space: normal; overflow: visible; }
+.operation-metadata dl > div { grid-template-columns: minmax(0, 1fr); }
+
+.operation-logs td [data-status] { white-space: normal; overflow-wrap: anywhere; }

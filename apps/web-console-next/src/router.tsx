@@ -44,6 +44,7 @@ export const appRoutes: RouteObject[] = [
     children: [
       { index: true, element: <ConsoleIndexRedirect /> },
       { path: 'overview', element: lazyPage('overview', () => import('./pages/overview')) },
+      { path: 'operations/:operationId', element: lazyPage('operationDetail', () => import('./pages/operationDetail')) },
       ...pendingConsoleRoutes.map(({ guard, ...route }) => {
         const page = lazyPage('pendingPage', () => import('./pages/pendingPage'))
         return { ...route, element: guard ? <Guard kind={guard}>{page}</Guard> : page }
