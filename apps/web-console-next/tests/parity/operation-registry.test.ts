@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { createEndpointRegistry } from './endpoint-registry'
 import { operationEndpoints, operation, bodyFor, entries } from './pages/operationDetail.manifest'
 // @ts-expect-error Read-only harness helper is JavaScript without declarations.
@@ -29,6 +29,53 @@ test('named fixture sequences exhaust retries and then recover independently', (
   expect(registry.responseFor('ops.detail', 'tenant_owner').body).toEqual(operation)
   registry.setVariants({ 'ops.detail': '500-then-success' })
   expect(registry.responseFor('ops.detail', 'tenant_owner').status).toBe(500)
+})
+
+test('recovered logs keep honoring pagination after automatic and manual retries', () => {
+  const registry = createEndpointRegistry({}, () => ({}), operationEndpoints)
+  registry.setVariants({ 'ops.logs': '500-then-success' })
+  for (let i = 0; i < 3; i++) expect(registry.responseFor('ops.logs', 'tenant_owner', bodyFor('logs', 20)).status).toBe(500)
+  for (const offset of [20, 40, 0]) {
+    expect(registry.responseFor('ops.logs', 'tenant_owner', bodyFor('logs', offset))).toEqual({
+      status: 200, body: { queryType: 'logs', operationId: 'op_1', entries: entries.slice(offset, offset + 20), total: 45, pagination: { limit: 20, offset } },
+    })
+  }
+})
+
+test('CSP session fixtures handle all operation queries and keep unrelated requests unmatched', async () => {
+  // @ts-expect-error Existing browser helper is JavaScript without declarations.
+  const { installSession } = await import('../browser-session.mjs')
+  const page = { addInitScript: vi.fn(), route: vi.fn() }
+  const unmatched = await installSession(page)
+  const handler = page.route.mock.calls[0][1]
+  async function send(method: string, path: string, body?: unknown, invalidJson = false) {
+    const route = {
+      request: () => ({ method: () => method, url: () => `http://localhost${path}`, postDataJSON: () => { if (invalidJson) throw new SyntaxError('invalid JSON'); return body } }),
+      fulfill: vi.fn(), abort: vi.fn(),
+    }
+    await handler(route)
+    return route
+  }
+  const tenants = await send('GET', '/v1/tenants?page%5Bsize%5D=100&sort=displayName')
+  expect(tenants.fulfill).toHaveBeenCalledWith({ json: { items: [], page: { after: null } } })
+  for (const queryType of ['detail', 'logs', 'result']) {
+    const route = await send('POST', '/v1/async-operation-query', bodyFor(queryType))
+    expect(route.fulfill).toHaveBeenCalledWith({ status: 200, json: expect.objectContaining({ queryType, operationId: 'op_1' }) })
+    expect(route.abort).not.toHaveBeenCalled()
+  }
+  expect(unmatched).toEqual([])
+  for (const [method, path, body, invalidJson] of [
+    ['GET', '/v1/async-operation-query', bodyFor('detail'), false],
+    ['POST', '/v1/async-operation-query', bodyFor('list'), false],
+    ['POST', '/v1/async-operation-query?unexpected=true', bodyFor('detail'), false],
+    ['POST', '/v1/unknown', {}, false],
+    ['POST', '/v1/async-operation-query', undefined, true],
+  ] as const) {
+    const route = await send(method, path, body, invalidJson)
+    expect(route.abort).toHaveBeenCalledOnce()
+    expect(route.fulfill).not.toHaveBeenCalled()
+  }
+  expect(unmatched).toHaveLength(5)
 })
 
 test('only exact injected resource diagnostics are tolerated once; console errors remain faults', () => {

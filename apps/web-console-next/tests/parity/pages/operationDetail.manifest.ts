@@ -1,4 +1,4 @@
-import type { EndpointResponse, ParityManifest, PageEndpoint } from '../manifest'
+import type { EndpointResponse, ParityManifest, PageEndpoint, Role } from '../manifest'
 
 export const operation = {
   queryType: 'detail', operationId: 'op_1', status: 'completed', operationType: 'synthetic-workspace-create',
@@ -19,6 +19,10 @@ const ok = (body: unknown): EndpointResponse => ({ status: 200, body })
 const failure = { status: 500, body: { code: 'HTTP_500', message: 'synthetic-error', requestId: 'synthetic-request' } }
 const detail = ok(operation)
 const result = ok(successResult)
+const logs = (_role: Role, body?: unknown): EndpointResponse => {
+  const pagination = (body as { pagination: { limit: number; offset: number } }).pagination
+  return ok({ queryType: 'logs', operationId: 'op_1', entries: entries.slice(pagination.offset, pagination.offset + pagination.limit), total: 45, pagination })
+}
 export const operationEndpoints: Record<string, PageEndpoint> = {
   'ops.detail': { method: 'POST', path: '/v1/async-operation-query', requestBody: { queryType: 'detail' }, fixtures: {
     success: detail, completed: detail, empty: ok({}), '500': failure,
@@ -26,17 +30,11 @@ export const operationEndpoints: Record<string, PageEndpoint> = {
     ...Object.fromEntries(['pending', 'running', 'failed', 'timed_out', 'cancelled'].map((status) => [status, ok({ ...operation, status })])),
   } },
   'ops.logs': { method: 'POST', path: '/v1/async-operation-query', requestBody: { queryType: 'logs' }, fixtures: {
-    success: (_role, body) => {
-      const pagination = (body as { pagination: { limit: number; offset: number } }).pagination
-      return ok({ queryType: 'logs', operationId: 'op_1', entries: entries.slice(pagination.offset, pagination.offset + pagination.limit), total: 45, pagination })
-    },
-    '45-entries': (_role, body) => {
-      const pagination = (body as { pagination: { limit: number; offset: number } }).pagination
-      return ok({ queryType: 'logs', operationId: 'op_1', entries: entries.slice(pagination.offset, pagination.offset + pagination.limit), total: 45, pagination })
-    },
+    success: logs,
+    '45-entries': logs,
     empty: ok({ queryType: 'logs', operationId: 'op_1', entries: [], total: 0, pagination: { limit: 20, offset: 0 } }),
     '500': failure,
-    '500-then-success': [failure, failure, failure, ok({ queryType: 'logs', operationId: 'op_1', entries: entries.slice(0, 20), total: 45, pagination: { limit: 20, offset: 0 } })],
+    '500-then-success': [failure, failure, failure, logs],
   } },
   'ops.result': { method: 'POST', path: '/v1/async-operation-query', requestBody: { queryType: 'result' }, fixtures: {
     success: result,

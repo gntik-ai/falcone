@@ -46,7 +46,8 @@ export function createEndpointRegistry(
         if (Object.hasOwn(fixtures, variant)) {
           const fixture = fixtures[variant]
           if (Array.isArray(fixture) && !fixture.length) throw new Error(`Empty fixture sequence: ${name} ${variant}`)
-          response = typeof fixture === 'function' ? fixture(role, body) : Array.isArray(fixture) ? fixture[Math.min(attempt, fixture.length - 1)] : fixture
+          const selectedFixture = Array.isArray(fixture) ? fixture[Math.min(attempt, fixture.length - 1)] : fixture
+          response = typeof selectedFixture === 'function' ? selectedFixture(role, body) : selectedFixture
         } else if (variant === 'network') response = { network: true }
         else if (['401', '403', '404', '500'].includes(variant)) {
           response = { status: Number(variant), body: { code: `HTTP_${variant}`, message: 'synthetic-error' } }

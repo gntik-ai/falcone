@@ -82,7 +82,9 @@ Operation detail registers three reads on the same POST path using disjoint flat
 must match its body as well as its method/path. Registrations without a body
 remain path-only; duplicate or overlapping registrations still throw. Fixture
 callbacks also receive the request body (for server pagination), and a fixture
-may be a nonempty response array, repeating its final entry after retries.
+may be a nonempty array of responses or callbacks, repeating its final entry
+after retries. A recovery callback receives each new request body, so subsequent
+log pages still honor the requested offset.
 
 Only injected operation-query 500/network responses authorize a corresponding
 browser resource diagnostic, once, at that exact URL. Application console errors,

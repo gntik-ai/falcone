@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import manifest, { bodyFor, entries } from './operationDetail.manifest.ts';
+import manifest, { bodyFor, entries, operation } from './operationDetail.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 
@@ -39,13 +39,14 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await next(parity).click();
       await expect(parity.page.getByText(entries[40].message, { exact: true })).toBeVisible();
       await expect(next(parity)).toBeDisabled();
-      await expect(parity.page.locator('[aria-current="page"]')).toBeFocused();
+      await expect(parity.page.locator('.operation-detail button[aria-current="page"]')).toBeFocused();
       // Copy does not navigate or lose focus and its live feedback is translated.
       await parity.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-      const copyButton = parity.page.getByRole('button', { name: copy(parity, 'Copiar ID de correlación', 'Copy Correlation ID'), exact: true });
+      const copyButton = parity.page.locator('.operation-metadata dd').filter({ hasText: operation.correlationId }).getByRole('button');
+      await expect(copyButton).toHaveAccessibleName(copy(parity, 'Copiar ID de correlación', 'Copy Correlation ID'));
       await copyButton.click();
       await expect(copyButton).toBeFocused();
-      await expect(parity.page.getByRole('button', { name: copy(parity, 'Copiado: ID de correlación', 'Copied: Correlation ID'), exact: true })).toBeFocused();
+      await expect(copyButton).toHaveAccessibleName(copy(parity, 'Copiado: ID de correlación', 'Copied: Correlation ID'));
       for (const [endpoint, variant, section, queryType] of [
         ['ops.logs', '500-then-success', ['Registros resumidos', 'Summarized logs'], 'logs'],
         ['ops.detail', '500-then-success', ['Metadatos', 'Metadata'], 'detail'],
