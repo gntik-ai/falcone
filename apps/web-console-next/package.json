@@ -24,10 +24,10 @@
   "dependencies": {
     "@fontsource/geist-mono": "5.2.5",
     "@fontsource/geist-sans": "5.2.5",
-    "@gntik-ai/blocks": "0.9.0",
-    "@gntik-ai/templates": "0.9.0",
+    "@gntik-ai/blocks": "0.10.0",
+    "@gntik-ai/templates": "0.10.0",
     "@gntik-ai/tokens": "0.2.1",
-    "@gntik-ai/ui": "0.9.0",
+    "@gntik-ai/ui": "0.10.0",
     "@in-falcone/console-api": "workspace:*",
     "@xyflow/react": "12.11.0",
     "i18next": "25.0.1",
