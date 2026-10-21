@@ -12,6 +12,7 @@ const CONSOLE_SESSION_INVALIDATED_EVENT = 'in-falcone:console-session-invalidate
 const ACCESS_TOKEN_REFRESH_WINDOW_MS = 60_000
 
 let inFlightSessionRefresh: Promise<ConsoleShellSession | null> | null = null
+let retryUnauthorizedHandler: (() => void) | null = null
 
 export interface ConsoleShellSession {
   sessionId: string
@@ -85,6 +86,17 @@ export function readConsoleShellSession(): ConsoleShellSession | null {
 
 export function clearConsoleShellSession(): void {
   removeStorage(CONSOLE_SHELL_SESSION_STORAGE_KEY)
+}
+
+// Opt in at application bootstrap only; shared clients and the legacy console leave this unset.
+export function setConsoleSessionRetryUnauthorizedHandler(handler: (() => void) | null): void {
+  retryUnauthorizedHandler = handler
+}
+
+export function invalidateConsoleShellSession(): void {
+  if (readConsoleShellSession()) {
+    clearUnusableConsoleShellSession()
+  }
 }
 
 export function subscribeConsoleSessionInvalidated(listener: () => void): () => void {
@@ -248,7 +260,14 @@ export async function requestConsoleSessionJson<T>(
       throw error
     }
 
-    return performAuthenticatedRequest<T>(url, options, refreshedAccessToken)
+    try {
+      return await performAuthenticatedRequest<T>(url, options, refreshedAccessToken)
+    } catch (retryError) {
+      if ((retryError as ApiError).status === 401) {
+        retryUnauthorizedHandler?.()
+      }
+      throw retryError
+    }
   }
 }
 
