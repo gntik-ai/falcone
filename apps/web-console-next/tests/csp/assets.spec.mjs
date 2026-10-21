@@ -56,7 +56,7 @@ async function expectFonts(page, observed, mono = false) {
 
 test('every concrete appRoutes path renders under the unchanged CSP with local assets', async ({ page }) => {
   test.setTimeout(300_000);
-  const unmatched = await installSession(page);
+  const unmatched = await installSession(page, undefined, { pageFixtures: true });
   const observed = await observe(page);
   await page.goto(server.url('tests/csp/index.html'));
   await expect(page.locator('[data-app-route]').first()).toBeVisible();
