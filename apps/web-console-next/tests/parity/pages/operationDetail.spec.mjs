@@ -83,7 +83,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.page.getByRole('link', { name: copy(parity, 'Volver a operaciones', 'Back to operations'), exact: true }).click();
       await expect(parity.page).toHaveURL(/\/console\/operations$/);
     });
-    test('error-empty', async ({ parity }) => {
+    test('error-empty', async ({ parity, server }) => {
       await check.errorEmpty(parity, manifest);
       await parity.open(manifest.route, { 'ops.detail': 'empty' });
       await expect(parity.page.getByText(copy(parity, 'Operación no encontrada o no disponible.', 'Operation not found or unavailable.'), { exact: true })).toBeVisible();
@@ -97,8 +97,19 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.open(manifest.route, { 'ops.result': 'pending' });
       await resultTab(parity).click();
       await expect(parity.page.getByText(copy(parity, 'La operación aún está en curso.', 'The operation is still in progress.'), { exact: true })).toBeVisible();
-      await parity.open(manifest.route, { 'ops.detail': '401' });
+      // A 401 leaves the shell, so do not use open's settled-shell assertions.
+      const unauthorizedStart = parity.network.requests.length;
+      const operationUrl = server.url(manifest.route.replace(/^\//, ''));
+      parity.network.setVariants({ 'ops.detail': '401' });
+      await parity.page.goto(operationUrl);
       await expect(parity.page).toHaveURL(/\/login$/);
+      const unauthorizedRequests = parity.network.requests.slice(unauthorizedStart);
+      expect(unauthorizedRequests.filter((request) => request.method === 'POST' && request.path === '/v1/auth/login-sessions/synthetic-session/refresh')).toHaveLength(1);
+      expect(unauthorizedRequests.filter((request) => request.method === 'POST' && request.path === '/v1/async-operation-query' && request.body?.queryType === 'detail')).toEqual([
+        { method: 'POST', path: '/v1/async-operation-query', body: bodyFor('detail') },
+        { method: 'POST', path: '/v1/async-operation-query', body: bodyFor('detail') },
+      ]);
+      await expect.poll(() => parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(operationUrl).pathname);
       // Observe actual skeletons before delayed responses settle.
       await parity.open(manifest.route);
       parity.network.setVariants({ 'ops.detail': { delayMs: 1000 }, 'ops.logs': { delayMs: 1000 }, 'ops.result': { delayMs: 1000 } });
