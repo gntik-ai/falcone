@@ -9,6 +9,7 @@ test.afterAll(async () => { await server?.close(); });
 for (const mechanism of ['NavLink', 'navigate']) {
   test(`pending lazy navigation through ${mechanism} preserves the shell`, async ({ page }) => {
     const unmatched = await installSession(page);
+    await page.addInitScript(() => localStorage.setItem('falcone-next-locale', 'es'));
     const errors = [], reactErrors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => { if (message.type() === 'error' && /#426|suspended while responding to synchronous input/i.test(message.text())) reactErrors.push(message.text()); });
@@ -28,6 +29,7 @@ for (const mechanism of ['NavLink', 'navigate']) {
 
 test('render errors retain navigation without stack text, and About shows build identity', async ({ page }) => {
   const unmatched = await installSession(page);
+  await page.addInitScript(() => localStorage.setItem('falcone-next-locale', 'es'));
   await page.goto(server.url('console/__fixture/throw'));
   await expect(page.getByRole('heading', { name: 'Error del servidor', exact: true }).first()).toBeVisible();
   await expect(page.getByText('500', { exact: true })).toBeVisible();
@@ -46,6 +48,7 @@ for (const width of [375, 768, 1280]) {
   ]) {
     test(`accessible ${path} at ${width}px`, async ({ page }) => {
       const unmatched = await installSession(page);
+      await page.addInitScript(() => localStorage.setItem('falcone-next-locale', 'es'));
       await page.setViewportSize({ width, height: 900 });
       await page.goto(server.url(`console/${path}`));
       await expect(page.getByRole('heading', { name: heading, exact: true }).first()).toBeVisible();
@@ -58,6 +61,7 @@ for (const width of [375, 768, 1280]) {
 
 test('the open mobile navigation drawer has no serious accessibility violations', async ({ page }) => {
   const unmatched = await installSession(page);
+  await page.addInitScript(() => localStorage.setItem('falcone-next-locale', 'es'));
   await page.setViewportSize({ width: 375, height: 900 });
   await page.goto(server.url('console/overview'));
   await expect(page.getByRole('heading', { name: 'Resumen' })).toBeVisible();

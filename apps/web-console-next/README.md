@@ -80,10 +80,10 @@ and uncaught page errors.
 
 ## Internationalization (wave u0)
 
-Spanish (`es`) is the first-load default, even in an English browser. The header
+English (`en`) is the first-load default, even in a Spanish browser. The header
 user menu and `/console/settings` share a native, labelled language select.
-English (`en`) is the other supported locale. `falcone-next-locale` in localStorage
-stores the preference; invalid or unavailable storage falls back safely to Spanish.
+Spanish (`es`) is the other supported locale. `falcone-next-locale` in localStorage
+stores the preference; invalid or unavailable storage falls back safely to English.
 Switching changes `<html lang>` and React copy without navigation. This preference
 is client-only; storing it on a user profile belongs to a later wave.
 
@@ -101,8 +101,8 @@ Use `src/i18n/format.ts` for Intl dates, numbers and relative times; it reads th
 active locale on every call. React consumers must subscribe with `useTranslation`
 so formatting re-renders on switches. Kit 0.9.0 built-in labels follow the shell's
 `I18nProvider`, which receives the active app locale. The mounted breadcrumb
-landmark is labelled `Ruta de navegación` by default and `Breadcrumb` after
-switching to English; the locale unit and browser tests assert both labels.
+landmark is labelled `Breadcrumb` by default and `Ruta de navegación` after
+switching to Spanish; the locale unit and browser tests assert both labels.
 Explicit kit label props override the catalog, so use translated app resources
 when supplying them. Common provides pagination summaries (ICU plural), filter
 controls and saved-view fallbacks for future page compositions.
