@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { MemoryRouter, NavLink, useNavigate } from 'react-router-dom'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, describe, expect, test } from 'vitest'
 import ConsoleRuntimePage from '../src/pages/consoleRuntime'
 import { ConsoleContextProvider } from '../src/shell/context'
 import { App } from '../src/App'
@@ -27,6 +27,7 @@ function open(role = 'platform_auditor', strict = false) {
   return renderWithSession(strict ? <StrictMode>{page}</StrictMode> : page, { route: '/console/runtime' })
 }
 const settled = () => screen.findByText('platform')
+const normalize = (text: string) => text.replace(/\s+/gu, ' ').trim()
 
 test.each(['es', 'en'] as const)('ports legacy hierarchy, values, read-only links and the identical GET in %s', async (locale) => {
   await i18n.changeLanguage(locale)
@@ -39,10 +40,9 @@ test.each(['es', 'en'] as const)('ports legacy hierarchy, values, read-only link
   expect(Array.from(document.querySelectorAll('dt')).map((node) => node.textContent)).toEqual(Object.values(copy.fields))
   const values = Array.from(document.querySelectorAll('dd'))
   const transition = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(ready.lastTransitionAt))
-  for (const [index, value] of [copy.mode.managed, ready.owner, ready.stage, ready.compatibility, ready.version, transition].entries()) {
-    expect(values[index]).toHaveTextContent(value, { normalizeWhitespace: true })
-  }
-  expect(values).toHaveLength(6)
+  expect(values.map((node) => normalize(node.textContent ?? ''))).toEqual(
+    [copy.mode.managed, ready.owner, ready.stage, ready.compatibility, ready.version, transition].map(normalize),
+  )
   expect(screen.getByLabelText(copy.statusName.replace('{state}', copy.state.ready))).toBeVisible()
   expect(runtimeCalls()).toHaveLength(1)
   expect(runtimeCalls()[0][1]).toMatchObject({ method: 'GET', body: undefined })
@@ -74,34 +74,50 @@ test.each(['es', 'en'] as const)('all denial roles receive translated shell stat
   }
 })
 
-test.each([
-  ['knative-degraded', 'Degradado', 'Gestionado por la plataforma', 'warning'],
-  ['knative-unverified', 'Sin verificar', 'Gestionado por la plataforma', 'neutral'],
-  ['knative-disabled', 'Deshabilitado', 'Deshabilitado', 'neutral'],
-  ['knative-unavailable-external', 'No disponible', 'Runtime externo', 'warning'],
-  ['knative-unknown-values', 'Estado no disponible', 'Modo no verificado', 'neutral'],
-] as const)('legacy labels, notes, dependency state and announcement: %s', async (variant, state, mode, tone) => {
-  const fixture = runtimeFixtures[variant]
-  mock(fixture.body); open()
-  const tag = await screen.findByLabelText(`Estado del runtime: ${state}`)
-  expect(tag.className).toContain(tone === 'neutral' ? 'bg-muted' : `bg-${tone}`)
-  expect(screen.getAllByText(mode).length).toBeGreaterThan(0)
-  expect(screen.getAllByText(`${state}. No hay acciones de mutación desde esta vista.`)).toHaveLength(2)
-  const actionable = variant === 'knative-degraded' || variant === 'knative-unavailable-external'
-  expect(Boolean(screen.queryByText(es.unavailableNote))).toBe(actionable)
-  expect(Boolean(screen.queryByText(es.advisory))).toBe(actionable)
-  expect(Boolean(screen.queryByText(es.disabledNote))).toBe(variant === 'knative-disabled')
-  expect(Boolean(screen.queryByText(es.unverifiedNote))).toBe(variant === 'knative-unverified')
-  expect(screen.queryByText('WEBHOOK_NOT_READY')).not.toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: /Editar|Desplegar|Habilitar|Deshabilitar/ })).not.toBeInTheDocument()
-  if (variant === 'knative-unknown-values') {
-    expect(screen.getByText(es.missingOwner)).toBeVisible()
-    expect(screen.getByText(es.missingVersion)).toBeVisible()
-  }
-  const announced = variant === 'knative-unknown-values' ? 'disponible' : state
-  await waitFor(() => expect(document.querySelector('[aria-live="polite"]')).toHaveTextContent(`Estado actualizado: ${announced}.`))
-  fireEvent.click(screen.getByRole('tab', { name: es.history }))
-  expect(within(screen.getByRole('list', { name: es.history })).getByText(state)).toBeVisible()
+describe.each(['es', 'en'] as const)('runtime fixture mapping in %s', (locale) => {
+  test.each([
+    ['knative-degraded', ['Degradado', 'Degraded'], ['Gestionado por la plataforma', 'Platform managed'], 'warning'],
+    ['knative-unverified', ['Sin verificar', 'Unverified'], ['Gestionado por la plataforma', 'Platform managed'], 'muted'],
+    ['knative-disabled', ['Deshabilitado', 'Disabled'], ['Deshabilitado', 'Disabled'], 'muted'],
+    ['knative-unavailable-external', ['No disponible', 'Unavailable'], ['Runtime externo', 'External runtime'], 'warning'],
+    ['knative-unknown-values', ['Estado no disponible', 'Status unavailable'], ['Modo no verificado', 'Unverified mode'], 'muted'],
+  ] as const)('legacy labels, values, notes, dependency state and announcement: %s', async (variant, stateLabels, modeLabels, tone) => {
+    await i18n.changeLanguage(locale)
+    const copy = locale === 'es' ? es : en
+    const fixture = runtimeFixtures[variant].body as Omit<typeof parityReady, 'version'> & { version: string | null }
+    mock(fixture); open()
+    const stateLabel = stateLabels[locale === 'es' ? 0 : 1]
+    const modeLabel = modeLabels[locale === 'es' ? 0 : 1]
+    const tag = await screen.findByLabelText(copy.statusName.replace('{state}', stateLabel))
+    expect(tag.className).toContain(`bg-${tone}`)
+    expect(screen.getAllByText(modeLabel).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(copy.dependencyDescription.replace('{state}', stateLabel))).toHaveLength(2)
+    const transition = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(fixture.lastTransitionAt))
+    expect(Array.from(document.querySelectorAll('dt'), (node) => node.textContent)).toEqual(Object.values(copy.fields))
+    // Compare each complete native row: nested kit spans must not hide missing or fabricated values.
+    expect(Array.from(document.querySelectorAll('dd'), (node) => normalize(node.textContent ?? ''))).toEqual([
+      modeLabel, fixture.owner || copy.missingOwner, fixture.stage,
+      fixture.compatibility, fixture.version ?? copy.missingVersion, transition,
+    ].map(normalize))
+    const actionable = variant === 'knative-degraded' || variant === 'knative-unavailable-external'
+    expect(Boolean(screen.queryByText(copy.unavailableNote))).toBe(actionable)
+    expect(Boolean(screen.queryByText(copy.advisory))).toBe(actionable)
+    expect(Boolean(screen.queryByText(copy.disabledNote))).toBe(variant === 'knative-disabled')
+    expect(Boolean(screen.queryByText(copy.unverifiedNote))).toBe(variant === 'knative-unverified')
+    expect(screen.queryByText('WEBHOOK_NOT_READY')).not.toBeInTheDocument()
+    expect(screen.queryByText(fixture.reason)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Editar|Desplegar|Habilitar|Deshabilitar|Edit|Deploy|Enable|Disable/ })).not.toBeInTheDocument()
+    if (variant === 'knative-unknown-values') {
+      expect(screen.getByText(copy.missingOwner)).toBeVisible()
+      expect(screen.getByText(copy.missingVersion)).toBeVisible()
+    }
+    const announced = variant === 'knative-unknown-values' ? (locale === 'es' ? 'disponible' : 'available') : stateLabel
+    await waitFor(() => expect(document.querySelector('[aria-live="polite"]')).toHaveTextContent(
+      locale === 'es' ? `Estado actualizado: ${announced}.` : `Status updated: ${announced}.`,
+    ))
+    fireEvent.click(screen.getByRole('tab', { name: copy.history }))
+    expect(within(screen.getByRole('list', { name: copy.history })).getByText(stateLabel)).toBeVisible()
+  })
 })
 
 test('loading has the named skeleton and read-only note', async () => {
@@ -182,7 +198,8 @@ test.each(['rejected', 'refresh-ok', 'after-refresh'])('401 session flow: %s', a
   render(<MemoryRouter basename="/next" initialEntries={['/next/console/runtime']}><App /></MemoryRouter>)
   if (variant === 'refresh-ok') await settled()
   else {
-    expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
+    // The first unauthorized case also loads the real lazy login route.
+    expect(await screen.findByRole('heading', { name: 'Acceso' }, { timeout: 3000 })).toBeVisible()
     expect(readProtectedRouteIntent()).toBe('/next/console/runtime')
   }
   expect(screen.queryByRole('heading', { name: es.errorTitle })).not.toBeInTheDocument()
