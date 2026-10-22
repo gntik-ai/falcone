@@ -51,7 +51,8 @@ const manifest: ParityManifest = {
   endpoints: operationEndpoints, fixtures: ['ops.detail', 'ops.logs', 'ops.result'],
   sources: ['src/pages/operationDetail.tsx', 'src/pages/operationDetail'],
   data: [
-    { name: 'title', locator: { es: 'h1:text-is("Detalle de operación")', en: 'h1:text-is("Operation detail")' } },
+    // The wrapping title span owns the text; :text-is on h1 only checks its own text nodes.
+    { name: 'title', locator: { es: 'h1:has(> span:text-is("Detalle de operación"))', en: 'h1:has(> span:text-is("Operation detail"))' } },
     ...['synthetic-workspace-create', 'synthetic-user', 'synthetic-tenant', 'synthetic-workspace', 'synthetic-correlation', 'synthetic-saga'].map((value) => ({ name: value, locator: `.operation-metadata dd :text-is("${value}")` })),
     { name: 'eight metadata fields', locator: '.operation-metadata dt >> nth=0' },
     { name: 'first log', locator: 'td:text-is("' + entries[0].message + '")' },
