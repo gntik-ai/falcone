@@ -100,10 +100,23 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       // Finish authenticated checks before deliberately invalidating the session.
       // The settled-shell helper must never run after the 401 redirect.
       await parity.open(manifest.route);
-      parity.network.setVariants({ 'ops.detail': { delayMs: 1000 }, 'ops.logs': { delayMs: 1000 }, 'ops.result': { delayMs: 1000 } });
-      await parity.page.reload();
-      await expect(parity.page.getByText(copy(parity, 'Cargando metadatos.', 'Loading metadata.'), { exact: true })).toHaveCount(1);
-      await expect(parity.page.getByText(copy(parity, 'Cargando cronología.', 'Loading timeline.'), { exact: true })).toHaveCount(1);
+      // Hold responses until every skeleton is observed, including on slow CI
+      // workers. Then delegate to the normal harness for fixtures and tracking.
+      let releaseQueries;
+      const heldQueries = new Promise((resolve) => { releaseQueries = resolve; });
+      const holdQuery = async (route) => { await heldQueries; await route.fallback(); };
+      const queryRoute = '**/v1/async-operation-query';
+      await parity.page.route(queryRoute, holdQuery);
+      try {
+        await parity.page.reload();
+        for (const labels of [
+          ['Cargando metadatos.', 'Loading metadata.'], ['Cargando cronología.', 'Loading timeline.'],
+          ['Cargando registros resumidos.', 'Loading summarized logs.'], ['Cargando resultado.', 'Loading result.'],
+        ]) await expect(parity.page.getByText(copy(parity, ...labels), { exact: true })).toHaveCount(1);
+      } finally {
+        releaseQueries();
+        await parity.page.unroute(queryRoute, holdQuery);
+      }
       await expect(parity.page.locator('.operation-detail [aria-busy="true"]')).toHaveCount(0);
       // A 401 leaves the shell, so do not use open's settled-shell assertions.
       const unauthorizedStart = parity.network.requests.length;
