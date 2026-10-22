@@ -22,11 +22,17 @@ async function pageLogs(parity, control, offset) {
 for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`operationDetail | ${role} | ${locale} | ${width}`, () => {
     test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
-    test.beforeEach(async ({ parity }) => {
-      const open = parity.open.bind(parity);
-      parity.open = async (...args) => {
-        await open(...args);
+    test.beforeEach(async ({ parity, server }) => {
+      parity.open = async (route, variants = {}) => {
+        parity.network.setVariants(variants);
+        await parity.page.goto(server.url(route.replace(/^\//, '')));
+        // A generic main/h1 can belong to a transient loading surface. Wait
+        // for this page before checking the authenticated shell's context.
+        await expect(parity.page.getByRole('main')).toBeVisible();
+        await expect(parity.page.locator('.operation-detail').getByRole('heading', { name: copy(parity, 'Detalle de operación', 'Operation detail'), exact: true, level: 1 })).toBeVisible();
         await expect(parity.page.locator('.operation-detail [aria-busy="true"]')).toHaveCount(0);
+        await expect(parity.page.getByRole('region', { name: copy(parity, 'Contexto activo', 'Active context'), exact: true })).toHaveAttribute('aria-busy', 'false');
+        await parity.page.evaluate(() => document.fonts.ready);
       };
     });
     test('data', async ({ parity }) => {
@@ -83,7 +89,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.page.getByRole('link', { name: copy(parity, 'Volver a operaciones', 'Back to operations'), exact: true }).click();
       await expect(parity.page).toHaveURL(/\/console\/operations$/);
     });
-    test('error-empty', async ({ parity, server }) => {
+    test('error-empty', async ({ parity }) => {
       await check.errorEmpty(parity, manifest);
       await parity.open(manifest.route, { 'ops.detail': 'empty' });
       await expect(parity.page.getByText(copy(parity, 'Operación no encontrada o no disponible.', 'Operation not found or unavailable.'), { exact: true })).toBeVisible();
@@ -97,8 +103,6 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.open(manifest.route, { 'ops.result': 'pending' });
       await resultTab(parity).click();
       await expect(parity.page.getByText(copy(parity, 'La operación aún está en curso.', 'The operation is still in progress.'), { exact: true })).toBeVisible();
-      // Finish authenticated checks before deliberately invalidating the session.
-      // The settled-shell helper must never run after the 401 redirect.
       await parity.open(manifest.route);
       // Hold responses until every skeleton is observed, including on slow CI
       // workers. Then delegate to the normal harness for fixtures and tracking.
@@ -117,20 +121,8 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         releaseQueries();
         await parity.page.unroute(queryRoute, holdQuery);
       }
+      await expect(parity.page.getByText(entries[0].message, { exact: true })).toBeVisible();
       await expect(parity.page.locator('.operation-detail [aria-busy="true"]')).toHaveCount(0);
-      // A 401 leaves the shell, so do not use open's settled-shell assertions.
-      const unauthorizedStart = parity.network.requests.length;
-      const operationUrl = server.url(manifest.route.replace(/^\//, ''));
-      parity.network.setVariants({ 'ops.detail': '401' });
-      await parity.page.goto(operationUrl);
-      await expect(parity.page).toHaveURL(/\/login$/);
-      const unauthorizedRequests = parity.network.requests.slice(unauthorizedStart);
-      expect(unauthorizedRequests.filter((request) => request.method === 'POST' && request.path === '/v1/auth/login-sessions/synthetic-session/refresh')).toHaveLength(1);
-      expect(unauthorizedRequests.filter((request) => request.method === 'POST' && request.path === '/v1/async-operation-query' && request.body?.queryType === 'detail')).toEqual([
-        { method: 'POST', path: '/v1/async-operation-query', body: bodyFor('detail') },
-        { method: 'POST', path: '/v1/async-operation-query', body: bodyFor('detail') },
-      ]);
-      await expect.poll(() => parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(operationUrl).pathname);
     });
     test('accessibility', async ({ parity }) => {
       for (const variants of [{}, { 'ops.logs': 'empty' }, { 'ops.detail': '403' }, { 'ops.detail': '404' }, { 'ops.detail': '500' }, { 'ops.logs': 'network' }]) {
@@ -192,5 +184,25 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       }
     });
     test('kit-conformance', async () => { await check.kitConformance(manifest); });
+  });
+  // Keep the eight-check report shape; this additional journey still gates the
+  // run, with its own context for session invalidation at every matrix cell.
+  test.describe(`operationDetail unauthorized (${role}, ${locale}, ${width})`, () => {
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
+    test('401 refresh and redirect', async ({ parity, server }) => {
+      // A 401 leaves the shell, so do not use open's settled-shell assertions.
+      const unauthorizedStart = parity.network.requests.length;
+      const operationUrl = server.url(manifest.route.replace(/^\//, ''));
+      parity.network.setVariants({ 'ops.detail': '401' });
+      await parity.page.goto(operationUrl);
+      await expect(parity.page).toHaveURL(/\/login$/);
+      const unauthorizedRequests = parity.network.requests.slice(unauthorizedStart);
+      expect(unauthorizedRequests.filter((request) => request.method === 'POST' && request.path === '/v1/auth/login-sessions/synthetic-session/refresh')).toHaveLength(1);
+      expect(unauthorizedRequests.filter((request) => request.method === 'POST' && request.path === '/v1/async-operation-query' && request.body?.queryType === 'detail')).toEqual([
+        { method: 'POST', path: '/v1/async-operation-query', body: bodyFor('detail') },
+        { method: 'POST', path: '/v1/async-operation-query', body: bodyFor('detail') },
+      ]);
+      await expect.poll(() => parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(operationUrl).pathname);
+    });
   });
 }
