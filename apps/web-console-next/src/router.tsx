@@ -46,6 +46,7 @@ export const appRoutes: RouteObject[] = [
       { path: 'overview', element: lazyPage('overview', () => import('./pages/overview')) },
       { path: 'operations/:operationId', element: lazyPage('operationDetail', () => import('./pages/operationDetail')) },
       ...pendingConsoleRoutes.map(({ guard, ...route }) => {
+        if (route.path === 'runtime') return { ...route, element: lazyPage('pages.console-runtime-page', () => import('./pages/consoleRuntime')) }
         const page = lazyPage('pendingPage', () => import('./pages/pendingPage'))
         return { ...route, element: guard ? <Guard kind={guard}>{page}</Guard> : page }
       }),

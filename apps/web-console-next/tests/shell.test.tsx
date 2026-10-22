@@ -7,6 +7,7 @@ import { App } from '../src/App'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
 import { changeLocale } from '../src/i18n'
 import { StrictMode } from 'react'
+import { ready } from './parity/pages/consoleRuntime.manifest'
 function open(path: string) {
   return render(<MemoryRouter initialEntries={[path]}><CurrentLocation /><App /></MemoryRouter>)
 }
@@ -70,9 +71,9 @@ test.each(['iam-access', 'plans', 'auth', 'tenants/t1/plan'].flatMap((path) =>
 
 test.each(['superadmin', 'platform_admin', 'platform_operator', 'platform_auditor', 'tenant_owner'])('runtime and workspace secrets follow shared permissions for %s', async (role) => {
   login([role])
-  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
+  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] }, 'GET /v1/platform/runtime/knative': ready })
   const runtime = open('/console/runtime')
-  expect(await screen.findByRole('heading', { name: role === 'tenant_owner' ? 'Acceso denegado' : 'Página pendiente' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: role === 'tenant_owner' ? 'Estado de plataforma restringido' : 'Runtime de funciones' })).toBeVisible()
   runtime.unmount()
   const allowed = canManageWorkspaceSecrets(readConsoleShellSession(), null)
   open('/console/workspace-secrets')
@@ -239,9 +240,9 @@ test('a tenant route parameter does not replace stored context', async () => {
 
 test.each(['plans', 'runtime'])('platform-global %s hides context controls', async (path) => {
   login()
-  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
+  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] }, 'GET /v1/platform/runtime/knative': ready })
   open(`/console/${path}`)
-  await screen.findByRole('heading', { name: 'Página pendiente' })
+  await screen.findByRole('heading', { name: path === 'runtime' ? 'Runtime de funciones' : 'Página pendiente' })
   expect(screen.queryByLabelText('Organización activa')).not.toBeInTheDocument()
 })
 
