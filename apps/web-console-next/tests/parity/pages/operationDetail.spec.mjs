@@ -9,6 +9,15 @@ const previous = (parity) => parity.page.getByRole('button', { name: copy(parity
 const resultTab = (parity) => parity.page.getByRole('tab', { name: copy(parity, 'Resultado', 'Result'), exact: true });
 const retry = (parity) => parity.page.getByRole('button', { name: copy(parity, 'Reintentar', 'Retry'), exact: true });
 const recovery = (parity, section) => parity.page.getByRole('heading', { name: copy(parity, ...section), exact: true, level: 2 });
+const currentLogPage = (parity) => parity.page.locator('.operation-detail button[aria-current="page"]');
+async function pageLogs(parity, control, offset) {
+  const start = parity.network.requests.length;
+  await control.click();
+  // Wait for the requested page before activating another control: the page
+  // deliberately ignores pagination changes while its query is still loading.
+  await expect(parity.page.getByText(entries[offset].message, { exact: true })).toBeVisible();
+  expect(parity.network.requests.slice(start)).toContainEqual({ method: 'POST', path: '/v1/async-operation-query', body: bodyFor('logs', offset) });
+}
 
 for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`operationDetail | ${role} | ${locale} | ${width}`, () => {
@@ -31,15 +40,18 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       }
     });
     test('action', async ({ parity }) => {
-      await check.action(parity, manifest);
       await parity.open(manifest.route);
       await expect(previous(parity)).toBeDisabled();
-      await next(parity).click();
-      await expect(parity.page.getByText(entries[20].message, { exact: true })).toBeVisible();
-      await next(parity).click();
-      await expect(parity.page.getByText(entries[40].message, { exact: true })).toBeVisible();
+      parity.network.setVariants({ 'ops.logs': { delayMs: 150 } });
+      await pageLogs(parity, next(parity), 20);
+      await expect(next(parity)).toBeFocused();
+      await pageLogs(parity, previous(parity), 0);
+      await expect(previous(parity)).toBeDisabled();
+      await expect(currentLogPage(parity)).toBeFocused();
+      await pageLogs(parity, next(parity), 20);
+      await pageLogs(parity, next(parity), 40);
       await expect(next(parity)).toBeDisabled();
-      await expect(parity.page.locator('.operation-detail button[aria-current="page"]')).toBeFocused();
+      await expect(currentLogPage(parity)).toBeFocused();
       // Copy does not navigate or lose focus and its live feedback is translated.
       await parity.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
       const copyButton = parity.page.locator('.operation-metadata dd').filter({ hasText: operation.correlationId }).getByRole('button');
@@ -112,8 +124,12 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(retry(parity)).toBeVisible();
       await retry(parity).click();
       await expect(parity.page.getByText(entries[0].message, { exact: true })).toBeVisible();
-      await next(parity).click();
-      await expect(parity.page.getByText(entries[20].message, { exact: true })).toBeVisible();
+      await pageLogs(parity, next(parity), 20);
+      await pageLogs(parity, next(parity), 40);
+      await expect(next(parity)).toBeDisabled();
+      await pageLogs(parity, previous(parity), 20);
+      await pageLogs(parity, previous(parity), 0);
+      await expect(previous(parity)).toBeDisabled();
       await resultTab(parity).click();
       await check.assertRuntimeHealth(parity);
       // Both negatives must still fail in the presence of tolerated HTTP resource errors.
