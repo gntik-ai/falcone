@@ -7,7 +7,6 @@ import i18n from '../i18n'
 import es from '../locales/es/operationDetail.json'
 import en from '../locales/en/operationDetail.json'
 import { useOperationQuery, type OperationDetailResponse, type OperationLogsResponse, type OperationResultResponse, type OperationStatus, type QueryError } from './operationDetail/query'
-import './operationDetail/page.css'
 
 i18n.addResourceBundle('es', 'operationDetail', es)
 i18n.addResourceBundle('en', 'operationDetail', en)
@@ -78,10 +77,10 @@ function OperationDetail({ operationId }: { operationId?: string }) {
   const levels = Object.fromEntries(Object.entries(levelTones).map(([level, tone]) => [level, { label: t(`level.${level}`), tone }])) as Record<string, StatusDefinition>
   const data = detail.data
   const notFound = !operationId || detail.error?.status === 404 || (!detail.isLoading && !detail.error && !data?.operationId)
-  const header = <PageHeader as="div" title={t('title')} description={t('description')} breadcrumbs={null}
+  const header = <PageHeader as="div" title={<span className="block whitespace-normal wrap-anywhere">{t('title')}</span>} description={t('description')} breadcrumbs={null}
     status={data?.status ?? ''} statuses={statuses} meta={[]} actions={[]} tabs={null}
     labels={{ title: t('title'), description: t('description'), moreActions: t('sections'), sections: t('sections') }} />
-  if (notFound || detail.error?.status === 403) return <Page width="default" header={header} actions={null} actionBar={null} className="operation-detail min-w-0">
+  if (notFound || detail.error?.status === 403) return <Page width="default" header={header} actions={null} actionBar={null} className="operation-detail min-w-0 wrap-anywhere">
     {detail.error?.status === 403
       ? <EmptyState title={t('noAccess')} description={t('notFoundDescription')} primaryAction={<BackLink />} secondaryAction={null} titleAs="h2" bordered={false} />
       : <NotFoundEmpty title={t('notFound')} description={t('notFoundDescription')} action={<BackLink />} titleAs="h2" bordered={false} />}
@@ -93,7 +92,7 @@ function OperationDetail({ operationId }: { operationId?: string }) {
     { id: 'updated', status: statuses[data.status].label, title: date(data.updatedAt), tone: statusTones[data.status], at: data.updatedAt, live: false },
     { id: 'created', status: t('createdAt'), title: date(data.createdAt), tone: 'neutral' as const, at: data.createdAt, live: false },
   ] : []
-  return <Page width="default" header={header} actions={null} actionBar={null} className="operation-detail min-w-0">
+  return <Page width="default" header={header} actions={null} actionBar={null} className="operation-detail min-w-0 wrap-anywhere">
     <BackLink />
     <QuerySection name={t('metadata')} query={detail} loading={<TableSkeleton rows={8} columns={2} label={t('loadingMetadata')} />}>
       {data && <DescriptionListCard title={t('metadata')} description={t('metadataDescription')} titleAs="h3" className="operation-metadata"
@@ -101,6 +100,7 @@ function OperationDetail({ operationId }: { operationId?: string }) {
         labels={{ title: t('metadata'), description: t('metadataDescription'), edit: t('edit'), copy: (label) => t('copy', { label }), copied: (label) => t('copiedLabel', { label }), copiedToClipboard: t('copied') }}
         items={(['operationType', 'actorId', 'workspaceId', 'tenantId', 'createdAt', 'updatedAt', 'correlationId', 'sagaId'] as const).map((key) => ({
           id: key, label: t(key), value: key.endsWith('At') ? date(data[key]) : data[key] ?? t('missing'),
+          render: <span className="block whitespace-normal wrap-anywhere">{key.endsWith('At') ? date(data[key]) : data[key] ?? t('missing')}</span>,
           mono: false, copyable: ['correlationId', 'sagaId'].includes(key) && Boolean(data[key]), copyValue: data[key] ?? '',
         }))} />}
     </QuerySection>
@@ -116,10 +116,10 @@ function OperationDetail({ operationId }: { operationId?: string }) {
           {!logs.data?.entries.length ? <FirstRunEmpty title={t('emptyTitle')} description={t('emptyDescription')} steps={[]} secondary={null} actionLabel={t('back')} onAction={() => navigate('/console/operations')} titleAs="h3" bordered={false} /> : <>
             <div role="log" aria-label={t('logs')} aria-live="off">
               <Table density="comfortable" stickyHeader={false} containerLabel={t('logs')} className="operation-logs w-full table-fixed">
-                <TableHeader><TableRow><TableHead>{t('levelHeading')}</TableHead><TableHead>{t('message')}</TableHead><TableHead>{t('date')}</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead className="w-1/4 whitespace-normal wrap-anywhere">{t('levelHeading')}</TableHead><TableHead className="w-1/2 whitespace-normal wrap-anywhere">{t('message')}</TableHead><TableHead className="w-1/4 whitespace-normal wrap-anywhere">{t('date')}</TableHead></TableRow></TableHeader>
                 <TableBody>{logs.data.entries.map((entry) => <TableRow key={entry.logEntryId}>
-                  <TableCell><StatusTag status={entry.level} statuses={levels} label={t(`level.${entry.level}`)} uppercase={false} /></TableCell>
-                  <TableCell>{entry.message}</TableCell><TableCell><time dateTime={entry.occurredAt}>{relativeTime(entry.occurredAt, locale)}</time></TableCell>
+                  <TableCell className="whitespace-normal wrap-anywhere"><StatusTag status={entry.level} statuses={levels} label={t(`level.${entry.level}`)} uppercase={false} className="whitespace-normal wrap-anywhere" /></TableCell>
+                  <TableCell className="whitespace-normal wrap-anywhere">{entry.message}</TableCell><TableCell className="whitespace-normal wrap-anywhere"><time dateTime={entry.occurredAt}>{relativeTime(entry.occurredAt, locale)}</time></TableCell>
                 </TableRow>)}</TableBody>
               </Table>
             </div>

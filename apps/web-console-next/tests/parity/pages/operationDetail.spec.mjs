@@ -97,6 +97,14 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.open(manifest.route, { 'ops.result': 'pending' });
       await resultTab(parity).click();
       await expect(parity.page.getByText(copy(parity, 'La operación aún está en curso.', 'The operation is still in progress.'), { exact: true })).toBeVisible();
+      // Finish authenticated checks before deliberately invalidating the session.
+      // The settled-shell helper must never run after the 401 redirect.
+      await parity.open(manifest.route);
+      parity.network.setVariants({ 'ops.detail': { delayMs: 1000 }, 'ops.logs': { delayMs: 1000 }, 'ops.result': { delayMs: 1000 } });
+      await parity.page.reload();
+      await expect(parity.page.getByText(copy(parity, 'Cargando metadatos.', 'Loading metadata.'), { exact: true })).toHaveCount(1);
+      await expect(parity.page.getByText(copy(parity, 'Cargando cronología.', 'Loading timeline.'), { exact: true })).toHaveCount(1);
+      await expect(parity.page.locator('.operation-detail [aria-busy="true"]')).toHaveCount(0);
       // A 401 leaves the shell, so do not use open's settled-shell assertions.
       const unauthorizedStart = parity.network.requests.length;
       const operationUrl = server.url(manifest.route.replace(/^\//, ''));
@@ -110,12 +118,6 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         { method: 'POST', path: '/v1/async-operation-query', body: bodyFor('detail') },
       ]);
       await expect.poll(() => parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(operationUrl).pathname);
-      // Observe actual skeletons before delayed responses settle.
-      await parity.open(manifest.route);
-      parity.network.setVariants({ 'ops.detail': { delayMs: 1000 }, 'ops.logs': { delayMs: 1000 }, 'ops.result': { delayMs: 1000 } });
-      await parity.page.reload();
-      await expect(parity.page.getByText(copy(parity, 'Cargando metadatos.', 'Loading metadata.'), { exact: true })).toHaveCount(1);
-      await expect(parity.page.getByText(copy(parity, 'Cargando cronología.', 'Loading timeline.'), { exact: true })).toHaveCount(1);
     });
     test('accessibility', async ({ parity }) => {
       for (const variants of [{}, { 'ops.logs': 'empty' }, { 'ops.detail': '403' }, { 'ops.detail': '404' }, { 'ops.detail': '500' }, { 'ops.logs': 'network' }]) {
