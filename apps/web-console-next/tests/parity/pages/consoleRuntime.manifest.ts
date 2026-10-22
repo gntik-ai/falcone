@@ -30,10 +30,10 @@ const manifest: ParityManifest = {
   sources: ['src/pages/consoleRuntime.tsx', 'src/pages/consoleRuntime'],
   data: [
     { name: 'title', locator: { es: 'h1:has-text("Runtime de funciones")', en: 'h1:has-text("Functions runtime")' } },
-    { name: 'owner', locator: 'dd:text-is("platform")' },
-    { name: 'version', locator: 'dd:text-is("1.15")' },
+    { name: 'owner', locator: 'dd:has(:text-is("platform"))' },
+    { name: 'version', locator: 'dd:has(:text-is("1.15"))' },
   ],
-  actions: [{ name: 'recheck', trigger: [{ es: 'button:text-is("Volver a comprobar")', en: 'button:text-is("Check again")' }], expected: { method: 'GET', path: runtimePath }, outcome: 'dd:text-is("platform")' }],
+  actions: [{ name: 'recheck', trigger: [{ es: 'button:text-is("Volver a comprobar")', en: 'button:text-is("Check again")' }], expected: { method: 'GET', path: runtimePath }, outcome: 'dd:has(:text-is("platform"))' }],
   states: [
     { fixture: 'runtime', variant: '403', locator: { es: 'h2:text-is("No tienes permiso para consultar el runtime.")', en: 'h2:text-is("You do not have permission to inspect the runtime.")' } },
     { fixture: 'runtime', variant: '404', locator: { es: 'h2:text-is("Runtime no encontrado")', en: 'h2:text-is("Runtime not found")' } },
