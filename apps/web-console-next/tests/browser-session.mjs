@@ -1,10 +1,11 @@
 import { createEndpointRegistry } from './parity/endpoint-registry.ts';
 import { operationEndpoints } from './parity/pages/operationDetail.manifest.ts';
+import { runtimeEndpoints } from './parity/pages/consoleRuntime.manifest.ts';
 
 // Synthetic identities only. The app still exercises real session parsing and loaders.
 export async function installSession(page, roles = ['superadmin']) {
   const unmatched = [];
-  const operations = createEndpointRegistry({}, () => ({}), operationEndpoints);
+  const endpoints = createEndpointRegistry({}, () => ({}), { ...operationEndpoints, ...runtimeEndpoints });
   await page.addInitScript((platformRoles) => {
     sessionStorage.setItem('in-falcone.console-shell-session', JSON.stringify({
       sessionId: 'synthetic-session', authenticationState: 'active', statusView: 'active',
@@ -23,9 +24,9 @@ export async function installSession(page, roles = ['superadmin']) {
       const request = route.request();
       let body;
       try { body = request.postDataJSON(); } catch { /* Invalid bodies remain unmatched. */ }
-      const name = operations.find(request.method(), url.pathname, body);
+      const name = endpoints.find(request.method(), url.pathname, body);
       if (name && !url.search) {
-        const response = operations.responseFor(name, 'superadmin', body);
+        const response = endpoints.responseFor(name, 'superadmin', body);
         await route.fulfill({ status: response.status, json: response.body });
         return;
       }

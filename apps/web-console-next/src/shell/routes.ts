@@ -40,7 +40,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'flows/:flowId/runs/:executionId' },
   { path: 'storage' },
   { path: 'observability' },
-  { path: 'runtime', guard: 'observer', handle: { platformGlobal: true } },
+  { path: 'runtime', migrated: true, guard: 'observer', handle: { platformGlobal: true } },
   { path: 'service-accounts' },
   { path: 'quotas' },
   { path: 'operations' },

@@ -52,7 +52,10 @@ export const test = base.extend({
       }
       const response = registry.responseFor(name, role, body);
       if (response.delayMs) await new Promise((done) => setTimeout(done, response.delayMs));
-      if (path === '/v1/async-operation-query' && (response.network || response.status === 500)) injectedFailures.push({ url: request.url(), kind: response.network ? 'network' : '500' });
+      if ((path === '/v1/async-operation-query' && (response.network || response.status === 500)) ||
+          (path === '/v1/platform/runtime/knative' && (response.network || [401, 403, 404, 500].includes(response.status)))) {
+        injectedFailures.push({ url: request.url(), kind: response.network ? 'network' : String(response.status) });
+      }
       if (response.network) await route.abort('failed');
       else await route.fulfill({ status: response.status ?? 200, json: response.body });
     });
