@@ -44,7 +44,6 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'service-accounts' },
   { path: 'quotas' },
   { path: 'operations' },
-  { path: 'operations/:operationId' },
   { path: 'mcp/servers/:mcpServerId' },
   { path: 'workspaces/:workspaceId/realtime' },
   { path: 'workspaces/:workspaceId/docs' },

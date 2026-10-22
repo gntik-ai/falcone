@@ -1,0 +1,208 @@
+import { createHash } from 'node:crypto';
+import manifest, { bodyFor, entries, operation } from './operationDetail.manifest.ts';
+import { test, expect } from '../harness.mjs';
+import * as check from '../checks.mjs';
+
+const copy = (parity, es, en) => parity.locale === 'es' ? es : en;
+const next = (parity) => parity.page.getByRole('button', { name: copy(parity, 'Siguiente', 'Next'), exact: true });
+const previous = (parity) => parity.page.getByRole('button', { name: copy(parity, 'Anterior', 'Previous'), exact: true });
+const resultTab = (parity) => parity.page.getByRole('tab', { name: copy(parity, 'Resultado', 'Result'), exact: true });
+const retry = (parity) => parity.page.getByRole('button', { name: copy(parity, 'Reintentar', 'Retry'), exact: true });
+const recovery = (parity, section) => parity.page.getByRole('heading', { name: copy(parity, ...section), exact: true, level: 2 });
+const currentLogPage = (parity) => parity.page.locator('.operation-detail button[aria-current="page"]');
+async function pageLogs(parity, control, offset) {
+  const start = parity.network.requests.length;
+  await control.click();
+  // Wait for the requested page before activating another control: the page
+  // deliberately ignores pagination changes while its query is still loading.
+  await expect(parity.page.getByText(entries[offset].message, { exact: true })).toBeVisible();
+  expect(parity.network.requests.slice(start)).toContainEqual({ method: 'POST', path: '/v1/async-operation-query', body: bodyFor('logs', offset) });
+}
+
+for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
+  test.describe(`operationDetail | ${role} | ${locale} | ${width}`, () => {
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
+    test.beforeEach(async ({ parity, server }) => {
+      parity.open = async (route, variants = {}) => {
+        parity.network.setVariants(variants);
+        await parity.page.goto(server.url(route.replace(/^\//, '')));
+        // A generic main/h1 can belong to a transient loading surface. Wait
+        // for this page before checking the authenticated shell's context.
+        await expect(parity.page.getByRole('main')).toBeVisible();
+        await expect(parity.page.locator('.operation-detail').getByRole('heading', { name: copy(parity, 'Detalle de operación', 'Operation detail'), exact: true, level: 1 })).toBeVisible();
+        await expect(parity.page.locator('.operation-detail [aria-busy="true"]')).toHaveCount(0);
+        await expect(parity.page.getByRole('region', { name: copy(parity, 'Contexto activo', 'Active context'), exact: true })).toHaveAttribute('aria-busy', 'false');
+        await parity.page.evaluate(() => document.fonts.ready);
+      };
+    });
+    test('data', async ({ parity }) => {
+      await check.data(parity, manifest);
+      await expect(parity.page.locator('.operation-metadata dt')).toHaveCount(8);
+      await expect(parity.page.getByRole('list', { name: copy(parity, 'Cronología', 'Timeline') }).locator('li')).toHaveCount(3);
+      for (const queryType of ['detail', 'logs', 'result']) expect(parity.network.requests).toContainEqual({ method: 'POST', path: '/v1/async-operation-query', body: bodyFor(queryType) });
+      for (const [status, es, en] of [['pending', 'Pendiente', 'Pending'], ['running', 'En curso', 'Running'], ['completed', 'Completada', 'Completed'], ['failed', 'Fallida', 'Failed'], ['timed_out', 'Expirada', 'Timed out'], ['cancelled', 'Cancelada', 'Cancelled']]) {
+        await parity.open(manifest.route, { 'ops.detail': status });
+        await expect(parity.page.locator('main').getByText(copy(parity, es, en), { exact: true }).first()).toBeVisible();
+      }
+    });
+    test('action', async ({ parity }) => {
+      await parity.open(manifest.route);
+      await expect(previous(parity)).toBeDisabled();
+      parity.network.setVariants({ 'ops.logs': { delayMs: 150 } });
+      await pageLogs(parity, next(parity), 20);
+      await expect(next(parity)).toBeFocused();
+      await pageLogs(parity, previous(parity), 0);
+      await expect(previous(parity)).toBeDisabled();
+      await expect(currentLogPage(parity)).toBeFocused();
+      await pageLogs(parity, next(parity), 20);
+      await pageLogs(parity, next(parity), 40);
+      await expect(next(parity)).toBeDisabled();
+      await expect(currentLogPage(parity)).toBeFocused();
+      // Copy does not navigate or lose focus and its live feedback is translated.
+      await parity.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+      const copyButton = parity.page.locator('.operation-metadata dd').filter({ hasText: operation.correlationId }).getByRole('button');
+      await expect(copyButton).toHaveAccessibleName(copy(parity, 'Copiar ID de correlación', 'Copy Correlation ID'));
+      await copyButton.click();
+      await expect(copyButton).toBeFocused();
+      await expect(copyButton).toHaveAccessibleName(copy(parity, 'Copiado: ID de correlación', 'Copied: Correlation ID'));
+      for (const [endpoint, variant, section, queryType] of [
+        ['ops.logs', '500-then-success', ['Registros resumidos', 'Summarized logs'], 'logs'],
+        ['ops.detail', '500-then-success', ['Metadatos', 'Metadata'], 'detail'],
+        ['ops.result', 'network-then-success', ['Resultado', 'Result'], 'result'],
+      ]) {
+        await parity.open(manifest.route, { [endpoint]: variant });
+        if (queryType === 'result') await resultTab(parity).click();
+        await expect(retry(parity)).toBeVisible();
+        const start = parity.network.requests.length;
+        await retry(parity).click();
+        await expect(recovery(parity, section)).toBeFocused();
+        expect(parity.network.requests.slice(start)).toContainEqual({ method: 'POST', path: '/v1/async-operation-query', body: bodyFor(queryType) });
+      }
+      await parity.open(manifest.route);
+      parity.network.setVariants({ 'ops.logs': ['500', '500', '500', 'success'] });
+      await next(parity).click();
+      await expect(retry(parity)).toBeVisible();
+      await expect(parity.page.getByText(entries[0].message, { exact: true })).toHaveCount(0);
+      await retry(parity).click();
+      await expect(parity.page.getByText(entries[20].message, { exact: true })).toBeVisible();
+      expect(parity.network.requests.at(-1)).toEqual({ method: 'POST', path: '/v1/async-operation-query', body: bodyFor('logs', 20) });
+      await parity.page.getByRole('link', { name: copy(parity, 'Volver a operaciones', 'Back to operations'), exact: true }).click();
+      await expect(parity.page).toHaveURL(/\/console\/operations$/);
+    });
+    test('error-empty', async ({ parity }) => {
+      await check.errorEmpty(parity, manifest);
+      await parity.open(manifest.route, { 'ops.detail': 'empty' });
+      await expect(parity.page.getByText(copy(parity, 'Operación no encontrada o no disponible.', 'Operation not found or unavailable.'), { exact: true })).toBeVisible();
+      await parity.open(manifest.route, { 'ops.logs': '500', 'ops.result': 'failure-retryable' });
+      await expect(parity.page.getByText('synthetic-workspace-create', { exact: true })).toBeVisible();
+      await expect(retry(parity)).toBeVisible();
+      await expect(parity.page.getByText('synthetic-request', { exact: true })).toBeVisible();
+      await resultTab(parity).click();
+      await expect(parity.page.getByText('Synthetic failure reason', { exact: true })).toBeVisible();
+      await expect(parity.page.getByText(copy(parity, 'Esta operación puede reintentarse.', 'This operation can be retried.'), { exact: true })).toBeVisible();
+      await parity.open(manifest.route, { 'ops.result': 'pending' });
+      await resultTab(parity).click();
+      await expect(parity.page.getByText(copy(parity, 'La operación aún está en curso.', 'The operation is still in progress.'), { exact: true })).toBeVisible();
+      await parity.open(manifest.route);
+      // Hold responses until every skeleton is observed, including on slow CI
+      // workers. Then delegate to the normal harness for fixtures and tracking.
+      let releaseQueries;
+      const heldQueries = new Promise((resolve) => { releaseQueries = resolve; });
+      const holdQuery = async (route) => { await heldQueries; await route.fallback(); };
+      const queryRoute = '**/v1/async-operation-query';
+      await parity.page.route(queryRoute, holdQuery);
+      try {
+        await parity.page.reload();
+        for (const labels of [
+          ['Cargando metadatos.', 'Loading metadata.'], ['Cargando cronología.', 'Loading timeline.'],
+          ['Cargando registros resumidos.', 'Loading summarized logs.'], ['Cargando resultado.', 'Loading result.'],
+        ]) await expect(parity.page.getByText(copy(parity, ...labels), { exact: true })).toHaveCount(1);
+      } finally {
+        releaseQueries();
+        await parity.page.unroute(queryRoute, holdQuery);
+      }
+      await expect(parity.page.getByText(entries[0].message, { exact: true })).toBeVisible();
+      await expect(parity.page.locator('.operation-detail [aria-busy="true"]')).toHaveCount(0);
+    });
+    test('accessibility', async ({ parity }) => {
+      for (const variants of [{}, { 'ops.logs': 'empty' }, { 'ops.detail': '403' }, { 'ops.detail': '404' }, { 'ops.detail': '500' }, { 'ops.logs': 'network' }]) {
+        await parity.open(manifest.route, variants);
+        await check.assertAccessibility(parity);
+        await check.assertLocale(parity);
+      }
+      await parity.open(manifest.route);
+      await parity.page.getByRole('tab', { name: copy(parity, 'Registros resumidos', 'Summarized logs') }).focus();
+      await parity.page.keyboard.press('ArrowRight');
+      await parity.page.keyboard.press('Enter');
+      await expect(resultTab(parity)).toHaveAttribute('aria-selected', 'true');
+      await check.assertAccessibility(parity);
+    });
+    test('runtime-health', async ({ parity }) => {
+      await parity.open(manifest.route, { 'ops.logs': '500-then-success' });
+      await expect(retry(parity)).toBeVisible();
+      await retry(parity).click();
+      await expect(parity.page.getByText(entries[0].message, { exact: true })).toBeVisible();
+      await pageLogs(parity, next(parity), 20);
+      await pageLogs(parity, next(parity), 40);
+      await expect(next(parity)).toBeDisabled();
+      await pageLogs(parity, previous(parity), 20);
+      await pageLogs(parity, previous(parity), 0);
+      await expect(previous(parity)).toBeDisabled();
+      await resultTab(parity).click();
+      await check.assertRuntimeHealth(parity);
+      // Both negatives must still fail in the presence of tolerated HTTP resource errors.
+      for (const fault of ['console.error', 'unhandledrejection']) {
+        const start = parity.faults.length;
+        await parity.page.evaluate((fault) => {
+          if (fault === 'console.error') console.error('synthetic-console-error');
+          else Promise.reject(new Error('synthetic-rejection'));
+        }, fault);
+        await expect.poll(() => parity.faults.length).toBeGreaterThan(start);
+        await expect(check.assertRuntimeHealth({ ...parity, faults: parity.faults.slice(start) })).rejects.toThrow(/runtime-health/);
+      }
+    });
+    test('responsive', async ({ parity }) => {
+      await parity.open(manifest.route);
+      await check.assertResponsive(parity, width);
+      await next(parity).click();
+      await expect(parity.page.getByText(entries[20].message, { exact: true })).toBeVisible();
+      await check.assertResponsive(parity, width);
+    });
+    test('visual-review', async ({ parity }, info) => {
+      // Capture review artifacts; a self-comparison is not operator approval.
+      for (const [state, variants, showResult] of [
+        ['completed', {}, false], ['failed', { 'ops.result': 'failure-retryable' }, true],
+        ['pending', { 'ops.result': 'pending' }, true], ['not-found', { 'ops.detail': '404' }, false],
+        ['error', { 'ops.detail': '500' }, false],
+      ]) {
+        await parity.open(manifest.route, variants);
+        if (showResult) await resultTab(parity).click();
+        await check.assertLocale(parity);
+        const body = await parity.page.screenshot({ fullPage: true, animations: 'disabled' });
+        const sha256 = createHash('sha256').update(body).digest('hex');
+        await info.attach(`${state}-${locale}-${width}-sha256-${sha256}`, { body, contentType: 'image/png' });
+      }
+    });
+    test('kit-conformance', async () => { await check.kitConformance(manifest); });
+  });
+  // Keep the eight-check report shape; this additional journey still gates the
+  // run, with its own context for session invalidation at every matrix cell.
+  test.describe(`operationDetail unauthorized (${role}, ${locale}, ${width})`, () => {
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
+    test('401 refresh and redirect', async ({ parity, server }) => {
+      // A 401 leaves the shell, so do not use open's settled-shell assertions.
+      const unauthorizedStart = parity.network.requests.length;
+      const operationUrl = server.url(manifest.route.replace(/^\//, ''));
+      parity.network.setVariants({ 'ops.detail': '401' });
+      await parity.page.goto(operationUrl);
+      await expect(parity.page).toHaveURL(/\/login$/);
+      const unauthorizedRequests = parity.network.requests.slice(unauthorizedStart);
+      expect(unauthorizedRequests.filter((request) => request.method === 'POST' && request.path === '/v1/auth/login-sessions/synthetic-session/refresh')).toHaveLength(1);
+      expect(unauthorizedRequests.filter((request) => request.method === 'POST' && request.path === '/v1/async-operation-query' && request.body?.queryType === 'detail')).toEqual([
+        { method: 'POST', path: '/v1/async-operation-query', body: bodyFor('detail') },
+        { method: 'POST', path: '/v1/async-operation-query', body: bodyFor('detail') },
+      ]);
+      await expect.poll(() => parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(operationUrl).pathname);
+    });
+  });
+}

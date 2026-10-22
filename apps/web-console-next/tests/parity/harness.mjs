@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import { startServer } from '../csp/server.mjs';
 import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
 import { createEndpointRegistry } from './endpoint-registry.ts';
+import { consumeResourceDiagnostic } from './resource-diagnostics.mjs';
 
 export { expect };
 export const test = base.extend({
@@ -12,12 +13,13 @@ export const test = base.extend({
     try { await use(server); } finally { await server.close(); }
   }, { scope: 'worker' }],
   parity: [async ({ page, server, role, locale, pageEndpoints }, use) => {
-    const requests = [], unmatched = [], faults = [];
+    const requests = [], unmatched = [], faults = [], injectedFailures = [];
     const registry = createEndpointRegistry(endpoints, responseFor, pageEndpoints);
     await page.clock.setFixedTime(new Date('2026-06-01T12:00:00Z'));
     await page.exposeBinding('__parityFault', (_, message) => { faults.push(message); });
     page.on('pageerror', (error) => faults.push(`pageerror: ${error.message}`));
     page.on('console', (message) => {
+      if (message.type() === 'error' && consumeResourceDiagnostic(message.text(), message.location().url, injectedFailures)) return;
       if (message.type() === 'error' || /#426|suspended while responding to synchronous input/i.test(message.text())) faults.push(`console.${message.type()}: ${message.text()}`);
     });
     await page.addInitScript(({ session, locale }) => {
@@ -42,14 +44,15 @@ export const test = base.extend({
       let body;
       try { body = request.postDataJSON() ?? undefined; } catch { body = request.postData(); }
       requests.push({ method, path: path + url.search, body });
-      const name = registry.find(method, path);
+      const name = registry.find(method, path, body);
       if (url.origin !== server.origin || !name) {
         unmatched.push(`${method} ${path}${url.search}`);
         await route.fulfill({ status: 404, json: { error_msg: '404 Route Not Found' } });
         return;
       }
-      const response = registry.responseFor(name, role);
+      const response = registry.responseFor(name, role, body);
       if (response.delayMs) await new Promise((done) => setTimeout(done, response.delayMs));
+      if (path === '/v1/async-operation-query' && (response.network || response.status === 500)) injectedFailures.push({ url: request.url(), kind: response.network ? 'network' : '500' });
       if (response.network) await route.abort('failed');
       else await route.fulfill({ status: response.status ?? 200, json: response.body });
     });
