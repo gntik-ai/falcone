@@ -10,20 +10,20 @@ const supported = (value: unknown): value is Locale => value === 'es' || value =
 function initialLocale(): Locale {
   try {
     const stored = localStorage.getItem(localeStorageKey)
-    return supported(stored) ? stored : 'es'
-  } catch { return 'es' }
+    return supported(stored) ? stored : 'en'
+  } catch { return 'en' }
 }
 
 // Resources are bundled locally. There is deliberately no browser detector or HTTP backend.
 void i18n.use(ICU).use(initReactI18next).init({
-  lng: initialLocale(), supportedLngs: ['es', 'en'], fallbackLng: 'es',
+  lng: initialLocale(), supportedLngs: ['es', 'en'], fallbackLng: 'en',
   defaultNS: 'common', ns: ['common'], initImmediate: false,
   resources: { es: { common: es }, en: { common: en } },
   interpolation: { escapeValue: false }
 })
 document.documentElement.lang = i18n.language
 i18n.on('languageChanged', (language) => {
-  const locale = supported(language) ? language : 'es'
+  const locale = supported(language) ? language : 'en'
   document.documentElement.lang = locale
   try { localStorage.setItem(localeStorageKey, locale) } catch { /* Storage can be disabled. */ }
 })
