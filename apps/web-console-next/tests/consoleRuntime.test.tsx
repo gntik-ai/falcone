@@ -28,14 +28,22 @@ function open(role = 'platform_auditor', strict = false) {
 }
 const settled = () => screen.findByText('platform')
 
-test('ports legacy hierarchy, values, read-only links and the identical GET', async () => {
+test.each(['es', 'en'] as const)('ports legacy hierarchy, values, read-only links and the identical GET in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
   mock(); open(); await settled()
-  expect(screen.getByRole('heading', { name: es.title })).toBeVisible()
+  expect(screen.getByRole('heading', { name: copy.title })).toBeVisible()
   expect(screen.getByText('1.22.1')).toBeVisible()
-  expect(screen.getByRole('link', { name: es.inspectFunctions })).toHaveAttribute('href', '/console/functions')
-  expect(screen.getByRole('link', { name: es.inspectHostedMcp })).toHaveAttribute('href', '/console')
-  expect(Array.from(document.querySelectorAll('dt')).map((node) => node.textContent)).toEqual(Object.values(es.fields))
-  expect(screen.getByLabelText('Estado del runtime: Listo')).toBeVisible()
+  expect(screen.getByRole('link', { name: copy.inspectFunctions })).toHaveAttribute('href', '/console/functions')
+  expect(screen.getByRole('link', { name: copy.inspectHostedMcp })).toHaveAttribute('href', '/console')
+  expect(Array.from(document.querySelectorAll('dt')).map((node) => node.textContent)).toEqual(Object.values(copy.fields))
+  const values = Array.from(document.querySelectorAll('dd'))
+  const transition = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(ready.lastTransitionAt))
+  for (const [index, value] of [copy.mode.managed, ready.owner, ready.stage, ready.compatibility, ready.version, transition].entries()) {
+    expect(values[index]).toHaveTextContent(value, { normalizeWhitespace: true })
+  }
+  expect(values).toHaveLength(6)
+  expect(screen.getByLabelText(copy.statusName.replace('{state}', copy.state.ready))).toBeVisible()
   expect(runtimeCalls()).toHaveLength(1)
   expect(runtimeCalls()[0][1]).toMatchObject({ method: 'GET', body: undefined })
 })

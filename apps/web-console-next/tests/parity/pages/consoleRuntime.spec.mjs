@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import manifest, { runtimePath, ready } from './consoleRuntime.manifest.ts';
+import manifest, { runtimePath, ready, runtimeFixtures } from './consoleRuntime.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import es from '../../../src/locales/es/pages.console-runtime-page.json' with { type: 'json' };
@@ -63,7 +63,11 @@ for (const role of observers) for (const locale of ['es', 'en']) for (const widt
         await expect(status(parity, state)).toBeVisible();
         const tone = state === 'ready' ? 'success' : ['degraded', 'unavailable'].includes(state) ? 'warning' : 'muted';
         await expect(status(parity, state)).toHaveClass(new RegExp(`bg-${tone}`));
-        await expect(parity.page.locator('dd').first()).toHaveText(copy(parity).mode[mode]);
+        const values = runtimeFixtures[fixture].body;
+        await expect(parity.page.locator('dd')).toHaveText([
+          copy(parity).mode[mode], values.owner || copy(parity).missingOwner,
+          values.stage, values.compatibility, values.version ?? copy(parity).missingVersion, expectedDate,
+        ]);
         const dependencyState = state === 'ready' ? copy(parity).available : copy(parity).state[state];
         await expect(parity.page.getByText(copy(parity).dependencyDescription.replace('{state}', dependencyState), { exact: true })).toHaveCount(2);
         const actionable = ['degraded', 'unavailable'].includes(state);
