@@ -21,7 +21,7 @@ test('route namespaces are lazy local chunks outside the static entry graph', ()
     ['recovery', 'Recuperar contraseña', 'Recover password'], ['invitation', 'Aceptar invitación', 'Accept invitation'],
     ['signup', 'Solicitar acceso', 'Request access'], ['pendingActivation', 'Registro pendiente', 'Registration pending'],
     ['overview', 'Resumen', 'Overview'],
-    ['pendingPage', 'Página pendiente', 'Page pending'], ['settings', 'Página pendiente', 'Page pending']
+    ['pendingPage', 'Página pendiente', 'Page pending'], ['settings', 'Ajustes de consola', 'Console settings']
   ]) {
     const key = `src/pages/${namespace}.tsx`;
     assert.ok(manifest[key]?.isDynamicEntry, `${namespace} must be a dynamic entry`);

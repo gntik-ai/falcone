@@ -7,12 +7,13 @@ import { consumeResourceDiagnostic } from './resource-diagnostics.mjs';
 export { expect };
 export const test = base.extend({
   role: ['superadmin', { option: true }],
+  preserveLocale: [false, { option: true }],
   pageEndpoints: [{}, { option: true }],
   server: [async ({}, use) => {
     const server = await startServer();
     try { await use(server); } finally { await server.close(); }
   }, { scope: 'worker' }],
-  parity: [async ({ page, server, role, locale, pageEndpoints }, use) => {
+  parity: [async ({ page, server, role, locale, pageEndpoints, preserveLocale }, use) => {
     const requests = [], unmatched = [], faults = [], injectedFailures = [];
     const registry = createEndpointRegistry(endpoints, responseFor, pageEndpoints);
     await page.clock.setFixedTime(new Date('2026-06-01T12:00:00Z'));
@@ -22,16 +23,16 @@ export const test = base.extend({
       if (message.type() === 'error' && consumeResourceDiagnostic(message.text(), message.location().url, injectedFailures)) return;
       if (message.type() === 'error' || /#426|suspended while responding to synchronous input/i.test(message.text())) faults.push(`console.${message.type()}: ${message.text()}`);
     });
-    await page.addInitScript(({ session, locale }) => {
+    await page.addInitScript(({ session, locale, preserveLocale }) => {
       let seed = 1075;
       Math.random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
       sessionStorage.setItem('in-falcone.console-shell-session', JSON.stringify(session));
-      localStorage.setItem('falcone-next-locale', locale);
+      if (!preserveLocale || !localStorage.getItem('falcone-next-locale')) localStorage.setItem('falcone-next-locale', locale);
       localStorage.setItem('falcone-next-theme', 'dark');
       localStorage.removeItem('in-falcone.console-active-context');
       window.addEventListener('unhandledrejection', (event) => { void window.__parityFault(`unhandledrejection: ${event.reason}`); });
       window.addEventListener('securitypolicyviolation', (event) => { void window.__parityFault(`securitypolicyviolation: ${event.violatedDirective}`); }, true);
-    }, { session: sessionFor(role), locale });
+    }, { session: sessionFor(role), locale, preserveLocale });
     // No browser request may leave the local test server.
     await page.route('**/*', async (route) => {
       if (new URL(route.request().url()).origin === server.origin) return route.continue();
