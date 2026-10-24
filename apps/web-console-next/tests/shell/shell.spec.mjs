@@ -65,6 +65,10 @@ test('the open mobile navigation drawer has no serious accessibility violations'
   await page.setViewportSize({ width: 375, height: 900 });
   await page.goto(server.url('console/overview'));
   await expect(page.getByRole('heading', { name: 'Resumen' })).toBeVisible();
+  const layoutTrigger = page.locator('.console-shell > div > header > button[aria-haspopup="dialog"]');
+  await expect(layoutTrigger).toHaveCount(1);
+  await expect(layoutTrigger).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Abrir navegación', exact: true })).toHaveCount(1);
   await page.getByRole('button', { name: 'Abrir navegación', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   const result = await new AxeBuilder({ page }).analyze();
