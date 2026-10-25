@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AuthLayout, Button, LiveAnnouncer, Logo, useAnnounce } from '@gntik-ai/ui'
 import { ErrorPanel, InlineCallout, ListSkeleton, NoAccessEmpty, NotFoundEmpty, PageHeader } from '@gntik-ai/blocks'
 import { Link as RouterLink, matchPath, useLocation } from 'react-router-dom'
@@ -18,7 +18,7 @@ interface RegistrationState {
   activationMode?: string
 }
 const publicRoutes = ['/', '/login', '/password-recovery', '/invitations/:tenantId/:invitationId', '/signup', '/signup/pending-activation']
-function ActionLink({ target, children, primary = false }: { target: string; children: ReactNode; primary?: boolean }) {
+function ActionLink({ target, children, primary = false }: { target: string; children: string; primary?: boolean }) {
   const isPublic = publicRoutes.some((path) => matchPath(path, target.split(/[?#]/)[0]))
   return <Button render={isPublic ? <RouterLink to={target} /> : <a href={target} />} nativeButton={false} role="link"
     variant={primary ? 'primary' : 'secondary'} size="md" loading={false} disabled={false} iconOnly={false}
