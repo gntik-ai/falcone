@@ -8,6 +8,8 @@ import { ShellErrorBoundary } from '../src/shell/RouteState'
 import { registerLocaleBundles, useLocaleLoader } from '../src/i18n/locale-loader'
 import { login, strictFetch } from './shell-support'
 import Settings from '../src/pages/settings'
+import welcomeEs from '../src/locales/es/pages.welcome-page.json'
+import welcomeEn from '../src/locales/en/pages.welcome-page.json'
 
 const context = vi.hoisted(() => vi.fn())
 vi.mock('../src/shell/context', () => ({ useConsoleContext: context, ConsoleContextProvider: ({ children }: { children: React.ReactNode }) => children }))
@@ -105,14 +107,15 @@ for (const [from, to] of [['es', 'en'], ['en', 'es']] as const) for (const contr
   })
 }
 
-test.each(['es', 'en'] as const)('a caught render error in %s has translated copy, a client reference and retry remounts', async (locale) => {
+test.each(['es', 'en'] as const)('a caught render error in %s has translated copy, no sample diagnostics and retry remounts', async (locale) => {
   await changeLocale(locale)
   const log = vi.spyOn(console, 'error').mockImplementation(() => {})
   context.mockImplementation(() => { throw new Error('synthetic render failure') })
   mount()
   expect(screen.getByRole('heading', { name: locale === 'es' ? 'Ajustes de consola' : 'Console settings', level: 1 })).toBeVisible()
-  expect(screen.getByText(locale === 'es' ? 'Referencia del error' : 'Error reference')).toBeVisible()
-  expect(document.querySelector('code')?.textContent).toMatch(/^client-.+/)
+  expect(screen.queryByText(locale === 'es' ? 'Referencia del error' : 'Error reference')).not.toBeInTheDocument()
+  expect(document.querySelector('code')).toBeNull()
+  expect(document.body).not.toHaveTextContent(/503|req_8f2c41d07a9b|acme-web/)
   expect(document.body.textContent).not.toContain('req_8f2c41d07a9b')
   context.mockReturnValue({ tenants: [], activeTenantId: null, loading: false })
   fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Reintentar' : 'Retry' }))
@@ -127,7 +130,8 @@ test.each(['missing crypto', 'missing randomUUID'])('render errors remain recove
     context.mockImplementation(() => { throw new Error('synthetic render failure') })
     const page = mount()
     expect(screen.getByRole('heading', { name: 'Ajustes de consola', level: 1 })).toBeVisible()
-    expect(document.querySelector('code')?.textContent).toMatch(/^client-.+/)
+    expect(document.querySelector('code')).toBeNull()
+    expect(document.body).not.toHaveTextContent(/503|req_8f2c41d07a9b|acme-web/)
     context.mockReturnValue({ tenants: [], activeTenantId: null, loading: false })
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
     expect(screen.getByText('Sin preferencias configurables')).toBeVisible()
@@ -155,7 +159,7 @@ for (const locale of ['es', 'en'] as const) for (const route of ['/console/overv
     login(['tenant_owner'])
     const network = strictFetch({})
     render(<MemoryRouter initialEntries={[route]}><App /></MemoryRouter>)
-    await screen.findByRole('heading', { name: route === '/' ? (locale === 'es' ? 'Bienvenida' : 'Welcome') : (locale === 'es' ? 'Resumen' : 'Overview') })
+    await screen.findByRole('heading', { name: route === '/' ? (locale === 'es' ? welcomeEs : welcomeEn).title : (locale === 'es' ? 'Resumen' : 'Overview') })
     const remove = registerLocaleBundles('synthetic-other-route', { es: async () => { throw new Error('synthetic failure') }, en: async () => { throw new Error('synthetic failure') } })
     function Observer() { const state = useLocaleLoader(); return <output data-testid="loader-result">{String(state.error)}</output> }
     render(<Observer />)

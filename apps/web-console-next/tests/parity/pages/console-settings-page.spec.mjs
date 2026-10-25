@@ -169,7 +169,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       } finally { release(); }
       await assertPreference(parity.page, target);
     });
-    test('render error reference and remount', async ({ parity, server }) => {
+    test('render error without sample diagnostics and remount', async ({ parity, server }) => {
       await parity.page.addInitScript(() => {
         window.__settingsRenderFailure = true;
         const find = Array.prototype.find;
@@ -180,8 +180,9 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       });
       await parity.page.goto(server.url('console/settings'));
       await expect(parity.page.getByRole('heading', { name: title(locale), level: 1 })).toBeVisible();
-      await expect(parity.page.getByText(copy(locale, 'Referencia del error', 'Error reference'), { exact: true })).toBeVisible();
-      await expect(parity.page.locator('code').filter({ hasText: /^client-.+/ })).toBeVisible();
+      await expect(parity.page.getByText('500', { exact: true }).first()).toBeVisible();
+      await expect(parity.page.locator('body')).not.toContainText(/503|req_8f2c41d07a9b|acme-web/);
+      await expect(parity.page.locator('code')).toHaveCount(0);
       await parity.page.evaluate(() => { window.__settingsRenderFailure = false; });
       await retry(parity.page, locale).click();
       await expect(select(parity.page, locale)).toBeEnabled();

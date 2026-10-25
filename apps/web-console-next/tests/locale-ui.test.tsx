@@ -2,12 +2,14 @@ import { login, strictFetch } from './shell-support'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, expect, test } from 'vitest'
+import es from '../src/locales/es/pages.welcome-page.json'
+import en from '../src/locales/en/pages.welcome-page.json'
 import { App } from '../src/App'
 import { changeLocale } from '../src/i18n'
 
 test.each([
-  ['es', 'Acerca de', 'Consola', 'Bienvenida', 'Esta página estará disponible próximamente.'],
-  ['en', 'About', 'Console', 'Welcome', 'This page will be available soon.']
+  ['es', 'Acerca de', 'Consola', es.title, es.intro],
+  ['en', 'About', 'Console', en.title, en.intro]
 ] as const)('shell and lazy welcome copy render in %s', async (locale, about, consoleName, title, body) => {
   await changeLocale(locale)
   render(<MemoryRouter><App /></MemoryRouter>)

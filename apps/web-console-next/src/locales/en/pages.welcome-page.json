@@ -1,0 +1,19 @@
+{
+  "badge": "Welcome to the console",
+  "title": "In Falcone Console",
+  "intro": "Administration console for your organization on the In Falcone BaaS platform: manage your team’s access, your organization’s configuration and enabled services in one place, with authentication backed by Keycloak.",
+  "secureTitle": "Secure access",
+  "secureBody": "Sign in with your organization account; only authorized people can enter the console.",
+  "signupTitle": "Don’t have an account yet?",
+  "signupBody": "If your organization enables registration, you can request access and track your registration until it is active.",
+  "login": "Go to login",
+  "signup": "Request access",
+  "recovery": "Forgot your password?",
+  "help": "Need help signing in? Contact your organization’s administrator.",
+  "documentTitle": "Welcome · In Falcone Console",
+  "logo": "In Falcone",
+  "back": "Back to sign in",
+  "skip": "Skip to content",
+  "sections": "Sections",
+  "moreActions": "More actions"
+}
