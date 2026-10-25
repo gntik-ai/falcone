@@ -32,7 +32,8 @@ async function failure(parity, control, recover = true) {
   if (control === 'menu') await page.keyboard.press('Escape');
   await expect(retry(page, locale)).toBeVisible();
   await assertPreference(page, locale);
-  await expect(page.locator('[aria-live="assertive"]')).toContainText(copy(locale, 'Se mantiene el idioma anterior.', 'The previous language remains active.'));
+  // The shell and page each own an announcer; the message must reach one of them.
+  await expect(page.locator('[data-live-announcer="assertive"]')).toContainText([copy(locale, 'Se mantiene el idioma anterior.', 'The previous language remains active.')]);
   if (recover) {
     let release;
     const held = new Promise((resolve) => { release = resolve; });
@@ -73,7 +74,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       const target = locale === 'es' ? 'en' : 'es';
       await choose(parity.page, locale, target, 'page');
       await assertPreference(parity.page, target);
-      await expect(parity.page.locator('[aria-live="polite"]')).toContainText(copy(target, 'Idioma de la interfaz cambiado', 'Interface language changed'));
+      await expect(parity.page.locator('[data-live-announcer="polite"]')).toContainText([copy(target, 'Idioma de la interfaz cambiado', 'Interface language changed')]);
       await expect(select(parity.page, target)).toBeFocused();
       await parity.page.reload();
       await assertPreference(parity.page, target);

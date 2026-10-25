@@ -18,7 +18,7 @@ test('English is the browser-independent default; menu preference survives reloa
   await expect(page.getByRole('navigation', { name: 'Breadcrumb', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Console settings' })).toBeVisible();
   await page.getByRole('button', { name: 'User menu' }).click();
-  const language = page.getByRole('combobox', { name: 'Language' }).first();
+  const language = page.getByRole('combobox', { name: 'Language', exact: true });
   await expect(language.getByRole('option')).toHaveText(['Spanish', 'English']);
   await language.selectOption('es');
   await expect(page.locator('html')).toHaveAttribute('lang', 'es');
