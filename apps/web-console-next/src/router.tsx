@@ -51,7 +51,7 @@ export const appRoutes: RouteObject[] = [
         return { ...route, element: guard ? <Guard kind={guard}>{page}</Guard> : page }
       }),
       ...(__SHELL_TEST_FIXTURES__ && FixtureRoutes ? [{ path: '__fixture/*', element: <FixtureRoutes /> }] : []),
-      { path: 'settings', element: lazyPage('settings', () => import('./pages/settings')) },
+      { path: 'settings', element: lazyPage('pages.console-settings-page', () => import('./pages/settings')) },
       { path: '*', element: <RouteState state="unknown" /> }
     ]
   }

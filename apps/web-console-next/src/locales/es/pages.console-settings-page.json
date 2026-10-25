@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "label": "Ajustes de cuenta",
+    "profile": "Perfil",
+    "settings": "Ajustes"
+  },
+  "badge": "Ajustes",
+  "title": "Ajustes de consola",
+  "description": "Preferencias operativas para tu cuenta y para {tenant}.",
+  "tenantFallback": "la organización activa",
+  "loading": "Cargando la organización activa.",
+  "language": {
+    "label": "Idioma de la interfaz",
+    "description": "El idioma se aplica inmediatamente y se guarda para próximas visitas.",
+    "es": "Español",
+    "en": "Inglés",
+    "changed": "Idioma de la interfaz cambiado a {language}."
+  },
+  "empty": {
+    "title": "Sin preferencias configurables",
+    "description": "Esta organización no tiene ajustes de consola disponibles en este momento.",
+    "body": "La gestión de miembros, cuotas y planes ya está disponible en sus propias secciones de la consola. Si necesitas cambiar un ajuste que no ves aquí, contacta con un administrador de la organización o con soporte."
+  },
+  "error": {
+    "title": "No se pudo cambiar el idioma",
+    "message": "No se pudo cargar el idioma seleccionado. Comprueba tu conexión y vuelve a intentarlo.",
+    "announcement": "No se pudo cambiar el idioma. Se mantiene el idioma anterior.",
+    "renderMessage": "No se pudieron mostrar los ajustes de consola. Vuelve a intentarlo.",
+    "retry": "Reintentar"
+  },
+  "labels": {
+    "title": "Error",
+    "message": "Vuelve a intentarlo.",
+    "support": "Contactar con soporte",
+    "retry": "Reintentar",
+    "retrying": "Reintentando…",
+    "retryingStatus": "Reintentando la carga.",
+    "requestId": "Referencia del error",
+    "copyRequestId": "Copiar referencia del error",
+    "copied": "Referencia copiada",
+    "requestIdCopied": "Referencia del error copiada.",
+    "details": "Detalles del error"
+  }
+}

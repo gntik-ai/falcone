@@ -1,5 +1,5 @@
 import { login, strictFetch } from './shell-support'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { App } from '../src/App'
@@ -33,15 +33,17 @@ test('user menu changes the shell and route copy without navigation', async () =
   expect(localStorage.getItem('falcone-next-locale')).toBe('en')
 })
 
-test('settings switch changes both controls and Intl samples', async () => {
+test('settings switch changes both controls', async () => {
   render(<MemoryRouter initialEntries={['/console/settings']}><App /></MemoryRouter>)
-  expect(await screen.findByRole('heading', { name: 'Página pendiente' })).toBeVisible()
-  const controls = screen.getAllByRole('combobox', { name: 'Idioma', hidden: true })
-  fireEvent.change(controls[0], { target: { value: 'en' } })
-  expect(await screen.findByRole('heading', { name: 'Page pending' })).toBeVisible()
-  expect(screen.getByText('1234.5')).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Ajustes de consola' })).toBeVisible()
+  fireEvent.click(screen.getByRole('combobox', { name: 'Idioma de la interfaz' }))
+  const option = within(await screen.findByRole('listbox')).getByRole('option', { name: 'Inglés' })
+  fireEvent.pointerDown(option)
+  fireEvent.click(option)
+  expect(await screen.findByRole('heading', { name: 'Console settings' })).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'User menu' }))
-  await waitFor(() => expect(screen.getAllByRole('combobox', { name: 'Language', hidden: true })).toHaveLength(2))
+  expect(screen.getByRole('combobox', { name: 'Interface language' })).toBeVisible()
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Language', hidden: true })).toHaveValue('en'))
 })
 
 test.each([['es', 'Página no encontrada'], ['en', 'Page not found']] as const)('unknown routes render localized 404 in %s', async (locale, title) => {

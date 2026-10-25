@@ -38,8 +38,10 @@ export const navigation = [
 export const navigationGroups = ['main', 'workspace', 'functions', 'administration', 'dataPlane', 'operations', 'restricted'] as const
 
 export function isMigratedRoute(href: string) {
-  if (!href.startsWith('/console/') || !pendingConsoleRoutes.some((route) => route.migrated === true)) return false
+  if (!href.startsWith('/console/')) return false
   const pathname = href.split(/[?#]/, 1)[0]
+  // Settings is a migrated lazy route declared separately from pending pages.
+  if (pathname === '/console/settings') return true
   // Prefer the most specific route (including unmarked child routes).
   const routes = [...pendingConsoleRoutes].sort((a, b) =>
     b.path.split('/').length - a.path.split('/').length ||

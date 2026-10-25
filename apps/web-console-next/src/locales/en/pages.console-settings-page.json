@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "label": "Account settings",
+    "profile": "Profile",
+    "settings": "Settings"
+  },
+  "badge": "Settings",
+  "title": "Console settings",
+  "description": "Operational preferences for your account and for {tenant}.",
+  "tenantFallback": "the active organization",
+  "loading": "Loading the active organization.",
+  "language": {
+    "label": "Interface language",
+    "description": "The language applies immediately and is saved for future visits.",
+    "es": "Spanish",
+    "en": "English",
+    "changed": "Interface language changed to {language}."
+  },
+  "empty": {
+    "title": "No configurable preferences",
+    "description": "This organization has no console settings available at the moment.",
+    "body": "Member, quota and plan management is already available in its own console sections. If you need to change a setting that is not shown here, contact an organization administrator or support."
+  },
+  "error": {
+    "title": "Could not change the language",
+    "message": "The selected language could not be loaded. Check your connection and try again.",
+    "announcement": "Could not change the language. The previous language remains active.",
+    "renderMessage": "Console settings could not be displayed. Try again.",
+    "retry": "Retry"
+  },
+  "labels": {
+    "title": "Error",
+    "message": "Try again.",
+    "support": "Contact support",
+    "retry": "Retry",
+    "retrying": "Retrying…",
+    "retryingStatus": "Retrying the load.",
+    "requestId": "Error reference",
+    "copyRequestId": "Copy error reference",
+    "copied": "Reference copied",
+    "requestIdCopied": "Error reference copied.",
+    "details": "Error details"
+  }
+}
