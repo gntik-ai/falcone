@@ -19,8 +19,7 @@ const links = (copy) => [[copy.back, 'login'], [copy.login, 'login'], [copy.sign
 async function assertWelcomeLocale({ page, locale }) {
   await expect(page.locator('html')).toHaveAttribute('lang', locale);
   await expect(page).toHaveTitle(copies[locale].documentTitle);
-  // The required product title also occurs as translated copy in another page's
-  // catalog. Validate this page's complete copy instead of a global English denylist.
+  // Check the page's complete copy in addition to the shared locale assertions.
   const allowed = [
     ...Object.values(copies[locale]), ...Object.values(common[locale].locale),
     common[locale].shell.console, common[locale].shell.about, common[locale].shell.userMenu,
@@ -135,6 +134,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.open();
       const page = parity.page;
       await check.assertAccessibility(parity);
+      await check.assertLocale(parity);
       await assertWelcomeLocale(parity);
       await expect(page.getByRole('main')).toHaveCount(1);
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
@@ -193,6 +193,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       } finally { await release(); }
       await expect(title(parity.page, locale)).toBeVisible();
       await parity.page.evaluate(() => document.fonts.ready);
+      await check.assertLocale(parity);
       await assertWelcomeLocale(parity);
       await capture(parity.page, info, 'welcome', locale, width);
     });
