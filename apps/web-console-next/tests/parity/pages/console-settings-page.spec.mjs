@@ -18,12 +18,13 @@ async function choose(page, from, to, control) {
   } else {
     await select(page, from).click();
     await page.getByRole('listbox').getByRole('option', { name: to === 'es' ? copy(from, 'Español', 'Spanish') : copy(from, 'Inglés', 'English'), exact: true }).click();
-    await expect(page.locator('[role="listbox"]')).toHaveCount(0);
+    await expect(page.getByRole('listbox')).toHaveCount(0);
   }
 }
 async function assertPreference(page, locale) {
   await expect(page.locator('html')).toHaveAttribute('lang', locale);
   await expect(page.getByRole('heading', { name: title(locale), level: 1 })).toBeVisible();
+  await expect(select(page, locale)).toHaveText(copy(locale, 'Español', 'English'));
   expect(await page.evaluate(() => localStorage.getItem('falcone-next-locale'))).toBe(locale);
 }
 async function failure(parity, control, recover = true) {
