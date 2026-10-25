@@ -1,6 +1,8 @@
 // Runs inside page.evaluate; keep the collector independent of module scope.
 export function unexpectedWelcomeCopy(allowedCopy) {
   const allowed = new Set(allowedCopy);
+  // React renders the optional commit suffix as a separate text node.
+  const buildVersion = /^(?:(?:dev|\d+\.\d+\.\d+[0-9A-Za-z.+-]*)(?: · [0-9a-f]{7})?|· [0-9a-f]{7})$/;
   const values = [];
   for (const element of document.body.querySelectorAll('*')) {
     const style = getComputedStyle(element);
@@ -12,5 +14,5 @@ export function unexpectedWelcomeCopy(allowedCopy) {
     for (const child of element.childNodes) if (child.nodeType === Node.TEXT_NODE) values.push(child.textContent);
     if (element.matches('input[type="button"], input[type="submit"], input[type="reset"]')) values.push(element.value);
   }
-  return values.map((value) => value.replace(/\s+/g, ' ').trim()).filter((value) => value && !allowed.has(value));
+  return values.map((value) => value.replace(/\s+/g, ' ').trim()).filter((value) => value && !allowed.has(value) && !buildVersion.test(value));
 }
