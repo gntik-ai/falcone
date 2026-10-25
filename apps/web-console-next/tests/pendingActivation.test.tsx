@@ -189,3 +189,38 @@ test('preserves history state on reload and restores the previous document title
   page.unmount()
   expect(document.title).toBe('Previous title')
 })
+
+test('CSP session serves the pending activation fixture and rejects unexpected requests', async () => {
+  // @ts-expect-error Browser helpers intentionally use native JavaScript modules.
+  const { installSession } = await import('./browser-session.mjs')
+  const page = { addInitScript: vi.fn(), route: vi.fn() }
+  const unmatched = await installSession(page)
+  const handle = page.route.mock.calls[0][1]
+  for (const [method, path] of [
+    ['GET', statusPath],
+    ['POST', statusPath],
+    ['GET', `${statusPath}/unexpected`],
+    ['GET', `${statusPath}?unexpected=true`],
+    ['GET', '/v1/auth/status-views/active'],
+  ]) {
+    const route = {
+      request: () => ({ url: () => `http://localhost${path}`, method: () => method, postDataJSON: () => undefined }),
+      fulfill: vi.fn(), abort: vi.fn(),
+    }
+    await handle(route)
+    if (method === 'GET' && path === statusPath) {
+      expect(route.fulfill).toHaveBeenCalledExactlyOnceWith({ status: 200, json: serverView })
+      expect(route.abort).not.toHaveBeenCalled()
+      expect(unmatched).toEqual([])
+    } else {
+      expect(route.fulfill).not.toHaveBeenCalled()
+      expect(route.abort).toHaveBeenCalledExactlyOnceWith()
+    }
+  }
+  expect(unmatched).toEqual([
+    `POST ${statusPath}`,
+    `GET ${statusPath}/unexpected`,
+    `GET ${statusPath}?unexpected=true`,
+    'GET /v1/auth/status-views/active',
+  ])
+})
