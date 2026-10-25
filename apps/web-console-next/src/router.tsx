@@ -4,7 +4,9 @@ import { StatusPage } from './StatusPage'
 import { ProtectedRoute } from './shell/session'
 import { Shell } from './shell/Shell'
 import { Guard, ConsoleIndexRedirect } from './shell/guards'
-import { RouteState } from './shell/RouteState'
+import { PageSkeleton } from '@gntik-ai/blocks'
+import { useTranslation } from 'react-i18next'
+import { RouteState, ShellErrorBoundary } from './shell/RouteState'
 import { pendingConsoleRoutes } from './shell/routes'
 
 declare const __SHELL_TEST_FIXTURES__: boolean
@@ -19,6 +21,11 @@ export function ConsoleRoutes() {
   return <Suspense fallback={<StatusPage state="loading" />}>{routes}</Suspense>
 }
 
+function WelcomeLoading() {
+  const { t } = useTranslation('common')
+  return <main className="mx-auto w-full max-w-5xl p-7 sm:p-10"><PageSkeleton stats={0} rows={2} label={t('states.loading.title')} className="" /></main>
+}
+
 // Namespace names are explicit so check:i18n validates the route/resource contract.
 function lazyPage(_namespace: string, load: () => Promise<{ default: ComponentType }>) {
   const Page = lazy(load)
@@ -29,7 +36,7 @@ export const appRoutes: RouteObject[] = [
   {
     element: <Outlet />,
     children: [
-      { path: '/', element: lazyPage('welcome', () => import('./pages/welcome')) },
+      { path: '/', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<WelcomeLoading />}>{lazyPage('pages.welcome-page', () => import('./pages/welcome'))}</Suspense></ShellErrorBoundary> },
       { path: '/login', element: lazyPage('login', () => import('./pages/login')) },
       { path: '/password-recovery', element: lazyPage('recovery', () => import('./pages/recovery')) },
       { path: '/invitations/:tenantId/:invitationId', element: lazyPage('invitation', () => import('./pages/invitation')) },

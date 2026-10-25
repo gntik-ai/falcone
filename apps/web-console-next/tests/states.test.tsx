@@ -3,12 +3,14 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { expect, test } from 'vitest'
 import { App } from '../src/App'
+import welcomeEs from '../src/locales/es/pages.welcome-page.json'
+import welcomeEn from '../src/locales/en/pages.welcome-page.json'
 import { StatusPage } from '../src/StatusPage'
 import { changeLocale } from '../src/i18n'
 
 const copy = {
   es: {
-    shell: ['Falcone', '.', 'Consola', 'Menú de usuario', 'Idioma', 'Español', 'Inglés', 'Acerca de', 'dev', 'Bienvenida', 'Esta página estará disponible próximamente.'],
+    shell: ['Falcone', '.', 'Consola', 'Menú de usuario', 'Idioma', 'Español', 'Inglés', 'Acerca de', 'dev', ...Object.values(welcomeEs)],
     states: [
       ['loading', 'Cargando', 'Espera un momento.'],
       ['empty', 'Sin resultados', 'No hay elementos para mostrar.'],
@@ -20,7 +22,7 @@ const copy = {
     ]
   },
   en: {
-    shell: ['Falcone', '.', 'Console', 'User menu', 'Language', 'Spanish', 'English', 'About', 'dev', 'Welcome', 'This page will be available soon.'],
+    shell: ['Falcone', '.', 'Console', 'User menu', 'Language', 'Spanish', 'English', 'About', 'dev', ...Object.values(welcomeEn)],
     states: [
       ['loading', 'Loading', 'Please wait.'],
       ['empty', 'No results', 'There are no items to display.'],
@@ -38,7 +40,7 @@ for (const locale of ['es', 'en'] as const) {
     test(`${locale} shell and ${state} expose only translated text and names`, async () => {
       await changeLocale(locale)
       const { container } = render(<LiveAnnouncer><MemoryRouter><App /></MemoryRouter><StatusPage state={state} /></LiveAnnouncer>)
-      await screen.findByRole('heading', { name: locale === 'es' ? 'Bienvenida' : 'Welcome' })
+      await screen.findByRole('heading', { name: 'In Falcone Console' })
       for (const details of container.querySelectorAll('details')) details.open = true
       expect(screen.getByRole('heading', { name: title })).toBeVisible()
       expect(screen.getByText(body)).toBeVisible()

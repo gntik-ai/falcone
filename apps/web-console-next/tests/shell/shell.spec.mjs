@@ -32,7 +32,8 @@ test('render errors retain navigation without stack text, and About shows build 
   await page.addInitScript(() => localStorage.setItem('falcone-next-locale', 'es'));
   await page.goto(server.url('console/__fixture/throw'));
   await expect(page.getByRole('heading', { name: 'Error del servidor', exact: true }).first()).toBeVisible();
-  await expect(page.getByText('500', { exact: true })).toBeVisible();
+  await expect(page.getByText('500', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('body')).not.toContainText(/req_8f2c41d07a9b|503|acme-web/);
   await expect(page.getByRole('navigation', { name: 'Navegación de consola' })).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/synthetic-render-failure|\bat https?:|Error:|Stack trace/);
   await page.getByRole('button', { name: 'Menú de usuario' }).click();
