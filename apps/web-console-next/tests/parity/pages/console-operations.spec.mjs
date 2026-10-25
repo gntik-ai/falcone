@@ -11,10 +11,28 @@ const terminalCopy = (p) => copy(p, '1 operación completada mientras estabas de
 const requests = (p) => p.network.requests.filter((r) => r.path === '/v1/async-operation-query' && r.body?.queryType === 'list');
 const reconnectRequests = (p) => p.network.requests.filter((r) => r.path === '/v1/console/session' || Array.isArray(r.body?.filters?.status));
 const caption = (p) => p.page.locator('.console-operations caption');
+const frozen = new WeakSet();
+const finishedLists = new WeakMap();
+async function failedAttempt(p, count) {
+  await expect.poll(() => requests(p).length).toBe(count);
+  // The registry records requests before it fulfills/aborts them. Advance retry
+  // time only once fetch has received the failure and scheduled its next timer.
+  await expect.poll(() => finishedLists.get(p)).toBe(count);
+  await p.page.evaluate(() => {});
+}
+async function activate(p, control) {
+  if (frozen.has(p)) {
+    // Pointer actionability waits for animation frames, which the clock has paused.
+    await control.focus();
+    await control.press('Enter');
+  } else await control.click();
+}
 async function choose(p, labels, option) {
   const control = p.page.getByRole('combobox', { name: copy(p, ...labels), exact: true });
-  await control.click();
-  await p.page.getByRole('option', { name: option, exact: true }).click();
+  await activate(p, control);
+  await activate(p, p.page.getByRole('listbox').getByRole('option', { name: option, exact: true }));
+  await expect(control).toHaveAttribute('aria-expanded', 'false');
+  await settle(p);
   return control;
 }
 async function settle(p) {
@@ -26,6 +44,23 @@ async function freeze(p) {
   const time = new Date('2026-06-01T12:00:00Z');
   await p.page.clock.install({ time });
   await p.page.clock.pauseAt(time);
+  frozen.add(p);
+  finishedLists.set(p, requests(p).length);
+  const finished = (request) => {
+    if (new URL(request.url()).pathname !== '/v1/async-operation-query' || request.postDataJSON()?.queryType !== 'list') return;
+    finishedLists.set(p, finishedLists.get(p) + 1);
+  };
+  p.page.on('requestfinished', finished);
+  p.page.on('requestfailed', finished);
+}
+async function resume(p) {
+  await p.page.clock.resume();
+  frozen.delete(p);
+}
+async function health(p) {
+  // The shared monitor drains a setTimeout(0); restore timers before calling it.
+  await resume(p);
+  await check.assertRuntimeHealth(p);
 }
 async function event(p, name = 'online') {
   await p.page.evaluate((name) => {
@@ -63,9 +98,10 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(previous(parity)).toBeDisabled();
       const types = parity.page.getByRole('combobox', { name: copy(parity, 'Tipo de operación', 'Operation type'), exact: true });
       await types.click();
-      await expect(parity.page.getByRole('option')).toHaveText([copy(parity, 'Todos', 'All'), 'synthetic-bucket-create', 'synthetic-workspace-create', 'synthetic-workspace-delete']);
+      await expect(parity.page.getByRole('listbox').getByRole('option')).toHaveText([copy(parity, 'Todos', 'All'), 'synthetic-bucket-create', 'synthetic-workspace-create', 'synthetic-workspace-delete']);
       await parity.page.keyboard.press('Escape');
-      const formatted = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(operations[0].createdAt));
+      // Use the browser's ICU/time zone, with an oracle independent of page resources.
+      const formatted = await parity.page.evaluate(({ locale, value }) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)), { locale, value: operations[0].createdAt });
       await expect(parity.page.locator('tbody tr:first-child td').last()).toHaveText(formatted);
       await expect(parity.page.locator('tbody tr:nth-child(2) td').nth(3)).toHaveText('—');
     });
@@ -100,15 +136,29 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await check.errorEmpty(parity, manifest);
       await parity.open(manifest.route, { 'ops.list': '404' });
       await expect(parity.page.getByRole('link', { name: copy(parity, 'Volver al resumen', 'Back to overview'), exact: true })).toHaveAttribute('href', /\/console\/overview$/);
-      parity.network.setVariants({ 'ops.list': { delayMs: 1000 } });
-      await parity.page.goto(server.url(manifest.route.slice(1)));
-      await expect(parity.page.getByRole('status', { name: copy(parity, 'Cargando operaciones', 'Loading operations'), exact: true })).toBeVisible();
+      let release;
+      const held = new Promise((resolve) => { release = resolve; });
+      const hold = async (route) => { await held; await route.fallback(); };
+      parity.network.setVariants({});
+      await parity.page.route('**/v1/async-operation-query', hold);
+      try {
+        await parity.page.goto(server.url(manifest.route.slice(1)));
+        await expect(parity.page.getByRole('status', { name: copy(parity, 'Cargando operaciones', 'Loading operations'), exact: true })).toBeVisible();
+      } finally {
+        release();
+        await parity.page.unroute('**/v1/async-operation-query', hold);
+      }
       await settle(parity);
       await freeze(parity);
       await parity.open(manifest.route);
       parity.network.setVariants({ 'ops.list': 'network' });
+      const start = requests(parity).length;
       await parity.page.clock.runFor(30_000);
-      await parity.page.clock.runFor(4000);
+      await failedAttempt(parity, start + 1);
+      await parity.page.clock.runFor(1000);
+      await failedAttempt(parity, start + 2);
+      await parity.page.clock.runFor(3000);
+      await failedAttempt(parity, start + 3);
       await expect(retry(parity)).toBeVisible();
       await expect(parity.page.getByText(copy(parity, 'La lista no está actualizada. Reintenta para actualizar las operaciones.', 'The list is out of date. Retry to update operations.'), { exact: true })).toBeVisible();
       const count = requests(parity).length;
@@ -135,8 +185,10 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.open(manifest.route, { 'ops.list': 'with-running' });
       await reconnect(parity);
       await expect(parity.page.getByText(terminalCopy(parity), { exact: true })).toBeVisible();
+      // Axe performs asynchronous browser work; timing is covered by runtime-health.
+      await resume(parity);
       await check.assertAccessibility(parity);
-      await parity.page.getByRole('button', { name: copy(parity, 'Cerrar', 'Close'), exact: true }).click();
+      await activate(parity, parity.page.getByRole('button', { name: copy(parity, 'Cerrar', 'Close'), exact: true }));
       await expect(caption(parity)).toBeFocused();
     });
     test('runtime-health', async ({ parity }) => {
@@ -145,6 +197,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       const start = requests(parity).length;
       await parity.page.clock.runFor(29_999); expect(requests(parity)).toHaveLength(start);
       await parity.page.clock.runFor(1); await expect.poll(() => requests(parity).length).toBe(start + 1);
+      await settle(parity);
       const beforeSync = await reconnect(parity);
       await expect(parity.page.getByText(terminalCopy(parity), { exact: true })).toBeVisible();
       expect(parity.network.requests.slice(beforeSync)).toEqual([
@@ -164,7 +217,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await event(parity, 'visible'); // Restore visibility before the next navigation.
       await parity.open(manifest.route, { 'ops.list': 'all-completed' });
       const terminal = requests(parity).length; await parity.page.clock.runFor(30_000); expect(requests(parity)).toHaveLength(terminal);
-      await check.assertRuntimeHealth(parity);
+      await health(parity);
     });
     test('responsive', async ({ parity }) => {
       await parity.open(manifest.route);
@@ -202,10 +255,11 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
     test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
     test('401 uses the shared refresh and protected-route intent', async ({ parity, server }) => {
       parity.network.setVariants({ 'ops.list': '401' });
-      await parity.page.goto(server.url(manifest.route.slice(1)));
+      const operationUrl = server.url(manifest.route.slice(1));
+      await parity.page.goto(operationUrl);
       await expect(parity.page).toHaveURL(/\/login$/);
       expect(parity.network.requests.filter((r) => r.method === 'POST' && r.path === '/v1/auth/login-sessions/synthetic-session/refresh')).toHaveLength(1);
-      expect(await parity.page.evaluate(() => sessionStorage.getItem('in-falcone.console-protected-route'))).toBe('/next/console/operations');
+      await expect.poll(() => parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(operationUrl).pathname);
     });
     test('retry timing and filtered offset survive automatic and manual recovery', async ({ parity }) => {
       await freeze(parity);
@@ -216,16 +270,16 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       for (const variant of ['500-then-success', 'network-then-success']) {
         parity.network.setVariants({ 'ops.list': variant });
         const start = requests(parity).length;
-        await next(parity).click();
-        await expect.poll(() => requests(parity).length).toBe(start + 1);
+        await activate(parity, next(parity));
+        await failedAttempt(parity, start + 1);
         await parity.page.clock.runFor(999); expect(requests(parity)).toHaveLength(start + 1);
-        await parity.page.clock.runFor(1); await expect.poll(() => requests(parity).length).toBe(start + 2);
+        await parity.page.clock.runFor(1); await failedAttempt(parity, start + 2);
         await parity.page.clock.runFor(2999); expect(requests(parity)).toHaveLength(start + 2);
-        await parity.page.clock.runFor(1); await expect(retry(parity)).toBeVisible();
+        await parity.page.clock.runFor(1); await failedAttempt(parity, start + 3); await expect(retry(parity)).toBeVisible();
         expect(requests(parity).slice(start).map((r) => r.body)).toEqual(Array(3).fill(listBody({ status: 'running' }, 20)));
-        await retry(parity).click(); await expect(caption(parity)).toBeFocused();
+        await activate(parity, retry(parity)); await expect(caption(parity)).toBeFocused();
         expect(requests(parity).at(-1).body).toEqual(listBody({ status: 'running' }, 20));
-        await previous(parity).click();
+        await activate(parity, previous(parity));
         await expect(parity.page.locator('.console-operations [aria-current="page"]')).toHaveAttribute('aria-label', copy(parity, 'Página 1', 'Page 1'));
         await expect(parity.page.locator('tbody tr:first-child a')).toHaveAttribute('href', /\/op_1$/);
         await settle(parity);
@@ -265,7 +319,13 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await parity.open(manifest.route, { 'ops.list': 'with-running' }); await settle(parity);
         const aborted = [];
         const onFailed = (request) => { if (request.failure()?.errorText.includes('ABORTED')) aborted.push(request.url()); };
+        const traffic = [];
+        const onRequest = (request) => {
+          const path = new URL(request.url()).pathname;
+          if (path === '/v1/console/session' || (path === '/v1/async-operation-query' && request.postDataJSON()?.queryType === 'list')) traffic.push(path);
+        };
         parity.page.on('requestfailed', onFailed);
+        parity.page.on('request', onRequest);
         let release;
         let holding = false;
         const held = new Promise((resolve) => { release = resolve; });
@@ -276,23 +336,29 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
           await held; await route.fallback().catch(() => {});
         };
         if (stage !== 'debounce') await parity.page.route(routePattern, hold);
-        const start = reconnectRequests(parity).length;
-        await event(parity);
-        if (stage !== 'debounce') {
-          await parity.page.clock.runFor(500);
-          await expect.poll(() => holding).toBe(true);
+        try {
+          await event(parity);
+          if (stage !== 'debounce') {
+            await parity.page.clock.runFor(500);
+            await expect.poll(() => holding).toBe(true);
+          }
+          // Wait for the detail to commit, not just its URL: lazy navigation can
+          // update history before the list's unmount cleanup aborts the request.
+          await activate(parity, parity.page.locator('tbody tr:first-child a'));
+          await expect(parity.page).toHaveURL(/\/console\/operations\/op_1$/);
+          await expect(parity.page.locator('.operation-detail')).toBeVisible();
+          release();
+          await parity.page.clock.runFor(2000);
+          if (stage !== 'debounce') await expect.poll(() => aborted.length).toBeGreaterThan(0);
+          expect(traffic).toEqual(stage === 'debounce' ? [] : stage === 'session' ? ['/v1/console/session'] : ['/v1/console/session', '/v1/async-operation-query']);
+        } finally {
+          release();
+          if (stage !== 'debounce') await parity.page.unroute(routePattern, hold);
+          parity.page.off('requestfailed', onFailed);
+          parity.page.off('request', onRequest);
         }
-        // The migrated operation-detail link unmounts the list without destroying the monitor.
-        await parity.page.locator('tbody tr:first-child a').click();
-        await expect(parity.page).toHaveURL(/\/console\/operations\/op_1$/);
-        release();
-        await parity.page.clock.runFor(2000);
-        if (stage === 'debounce') expect(reconnectRequests(parity)).toHaveLength(start);
-        else await expect.poll(() => aborted.length).toBeGreaterThan(0);
-        if (stage !== 'debounce') await parity.page.unroute(routePattern, hold);
-        parity.page.off('requestfailed', onFailed);
-        await check.assertRuntimeHealth(parity);
       }
+      await health(parity);
     });
   });
 }

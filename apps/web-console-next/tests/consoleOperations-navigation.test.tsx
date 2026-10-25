@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, expect, test } from 'vitest'
 import { App } from '../src/App'
 import i18n from '../src/i18n'
@@ -39,4 +39,26 @@ test.each(['es', 'en'])('row links keep the next basename and open the migrated 
   expect(window.location.href).toBe(documentLocation)
   const bodies = requests.mock.mock.calls.filter(([path]) => path === '/v1/async-operation-query').map(([, init]) => JSON.parse(String(init?.body)))
   expect(bodies).toEqual([listBody(), bodyFor('detail'), bodyFor('logs'), bodyFor('result')])
+})
+
+function CurrentLocation() {
+  const { pathname } = useLocation()
+  return <output aria-label="Current location">{pathname}</output>
+}
+
+test.each(['/', '/next'])('401 refresh uses the shared shell and preserves the operations intent at basename %s', async (basename) => {
+  const session = login(['platform_auditor'])
+  requests = strictFetch({
+    [`GET ${tenantUrl}`]: { items: [] },
+    'POST /v1/auth/login-sessions/synthetic-session/refresh': session,
+    'POST /v1/async-operation-query': () => Response.json({ code: 'HTTP_401', message: 'Synthetic unauthorized query' }, { status: 401 }),
+  })
+  const path = `${basename === '/' ? '' : basename}/console/operations`
+  render(<MemoryRouter basename={basename} initialEntries={[path]}><CurrentLocation /><App /></MemoryRouter>)
+  expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
+  expect(screen.getByLabelText('Current location')).toHaveTextContent('/login')
+  await waitFor(() => expect(JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')!)).toBe(path))
+  expect(requests.mock.mock.calls.filter(([url]) => url === '/v1/auth/login-sessions/synthetic-session/refresh')).toHaveLength(1)
+  const queries = requests.mock.mock.calls.filter(([url]) => url === '/v1/async-operation-query').map(([, init]) => JSON.parse(String(init?.body)))
+  expect(queries).toEqual([listBody(), listBody()])
 })
