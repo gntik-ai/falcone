@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link as RouterLink } from 'react-router-dom'
 import { I18nProvider, Page, Input, Field, FieldLabel, SimpleSelect, Link, StatusTag, Timestamp, EmptyState, LiveAnnouncer, useAnnounce } from '@gntik-ai/ui'
 import { PageHeader, PageToolbar, DataTable, PaginationFooter, NoResultsEmpty, NotFoundEmpty, NoAccessEmpty, TableSkeleton, ErrorPanel, type DataTableColumn } from '@gntik-ai/blocks'
 import { useConsoleContext } from '../shell/context'
@@ -62,7 +63,7 @@ function Operations() {
     paginationNav: () => t('pagination'), previous: t('previous'), next: t('next'), page: (page: number) => t('page', { page }),
   }
   const columns: DataTableColumn<OperationSummary>[] = [
-    { id: 'type', header: t('type'), sortable: false, accessor: (row) => row.operationType, cell: (row) => <Link href={`/console/operations/${encodeURIComponent(row.operationId)}`} underline="always">{row.operationType}</Link> },
+    { id: 'type', header: t('type'), sortable: false, accessor: (row) => row.operationType, cell: (row) => <Link render={<RouterLink to={`/console/operations/${encodeURIComponent(row.operationId)}`} />} tone="primary" underline="always" external={false} externalLabel="">{row.operationType}</Link> },
     { id: 'status', header: t('statusLabel'), sortable: false, cell: (row) => <OperationStatusBadge status={row.status} /> },
     { id: 'actor', header: t('actor'), sortable: false, accessor: (row) => row.actorId },
     { id: 'workspace', header: t('workspace'), sortable: false, accessor: (row) => row.workspaceId ?? t('missing') },
