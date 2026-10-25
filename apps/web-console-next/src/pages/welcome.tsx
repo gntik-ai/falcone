@@ -26,7 +26,7 @@ export default function WelcomePage() {
   return <AuthLayout variant="full-bleed" mainId="welcome-main" fullScreen={false}
     logo={<Logo size={28} wordmark={true} aria-label={t('logo')} />}
     brand={null} brandFooter={null} brandLabel={t('logo')} footer={null} skipLinkLabel={t('skip')}
-    className="welcome-layout min-w-0 [&>main>div]:max-w-5xl">
+    className="welcome-layout min-w-0">
     <div className="mb-6"><Link render={<RouterLink to={consoleAuthConfig.loginPath} />} tone="muted" underline="always" external={false} externalLabel="">{t('back')}</Link></div>
     <section aria-labelledby="welcome-title" className="space-y-6 min-w-0 wrap-anywhere">
       <Badge tone="neutral" variant="soft" size="auto" shape="rounded" dot={false} onRemove={undefined} removeLabel="">{t('badge')}</Badge>
