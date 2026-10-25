@@ -40,7 +40,7 @@ for (const locale of ['es', 'en'] as const) {
     test(`${locale} shell and ${state} expose only translated text and names`, async () => {
       await changeLocale(locale)
       const { container } = render(<LiveAnnouncer><MemoryRouter><App /></MemoryRouter><StatusPage state={state} /></LiveAnnouncer>)
-      await screen.findByRole('heading', { name: 'In Falcone Console' })
+      await screen.findByRole('heading', { name: (locale === 'es' ? welcomeEs : welcomeEn).title })
       for (const details of container.querySelectorAll('details')) details.open = true
       expect(screen.getByRole('heading', { name: title })).toBeVisible()
       expect(screen.getByText(body)).toBeVisible()

@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { expect, test, vi } from 'vitest'
 import { App } from '../src/App'
 import { changeLocale } from '../src/i18n'
+import es from '../src/locales/es/pages.welcome-page.json'
+import en from '../src/locales/en/pages.welcome-page.json'
 
 const fault = vi.hoisted(() => ({ active: true }))
 vi.mock('../src/pages/welcome', async (original) => {
@@ -15,6 +17,7 @@ vi.mock('../src/pages/welcome', async (original) => {
 })
 
 for (const locale of ['es', 'en'] as const) {
+  const copy = locale === 'es' ? es : en
   test(`${locale} welcome render faults replace the auth layout and retry the actual route`, async () => {
     await changeLocale(locale)
     fault.active = true
@@ -25,11 +28,11 @@ for (const locale of ['es', 'en'] as const) {
     expect((await screen.findAllByText('500', { exact: true }))[0]).toBeVisible()
     expect(screen.getAllByRole('main')).toHaveLength(1)
     expect(screen.queryByRole('img', { name: 'In Falcone' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'In Falcone Console' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: copy.title })).not.toBeInTheDocument()
     expect(document.body).not.toHaveTextContent(/503|req_8f2c41d07a9b|acme-web|synthetic-welcome-render-failure/)
     fault.active = false
     fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Reintentar' : 'Retry' }))
-    expect(await screen.findByRole('heading', { name: 'In Falcone Console' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: copy.title })).toBeVisible()
     expect(screen.getAllByRole('main')).toHaveLength(1)
     expect(screen.getByRole('img', { name: 'In Falcone' })).toBeVisible()
     expect(screen.queryByText('500')).not.toBeInTheDocument()

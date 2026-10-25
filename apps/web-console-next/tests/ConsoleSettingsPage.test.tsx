@@ -8,6 +8,8 @@ import { ShellErrorBoundary } from '../src/shell/RouteState'
 import { registerLocaleBundles, useLocaleLoader } from '../src/i18n/locale-loader'
 import { login, strictFetch } from './shell-support'
 import Settings from '../src/pages/settings'
+import welcomeEs from '../src/locales/es/pages.welcome-page.json'
+import welcomeEn from '../src/locales/en/pages.welcome-page.json'
 
 const context = vi.hoisted(() => vi.fn())
 vi.mock('../src/shell/context', () => ({ useConsoleContext: context, ConsoleContextProvider: ({ children }: { children: React.ReactNode }) => children }))
@@ -157,7 +159,7 @@ for (const locale of ['es', 'en'] as const) for (const route of ['/console/overv
     login(['tenant_owner'])
     const network = strictFetch({})
     render(<MemoryRouter initialEntries={[route]}><App /></MemoryRouter>)
-    await screen.findByRole('heading', { name: route === '/' ? 'In Falcone Console' : (locale === 'es' ? 'Resumen' : 'Overview') })
+    await screen.findByRole('heading', { name: route === '/' ? (locale === 'es' ? welcomeEs : welcomeEn).title : (locale === 'es' ? 'Resumen' : 'Overview') })
     const remove = registerLocaleBundles('synthetic-other-route', { es: async () => { throw new Error('synthetic failure') }, en: async () => { throw new Error('synthetic failure') } })
     function Observer() { const state = useLocaleLoader(); return <output data-testid="loader-result">{String(state.error)}</output> }
     render(<Observer />)

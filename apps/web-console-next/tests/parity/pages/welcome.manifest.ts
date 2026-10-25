@@ -8,7 +8,7 @@ const manifest: ParityManifest = {
     success: { status: 200, body: buildConsoleSignupPolicyFixture() },
   } } },
   fixtures: [], sources: ['src/pages/welcome.tsx', 'src/router.tsx', 'src/App.tsx', 'src/shell/RouteState.tsx'],
-  data: [{ name: 'welcome title', locator: 'h1:text-is("In Falcone Console")' }],
+  data: [{ name: 'welcome title', locator: { es: 'h1:text-is("Consola In Falcone")', en: 'h1:text-is("In Falcone Console")' } }],
   actions: [], states: [],
 }
 export default manifest

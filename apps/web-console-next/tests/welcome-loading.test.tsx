@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { expect, test, vi } from 'vitest'
 import { App } from '../src/App'
+import es from '../src/locales/es/pages.welcome-page.json'
 
 const held = vi.hoisted(() => {
   let release!: () => void
@@ -23,7 +24,7 @@ test('the pending welcome chunk has one loading announcement and one main withou
   expect(screen.getAllByRole('main')).toHaveLength(1)
   expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   await act(async () => { held.release() })
-  expect(await screen.findByRole('heading', { name: 'In Falcone Console' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: es.title })).toBeVisible()
   expect(loading[0]).not.toBeInTheDocument()
   expect(fetch).not.toHaveBeenCalled()
 })

@@ -1,6 +1,6 @@
 {
   "badge": "Bienvenido a la consola",
-  "title": "In Falcone Console",
+  "title": "Consola In Falcone",
   "intro": "Consola de administración para tu organización en la plataforma BaaS de In Falcone: gestiona el acceso de tu equipo, la configuración de tu organización y los servicios habilitados desde un mismo lugar, con autenticación respaldada por Keycloak.",
   "secureTitle": "Acceso seguro",
   "secureBody": "Inicia sesión con tu cuenta de organización; solo las personas autorizadas pueden entrar en la consola.",

@@ -13,7 +13,7 @@ const common = Object.fromEntries(['es', 'en'].map((locale) => [locale,
   JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/common.json`, import.meta.url), 'utf8')),
 ]));
 const chunk = /\/assets\/welcome-[^/?]+\.js(?:\?.*)?$/;
-const title = (page) => page.getByRole('heading', { level: 1, name: 'In Falcone Console', exact: true });
+const title = (page, locale) => page.getByRole('heading', { level: 1, name: copies[locale].title, exact: true });
 const links = (copy) => [[copy.back, 'login'], [copy.login, 'login'], [copy.signup, 'signup'], [copy.recovery, 'password-recovery']];
 
 async function assertWelcomeLocale({ page, locale }) {
@@ -40,7 +40,7 @@ async function injectRenderFault(page) {
 async function assertBoundary(page, locale) {
   await expect(page.getByText('500', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('main')).toHaveCount(1);
-  await expect(title(page)).toHaveCount(0);
+  await expect(title(page, locale)).toHaveCount(0);
   await expect(page.getByText(copies[locale].badge, { exact: true })).toHaveCount(0);
   await expect(page.getByRole('img', { name: 'In Falcone', exact: true })).toHaveCount(0);
   await expect(page.locator('body')).not.toContainText(/503|req_8f2c41d07a9b|acme-web|synthetic-welcome-failure/);
@@ -68,7 +68,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.page.addInitScript(() => sessionStorage.removeItem('in-falcone.console-shell-session'));
       parity.open = async () => {
         await parity.page.goto(server.url(''));
-        await expect(title(parity.page)).toBeVisible();
+        await expect(title(parity.page, locale)).toBeVisible();
         await parity.page.evaluate(() => document.fonts.ready);
       };
     });
@@ -96,7 +96,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await expect(parity.page).toHaveURL(server.url(destination));
         expect(await parity.page.evaluate(() => window.__welcomeDocument)).toBe(true);
         await parity.page.goBack();
-        await expect(title(parity.page)).toBeVisible();
+        await expect(title(parity.page, locale)).toBeVisible();
         await expect(parity.page.getByRole('main')).toBeFocused();
       }
     });
@@ -106,10 +106,10 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       try {
         await page.goto(server.url(''), { waitUntil: 'domcontentloaded' });
         await expect(page.getByRole('status').filter({ hasText: locale === 'es' ? 'Cargando' : 'Loading' })).toHaveCount(1);
-        await expect(title(page)).toHaveCount(0);
+        await expect(title(page, locale)).toHaveCount(0);
         await page.waitForTimeout(2000);
       } finally { await release(); }
-      await expect(title(page)).toBeVisible();
+      await expect(title(page, locale)).toBeVisible();
       // Neither a valid session nor an expired session may trigger refresh or redirect.
       for (const expired of [false, true]) {
         const session = sessionFor(role);
@@ -124,7 +124,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await assertBoundary(page, locale);
       await page.evaluate(() => sessionStorage.removeItem('welcome-render-fault'));
       await page.getByRole('button', { name: locale === 'es' ? 'Reintentar' : 'Retry', exact: true }).click();
-      await expect(title(page)).toBeVisible();
+      await expect(title(page, locale)).toBeVisible();
       await page.unroute(chunk);
       await page.route(chunk, (route) => route.abort('failed'));
       await page.reload();
@@ -168,7 +168,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await parity.page.getByRole('link', { name, exact: true }).click();
         await expect(parity.page.getByRole('heading', { level: 1 })).toBeVisible();
         await parity.page.goBack();
-        await expect(title(parity.page)).toBeVisible();
+        await expect(title(parity.page, locale)).toBeVisible();
       }
       expect(parity.network.requests).toEqual([]);
       await check.assertRuntimeHealth(parity);
@@ -191,7 +191,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await expect(parity.page.getByRole('status').filter({ hasText: locale === 'es' ? 'Cargando' : 'Loading' })).toHaveCount(1);
         await capture(parity.page, info, 'loading', locale, width);
       } finally { await release(); }
-      await expect(title(parity.page)).toBeVisible();
+      await expect(title(parity.page, locale)).toBeVisible();
       await parity.page.evaluate(() => document.fonts.ready);
       await assertWelcomeLocale(parity);
       await capture(parity.page, info, 'welcome', locale, width);
