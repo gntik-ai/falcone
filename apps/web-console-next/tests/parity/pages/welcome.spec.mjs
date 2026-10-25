@@ -4,13 +4,30 @@ import manifest from './welcome.manifest.ts';
 import { sessionFor } from '../fixtures/shell.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
+import { unexpectedWelcomeCopy } from './welcome-locale.mjs';
 
 const copies = Object.fromEntries(['es', 'en'].map((locale) => [locale,
   JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.welcome-page.json`, import.meta.url), 'utf8')),
 ]));
+const common = Object.fromEntries(['es', 'en'].map((locale) => [locale,
+  JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/common.json`, import.meta.url), 'utf8')),
+]));
 const chunk = /\/assets\/welcome-[^/?]+\.js(?:\?.*)?$/;
 const title = (page) => page.getByRole('heading', { level: 1, name: 'In Falcone Console', exact: true });
 const links = (copy) => [[copy.back, 'login'], [copy.login, 'login'], [copy.signup, 'signup'], [copy.recovery, 'password-recovery']];
+
+async function assertWelcomeLocale({ page, locale }) {
+  await expect(page.locator('html')).toHaveAttribute('lang', locale);
+  await expect(page).toHaveTitle(copies[locale].documentTitle);
+  // The required product title also occurs as translated copy in another page's
+  // catalog. Validate this page's complete copy instead of a global English denylist.
+  const allowed = [
+    ...Object.values(copies[locale]), ...Object.values(common[locale].locale),
+    common[locale].shell.console, common[locale].shell.about, common[locale].shell.userMenu,
+    'Falcone', '.', // Preset logo wordmark.
+  ];
+  expect(await page.evaluate(unexpectedWelcomeCopy, allowed), 'locale: unexpected welcome copy').toEqual([]);
+}
 
 async function injectRenderFault(page) {
   await page.addInitScript(() => sessionStorage.setItem('welcome-render-fault', 'true'));
@@ -118,7 +135,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.open();
       const page = parity.page;
       await check.assertAccessibility(parity);
-      await check.assertLocale(parity);
+      await assertWelcomeLocale(parity);
       await expect(page.getByRole('main')).toHaveCount(1);
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
       await expect(page.getByRole('heading', { level: 2 })).toHaveCount(2);
@@ -176,7 +193,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       } finally { await release(); }
       await expect(title(parity.page)).toBeVisible();
       await parity.page.evaluate(() => document.fonts.ready);
-      await check.assertLocale(parity);
+      await assertWelcomeLocale(parity);
       await capture(parity.page, info, 'welcome', locale, width);
     });
     test('kit-conformance', async () => { await check.kitConformance(manifest); });
