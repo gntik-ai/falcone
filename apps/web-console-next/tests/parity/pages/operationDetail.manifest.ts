@@ -24,6 +24,9 @@ const logs = (_role: Role, body?: unknown): EndpointResponse => {
   return ok({ queryType: 'logs', operationId: 'op_1', entries: entries.slice(pagination.offset, pagination.offset + pagination.limit), total: 45, pagination })
 }
 export const operationEndpoints: Record<string, PageEndpoint> = {
+  'ops.list': { method: 'POST', path: '/v1/async-operation-query', requestBody: { queryType: 'list' }, fixtures: {
+    success: ok({ queryType: 'list', items: [], total: 0, pagination: { limit: 20, offset: 0 } }),
+  } },
   'ops.detail': { method: 'POST', path: '/v1/async-operation-query', requestBody: { queryType: 'detail' }, fixtures: {
     success: detail, completed: detail, empty: ok({}), '500': failure,
     '500-then-success': [failure, failure, failure, detail],

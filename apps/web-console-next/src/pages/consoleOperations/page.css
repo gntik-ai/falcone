@@ -1,0 +1,15 @@
+/* PageToolbar has an unconditional search field; this page has only the three legacy filters. */
+.console-operations-toolbar div:has(> input[type="search"]) {
+  display: none;
+}
+.console-operations-toolbar > div:first-child {
+  display: block;
+  flex-basis: 100%;
+}
+.console-operations-toolbar > div:last-child {
+  display: none;
+}
+.console-operations caption:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}

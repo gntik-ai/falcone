@@ -4,11 +4,11 @@ import { operationEndpoints, operation, bodyFor, entries } from './pages/operati
 // @ts-expect-error Read-only harness helper is JavaScript without declarations.
 import { consumeResourceDiagnostic } from './resource-diagnostics.mjs'
 
-test('body discriminators select detail/logs/result and unknown bodies fail closed', () => {
+test('body discriminators select list/detail/logs/result and unknown bodies fail closed', () => {
   const registry = createEndpointRegistry({}, () => ({}), operationEndpoints)
-  for (const type of ['detail', 'logs', 'result']) expect(registry.find('POST', '/v1/async-operation-query', bodyFor(type))).toBe(`ops.${type}`)
+  for (const type of ['list', 'detail', 'logs', 'result']) expect(registry.find('POST', '/v1/async-operation-query', bodyFor(type))).toBe(`ops.${type}`)
   expect(registry.find('POST', '/v1/async-operation-query')).toBeUndefined()
-  expect(registry.find('POST', '/v1/async-operation-query', bodyFor('list'))).toBeUndefined()
+  expect(registry.find('POST', '/v1/async-operation-query', bodyFor('unknown'))).toBeUndefined()
   expect(registry.responseFor('ops.detail', 'tenant_owner').body).toEqual(operation)
   expect(registry.responseFor('ops.logs', 'tenant_owner', bodyFor('logs', 20)).body).toMatchObject({ entries: entries.slice(20, 40) })
 })
@@ -63,10 +63,12 @@ test('CSP session fixtures handle all operation queries and keep unrelated reque
     expect(route.fulfill).toHaveBeenCalledWith({ status: 200, json: expect.objectContaining({ queryType, operationId: 'op_1' }) })
     expect(route.abort).not.toHaveBeenCalled()
   }
+  const list = await send('POST', '/v1/async-operation-query', { queryType: 'list', filters: {}, pagination: { limit: 20, offset: 0 } })
+  expect(list.fulfill).toHaveBeenCalledWith({ status: 200, json: { queryType: 'list', items: [], total: 0, pagination: { limit: 20, offset: 0 } } })
   expect(unmatched).toEqual([])
   for (const [method, path, body, invalidJson] of [
     ['GET', '/v1/async-operation-query', bodyFor('detail'), false],
-    ['POST', '/v1/async-operation-query', bodyFor('list'), false],
+    ['POST', '/v1/async-operation-query', bodyFor('unknown'), false],
     ['POST', '/v1/async-operation-query?unexpected=true', bodyFor('detail'), false],
     ['POST', '/v1/unknown', {}, false],
     ['POST', '/v1/async-operation-query', undefined, true],
