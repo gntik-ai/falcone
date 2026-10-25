@@ -3,7 +3,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { App } from '../src/App'
 import { LocaleSwitch } from '../src/i18n/LocaleSwitch'
-import { changeLocale, type Locale } from '../src/i18n'
+import { changeLocale } from '../src/i18n'
+import { ShellErrorBoundary } from '../src/shell/RouteState'
 import { registerLocaleBundles, useLocaleLoader } from '../src/i18n/locale-loader'
 import { login, strictFetch } from './shell-support'
 import Settings from '../src/pages/settings'
@@ -12,6 +13,21 @@ const context = vi.hoisted(() => vi.fn())
 vi.mock('../src/shell/context', () => ({ useConsoleContext: context, ConsoleContextProvider: ({ children }: { children: React.ReactNode }) => children }))
 beforeEach(() => context.mockReturnValue({ tenants: [{ tenantId: 'synthetic-tenant', displayName: 'Tenant Alpha' }], activeTenantId: 'synthetic-tenant', workspaces: [], loading: false, error: null }))
 const mount = () => render(<MemoryRouter><Settings /><LocaleSwitch /></MemoryRouter>)
+
+test.each(['/', '/next'])('settings navigation stays in the migrated console under basename %s', async (basename) => {
+  login(['tenant_owner'])
+  const network = strictFetch({})
+  const location = `${basename === '/' ? '' : basename}/console/settings`
+  render(<MemoryRouter basename={basename} initialEntries={[location]}><App /></MemoryRouter>)
+  const settings = await screen.findByRole('link', { name: 'Ajustes' }, { timeout: 5_000 })
+  expect(settings).toHaveAttribute('href', location)
+  expect(settings).toHaveAttribute('aria-current', 'page')
+  expect(screen.getByRole('link', { name: 'Perfil' })).toHaveAttribute('href', '/console/profile')
+  expect(fireEvent.click(settings)).toBe(false)
+  expect(await screen.findByRole('heading', { name: 'Ajustes de consola', level: 1 })).toBeVisible()
+  network.verify()
+  expect(network.mock).not.toHaveBeenCalled()
+}, 10_000)
 
 for (const locale of ['es', 'en'] as const) {
   test(`ported legacy settings render tenant and honest empty copy without requests in ${locale}`, async () => {
@@ -89,6 +105,35 @@ test.each(['es', 'en'] as const)('a caught render error in %s has translated cop
   fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Reintentar' : 'Retry' }))
   expect(await screen.findByText(locale === 'es' ? 'Sin preferencias configurables' : 'No configurable preferences')).toBeVisible()
   log.mockRestore()
+})
+
+test.each(['missing crypto', 'missing randomUUID'])('render errors remain recoverable with %s', (availability) => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  vi.stubGlobal('crypto', availability === 'missing crypto' ? undefined : {})
+  try {
+    context.mockImplementation(() => { throw new Error('synthetic render failure') })
+    const page = mount()
+    expect(screen.getByRole('heading', { name: 'Ajustes de consola', level: 1 })).toBeVisible()
+    expect(document.querySelector('code')?.textContent).toMatch(/^client-.+/)
+    context.mockReturnValue({ tenants: [], activeTenantId: null, loading: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    expect(screen.getByText('Sin preferencias configurables')).toBeVisible()
+    page.unmount()
+
+    let fail = true
+    function BrokenRoute() {
+      if (fail) throw new Error('synthetic route failure')
+      return <Settings />
+    }
+    render(<MemoryRouter><ShellErrorBoundary><BrokenRoute /></ShellErrorBoundary></MemoryRouter>)
+    expect(screen.getByRole('heading', { name: 'Error del servidor', level: 1 })).toBeVisible()
+    fail = false
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    expect(screen.getByText('Sin preferencias configurables')).toBeVisible()
+  } finally {
+    vi.unstubAllGlobals()
+    log.mockRestore()
+  }
 })
 
 for (const locale of ['es', 'en'] as const) for (const route of ['/console/overview', '/']) {

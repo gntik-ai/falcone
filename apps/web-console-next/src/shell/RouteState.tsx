@@ -19,7 +19,12 @@ export function RouteState({ state, retry, title, description, message, errorRef
 
 export class ShellErrorBoundary extends Component<{ children: ReactNode; title?: string; message?: string; errorLabels?: ErrorPanelLabels }, { failed: boolean; reference: string }> {
   state = { failed: false, reference: '' }
-  static getDerivedStateFromError() { return { failed: true, reference: `client-${crypto.randomUUID()}` } }
+  static getDerivedStateFromError() {
+    const reference = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+    return { failed: true, reference: `client-${reference}` }
+  }
   render() {
     return this.state.failed ? <RouteState state="serverError" title={this.props.title} message={this.props.message} errorLabels={this.props.errorLabels} errorReference={this.state.reference} retry={() => this.setState({ failed: false })} /> : this.props.children
   }
