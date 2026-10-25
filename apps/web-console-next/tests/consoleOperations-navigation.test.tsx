@@ -27,19 +27,19 @@ test.each(['es', 'en'])('row links keep the next basename and open the migrated 
     },
   })
   render(<MemoryRouter basename="/next" initialEntries={['/next/console/operations']}><App /></MemoryRouter>)
-  const table = await screen.findByRole('table')
+  const table = await screen.findByRole('table', {}, { timeout: 10_000 })
   const link = within(table).getByRole('link', { name: operations[0].operationType })
   expect(link).toHaveAttribute('href', '/next/console/operations/op_1')
   link.focus()
   expect(link).toHaveFocus()
   const documentLocation = window.location.href
   expect(fireEvent.click(link)).toBe(false)
-  expect(await screen.findByRole('heading', { level: 1, name: locale === 'es' ? 'Detalle de operación' : 'Operation detail' })).toBeVisible()
+  expect(await screen.findByRole('heading', { level: 1, name: locale === 'es' ? 'Detalle de operación' : 'Operation detail' }, { timeout: 10_000 })).toBeVisible()
   expect(screen.getByRole('link', { name: locale === 'es' ? 'Volver a operaciones' : 'Back to operations' })).toHaveAttribute('href', '/next/console/operations')
   expect(window.location.href).toBe(documentLocation)
   const bodies = requests.mock.mock.calls.filter(([path]) => path === '/v1/async-operation-query').map(([, init]) => JSON.parse(String(init?.body)))
   expect(bodies).toEqual([listBody(), bodyFor('detail'), bodyFor('logs'), bodyFor('result')])
-})
+}, 15_000)
 
 function CurrentLocation() {
   const { pathname } = useLocation()

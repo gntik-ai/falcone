@@ -253,6 +253,34 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
   // Additional journeys stay outside the eight-check report shape.
   test.describe(`operations lifecycle (${role}, ${locale}, ${width})`, () => {
     test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
+    test('paging supersedes an in-flight poll without dropping the action', async ({ parity }) => {
+      await freeze(parity);
+      await parity.open(manifest.route, { 'ops.list': '45-running' }); await settle(parity);
+      let release;
+      let holding = false;
+      const held = new Promise((resolve) => { release = resolve; });
+      const hold = async (route) => {
+        const body = route.request().postDataJSON();
+        if (body?.queryType !== 'list' || body.pagination.offset !== 0) return route.fallback();
+        holding = true;
+        await held; await route.fallback().catch(() => {});
+      };
+      await parity.page.route('**/v1/async-operation-query', hold);
+      try {
+        await parity.page.clock.runFor(30_000);
+        await expect.poll(() => holding).toBe(true);
+        await expect(next(parity)).toBeEnabled();
+        await activate(parity, next(parity));
+        await expect(parity.page.locator('tbody tr:first-child a')).toHaveAttribute('href', /\/op_21$/);
+        expect(requests(parity).at(-1).body).toEqual(listBody({}, 20));
+        await expect(parity.page.locator('.console-operations p[aria-live]')).toHaveText(copy(parity, '21–40 de 45', '21–40 of 45'));
+        await expect(next(parity)).toBeFocused();
+      } finally {
+        release();
+        await parity.page.unroute('**/v1/async-operation-query', hold);
+      }
+      await health(parity);
+    });
     test('401 uses the shared refresh and protected-route intent', async ({ parity, server }) => {
       parity.network.setVariants({ 'ops.list': '401' });
       const operationUrl = server.url(manifest.route.slice(1));

@@ -70,6 +70,51 @@ test('paging uses offsets 20 and 40 and recovers focus when the boundary disable
   expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled()
 })
 
+test.each(['poll', 'reconnect'])('paging supersedes a pending %s and ignores its late response', async (source) => {
+  vi.useFakeTimers()
+  const rows = operations.map((row) => ({ ...row, status: 'running' as const }))
+  const request = mockList(rows); open(); await flush()
+  let release!: (response: unknown) => void
+  if (source === 'reconnect') {
+    request.mockResolvedValueOnce({} as never)
+    request.mockResolvedValueOnce(listResponse(rows.map((row) => ({ ...row, status: 'completed' as const }))) as never)
+  }
+  request.mockImplementationOnce(() => new Promise((resolve) => { release = resolve }))
+  if (source === 'poll') await flush(30_000)
+  else { fireEvent.online(window); await flush(500) }
+  const signal = request.mock.calls.at(-1)![1]!.signal!
+  expect(document.querySelector('.console-operations [aria-busy="true"]')).not.toBeNull()
+  expect(screen.queryByRole('status', { name: 'Cargando operaciones' })).not.toBeInTheDocument()
+  const next = screen.getByRole('button', { name: 'Siguiente' }); next.focus(); fireEvent.click(next); await flush()
+  expect(signal.aborted).toBe(true)
+  expect(request.mock.calls.at(-1)![1]!.body).toEqual(listBody({}, 20))
+  expect(screen.getByText('21–40 de 45', { selector: 'p' })).toBeVisible()
+  expect(screen.getAllByRole('link')[0]).toHaveAttribute('href', '/console/operations/op_21')
+  expect(next).toHaveFocus()
+  release(listResponse(rows.slice(0, 20), 45)); await flush()
+  expect(screen.getAllByRole('link')[0]).toHaveAttribute('href', '/console/operations/op_21')
+})
+
+test.each([1000, 3000])('paging cancels the %s ms automatic retry and loads the new page immediately', async (delay) => {
+  vi.useFakeTimers()
+  const request = mockList(operations.map((row) => ({ ...row, status: 'running' as const })))
+  open(); await flush()
+  request.mockRejectedValueOnce({ status: 500 })
+  if (delay === 3000) request.mockRejectedValueOnce({ status: 500 })
+  await flush(30_000)
+  if (delay === 3000) await flush(1000)
+  const signal = request.mock.calls.at(-1)![1]!.signal!
+  const count = request.mock.calls.length
+  fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); await flush()
+  expect(signal.aborted).toBe(true)
+  expect(request).toHaveBeenCalledTimes(count + 1)
+  expect(request.mock.calls.at(-1)![1]!.body).toEqual(listBody({}, 20))
+  expect(screen.getByText('21–40 de 45', { selector: 'p' })).toBeVisible()
+  await flush(delay)
+  expect(request).toHaveBeenCalledTimes(count + 1)
+  expect(screen.queryByText('No se pudieron cargar las operaciones.')).not.toBeInTheDocument()
+})
+
 test('F15 shows a first-run state, filtered no-results and an action to clear filters', async () => {
   mockList([]); open(); await flush()
   expect(screen.getByText('No hay operaciones registradas para esta organización.')).toBeVisible()

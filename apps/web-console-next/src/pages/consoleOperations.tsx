@@ -107,8 +107,8 @@ function Operations() {
           </div> : !error && (filterCount ? <NoResultsEmpty query="" filterCount={filterCount} entity={t('title')} onClearFilters={clear} onClearSearch={undefined} titleAs="h2" bordered={false}
             labels={{ title: () => t('noResults'), queryTitle: () => t('noResults'), description: () => t('noResultsDescription'), clearFilters: t('clearFilters'), clearSearch: t('clearFilters') }} />
             : <EmptyState title={t('empty')} description={t('description')} primaryAction={null} secondaryAction={null} titleAs="h2" bordered={false} />)}
-          <div ref={pagination} aria-disabled={busy} className="min-w-0"><PaginationFooter total={data.total} page={offset / PAGE_SIZE + 1} defaultPage={1} pageSize={PAGE_SIZE} defaultPageSize={PAGE_SIZE} pageSizeOptions={[PAGE_SIZE]}
-            noun={t('title')} locale={language.language} onPageSizeChange={undefined} onPageChange={(page) => { if (!busy) { paging.current = true; setOffset((page - 1) * PAGE_SIZE) } }} labels={paginationLabels} /></div>
+          <div ref={pagination} className="min-w-0"><PaginationFooter total={data.total} page={offset / PAGE_SIZE + 1} defaultPage={1} pageSize={PAGE_SIZE} defaultPageSize={PAGE_SIZE} pageSizeOptions={[PAGE_SIZE]}
+            noun={t('title')} locale={language.language} onPageSizeChange={undefined} onPageChange={(page) => { paging.current = true; setOffset((page - 1) * PAGE_SIZE) }} labels={paginationLabels} /></div>
         </>}
       </>}
   </Page>
