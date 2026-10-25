@@ -29,6 +29,19 @@ test.each(['/', '/next'])('settings navigation stays in the migrated console und
   expect(network.mock).not.toHaveBeenCalled()
 }, 10_000)
 
+test.each(['es', 'en'] as const)('the settings breadcrumb is translated in %s without adding a menu route', async (locale) => {
+  await changeLocale(locale)
+  login(['tenant_owner'])
+  const network = strictFetch({})
+  render(<MemoryRouter initialEntries={['/console/settings']}><App /></MemoryRouter>)
+  await screen.findByRole('heading', { name: locale === 'es' ? 'Ajustes de consola' : 'Console settings', level: 1 })
+  const breadcrumb = screen.getByRole('navigation', { name: locale === 'es' ? 'Ruta de navegación' : 'Breadcrumb' })
+  expect(within(breadcrumb).getByText(locale === 'es' ? 'Configuración' : 'Settings')).toHaveAttribute('aria-current', 'page')
+  fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Menú de usuario' : 'User menu' }))
+  expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(locale === 'es' ? ['Acerca de', 'Cerrar sesión'] : ['About', 'Sign out'])
+  network.verify()
+}, 10_000)
+
 for (const locale of ['es', 'en'] as const) {
   test(`ported legacy settings render tenant and honest empty copy without requests in ${locale}`, async () => {
     await changeLocale(locale)

@@ -10,6 +10,7 @@ const title = (locale) => copy(locale, 'Ajustes de consola', 'Console settings')
 const select = (page, locale) => page.getByRole('combobox', { name: copy(locale, 'Idioma de la interfaz', 'Interface language'), exact: true });
 const retry = (page, locale) => page.getByRole('button', { name: copy(locale, 'Reintentar', 'Retry'), exact: true });
 const rawBundle = (locale) => `**/${build[`src/locales/${locale}/pages.console-settings-page.json?raw`].file}`;
+const retryBundle = (locale) => `**/${build[`src/locales/${locale}/pages.console-settings-page.json`].file}`;
 async function choose(page, from, to, control) {
   if (control === 'menu') {
     await page.getByRole('button', { name: copy(from, 'Menú de usuario', 'User menu'), exact: true }).click();
@@ -17,6 +18,7 @@ async function choose(page, from, to, control) {
   } else {
     await select(page, from).click();
     await page.getByRole('listbox').getByRole('option', { name: to === 'es' ? copy(from, 'Español', 'Spanish') : copy(from, 'Inglés', 'English'), exact: true }).click();
+    await expect(page.locator('[role="listbox"]')).toHaveCount(0);
   }
 }
 async function assertPreference(page, locale) {
@@ -27,30 +29,38 @@ async function assertPreference(page, locale) {
 async function failure(parity, control, recover = true) {
   const { page, locale } = parity, target = locale === 'es' ? 'en' : 'es';
   await parity.open(manifest.route);
-  await page.route(rawBundle(target), (route) => route.fulfill({ status: 500, body: 'synthetic bundle failure' }));
-  await choose(page, locale, target, control);
-  if (control === 'menu') await page.keyboard.press('Escape');
-  await expect(retry(page, locale)).toBeVisible();
-  await assertPreference(page, locale);
-  // The shell and page each own an announcer; the message must reach one of them.
-  await expect(page.locator('[data-live-announcer="assertive"]')).toContainText([copy(locale, 'Se mantiene el idioma anterior.', 'The previous language remains active.')]);
-  if (recover) {
-    let release;
-    const held = new Promise((resolve) => { release = resolve; });
-    const hold = async (route) => { await held; await route.fallback(); };
-    await page.route('**/assets/pages.console-settings-page-*.json', hold);
-    try {
-      await retry(page, locale).focus();
-      await retry(page, locale).click();
-      await expect(select(page, locale)).toHaveAttribute('aria-busy', 'true');
-      await expect(select(page, locale)).toBeDisabled();
-      await expect(page.getByRole('button', { name: copy(locale, 'Reintentando…', 'Retrying…'), exact: true })).toBeFocused();
-      await assertPreference(page, locale);
-    } finally { release(); }
-    await assertPreference(page, target);
-    await expect(select(page, target)).toBeFocused();
-    await page.unroute('**/assets/pages.console-settings-page-*.json', hold);
-  }
+  const failBundle = (route) => route.fulfill({ status: 500, body: 'synthetic bundle failure' });
+  await page.route(rawBundle(target), failBundle);
+  try {
+    await choose(page, locale, target, control);
+    if (control === 'menu') await page.keyboard.press('Escape');
+    await expect(retry(page, locale)).toBeVisible();
+    await assertPreference(page, locale);
+    // The shell and page each own an announcer; the message must reach one of them.
+    await expect(page.locator('[data-live-announcer="assertive"]')).toContainText([copy(locale, 'Se mantiene el idioma anterior.', 'The previous language remains active.')]);
+    if (recover) {
+      let release;
+      const held = new Promise((resolve) => { release = resolve; });
+      let retryRequests = 0;
+      const hold = async (route) => { retryRequests++; await held; await route.fallback(); };
+      await page.route(retryBundle(target), hold);
+      try {
+        await retry(page, locale).focus();
+        await retry(page, locale).click();
+        await expect.poll(() => retryRequests).toBe(1);
+        await expect(select(page, locale)).toHaveAttribute('aria-busy', 'true');
+        await expect(select(page, locale)).toBeDisabled();
+        await expect(page.getByRole('button', { name: copy(locale, 'Reintentando…', 'Retrying…'), exact: true })).toBeFocused();
+        await assertPreference(page, locale);
+        release();
+        await assertPreference(page, target);
+        await expect(select(page, target)).toBeFocused();
+      } finally {
+        release();
+        await page.unroute(retryBundle(target), hold);
+      }
+    }
+  } finally { await page.unroute(rawBundle(target), failBundle); }
 }
 
 for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {

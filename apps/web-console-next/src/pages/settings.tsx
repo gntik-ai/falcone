@@ -34,16 +34,27 @@ function SettingsContent() {
   const trigger = useRef<HTMLButtonElement>(null)
   const retryFocus = useRef(false)
   const selectionFocus = useRef(false)
+  const focusFrame = useRef<number | null>(null)
   const previous = useRef(locale)
   useEffect(() => registerLocaleBundles('pages.console-settings-page', loaders), [])
+  useEffect(() => () => {
+    if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current)
+  }, [])
   useEffect(() => {
+    if (locale.pending && focusFrame.current !== null) {
+      cancelAnimationFrame(focusFrame.current)
+      focusFrame.current = null
+    }
     if (locale.target && !locale.pending && previous.current.revision !== locale.revision) {
       if (locale.error) announce(t('error.announcement'), 'assertive')
-      else {
-        announce(t('language.changed', { language: t(`language.${i18n.language}`) }))
-        if (retryFocus.current) trigger.current?.focus()
+      else announce(t('language.changed', { language: t(`language.${i18n.language}`) }))
+      if ((!locale.error && retryFocus.current) || selectionFocus.current) {
+        // Let the kit propagate its enabled state before focusing the trigger.
+        focusFrame.current = requestAnimationFrame(() => {
+          focusFrame.current = null
+          trigger.current?.focus()
+        })
       }
-      if (selectionFocus.current) trigger.current?.focus()
       selectionFocus.current = false
       retryFocus.current = false
     }
