@@ -1,0 +1,14 @@
+{
+  "code": "404",
+  "title": "Page not found",
+  "description": "The route you are trying to open does not exist in the In Falcone console. The link may be outdated or the address may be incorrect. Choose an option to continue.",
+  "console": "Go to console",
+  "login": "Go to sign in",
+  "home": "Back to home",
+  "back": "Go back",
+  "documentTitle": "Page not found · In Falcone Console",
+  "logo": "In Falcone",
+  "skip": "Skip to content",
+  "moreActions": "More actions",
+  "sections": "Sections"
+}

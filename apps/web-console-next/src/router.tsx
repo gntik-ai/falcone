@@ -5,6 +5,7 @@ import { ProtectedRoute } from './shell/session'
 import { Shell } from './shell/Shell'
 import { Guard, ConsoleIndexRedirect } from './shell/guards'
 import { PageSkeleton } from '@gntik-ai/blocks'
+import { StatusLayout } from '@gntik-ai/ui'
 import { useTranslation } from 'react-i18next'
 import { RouteState, ShellErrorBoundary } from './shell/RouteState'
 import { pendingConsoleRoutes } from './shell/routes'
@@ -26,6 +27,15 @@ function WelcomeLoading() {
   return <main className="mx-auto w-full max-w-5xl p-7 sm:p-10"><PageSkeleton stats={0} rows={2} label={t('states.loading.title')} className="" /></main>
 }
 
+function NotFoundLoading() {
+  const { t } = useTranslation('common')
+  return <StatusLayout mainId="not-found-loading" tone="neutral" fullScreen={false} className="min-w-0"
+    heading={<PageSkeleton stats={0} rows={2} label={t('states.loading.title')} className="" />}
+    code={null} titleRef={undefined} description={null} icon={undefined} illustration={null}
+    primaryAction={null} secondaryAction={null} header={null} footer={null} children={null}
+    skipLinkLabel={t('states.loading.title')} />
+}
+
 // Namespace names are explicit so check:i18n validates the route/resource contract.
 function lazyPage(_namespace: string, load: () => Promise<{ default: ComponentType }>) {
   const Page = lazy(load)
@@ -42,7 +52,7 @@ export const appRoutes: RouteObject[] = [
       { path: '/invitations/:tenantId/:invitationId', element: lazyPage('invitation', () => import('./pages/invitation')) },
       { path: '/signup', element: lazyPage('signup', () => import('./pages/signup')) },
       { path: '/signup/pending-activation', element: lazyPage('pendingActivation', () => import('./pages/pendingActivation')) },
-      { path: '*', element: <RouteState state="notFound" /> }
+      { path: '*', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<NotFoundLoading />}>{lazyPage('pages.not-found-page', () => import('./pages/notFound'))}</Suspense></ShellErrorBoundary> }
     ]
   },
   {

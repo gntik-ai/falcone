@@ -1,0 +1,14 @@
+{
+  "code": "404",
+  "title": "Página no encontrada",
+  "description": "La ruta que intentas abrir no existe en la consola de In Falcone. Puede que el enlace esté desactualizado o que la dirección no sea correcta. Elige una de las opciones para continuar.",
+  "console": "Ir a la consola",
+  "login": "Ir al acceso",
+  "home": "Volver al inicio",
+  "back": "Volver atrás",
+  "documentTitle": "Página no encontrada · Consola In Falcone",
+  "logo": "In Falcone",
+  "skip": "Saltar al contenido",
+  "moreActions": "Más acciones",
+  "sections": "Secciones"
+}
