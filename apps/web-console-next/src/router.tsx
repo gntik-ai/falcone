@@ -51,7 +51,7 @@ export const appRoutes: RouteObject[] = [
       { path: '/password-recovery', element: lazyPage('recovery', () => import('./pages/recovery')) },
       { path: '/invitations/:tenantId/:invitationId', element: lazyPage('invitation', () => import('./pages/invitation')) },
       { path: '/signup', element: lazyPage('signup', () => import('./pages/signup')) },
-      { path: '/signup/pending-activation', element: lazyPage('pendingActivation', () => import('./pages/pendingActivation')) },
+      { path: '/signup/pending-activation', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<WelcomeLoading />}>{lazyPage('pages.pending-activation-page', () => import('./pages/pendingActivation'))}</Suspense></ShellErrorBoundary> },
       { path: '*', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<NotFoundLoading />}>{lazyPage('pages.not-found-page', () => import('./pages/notFound'))}</Suspense></ShellErrorBoundary> }
     ]
   },
