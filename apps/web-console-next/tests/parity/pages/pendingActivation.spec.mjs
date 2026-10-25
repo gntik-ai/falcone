@@ -166,10 +166,11 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
           const retry = page.getByRole('button', { name: copy.retry, exact: true });
           await retry.focus(); await page.keyboard.press('Enter');
           await expect(retry).toBeFocused();
-          await expect(page.locator('[data-live-announcer="assertive"]')).toHaveText(copy.errorTitle);
+          // The shell and page each own a region; the nearest announcer receives the message.
+          await expect(page.locator('[data-live-announcer="assertive"]')).toContainText([copy.errorTitle]);
           await page.keyboard.press('Enter');
           await expect(page.getByRole('group', { name: copy.statusTitle, exact: true })).toBeFocused();
-          await expect(page.locator('[data-live-announcer="polite"]')).toHaveText(copy.statusTitle);
+          await expect(page.locator('[data-live-announcer="polite"]')).toContainText([copy.statusTitle]);
         }
         const links = page.getByRole('main').getByRole('link');
         const names = state.startsWith('pending') || state.startsWith('500')
