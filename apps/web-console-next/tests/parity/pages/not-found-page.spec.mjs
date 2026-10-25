@@ -5,6 +5,7 @@ import { sessionFor } from '../fixtures/shell.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { unexpectedWelcomeCopy } from './welcome-locale.mjs';
+import { allowedNotFoundCopy } from './not-found-locale.mjs';
 
 const copies = Object.fromEntries(['es', 'en'].map((locale) => [locale,
   JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.not-found-page.json`, import.meta.url), 'utf8')),
@@ -44,8 +45,7 @@ async function assertCopy(parity) {
   const { page, locale } = parity;
   await check.assertLocale(parity);
   await expect(page).toHaveTitle(copies[locale].documentTitle);
-  const allowed = [...Object.values(copies[locale]), ...Object.values(common[locale].locale),
-    common[locale].shell.console, common[locale].shell.about, common[locale].shell.userMenu, 'Falcone', '.'];
+  const allowed = allowedNotFoundCopy(copies[locale], common[locale]);
   expect(await page.evaluate(unexpectedWelcomeCopy, allowed), 'locale: unexpected not-found copy').toEqual([]);
 }
 async function capture(page, info, state, locale, width) {
