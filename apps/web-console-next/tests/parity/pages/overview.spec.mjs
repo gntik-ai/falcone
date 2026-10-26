@@ -106,7 +106,14 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await expect(meter).toHaveAttribute('aria-valuenow', String(utilization));
         await expect(item.getByText(usage, { exact: true })).toBeVisible();
       }
-      for (const slug of ['workspace-prod', 'workspace-dev']) await expect(overview(parity).getByText(slug, { exact: true })).toBeVisible();
+      for (const [slug, applications, serviceAccounts, resources] of [
+        ['workspace-prod', 12340, 4320, 19865], ['workspace-dev', 5, 1, 11],
+      ]) {
+        const workspace = overview(parity).getByText(slug, { exact: true }).locator('..');
+        const values = { applications, serviceAccounts, resources };
+        const detail = text.inventory.workspace.replace(/\{(applications|serviceAccounts|resources)\}/g, (_, key) => count(values[key]));
+        await expect(workspace.getByText(detail, { exact: true })).toBeVisible();
+      }
       await assertNoPageRequests(parity);
       await check.assertLocale(parity);
     });
@@ -125,7 +132,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         const link = overview(parity).getByRole('link', { name: copy(parity).quick[key].label, exact: true });
         await expect(link).toHaveAttribute('href', `/console/${key}`);
         // The destination is a legacy full load. Fulfil its document locally.
-        const target = server.url(`console/${key}`);
+        const target = new URL(`/console/${key}`, server.origin).href;
         await parity.page.route(target, (route) => route.fulfill({ contentType: 'text/html', body: '<main>synthetic-legacy-destination</main>' }));
         await link.focus(); await parity.page.keyboard.press('Enter');
         await expect(parity.page).toHaveURL(target);
@@ -160,6 +167,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       for (const variant of errors) {
         await parity.open(manifest.route, variants(variant));
         await expect(overview(parity).getByRole('heading', { name: variant === '403' ? copy(parity).noAccess.title : copy(parity).error.title, exact: true })).toBeVisible();
+        await expect(overview(parity).getByTestId('console-tenant-quota-summary')).toHaveCount(0);
         await expect(overview(parity).getByTestId('console-tenant-inventory-summary')).toHaveCount(0);
         await expect(overview(parity).getByRole('button')).toHaveCount(0);
         await expect(overview(parity).getByRole('link')).toHaveCount(4);
@@ -187,6 +195,24 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       if (role !== 'tenant_owner') {
         await openWithStoredTenant(parity, server, true);
         await expect(overview(parity).getByRole('heading', { name: copy(parity).empty.tenant.title })).toBeVisible();
+        await check.assertAccessibility(parity);
+        await assertOverviewLocale(parity);
+        const switcher = parity.page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active tenant', exact: true });
+        await switcher.selectOption('synthetic-tenant');
+        await expect(overview(parity).getByTestId('console-tenant-inventory-summary')).toBeVisible();
+        let releaseSwitch;
+        const switching = new Promise((resolve) => { releaseSwitch = resolve; });
+        const holdSwitch = async (route) => { await switching; await route.fallback(); };
+        await parity.page.route('**/v1/workspaces?**', holdSwitch);
+        parity.network.setVariants({ ...variants('overview-multiple-tenants'), workspaces: '500' });
+        try {
+          await switcher.selectOption('synthetic-tenant-other');
+          for (const label of Object.values(copy(parity).loading)) await expect(overview(parity).getByRole('status', { name: label })).toBeVisible();
+          for (const kind of ['quota', 'inventory']) await expect(overview(parity).getByTestId(`console-tenant-${kind}-summary`)).toHaveCount(0);
+        } finally { releaseSwitch(); await parity.page.unroute('**/v1/workspaces?**', holdSwitch); }
+        await expect(overview(parity).getByRole('heading', { name: copy(parity).error.title, exact: true })).toBeVisible();
+        for (const kind of ['quota', 'inventory']) await expect(overview(parity).getByTestId(`console-tenant-${kind}-summary`)).toHaveCount(0);
+        await expect(overview(parity).getByRole('link')).toHaveCount(4);
         await check.assertAccessibility(parity);
         await assertOverviewLocale(parity);
       }

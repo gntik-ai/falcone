@@ -54,6 +54,34 @@ test('switching to a tenant without summaries never retains the prior tenant inv
   expect(requests.mock).toHaveBeenCalledTimes(3)
 })
 
+test.each([403, 500, 'network'] as const)('a tenant switch clears populated summaries while loading and after a shell %s failure', async (status) => {
+  login(); storedContext('synthetic-tenant')
+  let complete!: (response: Response) => void
+  let fail!: (error: Error) => void
+  const pending = new Promise<Response>((resolve, reject) => { complete = resolve; fail = reject })
+  requests = strictFetch({
+    [`GET ${tenantUrl}`]: { items: [overviewTenant, { ...overviewTenant, tenantId: 'synthetic-other', displayName: 'Synthetic Other' }] },
+    [`GET ${workspaceUrl('synthetic-tenant')}`]: { items: [] },
+    [`GET ${workspaceUrl('synthetic-other')}`]: () => pending,
+  })
+  open(); await screen.findByTestId('console-tenant-inventory-summary')
+  fireEvent.change(screen.getByRole('combobox', { name: 'Organización activa' }), { target: { value: 'synthetic-other' } })
+  expect(await screen.findByRole('status', { name: 'Cargando resumen de cuotas.' })).toBeVisible()
+  expect(screen.getByRole('status', { name: 'Cargando inventario.' })).toBeVisible()
+  for (const kind of ['quota', 'inventory']) expect(screen.queryByTestId(`console-tenant-${kind}-summary`)).not.toBeInTheDocument()
+  if (status === 'network') fail(new TypeError('Synthetic network failure'))
+  else complete(Response.json({}, { status }))
+  expect(await screen.findByRole('heading', { name: status === 403 ? 'Sin acceso a los resúmenes' : 'No se pudieron cargar los resúmenes' })).toBeVisible()
+  for (const kind of ['quota', 'inventory']) expect(screen.queryByTestId(`console-tenant-${kind}-summary`)).not.toBeInTheDocument()
+  expect(screen.queryByText('12.345')).not.toBeInTheDocument()
+  for (const path of ['workspaces', 'members', 'flows', 'my-plan']) expect(document.querySelector(`.console-overview a[href="/console/${path}"]`)).toBeVisible()
+  expect(requests.mock.mock.calls.map(([path, init]) => ({ method: init?.method, path, body: init?.body }))).toEqual([
+    { method: 'GET', path: tenantUrl, body: undefined },
+    { method: 'GET', path: workspaceUrl('synthetic-tenant'), body: undefined },
+    { method: 'GET', path: workspaceUrl('synthetic-other'), body: undefined },
+  ])
+})
+
 test.each(['rejected', 'after-refresh', 'refresh-ok'])('delegates 401 refresh and login redirect to the shell: %s', async (variant) => {
   login(['tenant_owner'], ['synthetic-tenant'])
   let attempt = 0
