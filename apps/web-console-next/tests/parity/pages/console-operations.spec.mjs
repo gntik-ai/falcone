@@ -30,7 +30,9 @@ async function activate(p, control) {
 async function choose(p, labels, option) {
   const control = p.page.getByRole('combobox', { name: copy(p, ...labels), exact: true });
   await activate(p, control);
-  await activate(p, p.page.getByRole('listbox').getByRole('option', { name: option, exact: true }));
+  const listbox = p.page.getByRole('listbox').filter({ visible: true });
+  await expect(listbox).toHaveCount(1);
+  await activate(p, listbox.getByRole('option', { name: option, exact: true }));
   await expect(control).toHaveAttribute('aria-expanded', 'false');
   await settle(p);
   return control;
