@@ -254,7 +254,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.open('/console/settings');
       const nav = parity.page.getByRole('navigation', { name: locale === 'es' ? 'Navegación de consola' : 'Console navigation', exact: true }).first();
       if (!await nav.isVisible()) await parity.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
-      await parity.page.getByRole('link', { name: locale === 'es' ? 'Resumen' : 'Overview', exact: true }).filter({ visible: true }).first().click();
+      await parity.page.getByRole('link', { name: locale === 'es' ? 'Vista general' : 'Overview', exact: true }).filter({ visible: true }).first().click();
       await expect(overview(parity)).toBeVisible();
       await check.assertRuntimeHealth(parity);
     });
