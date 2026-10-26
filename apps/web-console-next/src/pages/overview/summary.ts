@@ -134,4 +134,3 @@ function quotaSeverityRank(value: ConsoleQuotaSeverity): number {
 
   return 1
 }
-
