@@ -179,7 +179,7 @@ for (const role of observers) for (const locale of ['es', 'en']) for (const widt
       await check.assertRuntimeHealth(parity);
       // Entry through the shell's real migrated client link, including the mobile drawer.
       await parity.page.goto(server.url('console/overview'));
-      await expect(parity.page.getByRole('heading', { name: locale === 'es' ? 'Resumen' : 'Overview', exact: true })).toBeVisible();
+      await expect(parity.page.getByRole('heading', { name: locale === 'es' ? 'Vista general de la consola' : 'Console overview', exact: true })).toBeVisible();
       if (width < 1024) await parity.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
       const navigation = width < 1024 ? parity.page.getByRole('dialog') : parity.page.locator('aside');
       await navigation.getByRole('link', { name: copy(parity).title, exact: true }).click();

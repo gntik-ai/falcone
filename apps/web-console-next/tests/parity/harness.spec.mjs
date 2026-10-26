@@ -12,7 +12,7 @@ test('open waits for the lazy page and the shell context independently', async (
   });
   await parity.open(manifest.route);
   await expect(parity.page.locator('main section[aria-busy="true"]')).toHaveCount(0);
-  await expect(parity.page.getByRole('heading', { name: 'Resumen', exact: true })).toBeVisible();
+  await expect(parity.page.getByRole('heading', { name: 'Vista general de la consola', exact: true })).toBeVisible();
 });
 
 test('visual-review compares fresh documents with the same clock and random seed', async ({ parity }, info) => {

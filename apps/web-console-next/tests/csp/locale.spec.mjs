@@ -49,7 +49,7 @@ test('menu switches both directions on overview', async ({ page }) => {
   await page.goto(server.url('console/overview'));
   await page.getByRole('button', { name: 'User menu' }).click();
   await page.getByRole('combobox', { name: 'Language' }).selectOption('es');
-  await expect(page.getByRole('heading', { name: 'Resumen' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Vista general de la consola' })).toBeVisible();
   await page.getByRole('combobox', { name: 'Idioma' }).selectOption('en');
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Console overview' })).toBeVisible();
 });
