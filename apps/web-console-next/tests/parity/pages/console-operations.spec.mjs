@@ -30,7 +30,10 @@ async function activate(p, control) {
 async function choose(p, labels, option) {
   const control = p.page.getByRole('combobox', { name: copy(p, ...labels), exact: true });
   await activate(p, control);
-  const listbox = p.page.getByRole('listbox').filter({ visible: true });
+  const listboxId = await control.getAttribute('aria-controls');
+  const listbox = listboxId
+    ? p.page.getByRole('listbox').and(p.page.locator(`[id=${JSON.stringify(listboxId)}]`))
+    : p.page.getByRole('listbox').filter({ visible: true });
   await expect(listbox).toHaveCount(1);
   await activate(p, listbox.getByRole('option', { name: option, exact: true }));
   await expect(control).toHaveAttribute('aria-expanded', 'false');
