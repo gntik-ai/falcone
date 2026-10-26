@@ -4,10 +4,10 @@ const manifest: ParityManifest = {
   route: '/console/overview',
   roles: ['superadmin', 'tenant_owner', 'tenant_viewer'],
   fixtures: ['tenants', 'tenant', 'workspaces', 'refresh', 'status', 'termination'],
-  sources: ['src/pages/overview.tsx', 'src/pages/placeholder.tsx', 'src/shell', 'src/App.tsx', 'src/styles.css'],
+  sources: ['src/pages/overview.tsx', 'src/pages/overview/summary.ts', 'src/shell', 'src/App.tsx', 'src/styles.css'],
   data: [
-    { name: 'overview title', locator: { es: 'h1:text-is("Resumen")', en: 'h1:text-is("Overview")' } },
-    { name: 'placeholder description', locator: { es: 'main p:text-is("Esta página estará disponible próximamente.")', en: 'main p:text-is("This page will be available soon.")' } },
+    { name: 'overview title', locator: { es: 'h1:text-is("Vista general de la consola")', en: 'h1:text-is("Console overview")' } },
+    { name: 'quick links', locator: { es: 'h2:text-is("Accesos rápidos")', en: 'h2:text-is("Quick links")' } },
     { name: 'tenant', locator: 'select:has(option:checked:text-is("Synthetic Tenant"))' },
     { name: 'workspace', locator: { es: 'button:has-text("Synthetic Workspace")', en: 'button:has-text("Synthetic Workspace")' } },
   ],
@@ -20,7 +20,6 @@ const manifest: ParityManifest = {
     expected: { method: 'DELETE', path: '/v1/auth/login-sessions/synthetic-session', body: { refreshToken: 'synthetic-refresh-token' } },
     outcome: { es: 'h1:text-is("Acceso")', en: 'h1:text-is("Sign in")' },
   }],
-  // The placeholder has no data-state panel. These are the shell's actual context states.
   states: [
     // Known kit localisation gap: assert no selected workspace without requiring English in es.
     { fixture: 'workspaces', variant: 'empty', locator: { es: 'button[aria-label="Área de trabajo activa"]:not(:has-text("Synthetic Workspace"))', en: 'button[aria-label="Active workspace"]:has-text("Select workspace")' } },

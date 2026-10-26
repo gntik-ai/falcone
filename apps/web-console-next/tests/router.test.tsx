@@ -29,7 +29,7 @@ test.each([
   const basename = routerBasename(base)
   expect(basename).toBe(expectedBasename)
   render(<MemoryRouter basename={basename} initialEntries={[location]}><App /></MemoryRouter>)
-  expect(await screen.findByRole('heading', { name: 'Resumen' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Vista general de la consola' })).toBeVisible()
 })
 
 let requests: ReturnType<typeof strictFetch>

@@ -44,7 +44,7 @@ test('render errors retain navigation without stack text, and About shows build 
 
 for (const width of [375, 768, 1280]) {
   for (const [path, heading] of [
-    ['overview', 'Resumen'], ['__fixture/forbidden', 'Acceso denegado'],
+    ['overview', 'Vista general de la consola'], ['__fixture/forbidden', 'Acceso denegado'],
     ['zzz', 'Sección de consola no encontrada'], ['__fixture/throw', 'Error del servidor'],
   ]) {
     test(`accessible ${path} at ${width}px`, async ({ page }) => {
@@ -65,7 +65,7 @@ test('the open mobile navigation drawer has no serious accessibility violations'
   await page.addInitScript(() => localStorage.setItem('falcone-next-locale', 'es'));
   await page.setViewportSize({ width: 375, height: 900 });
   await page.goto(server.url('console/overview'));
-  await expect(page.getByRole('heading', { name: 'Resumen' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Vista general de la consola' })).toBeVisible();
   const layoutTrigger = page.locator('.console-shell > div > header > button[aria-haspopup="dialog"]');
   await expect(layoutTrigger).toHaveCount(1);
   await expect(layoutTrigger).toBeHidden();
