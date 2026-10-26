@@ -38,7 +38,7 @@ function OverviewContent() {
     <PageHeader as="div" title={t('title')} description={t('description')} wrapTitle={true} titleRef={undefined} breadcrumbs={null} status="" statuses={{}} meta={[]} actions={[]} tabs={null}
       tab={undefined} defaultTab={undefined} onTabChange={undefined}
       labels={{ title: t('title'), description: t('description'), moreActions: t('quick.title'), sections: t('quick.title') }} />
-    <Badge variant="soft">{t('badge')}</Badge>
+    <Badge tone="neutral" variant="soft" size="auto" shape="rounded" dot={false} onRemove={undefined} removeLabel="">{t('badge')}</Badge>
   </div>
   return <Page width="default" header={header} title={null} description={null} actions={null} actionBar={null} actionBarLabel="" className="console-overview min-w-0 wrap-anywhere">
     <section aria-labelledby="overview-quick" className="space-y-4">
@@ -60,17 +60,17 @@ function OverviewContent() {
         : !tenant ? <FirstRunEmpty icon={undefined} title={t('empty.tenant.title')} description={t('empty.tenant.description')} actionLabel={t('empty.tenant.action')} onAction={openTenantSwitcher}
           secondary={null} steps={[]} titleAs="h2" bordered={false} labels={{ title: t('empty.tenant.title'), description: t('empty.tenant.description'), action: t('empty.tenant.action'), guide: '' }} />
         : <>
-          <Card data-testid="console-tenant-quota-summary"><CardBody className="space-y-4">
+          <Card variant="default" className="min-w-0" data-testid="console-tenant-quota-summary"><CardBody className="space-y-4">
             <SectionHeader title={t('quota.title')} description={t('quota.description')} as="h2" headingId="overview-quota" count={undefined} actions={[]} bordered={false} />
             {quota ? <>
-              <div className="flex flex-wrap gap-2">{severities.map((severity) => <Badge key={severity} variant="outline">{t(`quota.total.${severity}`, { total: count(quota.totals[severity]) })}</Badge>)}</div>
+              <div className="flex flex-wrap gap-2">{severities.map((severity) => <Badge key={severity} tone="neutral" variant="outline" size="auto" shape="rounded" dot={false} onRemove={undefined} removeLabel="">{t(`quota.total.${severity}`, { total: count(quota.totals[severity]) })}</Badge>)}</div>
               {quota.items.length ? <Collapsible variant="subtle" open={quotaOpen} onOpenChange={setQuotaOpen} disabled={false}>
                 <CollapsibleTrigger showChevron={true} className="whitespace-normal text-start">{t('quota.disclosure')}</CollapsibleTrigger>
                 <CollapsiblePanel className="space-y-4 pt-4">
                   {quota.items.map((item) => {
                     const usage = t('quota.usage', { used: count(item.used), limit: count(item.limit), remaining: count(item.remaining), utilization: count(item.utilizationPercent), unit: item.unit ? t('quota.unit', { unit: item.unit }) : '' })
                     return <div key={`${item.scope}-${item.metricKey}`} className="min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{item.metricKey}</span><Badge variant="soft">{t(`quota.severity.${item.severity}`)}</Badge></div>
+                      <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{item.metricKey}</span><Badge tone="neutral" variant="soft" size="auto" shape="rounded" dot={false} onRemove={undefined} removeLabel="">{t(`quota.severity.${item.severity}`)}</Badge></div>
                       <p className="text-sm text-muted-foreground">{t('quota.scope', { scope: item.scope })}</p>
                       <Meter value={item.utilizationPercent} min={0} max={100} size="md" label={null} aria-label={item.metricKey} valueLabel={usage} aria-valuetext={usage}
                         hideValue={false} thresholds={{ warning: 80, destructive: 100 }} higherIsBetter={false} note={null} />
@@ -80,7 +80,7 @@ function OverviewContent() {
               </Collapsible> : empty('quotaItems')}
             </> : empty('quota')}
           </CardBody></Card>
-          <Card data-testid="console-tenant-inventory-summary"><CardBody className="space-y-4">
+          <Card variant="default" className="min-w-0" data-testid="console-tenant-inventory-summary"><CardBody className="space-y-4">
             <SectionHeader title={t('inventory.title')} description={t('inventory.description')} as="h2" headingId="overview-inventory" count={undefined} actions={[]} bordered={false} />
             {inventory ? <>
               <KpiRow items={counts.map((key) => ({ id: key, label: t(`inventory.${key}`), value: count(inventory[key]), delta: undefined, trend: undefined, trendTone: undefined }))}

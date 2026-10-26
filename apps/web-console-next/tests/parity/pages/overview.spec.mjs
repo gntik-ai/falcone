@@ -89,9 +89,22 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(kpis.locator('svg')).toHaveCount(0);
       await toggle(parity, 'quota'); await toggle(parity, 'inventory');
       await expect(overview(parity).getByRole('meter')).toHaveCount(3);
-      for (const metric of ['invocations_per_minute', 'applications', 'workspaces']) {
+      const count = (value) => new Intl.NumberFormat(locale).format(value);
+      for (const [metric, scope, severity, used, limit, remaining, utilization, unit] of [
+        ['invocations_per_minute', 'workspace', 'blocked', 1000, 1000, 0, 100, 'rpm'],
+        ['applications', 'tenant', 'warning', 80, 100, 20, 80, ''],
+        ['workspaces', 'tenant', 'nominal', 2, 10, 8, 20, ''],
+      ]) {
+        const item = overview(parity).getByText(metric, { exact: true }).locator('xpath=../..');
+        await expect(item.getByText(text.quota.scope.replace('{scope}', scope), { exact: true })).toBeVisible();
+        await expect(item.getByText(text.quota.severity[severity], { exact: true })).toBeVisible();
+        const values = { used, limit, remaining, utilization };
+        const usage = text.quota.usage.replace(/\{(used|limit|remaining|utilization)\}/g, (_, key) => count(values[key]))
+          .replace('{unit}', unit ? text.quota.unit.replace('{unit}', unit) : '');
         const meter = overview(parity).getByRole('meter', { name: metric, exact: true });
-        await expect(meter).toHaveAttribute('aria-valuetext', /remaining|restante/);
+        await expect(meter).toHaveAttribute('aria-valuetext', usage);
+        await expect(meter).toHaveAttribute('aria-valuenow', String(utilization));
+        await expect(item.getByText(usage, { exact: true })).toBeVisible();
       }
       for (const slug of ['workspace-prod', 'workspace-dev']) await expect(overview(parity).getByText(slug, { exact: true })).toBeVisible();
       await assertNoPageRequests(parity);

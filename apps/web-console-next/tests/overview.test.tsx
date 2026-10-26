@@ -96,12 +96,28 @@ test.each(['es', 'en'] as const)('error states clear stale summaries and expose 
   }
 })
 
-test('a tenant switch immediately hides previous tenant data, including during loading and failure', () => {
+test.each(['es', 'en'] as const)('a tenant switch hides previous summaries during loading, failure and unresolved selection in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
   const view = render(<Overview />)
   const previous = screen.getByTestId('console-tenant-quota-summary')
-  expect(within(previous).getByRole('button', { name: es.quota.disclosure })).toBeVisible()
+  expect(within(previous).getByRole('button', { name: copy.quota.disclosure })).toBeVisible()
+  state.context.loading = true
+  view.rerender(<Overview />)
+  expect(screen.getByRole('status', { name: copy.loading.quota })).toBeVisible()
+  expect(screen.queryByTestId('console-tenant-quota-summary')).not.toBeInTheDocument()
+  expect(screen.queryByTestId('console-tenant-inventory-summary')).not.toBeInTheDocument()
+  state.context.loading = false
+  state.context.error = { status: 500 }
+  view.rerender(<Overview />)
+  expect(screen.getByRole('heading', { name: copy.error.title })).toBeVisible()
+  expect(screen.queryByTestId('console-tenant-quota-summary')).not.toBeInTheDocument()
+  expect(screen.queryByTestId('console-tenant-inventory-summary')).not.toBeInTheDocument()
+  state.context.error = null
   state.context.activeTenantId = 'synthetic-unavailable'
   view.rerender(<Overview />)
   expect(screen.queryByTestId('console-tenant-quota-summary')).not.toBeInTheDocument()
-  expect(screen.getByRole('heading', { name: es.empty.tenant.title })).toBeVisible()
+  expect(screen.queryByTestId('console-tenant-inventory-summary')).not.toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: copy.empty.tenant.title })).toBeVisible()
+  assertLinks()
 })
