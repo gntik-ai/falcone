@@ -29,6 +29,8 @@ async function activate(p, control) {
 }
 async function choose(p, labels, option) {
   const control = p.page.getByRole('combobox', { name: copy(p, ...labels), exact: true });
+  // Drain the previous popup before opening another; its closing animation can overlap.
+  if (!frozen.has(p)) await expect(p.page.getByRole('listbox')).toHaveCount(0);
   await activate(p, control);
   const listboxId = await control.getAttribute('aria-controls');
   const listbox = listboxId
