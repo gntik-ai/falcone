@@ -1,0 +1,85 @@
+{
+  "title": "Console overview",
+  "badge": "Overview",
+  "description": "Operational status and quick access to managing your organization on the BaaS platform.",
+  "quick": {
+    "title": "Quick links",
+    "description": "Common destinations for managing the active organization.",
+    "workspaces": {
+      "label": "Workspaces",
+      "description": "Inventory and provisioning status."
+    },
+    "members": {
+      "label": "Members",
+      "description": "Manage who has access to the organization."
+    },
+    "flows": {
+      "label": "Flows / workflows",
+      "description": "Automations and their execution history."
+    },
+    "my-plan": {
+      "label": "My plan",
+      "description": "Limits and usage of your subscribed plan."
+    }
+  },
+  "summaries": "Organization summaries",
+  "loading": {
+    "quota": "Loading quota summary.",
+    "inventory": "Loading inventory."
+  },
+  "quota": {
+    "title": "Active organization quota status",
+    "description": "Usage compared to the limits of your subscribed plan.",
+    "total": {
+      "nominal": "Nominal: {total}",
+      "warning": "Warning: {total}",
+      "blocked": "Blocked: {total}"
+    },
+    "disclosure": "View quota details",
+    "scope": "Scope: {scope}",
+    "usage": "Usage {used} / {limit} · remaining {remaining} · utilization {utilization}%{unit}",
+    "unit": " · {unit}",
+    "severity": {
+      "nominal": "nominal",
+      "warning": "warning",
+      "blocked": "blocked"
+    }
+  },
+  "inventory": {
+    "title": "Active organization composition",
+    "description": "Inventory of workspaces, applications and managed resources.",
+    "workspaceCount": "Workspaces",
+    "applicationCount": "Applications",
+    "managedResourceCount": "Managed resources",
+    "serviceAccountCount": "Service accounts",
+    "disclosure": "View breakdown by workspace",
+    "workspace": "Applications {applications} · Service accounts {serviceAccounts} · Resources {resources}"
+  },
+  "empty": {
+    "tenant": {
+      "title": "Select an organization",
+      "description": "Select the active organization to see its quotas and inventory.",
+      "action": "Select organization"
+    },
+    "quota": {
+      "title": "No quota summary",
+      "description": "The active organization has no quota summary available."
+    },
+    "quotaItems": {
+      "title": "No quota alerts",
+      "description": "There are no visible quota alerts for the active organization."
+    },
+    "inventory": {
+      "title": "No inventory",
+      "description": "The active organization has no inventory available."
+    }
+  },
+  "noAccess": {
+    "title": "No access to summaries",
+    "description": "You do not have permission to view the active organization summaries."
+  },
+  "error": {
+    "title": "Summaries could not be loaded",
+    "message": "Check your connection and open the page again."
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "title": "Vista general de la consola",
+  "badge": "Vista general",
+  "description": "Estado operativo y accesos rápidos a la administración de tu organización en la plataforma BaaS.",
+  "quick": {
+    "title": "Accesos rápidos",
+    "description": "Destinos más usados para administrar la organización activa.",
+    "workspaces": {
+      "label": "Áreas de trabajo",
+      "description": "Inventario y estado de aprovisionamiento."
+    },
+    "members": {
+      "label": "Miembros",
+      "description": "Gestiona quién tiene acceso a la organización."
+    },
+    "flows": {
+      "label": "Flujos / workflows",
+      "description": "Automatizaciones y su historial de ejecución."
+    },
+    "my-plan": {
+      "label": "Mi plan",
+      "description": "Límites y consumo del plan contratado."
+    }
+  },
+  "summaries": "Resúmenes de la organización",
+  "loading": {
+    "quota": "Cargando resumen de cuotas.",
+    "inventory": "Cargando inventario."
+  },
+  "quota": {
+    "title": "Estado de cuotas de la organización activa",
+    "description": "Resumen de consumo frente a los límites del plan contratado.",
+    "total": {
+      "nominal": "Nominal: {total}",
+      "warning": "Advertencia: {total}",
+      "blocked": "Bloqueadas: {total}"
+    },
+    "disclosure": "Ver detalle de cuotas",
+    "scope": "Ámbito: {scope}",
+    "usage": "Uso {used} / {limit} · restante {remaining} · utilización {utilization}%{unit}",
+    "unit": " · {unit}",
+    "severity": {
+      "nominal": "nominal",
+      "warning": "warning",
+      "blocked": "blocked"
+    }
+  },
+  "inventory": {
+    "title": "Composición de la organización activa",
+    "description": "Inventario de áreas de trabajo, aplicaciones y recursos gestionados.",
+    "workspaceCount": "Áreas de trabajo",
+    "applicationCount": "Aplicaciones",
+    "managedResourceCount": "Recursos gestionados",
+    "serviceAccountCount": "Cuentas de servicio",
+    "disclosure": "Ver desglose por área de trabajo",
+    "workspace": "Aplicaciones {applications} · Cuentas de servicio {serviceAccounts} · Recursos {resources}"
+  },
+  "empty": {
+    "tenant": {
+      "title": "Selecciona una organizacion",
+      "description": "Selecciona la organización activa para ver sus cuotas e inventario.",
+      "action": "Seleccionar organización"
+    },
+    "quota": {
+      "title": "Sin resumen de cuotas",
+      "description": "La organización activa no tiene un resumen de cuotas disponible."
+    },
+    "quotaItems": {
+      "title": "Sin alertas de cuota",
+      "description": "No hay alertas de cuota visibles para la organización activa."
+    },
+    "inventory": {
+      "title": "Sin inventario",
+      "description": "La organización activa no tiene un inventario disponible."
+    }
+  },
+  "noAccess": {
+    "title": "Sin acceso a los resúmenes",
+    "description": "No tienes permiso para ver los resúmenes de la organización activa."
+  },
+  "error": {
+    "title": "No se pudieron cargar los resúmenes",
+    "message": "Comprueba tu conexión y vuelve a abrir la página."
+  }
+}

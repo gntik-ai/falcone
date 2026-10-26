@@ -10,6 +10,7 @@ interface PendingConsoleRoute {
 
 // Keep authorization and context scope next to each route, as in the legacy router.
 export const pendingConsoleRoutes: PendingConsoleRoute[] = [
+  { path: 'overview', migrated: true },
   { path: 'tenants' },
   { path: 'workspaces' },
   { path: 'database' },

@@ -105,7 +105,7 @@ test.each([
   login(roles, ids)
   requests = strictFetch(Object.fromEntries(expected.map((url) => [`GET ${url}`, url === tenantUrl ? { items: [] } : { tenantId: url.endsWith('t1') ? 't1' : 't2', displayName: url } ])))
   open('/console/overview')
-  await screen.findByRole('heading', { name: 'Resumen' })
+  await screen.findByRole('heading', { name: 'Vista general de la consola' })
   await waitFor(() => expect(screen.getByLabelText('Organización activa')).toBeInTheDocument())
   expect(requests.mock.mock.calls.map(([url]) => url).sort()).toEqual(expected.sort())
 })
@@ -128,7 +128,7 @@ test('route workspace overrides stored context, then tenant switching clears it 
   expect(snapshot).toEqual({ userId: 'synthetic-user', tenantId: 't2', workspaceId: null, updatedAt: expect.any(String) })
 })
 
-test.each([['superadmin', 'Resumen', '/console/overview'], ['platform_auditor', 'Página pendiente', '/console/observability']] as const)('index chooses the permission landing for %s', async (role, heading, destination) => {
+test.each([['superadmin', 'Vista general de la consola', '/console/overview'], ['platform_auditor', 'Página pendiente', '/console/observability']] as const)('index chooses the permission landing for %s', async (role, heading, destination) => {
   login([role])
   requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
   open('/console')
@@ -172,7 +172,7 @@ test.each([200, 504, 400])('expired sessions use shared single-flight refresh an
   await act(async () => { await Promise.all([ensureConsoleSession(), ensureConsoleSession()]) })
   expect(posts).toBe(status === 504 ? 2 : 1)
   for (const [, init] of requests.mock.mock.calls) expect(JSON.parse(init!.body as string)).toEqual({ refreshToken: 'synthetic-refresh-token' })
-  expect(await screen.findByRole('heading', { name: status === 400 ? 'Acceso' : 'Resumen' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: status === 400 ? 'Acceso' : 'Vista general de la consola' })).toBeVisible()
   if (status === 400) {
     expect(sessionStorage.getItem('in-falcone.console-shell-session')).toBeNull()
     expect(readConsoleAuthStatusHint()).toEqual({ statusView: 'login', title: 'Tu sesión ha expirado', message: 'Vuelve a autenticarte para continuar en la consola.' })
@@ -187,7 +187,7 @@ test.each([204, 500])('sign-out revokes the shared session and leaves for login 
     }
   })
   open('/console/overview')
-  await screen.findByRole('heading', { name: 'Resumen' })
+  await screen.findByRole('heading', { name: 'Vista general de la consola' })
   fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Cerrar sesión' }))
   expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
@@ -220,7 +220,7 @@ test('About belongs to the kit user menu and shows the injected build identity',
   vi.stubGlobal('__APP_VERSION__', '1.2.3')
   vi.stubGlobal('__APP_COMMIT_SHA__', '0123456789abcdef0123456789abcdef01234567')
   open('/console/overview')
-  await screen.findByRole('heading', { name: 'Resumen' })
+  await screen.findByRole('heading', { name: 'Vista general de la consola' })
   fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Acerca de' }))
   expect(await screen.findByRole('dialog', { name: 'Acerca de' })).toHaveTextContent('1.2.3 · 0123456')
@@ -250,7 +250,7 @@ test('the application StrictMode bootstrap makes only one tenant collection requ
   login()
   requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
   render(<StrictMode><MemoryRouter initialEntries={['/console/overview']}><App /></MemoryRouter></StrictMode>)
-  await screen.findByRole('heading', { name: 'Resumen' })
+  await screen.findByRole('heading', { name: 'Vista general de la consola' })
   await waitFor(() => expect(screen.getByLabelText('Contexto activo')).toHaveAttribute('aria-busy', 'false'))
   expect(requests.mock).toHaveBeenCalledTimes(1)
 })
@@ -263,7 +263,7 @@ test('sign-out uses the latest shared session after token rotation', async () =>
     }
   })
   open('/console/overview')
-  await screen.findByRole('heading', { name: 'Resumen' })
+  await screen.findByRole('heading', { name: 'Vista general de la consola' })
   session.tokenSet!.accessToken = 'synthetic-rotated-access'
   session.tokenSet!.refreshToken = 'synthetic-rotated-refresh'
   persistConsoleShellSession(session)

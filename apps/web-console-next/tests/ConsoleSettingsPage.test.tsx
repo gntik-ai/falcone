@@ -159,7 +159,7 @@ for (const locale of ['es', 'en'] as const) for (const route of ['/console/overv
     login(['tenant_owner'])
     const network = strictFetch({})
     render(<MemoryRouter initialEntries={[route]}><App /></MemoryRouter>)
-    await screen.findByRole('heading', { name: route === '/' ? (locale === 'es' ? welcomeEs : welcomeEn).title : (locale === 'es' ? 'Resumen' : 'Overview') })
+    await screen.findByRole('heading', { name: route === '/' ? (locale === 'es' ? welcomeEs : welcomeEn).title : (locale === 'es' ? 'Vista general de la consola' : 'Console overview') })
     const remove = registerLocaleBundles('synthetic-other-route', { es: async () => { throw new Error('synthetic failure') }, en: async () => { throw new Error('synthetic failure') } })
     function Observer() { const state = useLocaleLoader(); return <output data-testid="loader-result">{String(state.error)}</output> }
     render(<Observer />)
