@@ -98,6 +98,11 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(surface(parity).locator('dd').filter({ hasText: 'synthetic@example.test' })).toBeVisible();
       await selectSection(parity, 'settings');
       await expect(parity.page).toHaveURL(/\/console\/settings$/);
+      await parity.page.goBack();
+      await expect(parity.page).toHaveURL(/\/console\/profile$/);
+      await expect(surface(parity)).toBeVisible();
+      await parity.page.goForward();
+      await expect(parity.page).toHaveURL(/\/console\/settings$/);
       // The anchor is migrated by ShellLink; the existing settings select still
       // follows the legacy handoff, as required by this page's scope boundary.
       if (width === 1280) {

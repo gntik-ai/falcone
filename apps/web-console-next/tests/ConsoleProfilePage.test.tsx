@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, afterEach, expect, test, vi } from 'vitest'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { persistConsoleShellSession } from '@in-falcone/console-api/session'
 import { App } from '../src/App'
 import ConsoleProfile from '../src/pages/consoleProfile'
@@ -142,7 +142,13 @@ for (const [locale, copy] of [['es', es], ['en', en]] as const) {
   }
 }
 
-function Location() { return <output data-testid="profile-location">{useLocation().pathname}</output> }
+function Location() {
+  const navigate = useNavigate()
+  return <>
+    <output data-testid="profile-location">{useLocation().pathname}</output>
+    <button onClick={() => navigate(-1)}>Back</button>
+  </>
+}
 test.each(['/', '/next'])('uses in-app profile navigation under basename %s', async (basename) => {
   login(['tenant_owner'])
   const prefix = basename === '/' ? '' : basename
@@ -155,6 +161,24 @@ test.each(['/', '/next'])('uses in-app profile navigation under basename %s', as
   expect(fireEvent.click(screen.getByRole('link', { name: 'Ajustes' }))).toBe(false)
   expect(await screen.findByRole('heading', { name: 'Ajustes de consola', level: 1 })).toBeVisible()
   expect(screen.getByTestId('profile-location')).toHaveTextContent('/console/settings')
+  fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+  expect(await screen.findByRole('heading', { name: es.title, level: 1 })).toBeVisible()
+  expect(screen.getByTestId('profile-location')).toHaveTextContent('/console/profile')
+})
+
+test.each(['/', '/next'])('the compact section select navigates once under basename %s', async (basename) => {
+  login(['tenant_owner'])
+  const prefix = basename === '/' ? '' : basename
+  render(<MemoryRouter basename={basename} initialEntries={[`${prefix}/console/profile`]}><App /><Location /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('combobox', { name: es.nav.label }))
+  const option = within(await screen.findByRole('listbox')).getByRole('option', { name: es.nav.settings })
+  fireEvent.pointerDown(option)
+  fireEvent.click(option)
+  expect(await screen.findByRole('heading', { name: 'Ajustes de consola', level: 1 })).toBeVisible()
+  expect(screen.getByTestId('profile-location')).toHaveTextContent('/console/settings')
+  fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+  expect(await screen.findByRole('heading', { name: es.title, level: 1 })).toBeVisible()
+  expect(screen.getByTestId('profile-location')).toHaveTextContent('/console/profile')
 })
 
 test.each([403, 404])('the %s back link reaches the console start', async (status) => {

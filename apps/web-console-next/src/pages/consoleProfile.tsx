@@ -1,4 +1,4 @@
-import { useEffect, type ComponentProps } from 'react'
+import { useEffect, useRef, type ComponentProps } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Badge, I18nProvider, Link, SettingsLayout } from '@gntik-ai/ui'
@@ -46,6 +46,7 @@ export default function ConsoleProfile() {
   const permissions = usePermissions()
   const context = useConsoleContext()
   const navigate = useNavigate()
+  const sectionLinkClicked = useRef(false)
   useEffect(() => registerLocaleBundles('pages.console-profile-page', loaders), [])
 
   const principal = session?.principal
@@ -80,9 +81,14 @@ export default function ConsoleProfile() {
 
   return <I18nProvider locale={language.language}>
     <SettingsLayout groups={[{ items: [
-      { id: 'profile', label: t('nav.profile'), href: '/console/profile', current: true },
-      { id: 'settings', label: t('nav.settings'), href: '/console/settings', current: false },
-    ] }]} value="profile" defaultValue={undefined} onValueChange={(_, selected) => { if (selected.href) navigate(selected.href) }}
+      { id: 'profile', label: t('nav.profile'), href: '/console/profile', current: true, onClick: () => { sectionLinkClicked.current = true } },
+      { id: 'settings', label: t('nav.settings'), href: '/console/settings', current: false, onClick: () => { sectionLinkClicked.current = true } },
+    ] }]} value="profile" defaultValue={undefined} onValueChange={(_, selected) => {
+      // The kit reports anchor clicks here too; ShellLink owns their navigation.
+      const fromLink = sectionLinkClicked.current
+      sectionLinkClicked.current = false
+      if (!fromLink && selected.href) navigate(selected.href)
+    }}
       navLabel={t('nav.label')} selectLabel={t('nav.label')} skipLinkLabel={t('title')}
       title={null} description={null} saveBar="none" embedded={true} fullScreen={false} width="wide" mainId="console-profile"
       className="console-profile min-w-0 wrap-anywhere"
