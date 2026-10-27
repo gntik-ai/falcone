@@ -24,7 +24,7 @@ test.each(['/', '/next'])('settings navigation stays in the migrated console und
   const settings = await screen.findByRole('link', { name: 'Ajustes' }, { timeout: 5_000 })
   expect(settings).toHaveAttribute('href', location)
   expect(settings).toHaveAttribute('aria-current', 'page')
-  expect(screen.getByRole('link', { name: 'Perfil' })).toHaveAttribute('href', '/console/profile')
+  expect(screen.getByRole('link', { name: 'Perfil' })).toHaveAttribute('href', `${basename === '/' ? '' : basename}/console/profile`)
   expect(fireEvent.click(settings)).toBe(false)
   expect(await screen.findByRole('heading', { name: 'Ajustes de consola', level: 1 })).toBeVisible()
   network.verify()
