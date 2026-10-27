@@ -49,7 +49,8 @@ async function settle(p) {
 }
 async function freeze(p) {
   const time = new Date('2026-06-01T12:00:00Z');
-  await p.page.clock.install({ time });
+  // The installed clock runs until pauseAt, so leave room for the two calls.
+  await p.page.clock.install({ time: new Date(time.getTime() - 1000) });
   await p.page.clock.pauseAt(time);
   frozen.add(p);
   finishedLists.set(p, requests(p).length);
