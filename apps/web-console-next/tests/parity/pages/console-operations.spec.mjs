@@ -29,8 +29,15 @@ async function activate(p, control) {
 }
 async function choose(p, labels, option) {
   const control = p.page.getByRole('combobox', { name: copy(p, ...labels), exact: true });
+  // Drain the previous popup before opening another; its closing animation can overlap.
+  if (!frozen.has(p)) await expect(p.page.getByRole('listbox')).toHaveCount(0);
   await activate(p, control);
-  await activate(p, p.page.getByRole('listbox').getByRole('option', { name: option, exact: true }));
+  const listboxId = await control.getAttribute('aria-controls');
+  const listbox = listboxId
+    ? p.page.getByRole('listbox').and(p.page.locator(`[id=${JSON.stringify(listboxId)}]`))
+    : p.page.getByRole('listbox').filter({ visible: true });
+  await expect(listbox).toHaveCount(1);
+  await activate(p, listbox.getByRole('option', { name: option, exact: true }));
   await expect(control).toHaveAttribute('aria-expanded', 'false');
   await settle(p);
   return control;
@@ -42,7 +49,8 @@ async function settle(p) {
 }
 async function freeze(p) {
   const time = new Date('2026-06-01T12:00:00Z');
-  await p.page.clock.install({ time });
+  // The installed clock runs until pauseAt, so leave room for the two calls.
+  await p.page.clock.install({ time: new Date(time.getTime() - 1000) });
   await p.page.clock.pauseAt(time);
   frozen.add(p);
   finishedLists.set(p, requests(p).length);
