@@ -2,11 +2,17 @@ import { createEndpointRegistry } from './parity/endpoint-registry.ts';
 import { operationEndpoints } from './parity/pages/operationDetail.manifest.ts';
 import { runtimeEndpoints } from './parity/pages/consoleRuntime.manifest.ts';
 import { pendingEndpoints } from './parity/pages/pendingActivation.manifest.ts';
+import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures';
 
 // Synthetic identities only. The app still exercises real session parsing and loaders.
 export async function installSession(page, roles = ['superadmin']) {
   const unmatched = [];
-  const endpoints = createEndpointRegistry({}, () => ({}), { ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints });
+  const endpoints = createEndpointRegistry({}, () => ({}), {
+    ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints,
+    signupPolicy: { method: 'GET', path: '/v1/auth/signups/policy', fixtures: {
+      success: { status: 200, body: buildConsoleSignupPolicyFixture() },
+    } },
+  });
   await page.addInitScript((platformRoles) => {
     sessionStorage.setItem('in-falcone.console-shell-session', JSON.stringify({
       sessionId: 'synthetic-session', authenticationState: 'active', statusView: 'active',

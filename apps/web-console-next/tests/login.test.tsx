@@ -11,6 +11,11 @@ import { App } from '../src/App'
 import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.login-page.json'
 import en from '../src/locales/en/pages.login-page.json'
+import welcomeManifest from './parity/pages/welcome.manifest'
+import { createEndpointRegistry } from './parity/endpoint-registry'
+import { endpoints, responseFor } from './parity/fixtures/shell'
+// @ts-expect-error Browser helpers intentionally use native JavaScript modules.
+import { installSession } from './browser-session.mjs'
 
 const policyPath = '/v1/auth/signups/policy'
 const loginPath = '/v1/auth/login-sessions'
@@ -58,6 +63,37 @@ function assertRequest(path: string, method: string, body?: unknown, count = 1) 
 }
 beforeEach(() => { install(); vi.stubGlobal('PointerEvent', MouseEvent) })
 afterEach(() => { fetchMock.mockReset(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
+
+test('welcome destinations share the login policy fixture without endpoint collisions', () => {
+  const registry = createEndpointRegistry(endpoints,
+    (name, variant, role) => responseFor(name, variant as Parameters<typeof responseFor>[1], role), welcomeManifest.endpoints)
+  expect(registry.find('GET', policyPath)).toBe('signupPolicy')
+  expect(registry.responseFor('signupPolicy', 'tenant_owner')).toEqual({ status: 200, body: buildConsoleSignupPolicyFixture() })
+})
+
+test('CSP sessions serve the public login policy and reject other methods, paths and queries', async () => {
+  const page = { addInitScript: vi.fn(), route: vi.fn() }
+  const unmatched = await installSession(page)
+  const handle = page.route.mock.calls[0][1]
+  for (const [method, path] of [
+    ['GET', policyPath], ['POST', policyPath], ['GET', `${policyPath}/unexpected`], ['GET', `${policyPath}?unexpected=true`],
+  ]) {
+    const route = {
+      request: () => ({ url: () => `http://localhost${path}`, method: () => method, postDataJSON: () => undefined }),
+      fulfill: vi.fn(), abort: vi.fn(),
+    }
+    await handle(route)
+    if (method === 'GET' && path === policyPath) {
+      expect(route.fulfill).toHaveBeenCalledExactlyOnceWith({ status: 200, json: buildConsoleSignupPolicyFixture() })
+      expect(route.abort).not.toHaveBeenCalled()
+      expect(unmatched).toEqual([])
+    } else {
+      expect(route.fulfill).not.toHaveBeenCalled()
+      expect(route.abort).toHaveBeenCalledExactlyOnceWith()
+    }
+  }
+  expect(unmatched).toEqual([`POST ${policyPath}`, `GET ${policyPath}/unexpected`, `GET ${policyPath}?unexpected=true`])
+})
 
 for (const locale of ['es', 'en'] as const) describe(`login legacy cases in ${locale}`, () => {
   const copy = locale === 'es' ? es : en
