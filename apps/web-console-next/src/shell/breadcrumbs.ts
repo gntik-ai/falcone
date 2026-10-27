@@ -7,8 +7,8 @@ function decode(segment: string) {
 }
 export function buildBreadcrumbs(pathname: string, t: TFunction): BreadcrumbItem[] {
   const path = pathname.replace(/\/+$/, '') || '/console'
-  // Account settings has a breadcrumb without adding a shell navigation item.
-  const match = [...navigation, { path: '/console/settings', key: 'settings' }].sort((a, b) => b.path.length - a.path.length).find((item) => path === item.path || path.startsWith(item.path + '/'))
+  // Account pages have translated breadcrumbs without shell navigation items.
+  const match = [...navigation, { path: '/console/settings', key: 'settings' }, { path: '/console/profile', key: 'profile' }].sort((a, b) => b.path.length - a.path.length).find((item) => path === item.path || path.startsWith(item.path + '/'))
   const base = match?.path ?? '/console'
   const segments = path.slice(base.length).split('/').filter(Boolean)
   const items: BreadcrumbItem[] = [{ label: t('shell.console'), href: path === '/console/overview' ? undefined : '/console/overview' }]

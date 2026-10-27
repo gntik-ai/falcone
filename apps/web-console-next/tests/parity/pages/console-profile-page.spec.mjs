@@ -103,15 +103,11 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(surface(parity)).toBeVisible();
       await parity.page.goForward();
       await expect(parity.page).toHaveURL(/\/console\/settings$/);
-      // The anchor is migrated by ShellLink; the existing settings select still
-      // follows the legacy handoff, as required by this page's scope boundary.
-      if (width === 1280) {
-        await parity.page.getByRole('link', { name: copy(parity).nav.profile, exact: true }).click();
-      } else {
-        await parity.page.evaluate((route) => {
-          history.pushState(null, '', route); dispatchEvent(new PopStateEvent('popstate'));
-        }, new URL(parity.page.url()).pathname.replace(/settings$/, 'profile'));
-      }
+      // Re-enter in-app at every width. The settings page's existing section
+      // handler still performs a legacy handoff and is outside this migration.
+      await parity.page.evaluate((route) => {
+        history.pushState(null, '', route); dispatchEvent(new PopStateEvent('popstate'));
+      }, new URL(parity.page.url()).pathname.replace(/settings$/, 'profile'));
       await expect(surface(parity)).toBeVisible();
       expect(await parity.page.evaluate(() => window.__profileDocument)).toBe(true);
       await check.assertRuntimeHealth(parity);

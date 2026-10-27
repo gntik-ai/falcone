@@ -6,7 +6,8 @@ import { App } from '../src/App'
 import ConsoleProfile from '../src/pages/consoleProfile'
 import { PermissionsProvider } from '../src/shell/permissions'
 import { SessionProvider } from '../src/shell/session'
-import { changeLocale } from '../src/i18n'
+import i18n, { changeLocale } from '../src/i18n'
+import { buildBreadcrumbs } from '../src/shell/breadcrumbs'
 import { login, renderWithSession, strictFetch } from './shell-support'
 import es from '../src/locales/es/pages.console-profile-page.json'
 import en from '../src/locales/en/pages.console-profile-page.json'
@@ -56,6 +57,12 @@ test('ports exactly two missing-context fallbacks', () => {
 })
 
 for (const [locale, copy] of [['es', es], ['en', en]] as const) {
+  test(`translates the profile breadcrumb without adding a sidebar destination in ${locale}`, async () => {
+    await changeLocale(locale)
+    expect(buildBreadcrumbs('/console/profile', i18n.getFixedT(locale, 'common')).map((item) => item.label))
+      .toEqual([i18n.t('shell.console'), copy.nav.profile])
+  })
+
   test(`renders two raw roles, the highest role and semantic identity in ${locale}`, async () => {
     await changeLocale(locale)
     const session = login(['platform_auditor', 'tenant_admin'])
