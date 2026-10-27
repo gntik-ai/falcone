@@ -128,11 +128,15 @@ for (const locale of ['es', 'en'] as const) describe(`login legacy cases in ${lo
     expect(screen.getByRole('link', { name: copy.labels.signup })).toHaveAttribute('href', '/signup?tenantId=tenant_example&workspaceId=workspace_example')
     expect(screen.getByText(copy.contextBoth.replace('{tenantId}', 'tenant_example').replace('{workspaceId}', 'workspace_example'))).toBeVisible()
   })
-  test('hides signup for a disabled invitation policy', async () => {
-    install({ [policyPath]: () => response(200, { ...policy(), selfServiceEnabled: false, mode: 'invitation', message: 'RAW_SERVER_POLICY' }) })
+  test.each(['invitation', 'self_service'])('renders disabled %s signup without any action', async (mode) => {
+    install({ [policyPath]: () => response(200, { ...policy(), selfServiceEnabled: false, mode, message: 'RAW_SERVER_POLICY' }) })
     open()
     expect(await screen.findByText(copy.signupDisabledTitle)).toBeVisible()
-    expect(screen.getByText(copy.invitationOnly)).toBeVisible()
+    expect(screen.getByText(mode === 'invitation' ? copy.invitationOnly : copy.labels.signupDisabled)).toBeVisible()
+    const aside = within(screen.getByRole('region', { name: copy.asideTitle }))
+    expect(aside.queryAllByRole('button', { hidden: true })).toHaveLength(0)
+    expect(aside.queryAllByRole('link', { hidden: true })).toHaveLength(0)
+    expect(screen.getByRole('button', { name: copy.labels.submit })).toBeEnabled()
     expect(screen.queryByRole('link', { name: copy.labels.signup })).toBeNull()
     expect(screen.queryByText('RAW_SERVER_POLICY')).toBeNull()
   })

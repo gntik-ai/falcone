@@ -169,6 +169,13 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
           return hasOutline(node) || hasOutline(node.parentElement);
         })).toBe(true);
       }
+      await open(parity, { signupPolicy: 'empty' });
+      await expect(page.getByRole('heading', { name: copy.signupDisabledTitle, exact: true })).toBeVisible();
+      const disabledAside = page.getByRole('region', { name: copy.asideTitle, exact: true });
+      await expect(disabledAside.getByRole('button', { includeHidden: true })).toHaveCount(0);
+      await expect(disabledAside.getByRole('link', { includeHidden: true })).toHaveCount(0);
+      await check.assertAccessibility(parity);
+      await check.assertLocale(parity);
       for (const area of ['policy', 'status']) for (const variant of ['403', '404']) {
         if (area === 'policy') await open(parity, { signupPolicy: variant }); else await restricted(parity, variant);
         const before = parity.network.requests.length;

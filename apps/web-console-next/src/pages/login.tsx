@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AuthLayout, Alert, Button, Checkbox, EmptyState, Field, FieldLabel, Input, Link, LiveAnnouncer, Logo, PasswordInput, Section, Text, useAnnounce } from '@gntik-ai/ui'
-import { ErrorPanel, FirstRunEmpty, InlineCallout, ListSkeleton, NoAccessEmpty, PageHeader } from '@gntik-ai/blocks'
+import { ErrorPanel, InlineCallout, ListSkeleton, NoAccessEmpty, PageHeader } from '@gntik-ai/blocks'
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { createConsoleLoginSession, getConsoleAccountStatusView, getConsoleSignupPolicy, inferStatusViewFromError, type ConsoleAccountStatusView, type ConsoleLoginRequest, type ConsoleSignupPolicy, type ConsoleStatusViewId } from '@in-falcone/console-api/auth'
@@ -245,8 +245,8 @@ function Login() {
           {policyBusy && !policyError ? <ListSkeleton rows={2} label={t('policyLoading')} className="min-w-0" /> : policyError ? policyError.status === 403 ? <>{noAccess(t('policyDeniedTitle'), t('policyDeniedMessage'))}{returnButton}</> : policyError.status === 404 ? missing(t('policyMissingTitle'), t('policyMissingMessage')) : panel(policyError, 'policy', policyBusy, () => loadPolicy(new AbortController(), true)) : policy?.selfServiceEnabled ? <>
             <Button render={<RouterLink to={signupTarget} data-signup aria-describedby={context ? 'signup-context-help' : undefined} />} nativeButton={false} role="link" variant="secondary" size="md" loading={false} disabled={false} iconOnly={false} icon={undefined} trailingIcon={undefined} className="w-full whitespace-normal">{label('signup')}</Button>
             {context ? <Text id="signup-context-help" as="p" variant="supporting" tone="muted" truncate={false} lineClamp={undefined}>{context}</Text> : null}
-          </> : policy ? <div data-disabled tabIndex={-1} className={focusClass}><FirstRunEmpty title={t('signupDisabledTitle')} description={policy.mode === 'invitation' ? t('invitationOnly') : label('signupDisabled')}
-            labels={{ title: '', description: '', action: '', guide: '' }} icon={undefined} actionLabel="" onAction={undefined} secondary={null} steps={[]} titleAs="h3" bordered={false} className="min-w-0" /></div> : null}
+          </> : policy ? <div data-disabled tabIndex={-1} className={focusClass}><EmptyState title={t('signupDisabledTitle')} description={policy.mode === 'invitation' ? t('invitationOnly') : label('signupDisabled')}
+            icon={undefined} primaryAction={null} secondaryAction={null} children={null} size="sm" titleAs="h3" bordered={false} className="min-w-0" /></div> : null}
         </div>
         <Text as="p" variant="supporting" tone="muted" truncate={false} lineClamp={undefined}>{t('sessionProtection')}</Text>
       </Section>
