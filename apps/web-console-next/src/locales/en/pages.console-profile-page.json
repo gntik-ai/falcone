@@ -1,0 +1,55 @@
+{
+  "nav": {
+    "label": "Account settings",
+    "profile": "Profile",
+    "settings": "Settings"
+  },
+  "badge": "Profile",
+  "title": "User profile",
+  "description": "Identity and permission details for the session you used to sign in to the console.",
+  "principalFallback": "Console operator",
+  "secondaryFallback": "Active protected session",
+  "fields": {
+    "username": "Username",
+    "email": "Email",
+    "tenant": "Active organization",
+    "workspace": "Active workspace",
+    "role": "Primary role"
+  },
+  "missingIdentity": "—",
+  "missingContext": "None selected",
+  "roles": {
+    "title": "Assigned roles",
+    "description": "Platform roles that determine what you can see and do in the console.",
+    "emptyTitle": "Your session has no assigned platform roles.",
+    "emptyDescription": "Contact an organization administrator if you need additional access.",
+    "labels": {
+      "superadmin": "Superadmin",
+      "platform_admin": "Platform administrator",
+      "platform_operator": "Platform operator",
+      "platform_team": "Platform team",
+      "tenant_owner": "Owner",
+      "tenant_admin": "Administrator",
+      "workspace_owner": "Workspace owner",
+      "workspace_admin": "Workspace administrator",
+      "tenant_developer": "Developer · read-only",
+      "tenant_viewer": "Viewer · read-only",
+      "none": "No assigned role",
+      "unknown": "Role without recognized write permissions"
+    }
+  },
+  "loading": {
+    "identity": "Loading identity and active context.",
+    "roles": "Loading assigned roles."
+  },
+  "context": {
+    "noAccessTitle": "No access to the active context",
+    "noAccessDescription": "You do not have permission to view the selected organization or workspace. Return to the console start to select another context.",
+    "notFoundTitle": "Active context not found",
+    "notFoundDescription": "The selected organization or workspace is no longer available. Return to the console start to select another context.",
+    "errorTitle": "Could not load the active context",
+    "errorMessage": "The selected organization or workspace could not be loaded. Check your connection or return to the console start.",
+    "back": "Back to console start",
+    "networkCode": "NETWORK_ERROR"
+  }
+}

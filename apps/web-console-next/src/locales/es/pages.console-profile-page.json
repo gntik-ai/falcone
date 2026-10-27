@@ -1,0 +1,55 @@
+{
+  "nav": {
+    "label": "Ajustes de cuenta",
+    "profile": "Perfil",
+    "settings": "Ajustes"
+  },
+  "badge": "Perfil",
+  "title": "Perfil de usuario",
+  "description": "Datos de identidad y permisos de la sesión con la que has iniciado sesión en la consola.",
+  "principalFallback": "Operador de consola",
+  "secondaryFallback": "Sesión protegida activa",
+  "fields": {
+    "username": "Usuario",
+    "email": "Correo",
+    "tenant": "Organización activa",
+    "workspace": "Área de trabajo activa",
+    "role": "Rol principal"
+  },
+  "missingIdentity": "—",
+  "missingContext": "Ninguna seleccionada",
+  "roles": {
+    "title": "Roles asignados",
+    "description": "Roles de plataforma que determinan qué puedes ver y hacer en la consola.",
+    "emptyTitle": "Tu sesión no tiene roles de plataforma asignados.",
+    "emptyDescription": "Contacta con un administrador de la organización si necesitas acceso adicional.",
+    "labels": {
+      "superadmin": "Superadmin",
+      "platform_admin": "Admin de plataforma",
+      "platform_operator": "Operador de plataforma",
+      "platform_team": "Equipo de plataforma",
+      "tenant_owner": "Propietario",
+      "tenant_admin": "Administrador",
+      "workspace_owner": "Propietario de área de trabajo",
+      "workspace_admin": "Administrador de área de trabajo",
+      "tenant_developer": "Developer · solo lectura",
+      "tenant_viewer": "Viewer · solo lectura",
+      "none": "Sin rol asignado",
+      "unknown": "Rol sin permisos de escritura reconocidos"
+    }
+  },
+  "loading": {
+    "identity": "Cargando la identidad y el contexto activo.",
+    "roles": "Cargando los roles asignados."
+  },
+  "context": {
+    "noAccessTitle": "Sin acceso al contexto activo",
+    "noAccessDescription": "No tienes permiso para consultar la organización o el área de trabajo seleccionada. Vuelve al inicio de la consola para seleccionar otro contexto.",
+    "notFoundTitle": "Contexto activo no encontrado",
+    "notFoundDescription": "La organización o el área de trabajo seleccionada ya no está disponible. Vuelve al inicio de la consola para seleccionar otro contexto.",
+    "errorTitle": "No se pudo cargar el contexto activo",
+    "errorMessage": "No se pudo consultar la organización o el área de trabajo seleccionada. Comprueba tu conexión o vuelve al inicio de la consola.",
+    "back": "Volver al inicio de la consola",
+    "networkCode": "NETWORK_ERROR"
+  }
+}
