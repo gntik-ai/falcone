@@ -5,7 +5,7 @@ import { ProtectedRoute } from './shell/session'
 import { Shell } from './shell/Shell'
 import { Guard, ConsoleIndexRedirect } from './shell/guards'
 import { PageSkeleton } from '@gntik-ai/blocks'
-import { StatusLayout } from '@gntik-ai/ui'
+import { AuthLayout, Logo, StatusLayout } from '@gntik-ai/ui'
 import { useTranslation } from 'react-i18next'
 import { RouteState, ShellErrorBoundary } from './shell/RouteState'
 import { pendingConsoleRoutes } from './shell/routes'
@@ -25,6 +25,15 @@ export function ConsoleRoutes() {
 function WelcomeLoading() {
   const { t } = useTranslation('common')
   return <main className="mx-auto w-full max-w-5xl p-7 sm:p-10"><PageSkeleton stats={0} rows={2} label={t('states.loading.title')} className="" /></main>
+}
+
+function LoginLoading() {
+  const { t } = useTranslation('common')
+  return <AuthLayout variant="card" mainId="login-loading" fullScreen={false}
+    logo={<Logo size={28} wordmark={true} aria-label={t('shell.console')} />} brand={null} brandFooter={null}
+    brandLabel={t('shell.console')} footer={null} skipLinkLabel={t('states.loading.title')} className="min-w-0">
+    <PageSkeleton stats={0} rows={2} label={t('states.loading.title')} className="" />
+  </AuthLayout>
 }
 
 function NotFoundLoading() {
@@ -47,7 +56,7 @@ export const appRoutes: RouteObject[] = [
     element: <Outlet />,
     children: [
       { path: '/', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<WelcomeLoading />}>{lazyPage('pages.welcome-page', () => import('./pages/welcome'))}</Suspense></ShellErrorBoundary> },
-      { path: '/login', element: lazyPage('login', () => import('./pages/login')) },
+      { path: '/login', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<LoginLoading />}>{lazyPage('pages.login-page', () => import('./pages/login'))}</Suspense></ShellErrorBoundary> },
       { path: '/password-recovery', element: lazyPage('recovery', () => import('./pages/recovery')) },
       { path: '/invitations/:tenantId/:invitationId', element: lazyPage('invitation', () => import('./pages/invitation')) },
       { path: '/signup', element: lazyPage('signup', () => import('./pages/signup')) },

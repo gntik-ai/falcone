@@ -1,0 +1,105 @@
+{
+  "documentTitle": "Acceso · Consola In Falcone",
+  "title": "Accede a In Falcone Console",
+  "subtitle": "Autenticación respaldada por Keycloak, la misma capa de identidad que protege el resto de la plataforma.",
+  "logo": "In Falcone",
+  "skip": "Saltar al contenido principal",
+  "moreActions": "Más acciones",
+  "sections": "Secciones",
+  "usernamePlaceholder": "operaciones",
+  "passwordPlaceholder": "••••••••••••",
+  "usernameHelp": "Usa el usuario de consola asociado a tu organización.",
+  "passwordHelp": "La policy de contraseña se valida en el servicio de acceso.",
+  "showPassword": "Mostrar contraseña",
+  "hidePassword": "Ocultar contraseña",
+  "strength": "Seguridad",
+  "credentialTitle": "No hemos podido validar tus credenciales",
+  "credentialMessage": "Revisa tu usuario y contraseña e inténtalo de nuevo.",
+  "deniedMessage": "No tienes acceso a la consola con estas credenciales. Revisa tu usuario y contraseña e inténtalo de nuevo.",
+  "loginErrorTitle": "El servicio de acceso no está disponible ahora mismo",
+  "loginErrorMessage": "Ha ocurrido un error operativo. Puedes reintentar en unos instantes sin recargar la consola.",
+  "networkTitle": "No se ha podido conectar con el servicio de acceso",
+  "networkMessage": "Comprueba tu conexión y vuelve a intentarlo.",
+  "policyErrorTitle": "No se puede consultar la policy de registro",
+  "policyErrorMessage": "Puedes reintentar la consulta sin interrumpir el acceso a la consola.",
+  "statusErrorTitle": "No se puede consultar el estado de la cuenta",
+  "statusErrorMessage": "Puedes reintentar la consulta del estado sin volver a enviar tus credenciales.",
+  "retry": "Reintentar",
+  "retrying": "Reintentando…",
+  "requestId": "ID de solicitud",
+  "copyRequestId": "Copiar ID de solicitud",
+  "copied": "ID de solicitud copiado",
+  "details": "Detalles técnicos",
+  "support": "Comparte este ID con soporte.",
+  "returnToForm": "Volver al formulario",
+  "statusDeniedTitle": "Estado de la cuenta no disponible para consulta",
+  "statusMissingTitle": "Estado de la cuenta no disponible",
+  "policyDeniedTitle": "No se puede consultar el registro",
+  "policyDeniedMessage": "No tienes permiso para consultar la policy de registro. Puedes seguir usando el formulario de acceso.",
+  "policyMissingTitle": "Política de registro no encontrada",
+  "policyMissingMessage": "No hemos encontrado la política de registro. Puedes seguir usando el formulario de acceso.",
+  "asideTitle": "Acceso y alta",
+  "asideDescription": "La consola consulta la policy efectiva de auto-registro y, si la sesión expira, devuelve al usuario al destino protegido una vez vuelva a autenticarse.",
+  "policyLoading": "Cargando policy de registro…",
+  "signupDisabledTitle": "Registro no disponible",
+  "invitationOnly": "El registro en este entorno está disponible solo mediante invitación.",
+  "sessionProtection": "Tu sesión permanece protegida durante la navegación: si el destino que buscabas requería iniciar sesión, volverás automáticamente a él en cuanto accedas.",
+  "contextBoth": "El alta conservará la organización {tenantId} y el área de trabajo {workspaceId}.",
+  "contextTenant": "El alta conservará la organización {tenantId}.",
+  "contextWorkspace": "El alta conservará el área de trabajo {workspaceId}; revisa la organización antes de enviar el registro.",
+  "labels": {
+    "username": "Usuario",
+    "password": "Contraseña",
+    "rememberMe": "Mantener la sesión abierta en este dispositivo",
+    "submit": "Entrar a la consola",
+    "submitLoading": "Validando acceso…",
+    "passwordRecovery": "¿Olvidaste tu contraseña?",
+    "signup": "Solicita acceso o crea tu cuenta",
+    "signupDisabled": "El auto-registro no está disponible actualmente para este entorno.",
+    "requiredField": "Este campo es obligatorio."
+  },
+  "statuses": {
+    "login": {
+      "title": "Inicia sesión en Falcone",
+      "message": "Usa tus credenciales de consola para acceder a tus tenants y workspaces."
+    },
+    "active": {
+      "title": "Cuenta activa",
+      "message": "Tu cuenta está lista para acceder a la consola."
+    },
+    "signup": {
+      "title": "Crea tu cuenta de consola",
+      "message": "Completa el registro para solicitar acceso a Falcone o activar el alta configurada para tu tenant."
+    },
+    "pending_activation": {
+      "title": "Tu registro está pendiente de activación",
+      "message": "Hemos recibido tu solicitud de acceso, pero todavía necesita aprobación o activación antes de entrar en la consola."
+    },
+    "account_suspended": {
+      "title": "Tu cuenta está suspendida",
+      "message": "El acceso a la consola está suspendido temporalmente para esta cuenta."
+    },
+    "credentials_expired": {
+      "title": "Tus credenciales han expirado",
+      "message": "Necesitas actualizar o recuperar tus credenciales antes de volver a entrar."
+    },
+    "password_recovery": {
+      "title": "Recupera el acceso a tu cuenta",
+      "message": "Solicita instrucciones de recuperación para volver a acceder a la consola."
+    },
+    "unknown": {
+      "title": "Estado especial de acceso",
+      "message": "La cuenta requiere una acción adicional antes de entrar."
+    }
+  },
+  "actions": {
+    "start_login": "Iniciar sesión",
+    "create_account": "Crear cuenta",
+    "return_to_login": "Volver a login",
+    "recover_password": "Recuperar contraseña",
+    "view_pending_activation": "Ver estado de activación",
+    "unknown": "Continuar"
+  },
+  "expiredHintTitle": "Tu sesión ha expirado",
+  "expiredHintMessage": "Vuelve a autenticarte para continuar en la consola."
+}

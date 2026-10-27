@@ -198,13 +198,15 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await switchLocale(parity.page, locale);
         await check.assertRuntimeHealth(parity);
       }
-      // A held read is aborted by router unmount and must not trigger a retry or another endpoint.
+      // Unmount aborts the held status read; the destination reads only its signup policy.
       await parity.open(manifest.route, { variant: variant('delayed'), loading: true });
       const start = parity.network.requests.length;
       await parity.page.getByRole('link', { name: copy.login, exact: true }).click();
       await expect(parity.page.getByRole('heading', { level: 1 })).toBeVisible();
       await parity.page.waitForTimeout(1600);
-      expect(parity.network.requests.slice(start)).toEqual([]);
+      expect(parity.network.requests.slice(start)).toEqual([
+        { method: 'GET', path: '/v1/auth/signups/policy', body: undefined },
+      ]);
       await check.assertRuntimeHealth(parity);
     });
     test('responsive', async ({ parity }) => {

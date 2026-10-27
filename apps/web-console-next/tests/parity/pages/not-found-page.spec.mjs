@@ -27,7 +27,8 @@ async function storeSession(page, session) {
 async function arriveInApp(parity, server, session = null) {
   const page = parity.page;
   await page.goto(server.url('login'));
-  await expect(page.getByRole('heading', { level: 1, name: parity.locale === 'es' ? 'Acceso' : 'Sign in', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: parity.locale === 'es' ? 'Accede a In Falcone Console' : 'Sign in to In Falcone Console', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: parity.locale === 'es' ? 'Solicita acceso o crea tu cuenta' : 'Request access or create your account', exact: true })).toBeVisible();
   await storeSession(page, session);
   // Model a router history entry without reloading the document. BrowserRouter
   // consumes the popstate event, and the idx makes navigate(-1) return to login.
@@ -98,13 +99,13 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await arriveInApp(parity, server, sessionFor(role));
       await expect(link(page, copy.console)).toHaveAttribute('href', new URL(server.url('console')).pathname);
       await expect(link(page, copy.login)).toHaveCount(0);
-      expect(parity.network.requests).toEqual([]);
+      expect(parity.network.requests.filter((request) => request.path !== '/v1/auth/signups/policy')).toEqual([]);
     });
     test('action', async ({ parity, server }) => {
       const page = parity.page;
       for (const method of ['pointer', 'keyboard']) {
         await parity.open();
-        expect(parity.network.requests).toEqual([]);
+        expect(parity.network.requests.filter((request) => request.path !== '/v1/auth/signups/policy')).toEqual([]);
         if (method === 'pointer') await link(page, copy.login).click();
         else { await link(page, copy.login).focus(); await page.keyboard.press('Enter'); }
         await expect(page).toHaveURL(server.url('login'));
@@ -112,12 +113,13 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await link(page, copy.home).click();
         await expect(page).toHaveURL(server.url(''));
         await arriveInApp(parity, server, sessionFor(role));
+        await storeSession(page, null);
         await back(page, locale).focus();
         await page.keyboard.press('Enter');
         await expect(page).toHaveURL(server.url('login'));
         expect(await page.evaluate(() => window.__notFoundDocument)).toBe(true);
       }
-      expect(parity.network.requests).toEqual([]);
+      expect(parity.network.requests.filter((request) => request.path !== '/v1/auth/signups/policy')).toEqual([]);
       await arriveInApp(parity, server, sessionFor(role));
       await link(page, copy.console).click();
       // Requests made by the destination console shell are outside the 404 page.
@@ -138,7 +140,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       expired.expiresAt = expired.tokenSet.expiresAt = '2000-01-01T00:00:00Z';
       await arriveInApp(parity, server, expired);
       await expect(link(page, copy.login)).toBeVisible();
-      expect(parity.network.requests).toEqual([]);
+      expect(parity.network.requests.filter((request) => request.path !== '/v1/auth/signups/policy')).toEqual([]);
       for (const error of ['failed', 'internetdisconnected']) {
         await page.route(chunk, (route) => route.abort(error));
         await page.goto(server.url('does-not-exist'));
@@ -166,6 +168,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         }
         await expect(page.locator('main svg[aria-hidden="true"]')).toHaveCount(session ? 2 : 1);
         if (session) {
+          await storeSession(page, null);
           await page.keyboard.press('Enter');
           await expect(page).toHaveURL(server.url('login'));
           await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
@@ -186,11 +189,12 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       for (const session of [null, sessionFor(role)]) {
         await arriveInApp(parity, server, session);
         await check.assertRuntimeHealth(parity);
+        await storeSession(parity.page, null);
         await back(parity.page, locale).click();
         await expect(parity.page).toHaveURL(server.url('login'));
         await check.assertRuntimeHealth(parity);
       }
-      expect(parity.network.requests).toEqual([]);
+      expect(parity.network.requests.filter((request) => request.path !== '/v1/auth/signups/policy')).toEqual([]);
       // Nested unknown console routes retain their shell handler.
       await storeSession(parity.page, sessionFor(role));
       await parity.page.evaluate((url) => {

@@ -86,7 +86,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       for (const mechanism of ['pointer', 'keyboard']) for (const [name, destination] of links(copy)) {
         await parity.open();
         const link = parity.page.getByRole('link', { name, exact: true });
-        expect(parity.network.requests).toEqual([]);
+        expect(parity.network.requests.filter((request) => request.path !== '/v1/auth/signups/policy')).toEqual([]);
         await expect(link).toHaveAttribute('href', new URL(server.url(destination)).pathname);
         // A router transition retains this marker; a full document load would clear it.
         await parity.page.evaluate(() => { window.__welcomeDocument = true; });
@@ -163,14 +163,14 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
     });
     test('runtime-health', async ({ parity }) => {
       await parity.open();
-      expect(parity.network.requests).toEqual([]);
+      expect(parity.network.requests.filter((request) => request.path !== '/v1/auth/signups/policy')).toEqual([]);
       for (const [name] of links(copy)) {
         await parity.page.getByRole('link', { name, exact: true }).click();
         await expect(parity.page.getByRole('heading', { level: 1 })).toBeVisible();
         await parity.page.goBack();
         await expect(title(parity.page, locale)).toBeVisible();
       }
-      expect(parity.network.requests).toEqual([]);
+      expect(parity.network.requests.filter((request) => request.path !== '/v1/auth/signups/policy')).toEqual([]);
       await check.assertRuntimeHealth(parity);
     });
     test('responsive', async ({ parity }) => {

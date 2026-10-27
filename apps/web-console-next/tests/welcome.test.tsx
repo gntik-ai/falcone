@@ -1,3 +1,4 @@
+import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { Link as RouterLink, MemoryRouter, useNavigate } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
@@ -15,6 +16,7 @@ vi.mock('@in-falcone/console-api/config', async (original) => {
   return { ...actual, consoleAuthConfig: { ...actual.consoleAuthConfig, labels: { ...actual.consoleAuthConfig.labels } } }
 })
 beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(buildConsoleSignupPolicyFixture())))
   Object.assign(consoleAuthConfig, { loginPath: '/login', signupPath: '/signup', passwordRecoveryPath: '/password-recovery' })
   Object.assign(consoleAuthConfig.labels, { passwordRecovery: es.recovery })
 })
@@ -71,30 +73,30 @@ test.each(['anonymous', 'stored', 'expired'])('%s welcome is public and makes no
   expect(fetch).not.toHaveBeenCalled()
 })
 
-test('other public routes retain their header logo and outer main', async () => {
+test('login owns its auth logo and main', async () => {
   render(<MemoryRouter initialEntries={['/login']}><App /></MemoryRouter>)
-  expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
-  expect(screen.getByRole('banner')).toContainElement(screen.getByRole('img', { name: 'Falcone' }))
+  expect(await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })).toBeVisible()
+  expect(screen.getByRole('img', { name: 'In Falcone' })).toBeVisible()
   expect(screen.getAllByRole('main')).toHaveLength(1)
 })
 
 test('returning to welcome by router navigation focuses main', async () => {
   render(<MemoryRouter initialEntries={['/login']}><RouterLink to="/">Return home</RouterLink><App /></MemoryRouter>)
-  await screen.findByRole('heading', { name: 'Acceso' })
+  await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })
   fireEvent.click(screen.getByRole('link', { name: 'Return home' }))
   await screen.findByRole('heading', { name: es.title })
   expect(screen.getByRole('main')).toHaveFocus()
 })
 
-test('programmatic navigation to every funnel destination preserves public chrome without requests', async () => {
-  const fetch = vi.fn()
+test('programmatic navigation preserves public chrome and only login reads its policy', async () => {
+  const fetch = vi.fn().mockImplementation(() => Promise.resolve(Response.json(buildConsoleSignupPolicyFixture())))
   vi.stubGlobal('fetch', fetch)
   let navigate!: ReturnType<typeof useNavigate>
   function NavigationProbe() { navigate = useNavigate(); return null }
   render(<MemoryRouter><NavigationProbe /><App /></MemoryRouter>)
   await screen.findByRole('heading', { name: es.title })
   for (const [path, heading] of [
-    [consoleAuthConfig.loginPath, 'Acceso'], [consoleAuthConfig.signupPath, 'Solicitar acceso'],
+    [consoleAuthConfig.loginPath, 'Accede a In Falcone Console'], [consoleAuthConfig.signupPath, 'Solicitar acceso'],
     [consoleAuthConfig.passwordRecoveryPath, 'Recuperar contraseña']
   ]) {
     await act(async () => { navigate(path) })
@@ -104,5 +106,6 @@ test('programmatic navigation to every funnel destination preserves public chrom
     await screen.findByRole('heading', { name: es.title })
     expect(screen.getByRole('main')).toHaveFocus()
   }
-  expect(fetch).not.toHaveBeenCalled()
+  expect(fetch).toHaveBeenCalledWith('/v1/auth/signups/policy', expect.objectContaining({ method: 'GET' }))
+  expect(fetch).toHaveBeenCalledTimes(1)
 })

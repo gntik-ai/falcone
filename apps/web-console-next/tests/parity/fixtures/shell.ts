@@ -1,5 +1,5 @@
 import {
-  buildConsoleLoginSessionFixture, buildConsoleRefreshSessionFixture, buildConsoleAccountStatusViewFixture,
+  buildConsoleSignupPolicyFixture, buildConsoleLoginSessionFixture, buildConsoleRefreshSessionFixture, buildConsoleAccountStatusViewFixture,
   buildConsoleSessionTerminationFixture, buildTenantFixture, buildTenantCollectionFixture, buildWorkspaceCollectionFixture,
 } from '@in-falcone/console-api/fixtures'
 import type { Role, Variant } from '../manifest'
@@ -7,6 +7,7 @@ import { overviewResponse, overviewVariants, type OverviewVariant } from './over
 
 export const variants: Variant[] = ['success', 'empty', '401', '403', '404', '500', 'network']
 export const endpoints = {
+  signupPolicy: { method: 'GET', path: '/v1/auth/signups/policy' },
   refresh: { method: 'POST', path: '/v1/auth/login-sessions/synthetic-session/refresh' },
   status: { method: 'GET', path: '/v1/auth/status-views/active' },
   tenants: { method: 'GET', path: '/v1/tenants' },
@@ -19,16 +20,18 @@ export function sessionFor(role: Role, refresh = false) {
   session.principal!.platformRoles = [role]
   return session
 }
-export function responseFor(name: string, variant: Variant | OverviewVariant, role: Role) {
+export function responseFor(name: string, variant: Variant | OverviewVariant | '504', role: Role) {
   if (overviewVariants.includes(variant as OverviewVariant) && ['tenant', 'tenants'].includes(name)) return overviewResponse(name, variant as OverviewVariant)
   const builders: Record<string, () => unknown> = {
+    signupPolicy: buildConsoleSignupPolicyFixture,
     refresh: () => sessionFor(role, true), status: buildConsoleAccountStatusViewFixture,
     tenants: () => { const value = buildTenantCollectionFixture(); if (variant === 'empty') value.items = []; return value }, tenant: buildTenantFixture,
     workspaces: () => { const value = buildWorkspaceCollectionFixture(); if (variant === 'empty') value.items = []; return value }, termination: buildConsoleSessionTerminationFixture,
   }
+  if (name === 'refresh' && variant === '504') return { status: 504, body: { status: 504, code: 'HTTP_504', message: 'synthetic-error' } }
   if (!builders[name] || !variants.includes(variant as Variant)) throw new Error(`Unknown fixture ${name} ${variant}`)
   if (variant === 'network') return { network: true }
-  if (!['success', 'empty'].includes(variant)) return { status: Number(variant), body: { code: `HTTP_${variant}`, message: 'synthetic-error' } }
-  const body = variant === 'empty' && !['tenants', 'workspaces'].includes(name) ? {} : builders[name]()
+  if (!['success', 'empty'].includes(variant)) return { status: Number(variant), body: { code: `HTTP_${variant}`, message: 'synthetic-error', ...(name === 'signupPolicy' && variant === '500' ? { requestId: 'synthetic-policy-request' } : {}) } }
+  const body = name === 'signupPolicy' && variant === 'empty' ? { ...buildConsoleSignupPolicyFixture(), selfServiceEnabled: false, mode: 'invitation' } : variant === 'empty' && !['tenants', 'workspaces'].includes(name) ? {} : builders[name]()
   return { status: 200, body }
 }

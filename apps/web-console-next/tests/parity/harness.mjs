@@ -53,7 +53,8 @@ export const test = base.extend({
       }
       const response = registry.responseFor(name, role, body);
       if (response.delayMs) await new Promise((done) => setTimeout(done, response.delayMs));
-      if ((path === '/v1/async-operation-query' && (response.network || response.status === 500)) ||
+      if ((/^\/v1\/auth\/(?:login-sessions(?:\/[^/]+\/refresh)?|signups\/policy|status-views\/[^/]+)$/.test(path) && (response.network || response.status >= 400)) ||
+          (path === '/v1/async-operation-query' && (response.network || response.status === 500)) ||
           (path === '/v1/platform/runtime/knative' && (response.network || [401, 403, 404, 500].includes(response.status)))) {
         injectedFailures.push({ url: request.url(), kind: response.network ? 'network' : String(response.status) });
       }
