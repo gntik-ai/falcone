@@ -18,7 +18,7 @@ const manifest: ParityManifest = {
       { es: '[role="menuitem"]:has-text("Cerrar sesión")', en: '[role="menuitem"]:has-text("Sign out")' },
     ],
     expected: { method: 'DELETE', path: '/v1/auth/login-sessions/synthetic-session', body: { refreshToken: 'synthetic-refresh-token' } },
-    outcome: { es: 'h1:text-is("Acceso")', en: 'h1:text-is("Sign in")' },
+    outcome: { es: 'h1:text-is("Accede a In Falcone Console")', en: 'h1:text-is("Sign in to In Falcone Console")' },
   }],
   states: [
     // Known kit localisation gap: assert no selected workspace without requiring English in es.
@@ -26,7 +26,7 @@ const manifest: ParityManifest = {
     ...(['401', '403', '404', '500', 'network'] as const).map((variant) => ({
       fixture: 'workspaces', variant,
       locator: variant === '401'
-        ? { es: 'h1:text-is("Acceso")', en: 'h1:text-is("Sign in")' }
+        ? { es: 'h1:text-is("Accede a In Falcone Console")', en: 'h1:text-is("Sign in to In Falcone Console")' }
         : variant === '403'
         ? { es: '[role="status"]:text-is("No tienes permiso para ver esta página.")', en: '[role="status"]:text-is("You do not have permission to view this page.")' }
         : { es: '[role="status"]:text-is("Comprueba tu conexión e inténtalo de nuevo.")', en: '[role="status"]:text-is("Check your connection and try again.")' },

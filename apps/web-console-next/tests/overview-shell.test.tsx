@@ -1,3 +1,4 @@
+import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
@@ -85,7 +86,7 @@ test.each([403, 500, 'network'] as const)('a tenant switch clears populated summ
 test.each(['rejected', 'after-refresh', 'refresh-ok'])('delegates 401 refresh and login redirect to the shell: %s', async (variant) => {
   login(['tenant_owner'], ['synthetic-tenant'])
   let attempt = 0
-  requests = strictFetch({
+  requests = strictFetch({ 'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture(),
     'GET /v1/tenants/synthetic-tenant': () => ++attempt === 2 && variant === 'refresh-ok' ? Response.json(overviewTenant) : Response.json({}, { status: 401 }),
     'POST /v1/auth/login-sessions/synthetic-session/refresh': () => variant === 'rejected' ? Response.json({}, { status: 401 }) : Response.json(buildConsoleRefreshSessionFixture()),
     [`GET ${workspaceUrl('synthetic-tenant')}`]: { items: [] },
@@ -93,7 +94,7 @@ test.each(['rejected', 'after-refresh', 'refresh-ok'])('delegates 401 refresh an
   open()
   if (variant === 'refresh-ok') await screen.findByTestId('console-tenant-inventory-summary')
   else {
-    expect(await screen.findByRole('heading', { name: 'Acceso' }, { timeout: 3000 })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Accede a In Falcone Console' }, { timeout: 3000 })).toBeVisible()
     expect(readProtectedRouteIntent()).toBe('/console/overview')
   }
   await waitFor(() => expect(requests.mock.mock.calls.filter(([path]) => String(path).endsWith('/refresh'))).toHaveLength(1))

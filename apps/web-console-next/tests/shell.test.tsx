@@ -1,5 +1,6 @@
+import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { ensureConsoleSession, persistConsoleShellSession, readConsoleAuthStatusHint, readConsoleShellSession, readProtectedRouteIntent } from '@in-falcone/console-api/session'
+import { ensureConsoleSession, persistConsoleShellSession, readConsoleShellSession, readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -18,15 +19,16 @@ function CurrentLocation() {
 
 test('a protected route preserves its query and requires login', async () => {
   sessionStorage.clear()
+  requests = strictFetch({ 'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture() })
   open('/console/quotas?x=1')
-  expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })).toBeVisible()
   expect(readProtectedRouteIntent()).toBe('/console/quotas?x=1')
   expect(sessionStorage.getItem('in-falcone.console-shell-session')).toBeNull()
 })
 
 test('in-app navigation revalidates expired access and refresh tokens and preserves the new intent', async () => {
   const session = login(['tenant_owner'])
-  requests = strictFetch({})
+  requests = strictFetch({ 'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture() })
   open('/console/zzz?x=1#section')
   await screen.findByRole('heading', { name: 'Sección de consola no encontrada' })
   session.expiresAt = session.tokenSet!.expiresAt = '2020-01-01T00:00:00Z'
@@ -35,24 +37,24 @@ test('in-app navigation revalidates expired access and refresh tokens and preser
 
   fireEvent.click(screen.getByRole('button', { name: 'Vista general' }))
 
-  expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })).toBeVisible()
   expect(readProtectedRouteIntent()).toBe('/console/overview')
   expect(readConsoleShellSession()).toBeNull()
-  expect(requests.mock).not.toHaveBeenCalled()
+  expect(requests.mock.mock.calls.filter(([path]) => path !== '/v1/auth/signups/policy')).toHaveLength(0)
 })
 
 test('a rejected session check denies access and preserves the protected intent', async () => {
   login(['tenant_owner'])
-  requests = strictFetch({})
+  requests = strictFetch({ 'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture() })
   const getItem = Storage.prototype.getItem
   vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key: string) {
     if (this === sessionStorage && key === 'in-falcone.console-shell-session') throw new DOMException('Storage unavailable', 'SecurityError')
     return getItem.call(this, key)
   })
   open('/console/quotas?x=1#section')
-  expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })).toBeVisible()
   expect(readProtectedRouteIntent()).toBe('/console/quotas?x=1#section')
-  expect(requests.mock).not.toHaveBeenCalled()
+  expect(requests.mock.mock.calls.filter(([path]) => path !== '/v1/auth/signups/policy')).toHaveLength(0)
 })
 
 
@@ -161,7 +163,7 @@ test.each([200, 504, 400])('expired sessions use shared single-flight refresh an
   persistConsoleShellSession(expired)
   const fresh = { ...expired, expiresAt: '2099-01-01T00:00:00Z', tokenSet: { ...expired.tokenSet!, expiresAt: '2099-01-01T00:00:00Z' } }
   let posts = 0
-  requests = strictFetch({
+  requests = strictFetch({ 'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture(),
     'POST /v1/auth/login-sessions/synthetic-session/refresh': async () => {
       posts++
       await new Promise((resolve) => setTimeout(resolve, 10))
@@ -171,17 +173,17 @@ test.each([200, 504, 400])('expired sessions use shared single-flight refresh an
   open('/console/overview')
   await act(async () => { await Promise.all([ensureConsoleSession(), ensureConsoleSession()]) })
   expect(posts).toBe(status === 504 ? 2 : 1)
-  for (const [, init] of requests.mock.mock.calls) expect(JSON.parse(init!.body as string)).toEqual({ refreshToken: 'synthetic-refresh-token' })
-  expect(await screen.findByRole('heading', { name: status === 400 ? 'Acceso' : 'Vista general de la consola' })).toBeVisible()
+  for (const [, init] of requests.mock.mock.calls.filter(([path]) => String(path).endsWith('/refresh'))) expect(JSON.parse(init!.body as string)).toEqual({ refreshToken: 'synthetic-refresh-token' })
+  expect(await screen.findByRole('heading', { name: status === 400 ? 'Accede a In Falcone Console' : 'Vista general de la consola' })).toBeVisible()
   if (status === 400) {
     expect(sessionStorage.getItem('in-falcone.console-shell-session')).toBeNull()
-    expect(readConsoleAuthStatusHint()).toEqual({ statusView: 'login', title: 'Tu sesión ha expirado', message: 'Vuelve a autenticarte para continuar en la consola.' })
+    expect(screen.getByText('Tu sesión ha expirado')).toBeVisible()
   }
 })
 
 test.each([204, 500])('sign-out revokes the shared session and leaves for login on %s', async (status) => {
   login(['tenant_owner'])
-  requests = strictFetch({
+  requests = strictFetch({ 'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture(),
     'DELETE /v1/auth/login-sessions/synthetic-session': () => {
       return new Response(null, { status })
     }
@@ -190,9 +192,9 @@ test.each([204, 500])('sign-out revokes the shared session and leaves for login 
   await screen.findByRole('heading', { name: 'Vista general de la consola' })
   fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Cerrar sesión' }))
-  expect(await screen.findByRole('heading', { name: 'Acceso' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })).toBeVisible()
   expect(sessionStorage.getItem('in-falcone.console-shell-session')).toBeNull()
-  expect(requests.mock).toHaveBeenCalledTimes(1)
+  expect(requests.mock.mock.calls.filter(([path]) => path !== '/v1/auth/signups/policy')).toHaveLength(1)
   const init = requests.mock.mock.calls[0][1]
   expect(JSON.parse(init!.body as string)).toEqual({ refreshToken: 'synthetic-refresh-token' })
   expect(new Headers(init!.headers).get('Authorization')).toBe('Bearer synthetic-access-token')
@@ -257,7 +259,7 @@ test('the application StrictMode bootstrap makes only one tenant collection requ
 
 test('sign-out uses the latest shared session after token rotation', async () => {
   const session = login(['tenant_owner'])
-  requests = strictFetch({
+  requests = strictFetch({ 'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture(),
     'DELETE /v1/auth/login-sessions/synthetic-session': () => {
       return new Response(null, { status: 204 })
     }
@@ -269,7 +271,7 @@ test('sign-out uses the latest shared session after token rotation', async () =>
   persistConsoleShellSession(session)
   fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Cerrar sesión' }))
-  await screen.findByRole('heading', { name: 'Acceso' })
+  await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })
   const init = requests.mock.mock.calls[0][1]
   expect(JSON.parse(init!.body as string)).toEqual({ refreshToken: 'synthetic-rotated-refresh' })
   expect(new Headers(init!.headers).get('Authorization')).toBe('Bearer synthetic-rotated-access')

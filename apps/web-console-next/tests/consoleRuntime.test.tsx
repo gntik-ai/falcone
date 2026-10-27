@@ -1,3 +1,4 @@
+import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { MemoryRouter, NavLink, useNavigate } from 'react-router-dom'
@@ -190,7 +191,7 @@ test.each(['es', 'en'] as const)('document title and its restoration follow loca
 test.each(['rejected', 'refresh-ok', 'after-refresh'])('401 session flow: %s', async (variant) => {
   login(['platform_auditor'])
   let count = 0
-  requests = strictFetch({
+  requests = strictFetch({ 'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture(),
     [`GET ${tenantUrl}`]: { items: [] },
     [`GET ${runtimePath}`]: () => ++count === 2 && variant === 'refresh-ok' ? Response.json(ready) : Response.json({ code: 'UNAUTHORIZED' }, { status: 401 }),
     'POST /v1/auth/login-sessions/synthetic-session/refresh': () => variant === 'rejected' ? Response.json({ code: 'UNAUTHORIZED' }, { status: 401 }) : Response.json(buildConsoleRefreshSessionFixture()),
@@ -199,7 +200,7 @@ test.each(['rejected', 'refresh-ok', 'after-refresh'])('401 session flow: %s', a
   if (variant === 'refresh-ok') await settled()
   else {
     // The first unauthorized case also loads the real lazy login route.
-    expect(await screen.findByRole('heading', { name: 'Acceso' }, { timeout: 3000 })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Accede a In Falcone Console' }, { timeout: 3000 })).toBeVisible()
     expect(readProtectedRouteIntent()).toBe('/next/console/runtime')
   }
   expect(screen.queryByRole('heading', { name: es.errorTitle })).not.toBeInTheDocument()

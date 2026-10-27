@@ -1,0 +1,105 @@
+{
+  "documentTitle": "Sign in · In Falcone Console",
+  "title": "Sign in to In Falcone Console",
+  "subtitle": "Authentication backed by Keycloak, the same identity layer that protects the rest of the platform.",
+  "logo": "In Falcone",
+  "skip": "Skip to main content",
+  "moreActions": "More actions",
+  "sections": "Sections",
+  "usernamePlaceholder": "operations",
+  "passwordPlaceholder": "••••••••••••",
+  "usernameHelp": "Use the console username associated with your organization.",
+  "passwordHelp": "The password policy is validated by the access service.",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
+  "strength": "Strength",
+  "credentialTitle": "We could not validate your credentials",
+  "credentialMessage": "Check your username and password and try again.",
+  "deniedMessage": "These credentials do not grant access to the console. Check your username and password and try again.",
+  "loginErrorTitle": "The access service is currently unavailable",
+  "loginErrorMessage": "An operational error occurred. You can retry shortly without reloading the console.",
+  "networkTitle": "Could not connect to the access service",
+  "networkMessage": "Check your connection and try again.",
+  "policyErrorTitle": "Could not read the signup policy",
+  "policyErrorMessage": "You can retry the policy read without interrupting sign-in.",
+  "statusErrorTitle": "Could not read the account status",
+  "statusErrorMessage": "You can retry the status read without sending your credentials again.",
+  "retry": "Retry",
+  "retrying": "Retrying…",
+  "requestId": "Request ID",
+  "copyRequestId": "Copy request ID",
+  "copied": "Request ID copied",
+  "details": "Technical details",
+  "support": "Share this ID with support.",
+  "returnToForm": "Return to the form",
+  "statusDeniedTitle": "Account status is not available for consultation",
+  "statusMissingTitle": "Account status unavailable",
+  "policyDeniedTitle": "Signup cannot be consulted",
+  "policyDeniedMessage": "You do not have permission to read the signup policy. You can still use the sign-in form.",
+  "policyMissingTitle": "Signup policy not found",
+  "policyMissingMessage": "We could not find the signup policy. You can still use the sign-in form.",
+  "asideTitle": "Access and signup",
+  "asideDescription": "The console checks the effective signup policy and, if your session expires, returns you to your protected destination after you sign in again.",
+  "policyLoading": "Loading signup policy…",
+  "signupDisabledTitle": "Signup unavailable",
+  "invitationOnly": "Signup in this environment is available by invitation only.",
+  "sessionProtection": "Your session stays protected while navigating: if your destination required sign-in, you will return to it automatically after signing in.",
+  "contextBoth": "Signup will preserve organization {tenantId} and workspace {workspaceId}.",
+  "contextTenant": "Signup will preserve organization {tenantId}.",
+  "contextWorkspace": "Signup will preserve workspace {workspaceId}; review the organization before submitting your registration.",
+  "labels": {
+    "username": "Username",
+    "password": "Password",
+    "rememberMe": "Keep me signed in on this device",
+    "submit": "Sign in to the console",
+    "submitLoading": "Validating access…",
+    "passwordRecovery": "Forgot your password?",
+    "signup": "Request access or create your account",
+    "signupDisabled": "Self-service signup is currently unavailable for this environment.",
+    "requiredField": "This field is required."
+  },
+  "statuses": {
+    "login": {
+      "title": "Sign in to Falcone",
+      "message": "Use your console credentials to access your tenants and workspaces."
+    },
+    "active": {
+      "title": "Account active",
+      "message": "Your account is ready to access the console."
+    },
+    "signup": {
+      "title": "Create your console account",
+      "message": "Complete registration to request access to Falcone or activate signup for your tenant."
+    },
+    "pending_activation": {
+      "title": "Your registration is pending activation",
+      "message": "We have received your access request, but it still needs approval or activation before you can access the console."
+    },
+    "account_suspended": {
+      "title": "Your account is suspended",
+      "message": "Console access is temporarily suspended for this account."
+    },
+    "credentials_expired": {
+      "title": "Your credentials have expired",
+      "message": "Update or recover your credentials before signing in again."
+    },
+    "password_recovery": {
+      "title": "Recover access to your account",
+      "message": "Request recovery instructions to access the console again."
+    },
+    "unknown": {
+      "title": "Additional action required",
+      "message": "Your account requires an additional action before signing in."
+    }
+  },
+  "actions": {
+    "start_login": "Sign in",
+    "create_account": "Create account",
+    "return_to_login": "Return to sign in",
+    "recover_password": "Recover password",
+    "view_pending_activation": "View activation status",
+    "unknown": "Continue"
+  },
+  "expiredHintTitle": "Your session has expired",
+  "expiredHintMessage": "Sign in again to continue in the console."
+}

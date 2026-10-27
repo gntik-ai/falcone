@@ -1,3 +1,4 @@
+import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
@@ -12,7 +13,7 @@ import { login } from './shell-support'
 import es from '../src/locales/es/pages.not-found-page.json'
 import en from '../src/locales/en/pages.not-found-page.json'
 
-beforeEach(() => { window.history.replaceState(null, '') })
+beforeEach(() => { window.history.replaceState(null, ''); vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(Response.json(buildConsoleSignupPolicyFixture())))) })
 
 test('the pending catch-all chunk shows skeletons on the status layout', async () => {
   render(<MemoryRouter initialEntries={['/missing']}><App /></MemoryRouter>)
@@ -84,7 +85,7 @@ for (const locale of ['es', 'en'] as const) {
     expect(back.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
     expect(document.querySelectorAll('main svg[aria-hidden="true"]')).toHaveLength(2)
     fireEvent.click(back)
-    expect(await screen.findByRole('heading', { name: locale === 'es' ? 'Acceso' : 'Sign in' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: locale === 'es' ? 'Accede a In Falcone Console' : 'Sign in to In Falcone Console' })).toBeVisible()
     expect(screen.getByText('/login', { selector: 'output' })).toBeVisible()
   })
 
@@ -107,7 +108,7 @@ test('in-app arrival focuses the catch-all heading and the home action uses rout
   let navigate!: ReturnType<typeof useNavigate>
   function Probe() { navigate = useNavigate(); return null }
   render(<MemoryRouter initialEntries={['/login']}><Probe /><App /></MemoryRouter>)
-  await screen.findByRole('heading', { name: 'Acceso' })
+  await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })
   await act(async () => { navigate('/does-not-exist') })
   expect(await screen.findByRole('heading', { name: es.title })).toHaveFocus()
   fireEvent.click(screen.getByRole('link', { name: es.home }))
