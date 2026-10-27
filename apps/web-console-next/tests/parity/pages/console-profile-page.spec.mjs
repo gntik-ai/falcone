@@ -76,13 +76,26 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await noPageRequests(parity);
     });
     test('action', async ({ parity }) => {
-      await open(parity);
+      // With one accessible tenant the shell automatically selects it, even
+      // after clearing the switcher. Reload its workspace options to exercise
+      // the context update without assuming an unsupported empty selection.
+      await open(parity, 'populated', { workspaces: ['empty', 'success'] });
+      await expect(surface(parity).getByText('Synthetic Tenant', { exact: true })).toBeVisible();
+      await expect(surface(parity).getByText(copy(parity).missingContext, { exact: true })).toHaveCount(1);
       await parity.page.evaluate(() => { window.__profileDocument = true; });
       const tenant = parity.page.getByRole('region', { name: locale === 'es' ? 'Contexto activo' : 'Active context', exact: true }).getByRole('combobox');
+      const requestCount = parity.network.requests.length;
       await tenant.selectOption('');
-      await expect(surface(parity).getByText(copy(parity).missingContext, { exact: true })).toHaveCount(2);
-      await tenant.selectOption('synthetic-tenant');
       await expect(surface(parity).getByText('Synthetic Workspace', { exact: true })).toBeVisible();
+      await expect(tenant).toHaveValue('synthetic-tenant');
+      await expect(surface(parity).getByText('Synthetic Tenant', { exact: true })).toBeVisible();
+      await expect(surface(parity).getByText(copy(parity).missingContext, { exact: true })).toHaveCount(0);
+      const updates = parity.network.requests.slice(requestCount);
+      expect(updates).toHaveLength(1);
+      expect(new URL(updates[0].path, 'http://synthetic.test').pathname).toBe('/v1/workspaces');
+      for (const role of ['tenant_admin', 'platform_auditor']) await expect(surface(parity).getByText(role, { exact: true })).toBeVisible();
+      await expect(surface(parity).locator('dd').filter({ hasText: 'synthetic-user' })).toBeVisible();
+      await expect(surface(parity).locator('dd').filter({ hasText: 'synthetic@example.test' })).toBeVisible();
       await selectSection(parity, 'settings');
       await expect(parity.page).toHaveURL(/\/console\/settings$/);
       // The anchor is migrated by ShellLink; the existing settings select still

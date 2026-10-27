@@ -9,8 +9,8 @@ const manifest: ParityManifest = {
   data: [
     { name: 'profile heading', locator: { es: 'h1:text-is("Perfil de usuario")', en: 'h1:text-is("User profile")' } },
     { name: 'principal', locator: '.console-profile h2:text-is("Synthetic Operator")' },
-    { name: 'organization', locator: '.console-profile dd:text-is("Synthetic Tenant")' },
-    { name: 'workspace', locator: '.console-profile dd:text-is("Synthetic Workspace")' },
+    { name: 'organization', locator: '.console-profile dd > span:text-is("Synthetic Tenant")' },
+    { name: 'workspace', locator: '.console-profile dd > span:text-is("Synthetic Workspace")' },
     { name: 'admin role', locator: '.console-profile :text-is("tenant_admin")' },
     { name: 'auditor role', locator: '.console-profile :text-is("platform_auditor")' },
   ],
