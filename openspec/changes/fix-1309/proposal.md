@@ -69,3 +69,31 @@ complete black-box command cannot pass here because its service-catalog subtest
 encounters `spawnSync git EPERM`, including with a process-scoped safe-directory
 setting. The implementation handoff marks that full check as skipped for this
 environment; no safety gate is removed.
+
+## CI repair review
+
+The follow-up reviewed source HEAD `9fa6f08ece000626ac8d90ed06453098fcfcf35f`
+against base `e60abcc0179be2d90f8bbbae42895f4ba2bed93f`. The reported
+`ui-parity-shards (4)` failure is the existing welcome action test at
+`apps/web-console-next/tests/parity/pages/welcome.spec.mjs:99`: after browser
+back navigation, the main landmark is visible but does not receive focus.
+The `ui-parity` aggregate fails because that shard fails.
+
+The entire `apps/web-console-next` tree, dependency manifests and lockfile are
+unchanged from base. The only workflow changes are Hermes's chart pins to
+`d9f6dd828207c4f2ae6f51f427775aff206e3ee1`. The parity jobs build shell fixtures
+directly with pnpm; they neither build the changed Dockerfile nor check out
+deployment charts. There is no changed execution path connecting the heap or
+chart pin to the focus assertion. Treat the focus failure as outside this
+ChangeSet; its cause and reproducibility on base remain unverified. No existing
+parity assertion, UI source, or CI gate is changed for this follow-up.
+
+The matching shard command was attempted, but pnpm encounters
+`spawnSync /usr/local/bin/node EPERM` before Playwright starts. Chromium is
+unavailable in the maker sandbox; PR CI must rerun the browser parity, axe and
+viewport checks. Visual artifacts still require checker assessment and operator
+approval. The root-context suite again encounters `spawnSync git EPERM` in its
+service-catalog subtest. The five Dockerfile checks pass when selected without
+that environment-blocked subtest. The existing CI structure and parity-tool
+Node test files also pass. No new test is added and no additional existing
+test expectation changes in this follow-up.
