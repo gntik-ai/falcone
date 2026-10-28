@@ -231,12 +231,20 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await submit(page);
         await expect(page.getByText(variant === 'success' ? copy.successTitle : titleFor(variant), { exact: true })).toBeVisible();
         await check.assertResponsive(parity, width);
+        const form = await page.locator('form').boundingBox();
         if (width === 375) {
-          const control = await submitButton(page).boundingBox(), input = await field(page).boundingBox();
-          expect(Math.abs(control.width - input.width)).toBeLessThanOrEqual(1);
+          // Input's inner editing area excludes the kit wrapper's border and padding.
+          const control = await submitButton(page).boundingBox();
+          expect(Math.abs(control.width - form.width)).toBeLessThanOrEqual(1);
+          if (variant === '500') {
+            const retry = await retryButton(page).boundingBox();
+            const actions = await retryButton(page).locator('..').boundingBox();
+            expect(Math.abs(retry.width - actions.width)).toBeLessThanOrEqual(1);
+            const copyControl = await page.getByRole('button', { name: copy.copyRequestId, exact: true }).boundingBox();
+            expect(Math.abs(copyControl.width - copyControl.height)).toBeLessThanOrEqual(1);
+          }
         }
         const aside = await page.getByRole('region', { name: copy.asideTitle, exact: true }).boundingBox();
-        const form = await page.locator('form').boundingBox();
         expect(aside.y).toBeGreaterThanOrEqual(form.y + form.height);
       }
     });
