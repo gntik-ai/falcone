@@ -68,7 +68,11 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(parity.page.locator('main h1')).toHaveText(copy(parity).title);
       await expect(parity.page.getByRole('heading', { name: copy(parity).firstTitle, exact: true })).toBeVisible();
       for (const key of ['slug', 'displayName', 'description']) await expect(field(parity, key)).toHaveValue('');
-      for (const key of ['stepSlug', 'stepName', 'stepDescription', 'stepLimits']) await expect(parity.page.getByText(copy(parity)[key], { exact: true })).toBeVisible();
+      // The kit prepends a numbered marker to each item's translated text.
+      const checklist = parity.page.getByRole('list').filter({ hasText: copy(parity).stepSlug }).getByRole('listitem');
+      await expect(checklist).toHaveCount(4);
+      await expect(checklist).toContainText(['stepSlug', 'stepName', 'stepDescription', 'stepLimits'].map((key) => copy(parity)[key]));
+      for (const item of await checklist.all()) await expect(item).toBeVisible();
       expect(parity.network.requests).toEqual([{ method: 'GET', path: '/v1/tenants?page%5Bsize%5D=100&sort=displayName', body: undefined }]);
       await button(parity, 'start').click();
       await expect(field(parity, 'slug')).toBeFocused();
@@ -179,13 +183,20 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     });
     test('responsive', async ({ parity }) => {
       await open(parity); await check.assertResponsive(parity, width);
-      await fail(parity); await check.assertResponsive(parity, width);
       const actionBar = parity.page.getByRole('region', { name: copy(parity).actions, exact: true });
-      await expect(actionBar).toBeVisible();
-      await parity.page.getByTestId('error-panel').scrollIntoViewIfNeeded();
-      const panel = await parity.page.getByTestId('error-panel').boundingBox();
-      const bar = await actionBar.boundingBox();
-      expect(panel.y + panel.height).toBeLessThanOrEqual(bar.y);
+      const assertUncovered = async (target) => {
+        // Intersection-based scrolling ignores sticky overlays; honor the page's scroll margin.
+        await target.evaluate((element) => element.scrollIntoView({ block: 'end', behavior: 'instant' }));
+        await expect(actionBar).toBeInViewport({ ratio: 1 });
+        const content = await target.boundingBox();
+        const bar = await actionBar.boundingBox();
+        const main = await parity.page.getByRole('main').boundingBox();
+        expect(content.y).toBeGreaterThanOrEqual(main.y);
+        expect(content.y + content.height).toBeLessThanOrEqual(bar.y);
+      };
+      await assertUncovered(field(parity, 'description'));
+      await fail(parity); await check.assertResponsive(parity, width);
+      await assertUncovered(parity.page.getByTestId('error-panel'));
     });
     test('visual-review', async ({ parity }, info) => {
       await open(parity); await snapshot(parity, info, 'pristine');
@@ -226,11 +237,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
 for (const role of ['tenant_owner', 'member']) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`consolePlanCreate denied | ${role} | ${locale} | ${width}`, () => {
     test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
-    test('superadmin guard renders forbidden without a POST', async ({ parity }) => {
-      await parity.open(manifest.route, { tenants: 'empty' });
-      await expect(parity.page.getByText('403', { exact: true })).toBeVisible();
+    test('superadmin guard renders forbidden without a POST', async ({ parity, server }) => {
+      parity.network.setVariants({ tenants: 'empty' });
+      // Guard's StatusLayout owns a nested main; parity.open assumes a single main.
+      await parity.page.goto(server.url('console/plans/new'));
+      await expect(parity.page.locator('#route-status').getByText('403', { exact: true })).toBeVisible();
       expect(calls(parity)).toHaveLength(0);
       await expect(field(parity, 'slug')).toHaveCount(0);
+      await check.assertRuntimeHealth(parity);
     });
   });
 }

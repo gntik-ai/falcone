@@ -113,7 +113,7 @@ function PlanForm() {
     labels={{ title: t('title'), description: '', moreActions: t('actions'), sections: t('sectionTitle') }} />
 
   const feedback = failure && failure.status !== 401 && <div ref={errorPanel} tabIndex={-1} data-testid="error-panel"
-          className="min-w-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring">
+          className="min-w-0 scroll-mb-24 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring">
           {failure.status === 403 ? <NoAccessEmpty resource={t('title')} owner="" onRequestAccess={undefined} showRequestAccess={false}
             action={{ label: t('back'), href: '/console/plans' }} defaultRequested={false} titleAs="h2" bordered={false}
             labels={{ title: () => t('noAccess'), description: () => t('noAccessDescription'), request: '', requested: '', sent: '' }} />
@@ -170,7 +170,7 @@ function PlanForm() {
           <Field invalid={false} className="min-w-0">
             <FieldLabel htmlFor="plan-description">{t('description')}</FieldLabel>
             <Textarea id="plan-description" name="description" value={values.description} onValueChange={(value) => change('description', value)}
-              readOnly={saving || readOnly} invalid={false} rows={4} aria-describedby="plan-description-help" />
+              readOnly={saving || readOnly} invalid={false} rows={4} aria-describedby="plan-description-help" className="scroll-mb-24" />
             <FieldDescription id="plan-description-help">{t('descriptionHelp')}</FieldDescription>
           </Field>
         </FormSection>
