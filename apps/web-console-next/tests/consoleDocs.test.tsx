@@ -74,6 +74,12 @@ for (const [locale, copy] of [['es', es], ['en', en]] as const) test(`translates
   network = strictFetch({ [`GET ${url}`]: { ...docs, authInstructions: { ...docs.authInstructions, consoleRef: 'Settings' } } })
   mount(); await screen.findByRole('region', { name: copy.authRegion })
   expect(screen.getByRole('heading', { name: copy.title })).toBeVisible()
+  const services = within(screen.getByRole('region', { name: copy.services }))
+  expect(services.getByRole('heading', { name: copy.services, level: 2 })).toBeVisible()
+  for (const service of docs.enabledServices) {
+    expect(services.getByRole('heading', { name: service.label, level: 3 })).toBeVisible()
+  }
+  expect(screen.getAllByRole('heading').every((heading) => heading.textContent?.trim())).toBe(true)
   const auth = within(screen.getByRole('region', { name: copy.authRegion }))
   for (const value of Object.values({ ...docs.authInstructions, consoleRef: 'Settings' })) expect(auth.getByText(value!)).toBeVisible()
   for (const key of ['method', 'tokenEndpoint', 'clientId', 'clientSecret', 'scopes', 'consoleRef'] as const) expect(auth.getByText(copy[key]).tagName).toBe('DT')

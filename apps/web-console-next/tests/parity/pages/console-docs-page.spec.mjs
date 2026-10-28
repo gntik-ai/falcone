@@ -44,7 +44,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(p.page.getByText('5432', { exact: true })).toBeVisible();
       await expect(p.page.locator('dt', { hasText: label(p, 'port') })).toHaveCount(1);
       for (const service of docs.enabledServices) {
-        await expect(p.page.getByText(service.label, { exact: true })).toBeVisible();
+        await expect(p.page.getByRole('heading', { name: service.label, level: 3, exact: true })).toBeVisible();
         await expect(p.page.getByText(service.endpoint, { exact: true })).toBeVisible();
         await expect(p.page.getByRole('tablist', { name: label(p, 'snippetTabs', { service: service.label }), exact: true })).toBeVisible();
       }
@@ -154,6 +154,11 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
     });
     test('accessibility', async ({ parity: p }) => {
       await p.open(manifest.route); await loaded(p); await check.assertAccessibility(p); await check.assertLocale(p);
+      const services = p.page.getByRole('region', { name: label(p, 'services'), exact: true });
+      await expect(services.getByRole('heading', { name: label(p, 'services'), level: 2, exact: true })).toBeVisible();
+      await expect(services.getByRole('heading', { level: 3 })).toHaveCount(docs.enabledServices.length);
+      for (const service of docs.enabledServices) await expect(services.getByRole('heading', { name: service.label, level: 3, exact: true })).toBeVisible();
+      expect(await p.page.getByRole('heading').evaluateAll((headings) => headings.every((heading) => heading.textContent.trim()))).toBe(true);
       const tabs = p.page.getByRole('tablist', { name: label(p, 'snippetTabs', { service: docs.enabledServices[0].label }), exact: true });
       await tabs.getByRole('tab').first().focus(); await p.page.keyboard.press('ArrowRight'); await p.page.keyboard.press('Enter');
       await expect(tabs.getByRole('tab').nth(1)).toHaveAttribute('aria-selected', 'true');
@@ -218,7 +223,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       const auth = p.page.getByRole('region', { name: label(p, 'authRegion'), exact: true });
       for (const value of Object.values({ ...docs.authInstructions, consoleRef: 'Settings' })) await expect(auth.getByText(value, { exact: true })).toHaveText(value);
       for (const service of docs.enabledServices) {
-        await expect(p.page.getByText(service.label, { exact: true })).toHaveText(service.label);
+        await expect(p.page.getByRole('heading', { name: service.label, level: 3, exact: true })).toHaveText(service.label);
         await expect(p.page.getByText(service.endpoint, { exact: true })).toHaveText(service.endpoint);
         for (const snippet of service.snippets) {
           await p.page.getByRole('tab', { name: snippet.label, exact: true }).click();

@@ -37,12 +37,12 @@ export function documentationEvents(data: WorkspaceDocsResponse, labels: { gener
   return events.sort((a, b) => Date.parse(String(b.at)) - Date.parse(String(a.at)))
 }
 
-function Metadata({ title, items }: { title: string | undefined; items: DescriptionItem[] }) {
+function Metadata({ title, titleAs, items }: { title: string; titleAs: 'h2' | 'h3'; items: DescriptionItem[] }) {
   const { t } = useTranslation('pages.console-docs-page')
   const announce = useAnnounce()
-  return <DescriptionListCard title={title ?? ''} description="" items={items} wrap={true} columns={1} titleAs="h2"
+  return <DescriptionListCard title={title} description="" items={items} wrap={true} columns={1} titleAs={titleAs}
     onEdit={undefined} editLabel="" onCopy={(item) => announce(t('copiedLabel', { label: item.label }))} className="min-w-0"
-    labels={{ title: title ?? '', description: '', edit: '', copy: (label) => t('copyLabel', { label }), copied: (label) => t('copiedLabel', { label }), copiedToClipboard: t('copied') }} />
+    labels={{ title, description: '', edit: '', copy: (label) => t('copyLabel', { label }), copied: (label) => t('copiedLabel', { label }), copiedToClipboard: t('copied') }} />
 }
 const item = (id: string, label: string, value: string, render?: DescriptionItem['render'], copyable = false): DescriptionItem => ({
   id, label, value, render, status: undefined, mono: false, copyable, copyValue: value,
@@ -58,7 +58,7 @@ function Service({ service }: { service: WorkspaceDocService }) {
   const active = service.snippets.find((snippet) => snippet.id === selected) ?? service.snippets[0]
   return <details open className="min-w-0 space-y-3">
     <summary className="cursor-pointer rounded text-lg font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring">{service.label}</summary>
-    <Metadata title={undefined} items={[
+    <Metadata title={service.label} titleAs="h3" items={[
       item('category', t('category'), service.category), item('endpoint', t('endpoint'), service.endpoint),
       ...(service.port ? [item('port', t('port'), String(service.port))] : []),
     ]} />
@@ -233,7 +233,7 @@ function Documentation({ workspaceId }: { workspaceId: string }) {
       error || !data ? <ErrorPanel title={t('errorTitle')} message={t('errorMessage')} code={error?.status ?? null} requestId={error?.requestId ?? ''} details=""
         onRetry={retry} retrying={false} retryLabel={t('retry')} secondaryAction={null} titleAs="h2" announce={true} className="min-w-0"
         labels={{ title: t('errorTitle'), message: t('errorMessage'), support: t('support'), retry: t('retry'), retrying: t('retrying'), retryingStatus: t('retryingStatus'), requestId: t('requestId'), copyRequestId: t('copyRequestId'), copied: t('copied'), requestIdCopied: t('copied'), details: t('details') }} /> : <>
-        <Metadata title={t('summary')} items={[
+        <Metadata title={t('summary')} titleAs="h2" items={[
           item('baseUrl', t('baseUrl'), data.baseUrl, undefined, true),
           ...(data.generatedAt ? [item('generatedAt', t('generatedAt'), data.generatedAt, <Timestamp value={data.generatedAt} format="absolute" locale={language.language} live={false} tooltip={false} dateOptions={{ dateStyle: 'medium', timeStyle: 'short' }} fallback="" />)] : []),
         ]} />
@@ -242,7 +242,7 @@ function Documentation({ workspaceId }: { workspaceId: string }) {
           <StatusTimeline events={documentationEvents(data, { generation: t('generation'), noteCreated: t('noteCreated'), noteEdited: t('noteEdited') })} label={t('timeline')} emptyLabel={t('noActivity')}
             showFewerLabel={t('fewer')} showEarlierLabel={(count) => t('earlier', { count })} actorLabel={t('actor')} maxVisible={3} timeFormat="absolute" className="min-w-0" />
         </section>
-        <section aria-label={t('authRegion')}><Metadata title={t('auth')} items={[
+        <section aria-label={t('authRegion')}><Metadata title={t('auth')} titleAs="h2" items={[
           item('method', t('method'), data.authInstructions.method),
           ...(data.authInstructions.tokenEndpoint !== null ? [item('tokenEndpoint', t('tokenEndpoint'), data.authInstructions.tokenEndpoint)] : []),
           item('clientId', t('clientId'), data.authInstructions.clientIdPlaceholder), item('clientSecret', t('clientSecret'), data.authInstructions.clientSecretPlaceholder),
