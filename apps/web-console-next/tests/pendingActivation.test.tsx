@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { StrictMode } from 'react'
+import { Profiler, StrictMode, type ProfilerProps } from 'react'
 import { MemoryRouter, RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
 import PendingActivationPage from '../src/pages/pendingActivation'
@@ -19,9 +19,9 @@ function mock(status = 200, body: unknown = serverView) {
   vi.stubGlobal('fetch', fetchMock)
   fetchMock.mockImplementation(async () => response(status, body))
 }
-function open(state?: unknown, basename = '/', app = false) {
+function open(state?: unknown, basename = '/', app = false, onRender: ProfilerProps['onRender'] = () => {}) {
   return render(<StrictMode><MemoryRouter basename={basename} initialEntries={[{ pathname: `${basename === '/' ? '' : basename}/signup/pending-activation`, state }]}>
-    {app ? <App /> : <PendingActivationPage />}
+    <Profiler id="pending-activation" onRender={onRender}>{app ? <App /> : <PendingActivationPage />}</Profiler>
   </MemoryRouter></StrictMode>)
 }
 async function settled() { await waitFor(() => expect(screen.queryByText(es.loading)).not.toBeInTheDocument()) }
@@ -147,17 +147,24 @@ test('ports safe network degradation while retaining retry and recovery actions'
 test('copies the server request ID and retries once per activation, restoring focus on failure and success', async () => {
   const writeText = vi.fn().mockResolvedValue(undefined)
   vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
-  mock(500, { status: 500, requestId: 'synthetic-pending-request' }); open(registration)
+  // Start the assertion at the link's commit, before the passive focus effect.
+  let focusCheck: Promise<unknown> | undefined
+  mock(500, { status: 500, requestId: 'synthetic-pending-request' }); open(registration, '/', false, () => {
+    if (screen.queryByRole('link', { name: es.actions.start_login })) focusCheck ??= waitFor(() => expect(screen.getByRole('group', { name: es.statusTitle })).toHaveFocus())
+  })
   await screen.findByRole('button', { name: es.retry })
   fireEvent.click(screen.getByRole('button', { name: es.copyRequestId }))
   await waitFor(() => expect(writeText).toHaveBeenCalledWith('synthetic-pending-request'))
   const retry = screen.getByRole('button', { name: es.retry }); retry.focus(); fireEvent.click(retry)
   await waitFor(() => expect(screen.getByRole('button', { name: es.retry })).toHaveFocus())
   assertRequest(2)
-  fetchMock.mockImplementation(async () => response(200, actionView))
+  let finish!: (value: Response) => void
+  fetchMock.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
   fireEvent.click(screen.getByRole('button', { name: es.retry }))
+  await act(async () => { finish(response(200, actionView)) })
   await screen.findByRole('link', { name: es.actions.start_login })
-  expect(screen.getByRole('group', { name: es.statusTitle })).toHaveFocus()
+  expect(focusCheck).toBeDefined()
+  await focusCheck
   expect(screen.queryByRole('button', { name: es.retry })).not.toBeInTheDocument()
   assertRequest(3)
 })

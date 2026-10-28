@@ -18,18 +18,25 @@ export function App() {
   useEffect(() => {
     const navigated = previousPath.current !== location.pathname
     previousPath.current = location.pathname
-    if (!navigated || !ownLayout) return
-    // The lazy page can commit after this effect; wait for its main, not the skeleton.
+    if (!navigated || !ownLayout || location.pathname !== '/') return
+    // Suspense can replace or hide main before the navigation has painted.
     const focusMain = () => {
       const main = document.getElementById('welcome-main')
-      if (!main) return false
-      if (!main.contains(document.activeElement)) main.focus()
-      return true
+      if (!main?.isConnected || main.closest('[hidden], [inert]')) return false
+      if (main.contains(document.activeElement)) return true
+      main.focus()
+      return document.activeElement === main
     }
-    if (focusMain()) return
-    const observer = new MutationObserver(() => { if (focusMain()) observer.disconnect() })
-    observer.observe(document.body, { childList: true, subtree: true })
-    return () => observer.disconnect()
+    const observer = new MutationObserver(() => { focusMain() })
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex', 'hidden', 'inert', 'style', 'class'] })
+    let frame: number
+    const afterPaint = () => {
+      if (focusMain()) observer.disconnect()
+      else frame = requestAnimationFrame(afterPaint)
+    }
+    focusMain()
+    frame = requestAnimationFrame(afterPaint)
+    return () => { observer.disconnect(); cancelAnimationFrame(frame) }
   }, [location.pathname, ownLayout])
   const version = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev'
   const commitSha = typeof __APP_COMMIT_SHA__ === 'string' ? __APP_COMMIT_SHA__ : ''

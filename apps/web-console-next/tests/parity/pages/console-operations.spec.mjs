@@ -337,13 +337,13 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       else await expect(message).toBeVisible();
     });
     test('no active tenant adds zero reconnect traffic after initial data', async ({ parity, server }) => {
-      await freeze(parity);
       const tenantFixture = role === 'tenant_owner' ? 'tenant' : 'tenants';
       parity.network.setVariants({ [tenantFixture]: 'empty', 'ops.list': 'with-running' });
       // Use goto: empty context is intentional and the shell still settles.
       await parity.page.goto(server.url(manifest.route.slice(1)));
       await settle(parity);
       await expect(parity.page.locator('tbody tr')).toHaveCount(1);
+      await freeze(parity);
       const start = reconnectRequests(parity).length;
       await event(parity); await event(parity, 'visible');
       await parity.page.clock.runFor(2000);

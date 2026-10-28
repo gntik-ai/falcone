@@ -1,5 +1,6 @@
 import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { Profiler } from 'react'
 import { Link as RouterLink, MemoryRouter, useNavigate } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { consoleAuthConfig } from '@in-falcone/console-api/config'
@@ -25,7 +26,11 @@ for (const locale of ['es', 'en'] as const) {
   const copy = locale === 'es' ? es : en
   test(`${locale} renders the legacy content, translated labels and four configured router links`, async () => {
     await changeLocale(locale)
-    render(<MemoryRouter basename="/next" initialEntries={['/next/']}><App /></MemoryRouter>)
+    // Start the assertion at commit, before the page's passive title effect.
+    let titleCheck: Promise<void> | undefined
+    render(<MemoryRouter basename="/next" initialEntries={['/next/']}><Profiler id="welcome" onRender={() => {
+      if (screen.queryByRole('heading', { level: 1, name: copy.title })) titleCheck ??= waitFor(() => expect(document.title).toBe(copy.documentTitle))
+    }}><App /></Profiler></MemoryRouter>)
     expect(await screen.findByRole('heading', { level: 1, name: copy.title })).toBeVisible()
     for (const key of ['badge', 'intro', 'secureTitle', 'secureBody', 'signupTitle', 'signupBody', 'help'] as const) expect(screen.getByText(copy[key])).toBeVisible()
     expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(2)
@@ -40,7 +45,8 @@ for (const locale of ['es', 'en'] as const) {
     expect(screen.getByRole('img', { name: copy.logo }).closest('a')).toBeNull()
     expect(screen.getAllByRole('img', { name: copy.logo })).toHaveLength(1)
     expect(main).not.toHaveFocus()
-    expect(document.title).toBe(copy.documentTitle)
+    expect(titleCheck).toBeDefined()
+    await titleCheck
     expect(document.body.textContent).not.toMatch(/EP-\d+|US-UI|\/v1\/|roadmap|llegarán en T\d|fundación de consola lista|stack confirmado|\bshell\b|Acme|This page will be available soon|Esta página estará disponible próximamente/i)
     expect(main.querySelectorAll('.welcome-actions svg[aria-hidden="true"]')).toHaveLength(2)
   })
@@ -108,4 +114,51 @@ test('programmatic navigation preserves public chrome and only login reads its p
   }
   expect(fetch).toHaveBeenCalledWith('/v1/auth/signups/policy', expect.objectContaining({ method: 'GET' }))
   expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+test('history Back waits until welcome main accepts focus', async () => {
+  let navigate!: ReturnType<typeof useNavigate>
+  let holdFocus = false
+  function NavigationProbe() { navigate = useNavigate(); return null }
+  const focus = HTMLElement.prototype.focus
+  vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options) {
+    if (!holdFocus || this.id !== 'welcome-main') focus.call(this, options)
+  })
+  render(<MemoryRouter><NavigationProbe /><App /></MemoryRouter>)
+  await screen.findByRole('heading', { name: es.title })
+  await act(async () => { navigate('/login') })
+  await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })
+  holdFocus = true
+  await act(async () => { navigate(-1) })
+  const main = screen.getByRole('main')
+  expect(main).not.toHaveFocus()
+  holdFocus = false
+  await act(async () => { main.setAttribute('tabindex', '-1') })
+  await waitFor(() => expect(main).toHaveFocus())
+  const link = screen.getByRole('link', { name: es.signup })
+  link.focus()
+  await act(async () => { main.setAttribute('class', main.className) })
+  expect(link).toHaveFocus()
+})
+
+test('leaving welcome cancels pending focus restoration', async () => {
+  let navigate!: ReturnType<typeof useNavigate>
+  function NavigationProbe() { navigate = useNavigate(); return null }
+  const focus = HTMLElement.prototype.focus
+  vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options) {
+    if (this.id !== 'welcome-main') focus.call(this, options)
+  })
+  render(<MemoryRouter initialEntries={['/login']}><NavigationProbe /><App /></MemoryRouter>)
+  await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })
+  await act(async () => { navigate('/') })
+  const main = screen.getByRole('main')
+  expect(main).not.toHaveFocus()
+  await act(async () => { navigate('/login') })
+  await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })
+  const input = screen.getByRole('textbox')
+  input.focus()
+  main.focus = focus
+  await act(async () => { document.body.append(main) })
+  expect(input).toHaveFocus()
+  main.remove()
 })
