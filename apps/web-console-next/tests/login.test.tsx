@@ -120,7 +120,7 @@ for (const locale of ['es', 'en'] as const) describe(`login legacy cases in ${lo
   test('navigates to the existing recovery route without a document load', async () => {
     const { router } = open(); await ready(copy)
     fireEvent.click(screen.getByRole('link', { name: copy.labels.passwordRecovery }))
-    expect(await screen.findByRole('heading', { name: locale === 'es' ? 'Recuperar contraseña' : 'Recover password' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: locale === 'es' ? 'Recupera el acceso a In Falcone Console' : 'Recover access to In Falcone Console' })).toBeVisible()
     expect(router.state.location.pathname).toBe('/password-recovery')
   })
   test('preserves organization and workspace in enabled signup', async () => {

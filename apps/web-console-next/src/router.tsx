@@ -57,7 +57,7 @@ export const appRoutes: RouteObject[] = [
     children: [
       { path: '/', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<WelcomeLoading />}>{lazyPage('pages.welcome-page', () => import('./pages/welcome'))}</Suspense></ShellErrorBoundary> },
       { path: '/login', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<LoginLoading />}>{lazyPage('pages.login-page', () => import('./pages/login'))}</Suspense></ShellErrorBoundary> },
-      { path: '/password-recovery', element: lazyPage('recovery', () => import('./pages/recovery')) },
+      { path: '/password-recovery', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<LoginLoading />}>{lazyPage('pages.password-recovery-page', () => import('./pages/recovery'))}</Suspense></ShellErrorBoundary> },
       { path: '/invitations/:tenantId/:invitationId', element: lazyPage('invitation', () => import('./pages/invitation')) },
       { path: '/signup', element: lazyPage('signup', () => import('./pages/signup')) },
       { path: '/signup/pending-activation', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<WelcomeLoading />}>{lazyPage('pages.pending-activation-page', () => import('./pages/pendingActivation'))}</Suspense></ShellErrorBoundary> },
