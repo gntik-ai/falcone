@@ -94,7 +94,7 @@ test('returning to welcome by router navigation focuses main', async () => {
   expect(screen.getByRole('main')).toHaveFocus()
 })
 
-test('programmatic navigation preserves public chrome and only login reads its policy', async () => {
+test('programmatic navigation preserves public chrome and only login and signup read the signup policy', async () => {
   const fetch = vi.fn().mockImplementation(() => Promise.resolve(Response.json(buildConsoleSignupPolicyFixture())))
   vi.stubGlobal('fetch', fetch)
   let navigate!: ReturnType<typeof useNavigate>
@@ -102,7 +102,7 @@ test('programmatic navigation preserves public chrome and only login reads its p
   render(<MemoryRouter><NavigationProbe /><App /></MemoryRouter>)
   await screen.findByRole('heading', { name: es.title })
   for (const [path, heading] of [
-    [consoleAuthConfig.loginPath, 'Accede a In Falcone Console'], [consoleAuthConfig.signupPath, 'Solicitar acceso'],
+    [consoleAuthConfig.loginPath, 'Accede a In Falcone Console'], [consoleAuthConfig.signupPath, 'Crea tu acceso a In Falcone Console'],
     [consoleAuthConfig.passwordRecoveryPath, 'Recupera el acceso a In Falcone Console']
   ]) {
     await act(async () => { navigate(path) })
@@ -113,7 +113,11 @@ test('programmatic navigation preserves public chrome and only login reads its p
     expect(screen.getByRole('main')).toHaveFocus()
   }
   expect(fetch).toHaveBeenCalledWith('/v1/auth/signups/policy', expect.objectContaining({ method: 'GET' }))
-  expect(fetch).toHaveBeenCalledTimes(1)
+  expect(fetch).toHaveBeenCalledTimes(2)
+  for (const [path, init] of fetch.mock.calls) {
+    expect(path).toBe('/v1/auth/signups/policy')
+    expect(init.method).toBe('GET')
+  }
 })
 
 test('history Back waits until welcome main accepts focus without a DOM mutation', async () => {
