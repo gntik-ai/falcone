@@ -116,7 +116,7 @@ test('programmatic navigation preserves public chrome and only login reads its p
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 
-test('history Back waits until welcome main accepts focus', async () => {
+test('history Back waits until welcome main accepts focus without a DOM mutation', async () => {
   let navigate!: ReturnType<typeof useNavigate>
   let holdFocus = false
   function NavigationProbe() { navigate = useNavigate(); return null }
@@ -133,7 +133,6 @@ test('history Back waits until welcome main accepts focus', async () => {
   const main = screen.getByRole('main')
   expect(main).not.toHaveFocus()
   holdFocus = false
-  await act(async () => { main.setAttribute('tabindex', '-1') })
   await waitFor(() => expect(main).toHaveFocus())
   const link = screen.getByRole('link', { name: es.signup })
   link.focus()
@@ -143,6 +142,9 @@ test('history Back waits until welcome main accepts focus', async () => {
 
 test('leaving welcome cancels pending focus restoration', async () => {
   let navigate!: ReturnType<typeof useNavigate>
+  let nextFrame: FrameRequestCallback | undefined
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { nextFrame = callback; return 1 })
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => { nextFrame = undefined })
   function NavigationProbe() { navigate = useNavigate(); return null }
   const focus = HTMLElement.prototype.focus
   vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options) {
@@ -158,7 +160,7 @@ test('leaving welcome cancels pending focus restoration', async () => {
   const input = screen.getByRole('textbox')
   input.focus()
   main.focus = focus
-  await act(async () => { document.body.append(main) })
+  await act(async () => { document.body.append(main); nextFrame?.(performance.now()) })
   expect(input).toHaveFocus()
   main.remove()
 })
