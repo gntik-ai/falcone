@@ -103,7 +103,7 @@ test('programmatic navigation preserves public chrome and only login reads its p
   await screen.findByRole('heading', { name: es.title })
   for (const [path, heading] of [
     [consoleAuthConfig.loginPath, 'Accede a In Falcone Console'], [consoleAuthConfig.signupPath, 'Solicitar acceso'],
-    [consoleAuthConfig.passwordRecoveryPath, 'Recuperar contraseña']
+    [consoleAuthConfig.passwordRecoveryPath, 'Recupera el acceso a In Falcone Console']
   ]) {
     await act(async () => { navigate(path) })
     expect(await screen.findByRole('heading', { name: heading })).toBeVisible()
