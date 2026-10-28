@@ -169,7 +169,13 @@ export default function SignupPage() {
             <Text as="p" variant="supporting" tone="default" truncate={false} lineClamp={undefined}>{t('reference', { id: registration.registrationId })}</Text>
             {navLink(`${consoleAuthConfig.loginPath}?${new URLSearchParams({ tenantId: registrationTenant })}`, t('continue'))}
           </div> : null}
-          {allowed && !loading ? <form ref={formElement} noValidate onSubmit={(event) => { event.preventDefault(); void submit() }} aria-describedby={failure ? 'signup-feedback' : undefined} className="min-w-0 space-y-6">
+          {allowed && !loading ? <form ref={formElement} noValidate onSubmit={(event) => { event.preventDefault(); void submit() }} onKeyDown={(event) => {
+            // The kit action bar uses button controls, so inputs need an explicit Enter path.
+            if (event.key === 'Enter' && !event.defaultPrevented && !event.nativeEvent.isComposing && event.target instanceof HTMLInputElement) {
+              event.preventDefault()
+              event.currentTarget.requestSubmit()
+            }
+          }} aria-describedby={failure ? 'signup-feedback' : undefined} className="min-w-0 space-y-6">
             <ValidationSummary errors={errors.map((name) => ({ fieldId: name, label: t(`fields.${name}.label`), message: t('requiredField') }))} submitCount={attempts} title={t('validationTitle')} labels={{ title: () => t('validationTitle') }} className="min-w-0" />
             {(['account', 'organization', 'password'] as const).map((section) => <FormSection key={section} title={t(`${section}Title`)} description={t(section === 'password' ? 'passwordSectionHelp' : `${section}Help`)} actions={null} headingLevel="h2" divided={section !== 'account'} labels={{ title: '', description: '' }} className="min-w-0 [&>div]:min-w-0">
               <div className="min-w-0 space-y-5">{(section === 'account' ? ['username', 'displayName', 'primaryEmail'] as const : section === 'organization' ? ['tenantId', 'workspaceId'] as const : ['password'] as const).map(field)}</div>

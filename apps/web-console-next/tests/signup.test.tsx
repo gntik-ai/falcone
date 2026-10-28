@@ -99,6 +99,32 @@ for (const locale of ['es', 'en'] as const) describe(`signup legacy parity in ${
     expect(input('username')).toHaveAttribute('aria-describedby', 'username-help username-required')
     expect(posts()).toHaveLength(0)
   })
+  test.each(Object.keys(copy.fields))('Enter in %s validates and submits once while a request is pending', async (name) => {
+    let finish!: (value: Response) => void
+    install(undefined, () => new Promise((resolve) => { finish = resolve }))
+    const { router } = open(); await ready(copy)
+    fireEvent.keyDown(input(name), { key: 'Enter' })
+    expect(await screen.findByRole('region', { name: copy.validationTitle })).toBeVisible()
+    expect(input('username')).toHaveFocus()
+    expect(screen.getAllByRole('alert').filter((element) => element.textContent?.includes(copy.requiredField))).toHaveLength(5)
+    expect(posts()).toHaveLength(0)
+    fill()
+    fireEvent.keyDown(input(name), { key: 'Enter' })
+    expect(await screen.findByRole('button', { name: copy.submitting })).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.keyDown(input(name), { key: 'Enter' })
+    expect(posts()).toHaveLength(1)
+    expect(JSON.parse(String(posts()[0][1]?.body))).toEqual({ username: 'operations', displayName: 'Platform Operations', primaryEmail: 'no-at-sign', tenantId: 'ten_console', password: secret })
+    expect(new Headers(posts()[0][1]?.headers).get('Idempotency-Key')).toMatch(/^idem_/)
+    await act(async () => { finish(Response.json(active, { status: 201 })) })
+    await waitFor(() => expect(screen.getByRole('group', { name: copy.successTitle })).toHaveFocus())
+    noLeaks(router)
+  })
+  test('Enter during input composition does not submit', async () => {
+    open(); await ready(copy); fill()
+    fireEvent.keyDown(input('password'), { key: 'Enter', isComposing: true })
+    expect(posts()).toHaveLength(0)
+    expect(screen.queryByRole('region', { name: copy.validationTitle })).not.toBeInTheDocument()
+  })
   test('submits trimmed text, untrimmed password and optional workspace with an idempotency key; success focuses once without leaks', async () => {
     let finish!: (value: Response) => void
     install(undefined, () => new Promise((resolve) => { finish = resolve }))

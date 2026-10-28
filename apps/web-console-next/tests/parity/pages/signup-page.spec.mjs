@@ -104,7 +104,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await expect(page.getByRole('region', { name: copy.notifications })).toContainText(copy.pendingTitle);
         await noLeaks(parity, output);
       }
-      await send(parity);
+      await ready(parity, { signup: 'active' }); await fill(page);
+      await control(page, 'password').press('Enter');
       await expect(page.getByRole('group', { name: copy.successTitle })).toBeFocused();
       await expect(page.getByText(copy.reference.replace('{id}', active.registrationId))).toBeVisible();
       const loginUrl = new URL(server.url('login?tenantId=ten_console'));
@@ -118,7 +119,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(control(page, 'username')).toHaveValue('');
       await expect(control(page, 'tenantId')).toHaveValue('ten_console');
       const budget = parity.network.requests.length;
-      await save(page).click();
+      await control(page, 'username').press('Enter');
       await expect(control(page, 'username')).toBeFocused();
       expect(parity.network.requests.length).toBe(budget);
       await page.getByRole('link', { name: copy.homeLabel }).click();
