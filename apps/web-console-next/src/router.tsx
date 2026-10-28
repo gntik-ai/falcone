@@ -76,6 +76,7 @@ export const appRoutes: RouteObject[] = [
       ...pendingConsoleRoutes.map(({ guard, ...route }) => {
         if (route.path === 'operations') return { ...route, element: lazyPage('pages.console-operations-page', () => import('./pages/consoleOperations')) }
         if (route.path === 'overview') return { ...route, element: lazyPage('pages.console-overview-page', () => import('./pages/overview')) }
+        if (route.path === 'plans/new') return { ...route, element: lazyPage('pages.console-plan-create-page', () => import('./pages/consolePlanCreate')) }
         if (route.path === 'runtime') return { ...route, element: lazyPage('pages.console-runtime-page', () => import('./pages/consoleRuntime')) }
         if (route.path === 'profile') return { ...route, element: lazyPage('pages.console-profile-page', () => import('./pages/consoleProfile')) }
         if (route.path === 'workspaces/:workspaceId/docs') return { ...route, element: lazyPage('pages.console-docs-page', () => import('./pages/consoleDocs')) }
