@@ -248,7 +248,9 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         for (const snippet of service.snippets) {
           const tab = p.page.getByRole('tab', { name: snippet.label, exact: true });
           await tab.click(); await expect(tab).toHaveAttribute('aria-selected', 'true');
-          const code = p.page.getByRole('region', { name: label(p, 'snippetCode', { service: service.label }), exact: true }).locator('code');
+          const panel = p.page.getByRole('tabpanel', { name: snippet.label, exact: true });
+          const code = panel.getByRole('region', { name: label(p, 'snippetCode', { service: service.label }), exact: true }).locator('code');
+          await expect(code).toBeVisible();
           await expect.poll(() => code.textContent()).toBe(snippet.code);
         }
       }
