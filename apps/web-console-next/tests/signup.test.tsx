@@ -257,3 +257,21 @@ test('signup owns its frame within the application and focuses main', async () =
   expect(screen.getByRole('main')).toHaveFocus()
   expect(screen.getByRole('img', { name: es.logo })).toBeVisible()
 })
+
+test.each(['es', 'en'] as const)('application signup announces a failed submission exactly once in its assertive region in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
+  install(undefined, () => fail(400))
+  const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: ['/next/signup'], basename: '/next' })
+  render(<RouterProvider router={router} />)
+  await ready(copy); fill(); submit(copy)
+  await waitFor(() => expect(document.getElementById('signup-feedback')).toHaveTextContent(copy.invalidTitle))
+  const regions = Array.from(document.querySelectorAll('[data-live-announcer="assertive"]'))
+  expect(regions).toHaveLength(2)
+  expect(regions.filter((region) => region.textContent?.includes(copy.invalidTitle))).toHaveLength(1)
+  expect(regions.at(-1)).toBeEmptyDOMElement()
+  expect(screen.getByRole('region', { name: copy.notifications })).toHaveTextContent(copy.invalidTitle)
+  expect(input('username')).toHaveValue('  operations  ')
+  expect(posts()).toHaveLength(1)
+  noLeaks(router)
+})

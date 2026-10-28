@@ -154,7 +154,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         const title = status === '400' ? copy.invalidTitle : status === '403' ? copy.deniedTitle : status === '404' ? copy.notFoundTitle : status === '409' ? copy.conflictTitle : copy.submitErrorTitle;
         await expect(page.locator('#signup-feedback')).toContainText(title);
         await expect(control(page, 'username')).toHaveValue('nuevo-operador');
-        await expect(page.locator('[data-live-announcer="assertive"]').last()).toContainText(title);
+        // Signup owns the nearest announcer; App also renders an outer region.
+        const announcement = page.locator('[data-live-announcer="assertive"]').filter({ hasText: title });
+        await expect(announcement).toHaveCount(1);
+        await expect(announcement).toContainText(title);
         if (status === '500' || status === 'network') {
           parity.network.setVariants({ signup: 'active' });
           await page.getByRole('button', { name: copy.retry, exact: true }).click();
