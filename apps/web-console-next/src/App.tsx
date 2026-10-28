@@ -20,12 +20,15 @@ export function App() {
     previousPath.current = location.pathname
     if (!navigated || !ownLayout || location.pathname !== '/') return
     // Suspense can replace or hide main before the navigation has painted.
+    let focusedMain: HTMLElement | null = null
     const focusMain = () => {
       const main = document.getElementById('welcome-main')
       if (!main?.isConnected || main.closest('[hidden], [inert]')) return false
-      if (main.contains(document.activeElement)) return true
+      if (main === focusedMain && main.contains(document.activeElement)) return true
       main.focus()
-      return document.activeElement === main
+      if (document.activeElement !== main) return false
+      focusedMain = main
+      return true
     }
     const observer = new MutationObserver(() => { focusMain() })
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex', 'hidden', 'inert', 'style', 'class'] })

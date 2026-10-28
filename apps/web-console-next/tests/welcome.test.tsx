@@ -1,7 +1,7 @@
 import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Profiler } from 'react'
-import { Link as RouterLink, MemoryRouter, useNavigate } from 'react-router-dom'
+import { Link as RouterLink, MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { consoleAuthConfig } from '@in-falcone/console-api/config'
 import { persistConsoleShellSession } from '@in-falcone/console-api/session'
@@ -163,4 +163,23 @@ test('leaving welcome cancels pending focus restoration', async () => {
   await act(async () => { document.body.append(main); nextFrame?.(performance.now()) })
   expect(input).toHaveFocus()
   main.remove()
+})
+
+test('history Back focuses main when a welcome link regains focus during commit', async () => {
+  let navigate!: ReturnType<typeof useNavigate>
+  let returning = false
+  function NavigationProbe() {
+    navigate = useNavigate()
+    const location = useLocation()
+    return <Profiler id="welcome-back" onRender={() => {
+      if (returning && location.pathname === '/') screen.getByRole('link', { name: es.signup }).focus()
+    }}><App /></Profiler>
+  }
+  render(<MemoryRouter><NavigationProbe /></MemoryRouter>)
+  await screen.findByRole('heading', { name: es.title })
+  await act(async () => { navigate('/login') })
+  await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })
+  returning = true
+  await act(async () => { navigate(-1) })
+  await waitFor(() => expect(screen.getByRole('main')).toHaveFocus())
 })
