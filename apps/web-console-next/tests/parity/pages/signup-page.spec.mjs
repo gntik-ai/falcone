@@ -107,7 +107,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await send(parity);
       await expect(page.getByRole('group', { name: copy.successTitle })).toBeFocused();
       await expect(page.getByText(copy.reference.replace('{id}', active.registrationId))).toBeVisible();
-      await expect(page.getByRole('link', { name: copy.continue })).toHaveAttribute('href', /\/next\/login\?tenantId=ten_console$/);
+      const loginUrl = new URL(server.url('login?tenantId=ten_console'));
+      await expect(page.getByRole('link', { name: copy.continue })).toHaveAttribute('href', loginUrl.pathname + loginUrl.search);
       await expect(page.getByRole('region', { name: copy.notifications })).toContainText(copy.successTitle);
       await noLeaks(parity, output);
       await page.getByRole('link', { name: copy.continue }).click();
@@ -127,7 +128,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       const page = parity.page;
       await open(parity, { signupPolicy: { variant: 'success', delayMs: 1500 } });
       await expect(page.locator('form')).toHaveCount(0);
-      await expect(page.getByText(copy.loadingTitle, { exact: true })).toBeVisible();
+      // The skeleton repeats this text in an sr-only status label.
+      const loadingCallout = page.getByRole('status', { name: copy.loadingTitle, exact: true });
+      await expect(loadingCallout).toBeVisible();
+      await expect(loadingCallout.locator('..')).toHaveAttribute('aria-busy', 'true');
       await expect(save(page)).toBeVisible();
       await open(parity, { signupPolicy: 'empty' });
       await expect(page.getByText(copy.disabledTitle, { exact: true })).toBeVisible();
