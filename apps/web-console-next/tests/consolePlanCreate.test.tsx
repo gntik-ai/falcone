@@ -100,7 +100,7 @@ test('shell loading skeleton has a localized status and no page request', async 
   let release!: (response: Response) => void
   requests = strictFetch({ [`GET ${tenantUrl}`]: () => new Promise<Response>((resolve) => { release = resolve }) })
   open()
-  const status = (await screen.findByText(es.loading)).closest('[role="status"]')
+  const status = await screen.findByRole('status', { name: es.loading })
   expect(status).toHaveTextContent(es.loading)
   expect(screen.queryByLabelText(es.slug, { exact: true })).not.toBeInTheDocument()
   await act(async () => release(Response.json({ items: [] })))
@@ -188,7 +188,9 @@ test('correlation ID is the request ID fallback and can be copied', async () => 
 
 function Location() { return <output data-testid="location">{useLocation().pathname}</output> }
 test.each(['success', 'retry', '401-success', '401-rejected'])('real lazy route, basename, navigation and shared session flow: %s', async (variant) => {
-  login()
+  const initialSession = login()
+  const refreshedSession = buildConsoleRefreshSessionFixture()
+  refreshedSession.principal = initialSession.principal
   let count = 0
   requests = strictFetch({
     [`GET ${tenantUrl}`]: { items: [] },
@@ -199,7 +201,7 @@ test.each(['success', 'retry', '401-success', '401-rejected'])('real lazy route,
       if (variant === 'retry' && count === 1) return errorResponse(500)
       return Response.json({ id: 'p1' })
     },
-    [`POST ${refresh}`]: () => variant === '401-rejected' ? errorResponse(401) : Response.json(buildConsoleRefreshSessionFixture()),
+    [`POST ${refresh}`]: () => variant === '401-rejected' ? errorResponse(401) : Response.json(refreshedSession),
   })
   render(<MemoryRouter basename="/next" initialEntries={['/next/console/plans/new']}><Location /><App /></MemoryRouter>)
   await fill(); submit()
@@ -207,6 +209,7 @@ test.each(['success', 'retry', '401-success', '401-rejected'])('real lazy route,
   const target = variant === '401-rejected' ? '/login' : '/console/plans/p1'
   await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(target), { timeout: 3000 })
   if (variant === '401-rejected') expect(readProtectedRouteIntent()).toBe('/next/console/plans/new')
+  else await waitFor(() => expect(document.querySelector('[data-live-announcer="assertive"]')).toHaveTextContent(es.success))
   expect(calls()).toHaveLength(['retry', '401-success'].includes(variant) ? 2 : 1)
   for (const [, init] of calls()) expect(JSON.parse(String(init?.body))).toEqual(body)
   expect(requests.mock.mock.calls.filter(([url]) => url === refresh)).toHaveLength(variant.startsWith('401') ? 1 : 0)

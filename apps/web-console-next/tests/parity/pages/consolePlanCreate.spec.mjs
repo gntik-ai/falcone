@@ -91,7 +91,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         const sent = calls(parity).slice(start);
         expect(sent).toHaveLength(variant === 'success' ? 1 : 2);
         for (const request of sent) expect(request).toEqual({ method: 'POST', path: planPath, body: planBody });
-        await expect(parity.page.locator('[aria-live="polite"]').filter({ hasText: copy(parity).success })).toHaveCount(1);
+        await expect(parity.page.locator('[aria-live="assertive"]').filter({ hasText: copy(parity).success })).toHaveCount(1);
       }
       await open(parity);
       // Model the unchanged legacy catalog document so Discard can be exercised offline.
@@ -202,7 +202,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
           parity.network.setVariants({ tenants: 'empty', 'plans.create': 'slow' });
           await parity.page.goto(parity.page.url().replace(/console\/.*$/, 'console/plans/new'));
           if (state === 'saving') { await fill(parity); await button(parity, 'create').click(); await expect(button(parity, 'saving')).toBeDisabled(); }
-          else await expect(parity.page.getByText(copy(parity).loading, { exact: true })).toBeVisible();
+          else await expect(parity.page.getByRole('status', { name: copy(parity).loading, exact: true })).toBeVisible();
           await snapshot(parity, info, state);
         } finally { release(); await parity.page.unroute(url, hold); }
         if (state === 'loading') await expect(field(parity, 'slug')).toBeVisible();

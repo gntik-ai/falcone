@@ -82,7 +82,7 @@ function PlanForm() {
     try {
       const created = await createPlan(body)
       if (!mounted.current) return
-      announce(t('success'))
+      announce(t('success'), 'assertive')
       navigate(`/console/plans/${created.id}`)
     } catch (cause) {
       if (!mounted.current) return
@@ -138,7 +138,9 @@ function PlanForm() {
       <Button type="submit" form="plan-create-form" loading={saving} disabled={saving || failed || readOnly}
         aria-busy={saving} variant="primary">{t(saving ? 'saving' : 'create')}</Button>
     </div>}>
-    {loading ? <TableSkeleton rows={3} columns={1} label={t('loading')} className="min-w-0" /> : <>
+    {loading ? <div role="status" aria-label={t('loading')} aria-busy={true}>
+      <div aria-hidden={true}><TableSkeleton rows={3} columns={1} label={t('loading')} className="min-w-0" /></div>
+    </div> : <>
       {pristine && <FirstRunEmpty title={t('firstTitle')} description={t('firstDescription')}
         steps={[t('stepSlug'), t('stepName'), t('stepDescription'), t('stepLimits')]}
         actionLabel={t('start')} onAction={() => slugInput.current?.focus()} secondary={null} titleAs="h2" bordered={false}
