@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: 'ddb8aec542502bd2650479ff301bcaf164805bd6'
+  FALCONE_CHARTS_REF: '03be97c2035d89300faadcd354bfea3f18b2854b'
 
 jobs:
   quality:
@@ -508,7 +508,7 @@ jobs:
       - name: Build the legacy console image without publishing
         run: docker build -f apps/web-console/Dockerfile .
 
-  ui-parity:
+  ui-parity-structure:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -535,22 +535,98 @@ jobs:
           pnpm --filter @in-falcone/web-console-next parity:scan
           pnpm --filter @in-falcone/web-console-next parity:validate
 
+  ui-parity-shards:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Install Chromium
         run: pnpm --filter @in-falcone/web-console-next exec playwright install --with-deps chromium
 
       - name: Build the shell fixtures
         run: SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
 
-      - name: Test parity and seeded faults
-        run: pnpm --filter @in-falcone/web-console-next test:parity
+      - name: Test parity shard
+        run: pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/4
 
       - name: Upload parity reports and traces
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ui-parity
+          name: ui-parity-shard-${{ matrix.shard }}
           path: apps/web-console-next/test-results/parity/
           retention-days: 7
+
+  ui-parity-negatives:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @in-falcone/web-console-next exec playwright install --with-deps chromium
+
+      - name: Build the shell fixtures
+        run: SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
+
+      - name: Verify seeded parity faults
+        run: pnpm --filter @in-falcone/web-console-next exec node tests/parity/verify-negatives.mjs
+
+      - name: Upload seeded-fault reports and traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ui-parity-negatives
+          path: apps/web-console-next/test-results/parity/negative/
+          retention-days: 7
+
+  ui-parity:
+    runs-on: ubuntu-latest
+    needs: [ui-parity-structure, ui-parity-shards, ui-parity-negatives]
+    if: always()
+    steps:
+      - name: Require every parity job to succeed
+        env:
+          STRUCTURE_RESULT: ${{ needs.ui-parity-structure.result }}
+          SHARDS_RESULT: ${{ needs.ui-parity-shards.result }}
+          NEGATIVES_RESULT: ${{ needs.ui-parity-negatives.result }}
+        run: |
+          for result in "$STRUCTURE_RESULT" "$SHARDS_RESULT" "$NEGATIVES_RESULT"; do
+            [ "$result" = success ] || exit 1
+          done
 
   security:
     runs-on: ubuntu-latest

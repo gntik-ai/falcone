@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import YAML from 'yaml';
 
@@ -76,35 +77,115 @@ test('the shell step enforces release exclusion, fixture build and browser tests
   assert.ok(!release.env.SHELL_TEST_FIXTURES);
 });
 
-test('ui-parity is an unconditional isolated job with pinned actions and downloadable reports', () => {
-  const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
-  const job = ci.jobs['ui-parity'];
-  assert.ok(job, 'ui-parity must run on every PR and push');
-  assert.equal(job['runs-on'], 'ubuntu-latest');
-  assert.equal(ci.on.pull_request?.paths, undefined);
-  assert.equal(ci.on.push?.paths, undefined);
-  const original = ci.jobs['web-console-next'];
-  for (const prefix of ['actions/checkout@', 'pnpm/action-setup@', 'actions/setup-node@']) {
-    assert.equal(job.steps.find((s) => s.uses?.startsWith(prefix))?.uses, original.steps.find((s) => s.uses?.startsWith(prefix))?.uses);
+function assertParityWorkflow(ci) {
+  const names = ['ui-parity-structure', 'ui-parity-shards', 'ui-parity-negatives'];
+  const structure = ci.jobs[names[0]];
+  const shards = ci.jobs[names[1]];
+  const negatives = ci.jobs[names[2]];
+  const aggregate = ci.jobs['ui-parity'];
+  assert.deepEqual(shards?.strategy, { 'fail-fast': false, matrix: { shard: [1, 2, 3, 4] } });
+  for (const event of ['pull_request', 'push']) {
+    assert.ok(Object.hasOwn(ci.on, event), `${event} must trigger parity`);
+    assert.equal(ci.on[event]?.paths, undefined);
+    assert.equal(ci.on[event]?.['paths-ignore'], undefined);
   }
-  const uploads = job.steps.filter((s) => s.uses?.startsWith('actions/upload-artifact@'));
-  assert.equal(uploads.length, 1);
-  assert.equal(uploads[0].if, 'always()');
-  assert.match(uploads[0].with.path, /test-results\/parity/);
-  function inspect(value, isUpload = false) {
+  const original = ci.jobs['web-console-next'];
+  const commands = (job) => job.steps.filter((s) => s.run).map((s) => s.run).join('\n');
+  const inspect = (value, allowAlways = false) => {
     if (!value || typeof value !== 'object') return;
     for (const [key, child] of Object.entries(value)) {
       assert.notEqual(key, 'continue-on-error');
-      if (key === 'if') assert.ok(isUpload && child === 'always()', 'only artifact upload may use if: always()');
+      if (key === 'if') assert.ok(allowAlways && child === 'always()', 'only uploads and the aggregate job may use if: always()');
       inspect(child);
     }
+  };
+  const artifactNames = [];
+  for (const name of [...names, 'ui-parity']) {
+    const job = ci.jobs[name];
+    assert.ok(job, `${name} must run on every PR and push`);
+    assert.equal(job['runs-on'], 'ubuntu-latest');
+    const { steps, ...properties } = job;
+    inspect(properties, name === 'ui-parity');
+    for (const step of steps) inspect(step, step.uses?.startsWith('actions/upload-artifact@'));
+    assert.doesNotMatch(JSON.stringify(job), /secrets\.|cache.*browser|4173/);
+    assert.ok(steps.every((s) => !s.uses || /^[^@]+@[a-f0-9]{40}$/.test(s.uses)), 'actions must be pinned');
+    if (name === 'ui-parity') continue;
+    assert.equal(job.needs, undefined, 'parity checks must run independently');
+    for (const prefix of ['actions/checkout@', 'pnpm/action-setup@', 'actions/setup-node@']) {
+      assert.equal(steps.find((s) => s.uses?.startsWith(prefix))?.uses, original.steps.find((s) => s.uses?.startsWith(prefix))?.uses);
+    }
+    assert.ok(commands(job).includes('pnpm install --frozen-lockfile'));
+    const uploads = steps.filter((s) => s.uses?.startsWith('actions/upload-artifact@'));
+    assert.equal(uploads.length, name === 'ui-parity-structure' ? 0 : 1);
+    for (const upload of uploads) {
+      assert.equal(upload.uses, 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02');
+      assert.equal(upload.if, 'always()');
+      assert.equal(upload.with['retention-days'], 7);
+      artifactNames.push(upload.with.name);
+    }
   }
-  const { steps, ...properties } = job;
-  inspect(properties);
-  for (const step of steps) inspect(step, uploads.includes(step));
-  assert.doesNotMatch(JSON.stringify(job), /secrets\.|cache.*browser|4173/);
-  const commands = steps.filter((s) => s.run).map((s) => s.run).join('\n');
-  for (const command of ['pnpm install --frozen-lockfile', 'exec playwright install --with-deps chromium', 'parity:scan', 'parity:validate', 'test:parity', 'node --test tests/unit/web-console-next-ci.test.mjs', 'node --test tests/unit/parity-tools.test.mjs']) assert.ok(commands.includes(command), command);
-  assert.match(commands, /SHELL_TEST_FIXTURES=true.*web-console-next build/);
-  assert.ok(steps.every((s) => !s.uses || /^[^@]+@[a-f0-9]{40}$/.test(s.uses)), 'actions must be pinned');
+  for (const command of ['parity:scan', 'parity:validate', 'node --test tests/unit/web-console-next-ci.test.mjs', 'node --test tests/unit/parity-tools.test.mjs']) {
+    assert.ok(commands(structure).includes(command), command);
+  }
+  for (const job of [shards, negatives]) {
+    assert.ok(commands(job).includes('exec playwright install --with-deps chromium'));
+    assert.match(commands(job), /SHELL_TEST_FIXTURES=true VITE_BASE_PATH=\/ pnpm --filter @in-falcone\/web-console-next build/);
+  }
+  assert.ok(commands(shards).includes('pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/4'));
+  assert.doesNotMatch(commands(shards), /--grep|--test-list|test:parity|verify-negatives/);
+  assert.equal(negatives.strategy, undefined, 'seeded faults run once');
+  assert.ok(commands(negatives).includes('pnpm --filter @in-falcone/web-console-next exec node tests/parity/verify-negatives.mjs'));
+  assert.equal(names.flatMap((name) => commands(ci.jobs[name]).match(/verify-negatives\.mjs/g) ?? []).length, 1);
+  const upload = (job) => job.steps.find((s) => s.uses?.startsWith('actions/upload-artifact@')).with;
+  assert.equal(upload(shards).name, 'ui-parity-shard-${{ matrix.shard }}');
+  assert.equal(upload(shards).path, 'apps/web-console-next/test-results/parity/');
+  assert.equal(upload(negatives).name, 'ui-parity-negatives');
+  assert.equal(upload(negatives).path, 'apps/web-console-next/test-results/parity/negative/');
+  assert.equal(new Set(artifactNames).size, artifactNames.length);
+  assert.deepEqual(aggregate.needs, names);
+  assert.equal(aggregate.if, 'always()');
+  assert.equal(aggregate.steps.length, 1, 'aggregate only checks results');
+  assert.equal(aggregate.steps[0].uses, undefined);
+  assert.deepEqual(aggregate.steps[0].env, {
+    STRUCTURE_RESULT: '${{ needs.ui-parity-structure.result }}',
+    SHARDS_RESULT: '${{ needs.ui-parity-shards.result }}',
+    NEGATIVES_RESULT: '${{ needs.ui-parity-negatives.result }}',
+  });
+}
+
+test('ui-parity is an unconditional isolated job with pinned actions and downloadable reports', () => {
+  assertParityWorkflow(YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8')));
+  const config = readFileSync('apps/web-console-next/tests/parity/playwright.config.mjs', 'utf8');
+  assert.match(config, /workers: 1/);
+  assert.doesNotMatch(config, /fullyParallel/);
+});
+
+test('ui-parity structure checks reject coverage loss and a bypassed aggregate', () => {
+  const mutations = [
+    (jobs) => { jobs['ui-parity-shards'].strategy.matrix.shard.pop(); },
+    (jobs) => { jobs['ui-parity-shards'].steps.find((s) => s.run?.includes('--shard=')).run = 'pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs'; },
+    (jobs) => { delete jobs['ui-parity-shards'].steps.at(-1).if; },
+    (jobs) => { jobs['ui-parity-shards'].steps.at(-1).with.name = 'ui-parity-negatives'; },
+    (jobs) => { jobs['ui-parity'].needs.pop(); },
+    (jobs) => { delete jobs['ui-parity'].if; },
+    (jobs) => { jobs['ui-parity-negatives'].if = 'false'; },
+  ];
+  for (const mutate of mutations) {
+    const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
+    mutate(ci.jobs);
+    assert.throws(() => assertParityWorkflow(ci), { code: 'ERR_ASSERTION' });
+  }
+});
+
+test('ui-parity aggregate fails on failure, cancellation, skipping or missing results', () => {
+  const job = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs['ui-parity'];
+  const step = job.steps[0];
+  const success = { STRUCTURE_RESULT: 'success', SHARDS_RESULT: 'success', NEGATIVES_RESULT: 'success' };
+  const run = (results) => spawnSync('bash', ['-e', '-c', step.run], { env: { ...process.env, ...results }, encoding: 'utf8' });
+  assert.equal(run(success).status, 0);
+  for (const key of Object.keys(success)) {
+    for (const result of ['failure', 'cancelled', 'skipped', '']) {
+      assert.equal(run({ ...success, [key]: result }).status, 1, `${key}=${result}`);
+    }
+  }
 });
