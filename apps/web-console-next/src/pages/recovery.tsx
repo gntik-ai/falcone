@@ -129,7 +129,7 @@ function Recovery() {
             code={failure.status ?? null} requestId={failure.requestId ?? ''} details="" icon={undefined} onRetry={() => submit(true)} retrying={busy} retryLabel={t('retry')}
             secondaryAction={null} titleAs="h2" announce={true} labels={{ title: '', message: '', support: '', retry: t('retry'), retrying: t('retrying'), retryingStatus: t('retrying'),
               requestId: t('requestId'), copyRequestId: t('copyRequestId'), copied: t('copied'), requestIdCopied: t('copied'), details: '' }}
-            className="min-w-0 wrap-anywhere [&_code]:min-w-0 [&_code]:break-all [&_code]:whitespace-normal [&_code]:flex-1 [&_button]:w-full sm:[&_button]:w-auto" /></div> : null}
+            className="min-w-0 wrap-anywhere [&_code]:min-w-0 [&_code]:break-all [&_code]:whitespace-normal [&_code]:flex-1" /></div> : null}
         </div>
         {!stateLink ? back : null}
       </form>
