@@ -72,7 +72,7 @@ environment; no safety gate is removed.
 
 ## CI repair review
 
-The follow-up reviewed source HEAD `9fa6f08ece000626ac8d90ed06453098fcfcf35f`
+The follow-up reviewed source HEAD `4a8376390fb9eb1d53de74c3923dc4ab37f21815`
 against base `e60abcc0179be2d90f8bbbae42895f4ba2bed93f`. The reported
 `ui-parity-shards (4)` failure is the existing welcome action test at
 `apps/web-console-next/tests/parity/pages/welcome.spec.mjs:99`: after browser
@@ -81,7 +81,7 @@ The `ui-parity` aggregate fails because that shard fails.
 
 The entire `apps/web-console-next` tree, dependency manifests and lockfile are
 unchanged from base. The only workflow changes are Hermes's chart pins to
-`d9f6dd828207c4f2ae6f51f427775aff206e3ee1`. The parity jobs build shell fixtures
+`c0dd5010219713800573853344cc0d900b8c3865`. The parity jobs build shell fixtures
 directly with pnpm; they neither build the changed Dockerfile nor check out
 deployment charts. There is no changed execution path connecting the heap or
 chart pin to the focus assertion. Treat the focus failure as outside this
@@ -97,3 +97,15 @@ service-catalog subtest. The five Dockerfile checks pass when selected without
 that environment-blocked subtest. The existing CI structure and parity-tool
 Node test files also pass. No new test is added and no additional existing
 test expectation changes in this follow-up.
+
+Revalidation after the latest Hermes pin confirms the same scope: no UI source,
+dependency, parity test, or parity job changes from the immutable base. Both
+reported failures still concern the unchanged welcome focus assertion and its
+aggregate. No new test files exist relative to base. The Dockerfile checks pass
+with `--experimental-test-isolation=none` and a name filter selecting the five
+Dockerfile checks; this does not replace the complete suite. The complete suite
+still encounters `spawnSync git EPERM` even with a process-scoped safe-directory
+setting. The matching shard command still encounters `spawnSync node EPERM`
+before Playwright starts. Docker socket access is denied, so the earlier RSS
+measurement remains the available memory evidence, pending the image-build CI
+gate. No workflow pin or test expectation is changed by this revalidation.
