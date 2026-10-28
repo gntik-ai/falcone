@@ -27,6 +27,14 @@ export async function installSession(page, roles = ['superadmin']) {
     const url = new URL(route.request().url());
     if (route.request().method() === 'GET' && url.pathname === '/v1/tenants' && url.search === '?page%5Bsize%5D=100&sort=displayName') {
       await route.fulfill({ json: { items: [], page: { after: null } } });
+    } else if (route.request().method() === 'GET' && /^\/v1\/workspaces\/[^/]+\/docs$/.test(url.pathname) && !url.search) {
+      await route.fulfill({ json: {
+        workspaceId: decodeURIComponent(url.pathname.split('/')[3]), tenantId: 'synthetic-tenant',
+        baseUrl: 'https://synthetic-api.example.test', generatedAt: '2026-06-01T12:00:00Z',
+        authInstructions: { method: 'synthetic-oidc', tokenEndpoint: null, clientIdPlaceholder: '<SYNTHETIC_CLIENT_ID>',
+          clientSecretPlaceholder: '<SYNTHETIC_CLIENT_SECRET>', scopeHint: 'synthetic-scope', consoleRef: 'Synthetic console reference' },
+        enabledServices: [], customNotes: [],
+      } });
     } else {
       const request = route.request();
       let body;
