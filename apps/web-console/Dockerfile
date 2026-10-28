@@ -28,8 +28,8 @@ ARG APP_COMMIT_SHA=
 WORKDIR /src
 COPY . .
 RUN corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console... --filter @in-falcone/web-console-next...
-RUN NODE_OPTIONS=--max-old-space-size=1536 VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console exec vite build
-RUN NODE_OPTIONS=--max-old-space-size=1536 CSP_TEST_HARNESS= VITE_BASE_PATH=/next/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build
+RUN NODE_OPTIONS=--max-old-space-size=3072 VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console exec vite build
+RUN NODE_OPTIONS=--max-old-space-size=3072 CSP_TEST_HARNESS= VITE_BASE_PATH=/next/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build
 
 FROM ${NODE_BASE_IMAGE}
 WORKDIR /app

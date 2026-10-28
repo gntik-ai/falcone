@@ -11,8 +11,8 @@ const webDockerfilePath = path.join(repoRoot, 'apps/web-console/Dockerfile');
 const fnDockerfile = fs.readFileSync(fnDockerfilePath, 'utf8');
 const webDockerfile = fs.readFileSync(webDockerfilePath, 'utf8');
 const filteredInstall = 'corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console... --filter @in-falcone/web-console-next...';
-const boundedBuild = 'NODE_OPTIONS=--max-old-space-size=1536 VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console exec vite build';
-const nextBuild = 'NODE_OPTIONS=--max-old-space-size=1536 CSP_TEST_HARNESS= VITE_BASE_PATH=/next/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build';
+const boundedBuild = 'NODE_OPTIONS=--max-old-space-size=3072 VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console exec vite build';
+const nextBuild = 'NODE_OPTIONS=--max-old-space-size=3072 CSP_TEST_HARNESS= VITE_BASE_PATH=/next/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build';
 // The web-console FROM stages are parameterized by a base-image build arg (issue #929); the ARG
 // default preserves the current base. These literal strings are single-quoted so `${...}` stays
 // literal (no JS interpolation).
@@ -105,7 +105,7 @@ function validateWebBuilder(source) {
   assert.ok(builder.indexOf(contextCopy) < builder.indexOf(runs[0]));
   assert.ok(builder.indexOf(runs[0]) < builder.indexOf(runs[1]));
   assert.match(runs[0].args, /pnpm install --frozen-lockfile --filter @in-falcone\/web-console\.\.\. --filter @in-falcone\/web-console-next\.\.\.$/);
-  assert.match(runs[1].args, /^NODE_OPTIONS=--max-old-space-size=1536\s/);
+  assert.match(runs[1].args, /^NODE_OPTIONS=--max-old-space-size=3072\s/);
 
   const rootPackage = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
   assert.match(rootPackage.packageManager, /^pnpm@\d+\.\d+\.\d+$/);
@@ -179,14 +179,16 @@ test('contract validators are sensitive to both pre-fix Dockerfile regressions',
 });
 
 // bbx-922-005 | fn-openshift-build-from-source | #### Scenario: Web console build avoids the previously observed build-stage OOM
-test('builder contract rejects 512/768 MiB heaps and a combined install/build RUN regression', () => {
-  for (const insufficientHeap of [512, 768]) {
-    const constrained = webDockerfile.replace(
-      '--max-old-space-size=1536',
-      `--max-old-space-size=${insufficientHeap}`,
-    );
-    assert.notEqual(constrained, webDockerfile);
-    assert.throws(() => validateWebBuilder(constrained), /1536/);
+test('builder contract rejects 512/768/1536 MiB heaps in either build and a combined install/build RUN regression', () => {
+  for (const build of [boundedBuild, nextBuild]) {
+    for (const insufficientHeap of [512, 768, 1536]) {
+      const constrained = webDockerfile.replace(
+        build,
+        build.replace('--max-old-space-size=3072', `--max-old-space-size=${insufficientHeap}`),
+      );
+      assert.notEqual(constrained, webDockerfile);
+      assert.throws(() => validateWebBuilder(constrained), /3072/);
+    }
   }
 
   const combined = webDockerfile.replace(
