@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import manifest, { docs, note, secondNote, createdNote, updatedNote } from './console-docs-page.manifest.ts';
+import manifest, { docs, docsWorkspaces, note, secondNote, createdNote, updatedNote } from './console-docs-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import { sessionFor } from '../fixtures/shell.ts';
 import * as check from '../checks.mjs';
@@ -8,6 +8,20 @@ import * as check from '../checks.mjs';
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-docs-page.json`, import.meta.url), 'utf8'))]));
 const build = JSON.parse(readFileSync(new URL('../../../dist/.vite/manifest.json', import.meta.url), 'utf8'));
 const entry = Object.values(build).find((chunk) => chunk.isEntry && chunk.name === 'app').file;
+// Keep this page's route, membership and workspace collection consistent without changing shared fixtures.
+test.beforeEach(async ({ parity: p }) => {
+  await p.page.route(`**/${entry}`, async (route) => {
+    await p.page.evaluate((workspaceId) => {
+      const key = 'in-falcone.console-shell-session';
+      const session = JSON.parse(sessionStorage.getItem(key));
+      session.principal.workspaceIds = [...new Set([...session.principal.workspaceIds, workspaceId])];
+      sessionStorage.setItem(key, JSON.stringify(session));
+    }, docs.workspaceId);
+    await route.fallback();
+  });
+  await p.page.route('**/v1/workspaces?**', async (route) => route.fulfill({ json: docsWorkspaces }));
+});
+
 const label = (p, key, values = {}) => Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, String(value)), bundles[p.locale][key]);
 const button = (p, key, values) => p.page.getByRole('button', { name: label(p, key, values), exact: true });
 const notes = (p) => p.page.getByRole('region', { name: label(p, 'notesRegion'), exact: true });
@@ -19,6 +33,11 @@ async function loaded(p) { await expect(p.page.getByRole('region', { name: label
 async function openDelete(p) { await notes(p).getByRole('button', { name: label(p, 'delete'), exact: true }).first().click(); await expect(p.page.getByRole('alertdialog')).toBeVisible(); }
 async function announce(p, key, politeness = 'polite') { await expect(p.page.locator(`[data-live-announcer="${politeness}"]`)).toContainText([label(p, key)]); }
 async function expand(p) { await button(p, 'earlier', { count: 1 }).click(); }
+async function contextReady(p) {
+  const context = p.page.getByRole('region', { name: p.locale === 'es' ? 'Contexto activo' : 'Active context', exact: true });
+  await expect(context).toHaveAttribute('aria-busy', 'false');
+  await expect(context.getByRole('button', { name: /^wrk-1,/ })).toBeVisible();
+}
 async function attach(p, info, state, width) {
   const body = await p.page.screenshot({ fullPage: true, animations: 'disabled' });
   const hash = createHash('sha256').update(body).digest('hex');
@@ -36,7 +55,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
   test.describe(`console-docs-page | ${role} | ${locale} | ${width}`, () => {
     test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
     test('data', async ({ parity: p }) => {
-      await check.data(p, manifest); await loaded(p);
+      await check.data(p, manifest); await loaded(p); await contextReady(p);
       await expect(p.page.getByText(docs.baseUrl, { exact: true })).toBeVisible();
       const auth = p.page.getByRole('region', { name: label(p, 'authRegion'), exact: true });
       for (const value of Object.values(docs.authInstructions)) await expect(auth.getByText(value, { exact: true })).toBeVisible();
@@ -209,6 +228,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await holdRequest(p, '/v1/workspaces/wrk-1/docs', async () => {
         await p.page.goto(server.url(manifest.route.slice(1)));
         await expect(p.page.locator('[role="status"][aria-busy="true"]')).toContainText(label(p, 'loading'));
+        await contextReady(p);
         await check.assertLocale(p); await attach(p, info, `loading-${role}`, width);
       });
     });
@@ -226,8 +246,10 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await expect(p.page.getByRole('heading', { name: service.label, level: 3, exact: true })).toHaveText(service.label);
         await expect(p.page.getByText(service.endpoint, { exact: true })).toHaveText(service.endpoint);
         for (const snippet of service.snippets) {
-          await p.page.getByRole('tab', { name: snippet.label, exact: true }).click();
-          expect(await p.page.getByRole('region', { name: label(p, 'snippetCode', { service: service.label }), exact: true }).locator('code').textContent()).toBe(snippet.code);
+          const tab = p.page.getByRole('tab', { name: snippet.label, exact: true });
+          await tab.click(); await expect(tab).toHaveAttribute('aria-selected', 'true');
+          const code = p.page.getByRole('region', { name: label(p, 'snippetCode', { service: service.label }), exact: true }).locator('code');
+          await expect.poll(() => code.textContent()).toBe(snippet.code);
         }
       }
       await expect(button(p, 'refreshLabel')).toHaveText(label(p, 'refresh'));

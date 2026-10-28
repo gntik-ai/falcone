@@ -1,5 +1,6 @@
 import type { PageEndpoint, ParityManifest } from '../manifest'
 import type { WorkspaceDocsResponse } from '../../../src/pages/consoleDocs/api'
+import { buildWorkspaceCollectionFixture } from '@in-falcone/console-api/fixtures'
 
 export const note = {
   noteId: 'synthetic-note-1', content: 'Synthetic customer checklist', authorId: 'synthetic-author-1',
@@ -23,6 +24,8 @@ export const docs: WorkspaceDocsResponse = {
   ],
   customNotes: [note, secondNote],
 }
+export const docsWorkspaces = buildWorkspaceCollectionFixture()
+docsWorkspaces.items = docsWorkspaces.items.map((workspace) => ({ ...workspace, workspaceId: docs.workspaceId, displayName: docs.workspaceId }))
 const ok = (body: unknown) => ({ status: 200, body })
 export const docsFailure = { status: 500, body: { code: 'HTTP_500', message: 'synthetic-error', requestId: 'synthetic-docs-request' } }
 export const optionalDocs = { ...docs, authInstructions: { ...docs.authInstructions, tokenEndpoint: null }, enabledServices: docs.enabledServices.map((service) => ({ ...service, port: 0 })) }

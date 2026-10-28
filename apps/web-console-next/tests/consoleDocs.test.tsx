@@ -6,7 +6,7 @@ import { buildConsoleSignupPolicyFixture, buildTenantCollectionFixture, buildWor
 import { SessionProvider } from '../src/shell/session'
 import ConsoleDocs, { documentationEvents } from '../src/pages/consoleDocs'
 import { fetchWorkspaceDocs, createDocNote, updateDocNote, deleteDocNote } from '../src/pages/consoleDocs/api'
-import { docs, note, createdNote, updatedNote, docsFailure, optionalDocs } from './parity/pages/console-docs-page.manifest'
+import { docs, docsWorkspaces, note, createdNote, updatedNote, docsFailure, optionalDocs } from './parity/pages/console-docs-page.manifest'
 import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
 import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-docs-page.json'
@@ -264,6 +264,18 @@ test('encodes route and note identifiers while preserving all four legacy API sh
   expect(network.mock.mock.calls.map(([, init]) => [init?.method, init?.body])).toEqual([['GET', undefined], ['POST', '{"content":" raw "}'], ['PUT', '{"content":" edit "}'], ['DELETE', undefined]])
 })
 
+
+for (const role of ['workspace_admin', 'workspace_viewer']) for (const locale of ['es', 'en']) test(`the docs parity context resolves its route workspace for ${role} in ${locale}`, async () => {
+  await i18n.changeLanguage(locale)
+  login([role], ['synthetic-tenant'], [docs.workspaceId])
+  network = strictFetch({ [`GET ${url}`]: docs, [`GET ${tenantUrl}`]: buildTenantCollectionFixture(), [`GET ${workspaceUrl('synthetic-tenant')}`]: docsWorkspaces })
+  render(<MemoryRouter initialEntries={['/console/workspaces/wrk-1/docs']}><App /></MemoryRouter>)
+  const context = await screen.findByRole('region', { name: locale === 'es' ? 'Contexto activo' : 'Active context' })
+  await waitFor(() => expect(context).toHaveAttribute('aria-busy', 'false'))
+  expect(within(context).getByRole('button', { name: /^wrk-1,/ })).toBeVisible()
+  expect(context).not.toHaveTextContent('Select workspace')
+  expect(network.mock.mock.calls.filter(([path]) => String(path).includes('/docs')).map(([path]) => path)).toEqual([url])
+})
 
 test('the next shell honors the route workspace over stored selection, renders one linked breadcrumb and reads once', async () => {
   const session = login(['workspace_admin'], ['synthetic-tenant'], ['wrk-1', 'wrk-2'])
