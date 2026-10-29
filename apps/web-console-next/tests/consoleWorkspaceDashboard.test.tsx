@@ -253,8 +253,9 @@ test.each([false, true])('401 shared refresh rejected=%s retries once or clears 
   })
   render(<MemoryRouter initialEntries={['/console/workspaces/synthetic-workspace']}>{routes()}</MemoryRouter>)
   if (rejected) {
+    // Session invalidation and the login navigation finish in separate renders.
+    expect(await screen.findByLabelText('Location')).toHaveTextContent('/login')
     await waitFor(() => expect(readProtectedRouteIntent()).toBe('/console/workspaces/synthetic-workspace'))
-    expect(screen.getByLabelText('Location')).toHaveTextContent('/login')
     expect(readConsoleShellSession()).toBeNull()
     assertGet(1)
   } else {
