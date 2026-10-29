@@ -16,9 +16,18 @@ function Home() {
     <Button onClick={() => navigate('/console/__fixture/lazy')}>{t('shell.fixtures.navigate')}</Button>
   </section>
 }
+function QuotasLink() {
+  const navigate = useNavigate()
+  const { t } = useTranslation('common')
+  return <section><h1>{t('shell.fixtures.home')}</h1>
+    <NavLink to="/console/quotas">{t('shell.fixtures.link')}</NavLink>
+    <Button type="button" onClick={() => navigate('/console/quotas')}>{t('shell.fixtures.navigate')}</Button>
+  </section>
+}
 function Throw(): never { throw new Error('synthetic-render-failure') }
 export default function FixtureRoutes() {
   return <Routes>
+    <Route path="quotas-link" element={<QuotasLink />} />
     <Route path="home" element={<Home />} />
     <Route path="lazy" element={<LazyDestination />} />
     <Route path="throw" element={<Throw />} />

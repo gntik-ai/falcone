@@ -61,3 +61,50 @@ export function removeIamUserFromGroup(realmId: string, userId: string, groupId:
     { method: 'DELETE', signal }
   )
 }
+
+// Quota page contracts are pinned to the legacy metrics and plan clients until publication.
+export interface QuotaDimension {
+  dimensionId?: string
+  displayName?: string
+  policyMode?: 'enforced' | 'unbounded' | 'not_enforced'
+  hardLimit?: number | null
+  softLimit?: number | null
+  measuredValue?: number
+  remainingToHardLimit?: number | null
+  freshnessStatus?: 'fresh' | 'degraded' | 'unavailable'
+  unit?: string
+}
+export interface QuotaPostureResponse {
+  evaluatedAt?: string
+  dimensions?: QuotaDimension[]
+  hardLimitBreaches?: string[]
+}
+export interface QuotaOverviewResponse {
+  generatedAt?: string
+  overallPosture?: string
+  hardLimitDimensions?: string[]
+}
+export interface QuotaTenantPlan {
+  noAssignment?: boolean
+  assignment?: { planId?: string }
+  plan?: { id?: string; displayName?: string; status?: string }
+}
+export function getTenantQuotaPosture(tenantId: string) {
+  return requestConsoleSessionJson<QuotaPostureResponse>(`/v1/metrics/tenants/${tenantId}/quotas`)
+}
+export function getTenantQuotaOverview(tenantId: string) {
+  return requestConsoleSessionJson<QuotaOverviewResponse>(`/v1/metrics/tenants/${tenantId}/overview`)
+}
+export function getWorkspaceQuotaPosture(workspaceId: string) {
+  return requestConsoleSessionJson<QuotaPostureResponse>(`/v1/metrics/workspaces/${workspaceId}/quotas`)
+}
+export function getWorkspaceQuotaOverview(workspaceId: string) {
+  return requestConsoleSessionJson<QuotaOverviewResponse>(`/v1/metrics/workspaces/${workspaceId}/overview`)
+}
+export function getQuotaTenantPlan(tenantId: string) {
+  return requestConsoleSessionJson<QuotaTenantPlan>(`/v1/tenants/${tenantId}/plan`)
+}
+export function setQuotaPlanLimit(planId: string, dimensionKey: string, value: number) {
+  return requestConsoleSessionJson<{ planId: string; dimensionKey: string; newValue: number; source: string }>(
+    `/v1/plans/${planId}/limits/${dimensionKey}`, { method: 'PUT', body: { value } })
+}
