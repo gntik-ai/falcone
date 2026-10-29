@@ -7,7 +7,7 @@ import * as check from '../checks.mjs';
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale,
   JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-workspace-dashboard-page.json`, import.meta.url), 'utf8')),
 ]));
-const path = '/v1/workspaces/sample-workspaceId/consumption';
+const path = `/v1/workspaces/${consumption.workspaceId}/consumption`;
 const surface = (parity) => parity.page.locator('.workspace-dashboard');
 const calls = (parity) => parity.network.requests.filter((request) => request.path.endsWith('/consumption'));
 const endpoints = {
@@ -43,7 +43,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(surface(parity).locator('time')).toHaveText(new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(consumption.snapshotAt)));
       for (const key of ['override', 'unlimited', 'unavailableData']) await expect(table.getByText(copy[key], { exact: true })).toBeVisible();
       await expect(surface(parity).getByLabel(locale === 'es' ? 'PostgreSQL databases: estado Dentro del límite' : 'PostgreSQL databases: status Within limit', { exact: true })).toBeVisible();
-      await expect(surface(parity).getByLabel(locale === 'es' ? 'Realtime: capacidad habilitada' : 'Realtime: capability enabled', { exact: true })).toBeVisible();
+      await expect(surface(parity).getByLabel(locale === 'es' ? 'Synthetic realtime capability: capacidad habilitada' : 'Synthetic realtime capability: capability enabled', { exact: true })).toBeVisible();
       assertReads(parity, 1);
       await check.assertLocale(parity);
     });
@@ -94,15 +94,21 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       expect(await parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(manifest.route);
     });
     test('accessibility', async ({ parity }) => {
-      await open(parity, ['500', '500', 'success']);
+      await open(parity, ['500', { variant: '500', delayMs: 1000 }, 'success']);
       await keyboardFocus(parity.page, surface(parity).getByRole('link', { name: copy.myPlan, exact: true }));
       await parity.page.keyboard.press('Tab');
       await expect(surface(parity).getByRole('button', { name: copy.retry, exact: true })).toBeFocused();
       await parity.page.keyboard.press('Enter');
+      await expect(surface(parity).getByRole('button', { name: copy.retrying, exact: true })).toBeFocused();
       await expect.poll(() => calls(parity).length).toBe(2);
-      await expect(surface(parity).getByRole('button', { name: copy.retry, exact: true })).toBeFocused();
+      const retry = surface(parity).getByRole('button', { name: copy.retry, exact: true });
+      await expect(retry).toHaveAttribute('aria-busy', 'false');
+      await expect(retry).toHaveAttribute('aria-disabled', 'false');
+      await expect(retry).toBeFocused();
+      assertReads(parity, 2);
       await parity.page.keyboard.press('Enter');
       await expect(surface(parity).getByRole('table')).toBeVisible();
+      assertReads(parity, 3);
       await expect(surface(parity).getByRole('heading', { level: 1 })).toBeFocused();
       await expect(surface(parity).getByRole('checkbox')).toHaveCount(0);
       await expect(surface(parity).getByRole('combobox')).toHaveCount(0);

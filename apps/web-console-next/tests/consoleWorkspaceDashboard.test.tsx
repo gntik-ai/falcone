@@ -11,7 +11,7 @@ import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-workspace-dashboard-page.json'
 import en from '../src/locales/en/pages.console-workspace-dashboard-page.json'
 
-const path = '/v1/workspaces/sample-workspaceId/consumption'
+const path = '/v1/workspaces/synthetic-workspace/consumption'
 const refresh = '/v1/auth/login-sessions/synthetic-session/refresh'
 let requests: ReturnType<typeof strictFetch>
 afterEach(() => { requests?.verify(); window.history.replaceState({}, '', '/') })
@@ -26,12 +26,12 @@ function routes() {
     <Route path="/login" element={<Location />} />
   </Routes>
 }
-function open(response: unknown = consumption, id = 'sample-workspaceId', role = 'workspace_viewer') {
+function open(response: unknown = consumption, id = 'synthetic-workspace', role = 'workspace_viewer') {
   login([role])
   requests = strictFetch({ [`GET /v1/workspaces/${encodeURIComponent(id)}/consumption`]: response })
   return render(<MemoryRouter initialEntries={[`/console/workspaces/${encodeURIComponent(id)}`]}>{routes()}</MemoryRouter>)
 }
-function assertGet(count: number, id = 'sample-workspaceId') {
+function assertGet(count: number, id = 'synthetic-workspace') {
   expect(calls()).toHaveLength(count)
   for (const [url, init] of calls()) {
     expect(url).toBe(`/v1/workspaces/${encodeURIComponent(id)}/consumption`)
@@ -48,13 +48,13 @@ test.each(['es', 'en'] as const)('ports legacy metadata, five quota columns, sou
   expect(within(table).getAllByRole('columnheader')).toHaveLength(5)
   expect(within(table).getAllByRole('row')).toHaveLength(4)
   expect(screen.getByRole('heading', { level: 1, name: copy.title })).toBeVisible()
-  expect(screen.getByText('sample-workspaceId')).toBeVisible()
+  expect(screen.getByText('synthetic-workspace')).toBeVisible()
   expect(screen.getByText('synthetic-tenant')).toBeVisible()
   const time = document.querySelector('time')!
   expect(time).toHaveAttribute('datetime', consumption.snapshotAt)
   expect(time.textContent).toBe(new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(consumption.snapshotAt)))
   expect(screen.getByLabelText(locale === 'es' ? 'PostgreSQL databases: estado Dentro del límite' : 'PostgreSQL databases: status Within limit')).toBeVisible()
-  expect(screen.getByLabelText(locale === 'es' ? 'Realtime: capacidad habilitada' : 'Realtime: capability enabled')).toHaveTextContent(copy.enabled)
+  expect(screen.getByLabelText(locale === 'es' ? 'Synthetic realtime capability: capacidad habilitada' : 'Synthetic realtime capability: capability enabled')).toHaveTextContent(copy.enabled)
   expect(screen.getByLabelText(locale === 'es' ? 'Synthetic disabled capability: capacidad deshabilitada' : 'Synthetic disabled capability: capability disabled')).toHaveTextContent(copy.disabled)
   const row = within(table).getAllByRole('row')[1]
   expect(row).toHaveTextContent(copy.override)
@@ -75,7 +75,7 @@ test.each(['es', 'en'] as const)('ports legacy metadata, five quota columns, sou
 })
 
 test.each(['superadmin', 'tenant_owner', 'tenant_viewer', 'workspace_admin', 'workspace_viewer'])('all authenticated roles read the same data: %s', async (role) => {
-  open(consumption, 'sample-workspaceId', role)
+  open(consumption, 'synthetic-workspace', role)
   await screen.findByRole('table')
   assertGet(1)
 })
@@ -85,7 +85,7 @@ test('announces loading once with workspace context and hides the skeleton annou
   open(async () => { await new Promise<void>((resolve) => { release = resolve }); return Response.json(consumption) })
   const status = await screen.findByRole('status', { name: es.loading })
   expect(status).toHaveAttribute('aria-busy', 'true')
-  expect(status).toHaveTextContent('sample-workspaceId')
+  expect(status).toHaveTextContent('synthetic-workspace')
   expect(within(status).queryAllByRole('status')).toHaveLength(0)
   expect(status.querySelectorAll('[aria-hidden="true"] [role="status"]').length).toBe(4)
   await waitFor(() => expect(release).toBeTypeOf('function'))
@@ -100,7 +100,7 @@ test.each(['es', 'en'] as const)('independent empty and absent fields preserve t
   for (const variant of ['dimensions-empty', 'capabilities-empty', 'capabilities-absent', 'dimensions-empty-capabilities-absent'] as const) {
     const fixture = consumptionFixtures[`workspace-consumption.${variant}`].body
     const page = open(fixture)
-    await screen.findByText('sample-workspaceId', { exact: true })
+    await screen.findByText('synthetic-workspace', { exact: true })
     const noDimensions = variant.startsWith('dimensions-empty')
     const noCapabilities = variant.endsWith('capabilities-absent')
     expect(screen.queryByRole('table')).toBe(noDimensions ? null : screen.getByRole('table'))
@@ -145,7 +145,7 @@ test.each(['es', 'en'] as const)('403 and 404 offer My plan with no request-acce
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(document.body).not.toHaveTextContent('PRIVATE_MARKER')
-    if (status === 404) expect(screen.getByText(copy.unavailableDescription.replace('{workspaceId}', 'sample-workspaceId'))).toBeVisible()
+    if (status === 404) expect(screen.getByText(copy.unavailableDescription.replace('{workspaceId}', 'synthetic-workspace'))).toBeVisible()
     assertGet(1)
     page.unmount()
     requests.verify()
@@ -251,9 +251,9 @@ test.each([false, true])('401 shared refresh rejected=%s retries once or clears 
     [`GET ${path}`]: () => ++count === 1 ? fail(401) : Response.json(consumption),
     [`POST ${refresh}`]: () => rejected ? fail(401) : Response.json(buildConsoleRefreshSessionFixture()),
   })
-  render(<MemoryRouter initialEntries={['/console/workspaces/sample-workspaceId']}>{routes()}</MemoryRouter>)
+  render(<MemoryRouter initialEntries={['/console/workspaces/synthetic-workspace']}>{routes()}</MemoryRouter>)
   if (rejected) {
-    await waitFor(() => expect(readProtectedRouteIntent()).toBe('/console/workspaces/sample-workspaceId'))
+    await waitFor(() => expect(readProtectedRouteIntent()).toBe('/console/workspaces/synthetic-workspace'))
     expect(screen.getByLabelText('Location')).toHaveTextContent('/login')
     expect(readConsoleShellSession()).toBeNull()
     assertGet(1)

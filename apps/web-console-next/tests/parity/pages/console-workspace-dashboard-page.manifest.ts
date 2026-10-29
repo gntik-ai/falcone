@@ -2,7 +2,7 @@ import type { WorkspaceConsumptionResponse } from '@in-falcone/console-api/clien
 import type { PageEndpoint, ParityManifest } from '../manifest'
 
 export const consumption: WorkspaceConsumptionResponse = {
-  workspaceId: 'sample-workspaceId', tenantId: 'synthetic-tenant', snapshotAt: '2026-07-01T00:00:00.000Z',
+  workspaceId: 'synthetic-workspace', tenantId: 'synthetic-tenant', snapshotAt: '2026-07-01T00:00:00.000Z',
   dimensions: [
     { dimensionKey: 'max_pg_databases', displayLabel: 'PostgreSQL databases', unit: 'count', tenantEffectiveValue: 10,
       workspaceLimit: 6, workspaceSource: 'workspace_sub_quota', currentUsage: 4, usageStatus: 'within_limit', usageUnknownReason: null },
@@ -12,7 +12,7 @@ export const consumption: WorkspaceConsumptionResponse = {
       workspaceLimit: null, workspaceSource: 'tenant_shared_pool', currentUsage: null, usageStatus: 'unknown' },
   ],
   capabilities: [
-    { capabilityKey: 'realtime', displayLabel: 'Realtime', enabled: true, source: 'plan' },
+    { capabilityKey: 'realtime', displayLabel: 'Synthetic realtime capability', enabled: true, source: 'plan' },
     { capabilityKey: 'synthetic.disabled', displayLabel: 'Synthetic disabled capability', enabled: false },
   ],
 }
@@ -48,10 +48,15 @@ export const consumptionFixtures = {
   network: { network: true }, 'workspace-consumption.network': { network: true },
 }
 export const workspaceConsumptionEndpoints: Record<string, PageEndpoint> = {
-  workspaceConsumption: { method: 'GET', path: '/v1/workspaces/sample-workspaceId/consumption', fixtures: consumptionFixtures },
+  // Keep the parity route inside the shared shell session's workspace membership.
+  workspaceConsumption: { method: 'GET', path: `/v1/workspaces/${consumption.workspaceId}/consumption`, fixtures: consumptionFixtures },
+  // The CSP route enumerator uses this parameter sample independently of shell membership.
+  sampleWorkspaceConsumption: { method: 'GET', path: '/v1/workspaces/sample-workspaceId/consumption', fixtures: {
+    success: ok({ ...consumption, workspaceId: 'sample-workspaceId' }),
+  } },
 }
 const manifest: ParityManifest = {
-  route: '/console/workspaces/sample-workspaceId', roles: ['superadmin', 'tenant_owner', 'tenant_viewer', 'workspace_admin', 'workspace_viewer'],
+  route: `/console/workspaces/${consumption.workspaceId}`, roles: ['superadmin', 'tenant_owner', 'tenant_viewer', 'workspace_admin', 'workspace_viewer'],
   endpoints: workspaceConsumptionEndpoints, fixtures: ['tenant', 'tenants', 'workspaces', 'refresh', 'workspaceConsumption'],
   sources: ['src/pages/consoleWorkspaceDashboard.tsx'],
   data: [{ name: 'quota table', locator: '.workspace-dashboard table' }, { name: 'capabilities', locator: '.workspace-dashboard ul' }],
