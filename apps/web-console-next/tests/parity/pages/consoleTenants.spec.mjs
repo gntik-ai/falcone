@@ -129,6 +129,30 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       expect(calls(p, plansPath)).toHaveLength(planStart);
     });
     test('action', async ({ parity: p }) => {
+      for (const path of [quotaPath, overviewPath]) {
+        let release;
+        const held = new Promise((resolve) => { release = resolve; });
+        const hold = async (route) => { await held; await route.fallback(); };
+        const matches = (url) => url.pathname === path;
+        await p.page.route(matches, hold);
+        try {
+          await open(p);
+          await wizard(p);
+          await p.page.getByLabel(copy(p).name, { exact: true }).fill(tenantBody.name);
+          await button(p, 'next').click();
+          await choose(p, 'planId', 'Starter (starter)');
+          await expect(button(p, 'next')).toBeEnabled();
+          for (const key of ['noAccess', 'notFound', 'error']) {
+            await expect(p.page.getByRole('heading', { name: copy(p).precheck[key], exact: true })).toHaveCount(0);
+          }
+          expect(writes(p)).toHaveLength(0);
+        } finally {
+          const response = p.page.waitForResponse((response) => new URL(response.url()).pathname === path);
+          release();
+          await response;
+          await p.page.unroute(matches, hold);
+        }
+      }
       for (const variant of ['success', 'delayed', '500-then-success', '500-then-delayed-success', 'network-then-success']) {
         await open(p, { 'tenants.create': variant });
         const start = writes(p).length, keyStart = p.keys.length;
@@ -154,9 +178,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await button(p, 'back').click(); await choose(p, 'region', copy(p).usEast); await button(p, 'next').click(); await button(p, 'createTenant').click();
       await button(p, 'retry').waitFor(); expect(p.keys.at(-1)).not.toBe(key);
       await button(p, 'exit').click(); await expect(button(p, 'create')).toBeFocused();
-      const metrics = calls(p, quotaPath).length;
-      await wizard(p); await button(p, 'exit').click(); await wizard(p);
-      expect(calls(p, quotaPath)).toHaveLength(metrics);
+      const metrics = [calls(p, quotaPath).length, calls(p, overviewPath).length];
+      const catalogs = calls(p, plansPath).length;
+      await wizard(p); await expect.poll(() => calls(p, plansPath).length).toBe(catalogs + 1);
+      await button(p, 'exit').click(); await wizard(p);
+      await expect.poll(() => calls(p, plansPath).length).toBe(catalogs + 2);
+      expect([calls(p, quotaPath).length, calls(p, overviewPath).length]).toEqual(metrics);
       p.testRole = 'platform_operator'; await open(p);
       await p.page.getByRole('button', { name: copy(p).useActiveName.replace('{name}', 'Beta'), exact: true }).click();
       await expect(p.page.getByRole('button', { name: copy(p).alreadyActive.replace('{name}', 'Beta'), exact: true })).toBeDisabled();

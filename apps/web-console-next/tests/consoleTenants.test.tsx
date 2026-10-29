@@ -94,7 +94,10 @@ test.each([403, 404, 500, 0])('inventory %s is distinct from empty, carries requ
   await screen.findByRole('heading', { name: status === 403 ? es.inventory.noAccess : status === 404 ? es.inventory.notFound : es.inventory.error })
   expect(screen.queryByRole('heading', { name: es.empty })).not.toBeInTheDocument()
   if (status === 500) expect(screen.getByText('req_synthetic')).toBeVisible()
-  if (status === 404) expect(screen.getByRole('link', { name: es.overview })).toHaveAttribute('href', '/console/overview')
+  if (status === 404) {
+    expect(screen.getByRole('link', { name: es.overview })).toHaveAttribute('href', '/console/overview')
+    await waitFor(() => expect(screen.getByRole('heading', { name: es.inventory.notFound })).toHaveFocus())
+  }
   fireEvent.click(button(es.retry)); await screen.findByRole('heading', { name: es.empty })
   expect(calls(tenantUrl)).toHaveLength(2)
 })
@@ -107,7 +110,8 @@ test.each([403, 404, 500, 0, -1])('catalog %s blocks only the plan step, and ret
   expect(button(es.next)).toBeDisabled()
   if (status === -1) expect(await screen.findByText(es.plansEmpty)).toBeVisible()
   else {
-    await screen.findByRole('heading', { name: status === 403 ? es.catalog.noAccess : status === 404 ? es.catalog.notFound : es.catalog.error })
+    const heading = await screen.findByRole('heading', { name: status === 403 ? es.catalog.noAccess : status === 404 ? es.catalog.notFound : es.catalog.error })
+    await waitFor(() => expect(heading).toHaveFocus())
     expect(screen.queryByText(es.plansEmpty)).not.toBeInTheDocument()
     expect(screen.queryByText('PRIVATE_MARKER')).not.toBeInTheDocument()
     fireEvent.click(button(es.retry))
@@ -126,9 +130,9 @@ test.each([403, 404, 500, 0])('quota %s failure is nonblocking and only explicit
   await waitFor(() => expect(calls(quotas)).toHaveLength(2))
   expect(calls(overview)).toHaveLength(2); expect(calls(create)).toHaveLength(0)
 })
-test('pending quota requests do not announce a failure or disable Next; reopening only reloads plans', async () => {
+test.each([quotas, overview])('a pending %s does not announce a failure or disable Next; reopening only reloads plans', async (path) => {
   let resolve!: (response: Response) => void
-  mock({ [`GET ${quotas}`]: () => new Promise<Response>((done) => { resolve = done }) })
+  mock({ [`GET ${path}`]: () => new Promise<Response>((done) => { resolve = done }) })
   await open(); await wizard()
   fireEvent.change(screen.getByLabelText(es.name), { target: { value: 'Organization' } }); fireEvent.click(button(es.next))
   await waitFor(() => expect(button(es.next)).toBeEnabled())
@@ -145,7 +149,9 @@ test.each(['es', 'en'] as const)('create retry retains body and idempotency key,
   let count = 0
   mock({ [`POST ${create}`]: () => ++count === 1 ? errorResponse(500) : new Promise<Response>((done) => { resolve = done }) })
   await open('superadmin', locale); await summary(copy)
-  fireEvent.click(button(copy.createTenant)); await within(modal()).findByRole('heading', { name: copy.submit.error })
+  fireEvent.click(button(copy.createTenant))
+  const heading = await within(modal()).findByRole('heading', { name: copy.submit.error })
+  await waitFor(() => expect(heading).toHaveFocus())
   expect(within(modal()).getByText(body.name.trim())).toBeVisible()
   fireEvent.click(button(copy.retry)); fireEvent.click(button(copy.creating))
   expect(button(copy.creating)).toHaveAttribute('aria-disabled', 'true'); expect(button(copy.back)).toBeDisabled(); expect(button(copy.creating)).toHaveAttribute('aria-busy', 'true')
@@ -174,7 +180,8 @@ test('Back and an edit use a new key; create 404 also reloads the catalog withou
 test.each([403, 409, 422, 0])('submit %s preserves fields and offers only the applicable recovery', async (status) => {
   mock({ [`POST ${create}`]: () => { if (!status) throw new TypeError('network'); return errorResponse(status) } })
   await open(); await summary(); fireEvent.click(button(es.createTenant))
-  await within(modal()).findByRole('heading', { name: status === 403 ? es.submit.noAccess : es.submit.error })
+  const heading = await within(modal()).findByRole('heading', { name: status === 403 ? es.submit.noAccess : es.submit.error })
+  await waitFor(() => expect(heading).toHaveFocus())
   expect(within(modal()).getByText(body.name.trim())).toBeVisible()
   if (status === 403) { expect(screen.queryByRole('button', { name: es.retry })).not.toBeInTheDocument(); expect(button(es.closeWizard)).toBeEnabled() }
   else expect(button(es.retry)).toBeEnabled()
