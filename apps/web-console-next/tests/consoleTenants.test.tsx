@@ -75,7 +75,7 @@ test('operator activates rows, disables the active action and announces the new 
   await screen.findByRole('table')
   fireEvent.click(screen.getByRole('button', { name: es.useActiveName.replace('{name}', 'Beta') }))
   await waitFor(() => expect(screen.getByRole('button', { name: es.alreadyActive.replace('{name}', 'Beta') })).toBeDisabled())
-  expect(screen.getByRole('row', { current: true })).toHaveTextContent('Beta')
+  await waitFor(() => expect(screen.getByRole('row', { current: true })).toHaveTextContent('Beta'))
   expect(screen.getAllByText(es.activated.replace('{name}', 'Beta')).length).toBeGreaterThan(0)
   expect(screen.queryByRole('link', { name: es.openPlan })).not.toBeInTheDocument()
 })

@@ -190,10 +190,16 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(p.page.getByRole('row').and(p.page.locator('[aria-current="true"]'))).toContainText('Beta');
       await expect(p.page.getByText(copy(p).activated.replace('{name}', 'Beta'), { exact: true }).first()).toBeAttached();
       p.testRole = 'superadmin'; await open(p);
-      await p.page.route((url) => url.pathname === '/console/tenants/t1/plan', (route) => route.fulfill({ contentType: 'text/html', body: `<html lang="${locale}"><body><main><h1>Alpha</h1></main></body></html>` }));
-      await p.page.getByRole('link', { name: copy(p).openPlanName.replace('{name}', 'Alpha'), exact: true }).click();
-      await expect(p.page).toHaveURL(/\/console\/tenants\/t1\/plan$/);
-      expect(await p.page.evaluate(() => JSON.parse(localStorage.getItem('in-falcone.console-active-context')).tenantId)).toBe('t1');
+      await expect(p.page.getByRole('row').and(p.page.locator('[aria-current="true"]'))).toContainText('Alpha');
+      let selectionAtNavigation;
+      await p.page.route((url) => url.pathname === '/console/tenants/t2/plan', async (route) => {
+        // Capture activation before the destination document's harness init script clears storage.
+        selectionAtNavigation = await p.page.evaluate(() => JSON.parse(localStorage.getItem('in-falcone.console-active-context')));
+        await route.fulfill({ contentType: 'text/html', body: `<html lang="${locale}"><body><main><h1>Beta</h1></main></body></html>` });
+      });
+      await p.page.getByRole('link', { name: copy(p).openPlanName.replace('{name}', 'Beta'), exact: true }).click();
+      await expect(p.page).toHaveURL(/\/console\/tenants\/t2\/plan$/);
+      expect(selectionAtNavigation).toMatchObject({ tenantId: 't2', workspaceId: null });
     });
     test('error-empty', async ({ parity: p }) => {
       test.setTimeout(180_000);
