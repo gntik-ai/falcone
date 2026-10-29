@@ -37,7 +37,22 @@ export function Shell() {
 
 function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
   const { t } = useTranslation('common')
-  const { pathname } = useLocation()
+  const { pathname, state, key } = useLocation()
+  useEffect(() => {
+    if (state?.focusMainHeading !== true) return
+    // The destination may be lazy. Observe only this explicitly requested navigation.
+    const focusHeading = () => {
+      const heading = document.querySelector<HTMLElement>('main h1')
+      if (!heading || heading.closest('[aria-busy="true"], [hidden], [inert], [style*="display: none"]')) return false
+      heading.tabIndex = -1
+      heading.focus()
+      return true
+    }
+    if (focusHeading()) return
+    const observer = new MutationObserver(() => { if (focusHeading()) observer.disconnect() })
+    observer.observe(document.querySelector('main') ?? document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'inert', 'style', 'aria-busy'] })
+    return () => observer.disconnect()
+  }, [pathname, state, key])
   const [drawerOpen, setDrawerOpen] = useState(false)
   useEffect(() => setDrawerOpen(false), [pathname])
   const session = useSession()

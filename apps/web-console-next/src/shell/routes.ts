@@ -22,7 +22,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'plans/:planId', guard: 'superadmin', handle: { platformGlobal: true } },
   { path: 'tenants/:tenantId/plan', guard: 'superadmin' },
   { path: 'my-plan' },
-  { path: 'my-plan/allocation' },
+  { path: 'my-plan/allocation', migrated: true },
   { path: 'workspaces/:workspaceId' },
   { path: 'auth', guard: 'superadmin' },
   { path: 'auth-config' },
