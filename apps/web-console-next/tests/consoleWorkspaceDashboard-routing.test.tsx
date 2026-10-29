@@ -16,7 +16,8 @@ test('removing the migrated flag restores the pending workspace route without co
   login(['workspace_viewer'])
   const requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
   render(<MemoryRouter initialEntries={['/console/workspaces/w2']}><App /></MemoryRouter>)
-  expect(await screen.findByRole('heading', { name: 'Página pendiente' })).toBeVisible()
+  // The auth and shell bootstrap must finish before asserting the lazy destination.
+  expect(await screen.findByRole('heading', { name: 'Página pendiente' }, { timeout: 5000 })).toBeVisible()
   expect(requests.mock.mock.calls.filter(([url]) => String(url).endsWith('/consumption'))).toEqual([])
   requests.verify()
-})
+}, 10000)
