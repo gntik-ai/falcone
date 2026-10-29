@@ -170,9 +170,17 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     });
     test('responsive', async ({ parity }) => {
       await open(parity); await ready(parity); await check.assertResponsive(parity, width);
-      const scroll = parity.page.getByRole('region', { name: copy(parity).caption, exact: true });
+      const scroll = parity.page.getByRole('table').locator('..');
       await expect(scroll).toBeVisible();
       expect(await scroll.evaluate((element) => getComputedStyle(element).overflowX)).toMatch(/auto|scroll/);
+      // The kit makes the container a named keyboard stop only when it overflows.
+      if (await scroll.evaluate((element) => element.scrollWidth > element.clientWidth + 1)) {
+        await expect(scroll).toHaveAttribute('role', 'region');
+        await expect(scroll).toHaveAccessibleName(copy(parity).caption);
+        await expect(scroll).toHaveAttribute('tabindex', '0');
+        await scroll.focus(); await parity.page.keyboard.press('ArrowRight');
+        await expect.poll(() => scroll.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+      }
       await open(parity, 'archived-empty'); await select(parity, copy(parity).filter, copy(parity).status.archived); await check.assertResponsive(parity, width);
       if (width === 375) {
         const clear = await parity.page.getByRole('button', { name: copy(parity).clear, exact: true }).boundingBox();

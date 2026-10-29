@@ -97,6 +97,16 @@ test('keeps filtered empty results recoverable and returns focus to the filter',
   expect(screen.getByRole('combobox', { name: es.filter })).toHaveFocus()
 })
 
+test('returns focus to page one when Previous becomes disabled', async () => {
+  setup(); open(); await ready()
+  fireEvent.click(screen.getByRole('button', { name: 'Página 2' }))
+  await screen.findByRole('link', { name: 'synthetic-plan-21' })
+  const previous = screen.getByRole('button', { name: es.previous })
+  previous.focus(); fireEvent.click(previous); await ready()
+  expect(previous).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Página 1' })).toHaveFocus()
+})
+
 test('renders the first-run empty state with the create action', async () => {
   setup('empty'); open()
   expect(await screen.findByRole('heading', { name: es.empty })).toBeVisible()

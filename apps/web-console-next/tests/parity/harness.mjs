@@ -3,6 +3,7 @@ import { startServer } from '../csp/server.mjs';
 import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
 import { createEndpointRegistry } from './endpoint-registry.ts';
 import { consumeResourceDiagnostic } from './resource-diagnostics.mjs';
+import { catalogResponse, isPlansQuery } from './pages/console-plan-catalog-page.manifest.ts';
 
 export { expect };
 export const test = base.extend({
@@ -46,6 +47,12 @@ export const test = base.extend({
       try { body = request.postDataJSON() ?? undefined; } catch { body = request.postData(); }
       requests.push({ method, path: path + url.search, body });
       const name = registry.find(method, path, body);
+      // Other page journeys can now navigate back to the migrated catalog.
+      if (url.origin === server.origin && !name && isPlansQuery(method, url)) {
+        const response = catalogResponse('45-mixed', url);
+        await route.fulfill({ status: response.status, json: response.body });
+        return;
+      }
       if (url.origin !== server.origin || !name) {
         unmatched.push(`${method} ${path}${url.search}`);
         await route.fulfill({ status: 404, json: { error_msg: '404 Route Not Found' } });

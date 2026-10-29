@@ -31,7 +31,7 @@ function PlanCatalog() {
   const table = useRef<HTMLDivElement>(null)
   const footer = useRef<HTMLDivElement>(null)
   const recovery = useRef(false)
-  const paging = useRef(false)
+  const paging = useRef<{ page: number; control: Element | null } | null>(null)
   const loading = bootstrap || result.key !== key
   const data = !loading ? result.data : null
   const error = !loading ? result.error : null
@@ -61,12 +61,14 @@ function PlanCatalog() {
     if (loading) return
     if (data && recovery.current) { caption?.focus(); recovery.current = false; announce(t('loaded', { count: data.total })) }
     if (error) { recovery.current = false; if (error.status !== 401) announce(t('errorTitle')) }
-    if (paging.current) {
+    if (paging.current?.page === query.page) {
       const active = document.activeElement
-      if (!active || active === document.body || !active.isConnected || active.hasAttribute('disabled')) footer.current?.querySelector<HTMLElement>('[aria-current="page"]')?.focus()
-      paging.current = false
+      const { control } = paging.current
+      // Retain the activated control across browser blur when an arrow becomes disabled.
+      if (!control?.isConnected || control.hasAttribute('disabled') || !active || active === document.body) footer.current?.querySelector<HTMLElement>('[aria-current="page"]')?.focus()
+      paging.current = null
     }
-  }, [data, error, loading, announce, t])
+  }, [data, error, loading, announce, t, query.page])
 
   const clear = () => { setQuery((current) => ({ ...current, status: 'all', page: 1 })); filter.current?.focus() }
   const create = () => navigate('/console/plans/new')
@@ -123,7 +125,7 @@ function PlanCatalog() {
         items={[20, 50, 100].map((size) => ({ value: String(size), label: String(size) }))} clearable={false} size="md"
         onValueChange={(value) => { if (value) setQuery((current) => ({ ...current, pageSize: Number(value), page: 1 })) }} /></Field>
       <Pagination page={query.page} pageCount={Math.ceil(total / query.pageSize)} siblingCount={1} size="sm" labels={{ nav: t('pagination'), previous: t('previous'), next: t('next'), page: (page) => t('page', { page }) }}
-        onPageChange={(page) => { paging.current = true; setQuery((current) => ({ ...current, page })) }} />
+        onPageChange={(page) => { paging.current = { page, control: document.activeElement }; setQuery((current) => ({ ...current, page })) }} />
     </div>}
   </Page>
 }

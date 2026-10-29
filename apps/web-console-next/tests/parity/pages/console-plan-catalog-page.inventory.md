@@ -29,3 +29,11 @@ The unit test ports legacy rendering, semantic links, navigation and immediate f
 The parity spec covers es/en at 375, 768 and 1280 pixels, including axe, focus, runtime health, locale checks, table scrolling, stacked empty actions, navigation and SHA256-labelled screenshot artifacts. CSP uses the 45-mixed synthetic fixture and retains strict query rejection for unrelated endpoints.
 
 Chromium is unavailable in the maker sandbox; PR CI runs browser parity, axe, responsive and CSP checks. Screenshot artifacts still require the independent checker's assessment and operator approval. No visual approval is claimed here. The offline kit MCP server is unavailable, so validate_page is NOT_RUN; repository colour and i18n checks are used locally. Merge ordering still requires the plan detail migration and the listed blueprint prerequisites. This maker performs no merge or deployment.
+
+## CI repair
+
+Pagination focus recovery now retains both the activated control and its destination page. An effect from the previous page cannot consume the pending recovery, and a browser blur when an arrow becomes disabled cannot lose the original control. Unit coverage checks both the first-page and last-page boundaries.
+
+The new catalog responsive test previously required a named scroll region even at desktop widths where the table fits. The pinned kit only adds that role and keyboard stop when the container overflows. The corrected test checks the scroll container at every width and additionally checks its localized name, focusability and keyboard scrolling when horizontal overflow exists. Page overflow and stacked empty-state actions remain asserted.
+
+The shared parity harness serves the synthetic catalog response when another page journey returns to the migrated catalog. This fallback requires the local origin and the exact approved GET query shape and only applies to requests without a registered page endpoint. A browserless regression test exercises the unchanged create endpoint, catalog navigation and fail-closed handling of extra keys, missing keys, wrong paths, wrong methods, unrelated queries and external origins. The pre-existing create journey and other pre-existing test expectations are unchanged.
