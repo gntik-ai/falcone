@@ -11,6 +11,8 @@ vi.mock('../src/shell/routes', async (importOriginal) => {
 import { App } from '../src/App'
 
 test('removing the migrated flag restores the pending workspace route without consumption requests', async () => {
+  // Test route selection independently of the lazy destination's cold module transform.
+  await import('../src/pages/pendingPage')
   login(['workspace_viewer'])
   const requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
   render(<MemoryRouter initialEntries={['/console/workspaces/w2']}><App /></MemoryRouter>)
