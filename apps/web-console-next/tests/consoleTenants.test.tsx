@@ -177,6 +177,45 @@ test.each([403, 404, 500, 0])('inventory %s is distinct from empty, carries requ
   fireEvent.click(button(es.retry)); await screen.findByRole('heading', { name: es.empty })
   expect(calls(tenantUrl)).toHaveLength(2)
 })
+test.each([['es', 404], ['es', 500], ['en', 404], ['en', 500]] as const)('inventory %s/%s retains retry focus when the later precheck fails', async (locale, status) => {
+  const copy = locale === 'es' ? es : en
+  let resolve!: (response: Response) => void
+  mock({ [`GET ${tenantUrl}`]: () => errorResponse(status), [`GET ${overview}`]: () => new Promise<Response>((done) => { resolve = done }) })
+  await open('superadmin', locale)
+  const heading = await screen.findByRole('heading', { name: status === 404 ? copy.inventory.notFound : copy.inventory.error })
+  await waitFor(() => expect(heading).toHaveFocus())
+  const retry = button(copy.retry)
+  retry.focus()
+  await act(async () => resolve(errorResponse(500)))
+  expect(retry).toHaveFocus()
+  expect(calls(overview)).toHaveLength(1); expect(calls(create)).toHaveLength(0)
+})
+test.each([['es', 404], ['es', 500], ['en', 404], ['en', 500]] as const)('inventory %s/%s does not move wizard focus when retrying the precheck', async (locale, status) => {
+  const copy = locale === 'es' ? es : en
+  let resolve!: (response: Response) => void
+  let checks = 0
+  mock({ [`GET ${tenantUrl}`]: () => errorResponse(status), [`GET ${overview}`]: () => ++checks === 1 ? errorResponse(500) : new Promise<Response>((done) => { resolve = done }) })
+  await open('superadmin', locale)
+  const heading = await screen.findByRole('heading', { name: status === 404 ? copy.inventory.notFound : copy.inventory.error })
+  await waitFor(() => expect(heading).toHaveFocus())
+  await wizard(copy)
+  const name = screen.getByLabelText(copy.name, { exact: true })
+  await waitFor(() => expect(name).toHaveFocus())
+  fireEvent.change(name, { target: { value: 'Organization' } }); fireEvent.click(button(copy.next))
+  const dialog = modal()
+  await within(dialog).findByRole('heading', { name: copy.precheck.error })
+  const next = button(copy.next)
+  await waitFor(() => expect(next).toBeEnabled())
+  next.focus(); fireEvent.click(button(copy.retryPrecheck))
+  expect(next).toHaveFocus()
+  expect(dialog).toContainElement(document.activeElement as HTMLElement)
+  await waitFor(() => expect(calls(overview)).toHaveLength(2))
+  await act(async () => resolve(errorResponse(500)))
+  expect(within(dialog).getByRole('heading', { name: copy.precheck.error })).toBeVisible()
+  expect(next).toHaveFocus()
+  expect(dialog).toContainElement(document.activeElement as HTMLElement)
+  expect(calls(quotas)).toHaveLength(2); expect(calls(create)).toHaveLength(0)
+})
 test.each([403, 404, 500, 0, -1])('catalog %s blocks only the plan step, and retry recovers without exposing private error copy', async (status) => {
   let count = 0
   mock({ [`GET ${plans}`]: () => { if (++count > 1) return Response.json(planList); if (status === -1) return Response.json({ items: [] }); if (!status) throw new TypeError('network'); return errorResponse(status) } })

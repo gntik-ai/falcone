@@ -9,12 +9,13 @@ export function Feedback({ failure, area, retry, close, secondary = null, polite
 }) {
   const { t } = useTranslation('pages.console-tenants-page')
   const panel = useRef<HTMLDivElement>(null)
+  const { status, requestId } = failure
   useEffect(() => {
-    if (polite || failure.status === 401) return
+    if (polite || status === 401) return
     const heading = panel.current?.querySelector('h2')
     if (heading) { heading.tabIndex = -1; heading.classList.add('focus-visible:outline-2', 'focus-visible:outline-offset-2', 'focus-visible:outline-focus-ring'); heading.focus() }
     else panel.current?.focus()
-  }, [failure, polite])
+  }, [area, status, requestId, polite])
   const title = t(`${area}.${failure.status === 403 ? 'noAccess' : failure.status === 404 ? 'notFound' : 'error'}`)
   const message = area === 'submit' && (failure.status === 409 || failure.status === 422)
     ? failure.message || t(failure.status === 409 ? 'conflict' : 'invalidData')

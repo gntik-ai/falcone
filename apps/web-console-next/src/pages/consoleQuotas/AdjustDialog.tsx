@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Field, FieldDescription, FieldLabel, Input, Link, Text, useAnnounce, useToast } from '@gntik-ai/ui'
 import { InlineCallout } from '@gntik-ai/blocks'
@@ -44,8 +44,9 @@ export function AdjustDialog({ target, onClose, onAdjusted }: { target: AdjustTa
     })
     return () => { active = false }
   }, [target.tenantId, attempt, t])
-  useEffect(() => {
-    if (saved !== null || ['plan-error', 'no-plan', 'frozen'].includes(resolution.state)) closeButton.current?.focus()
+  useLayoutEffect(() => {
+    if (resolution.state === 'resolving') panel.current?.focus()
+    else if (saved !== null || ['plan-error', 'no-plan', 'frozen'].includes(resolution.state)) closeButton.current?.focus()
     else if (resolution.state === 'ready') {
       if (confirm) confirmButton.current?.focus()
       else input.current?.focus()
