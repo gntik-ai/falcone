@@ -245,6 +245,23 @@ test('plan resolution errors keep focus inside and retry only the plan request',
   fireEvent.click(screen.getByRole('button', { name: es.retry }))
   expect(await screen.findByRole('spinbutton')).toHaveValue(5); expect(count).toBe(2); expect(calls('GET')).toHaveLength(6)
 })
+test.each([false, true])('retrying a failed plan focuses the resolved spinbutton; delayed=%s', async (delayed) => {
+  const pending = deferred<Response>(); let count = 0
+  setup({ [`GET ${plan}`]: () => ++count === 1 ? response(500) : delayed ? pending.promise : Response.json(tenantPlanReady) }); open(); await ready()
+  fireEvent.click(screen.getAllByRole('button', { name: 'Ajustar cuota de Maximum Workspaces' })[0])
+  expect(await screen.findByText(es.planError)).toBeVisible()
+  const retry = screen.getByRole('button', { name: es.retry })
+  retry.focus(); fireEvent.click(retry)
+  if (delayed) {
+    expect(screen.getByText(es.resolving)).toBeVisible()
+    await waitFor(() => expect(screen.getByRole('dialog', { name: /^Ajustar cuota:/ })).toHaveFocus())
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    await act(async () => pending.resolve(Response.json(tenantPlanReady)))
+  }
+  await waitFor(() => expect(screen.getByRole('spinbutton')).toHaveFocus())
+  expect(screen.getByRole('spinbutton')).toHaveValue(5)
+  expect(count).toBe(2); expect(calls('GET')).toHaveLength(6); expect(puts()).toHaveLength(0)
+})
 test('no tenant sends no requests; a tenant without workspace sends only the tenant pair', async () => {
   context.activeTenantId = null; setup(); const view = open()
   expect(await screen.findByText(es.blocked)).toBeVisible(); expect(calls('GET')).toHaveLength(0)

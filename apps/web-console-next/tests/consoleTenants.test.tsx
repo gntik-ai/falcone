@@ -38,7 +38,7 @@ async function select(label: string, option: string) {
   fireEvent.click(trigger)
   const item = await screen.findByRole('option', { name: option })
   fireEvent.pointerDown(item); fireEvent.click(item)
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+  await waitFor(() => expect(trigger).toHaveFocus())
 }
 async function wizard(copy = es) {
   fireEvent.click(button(copy.create))

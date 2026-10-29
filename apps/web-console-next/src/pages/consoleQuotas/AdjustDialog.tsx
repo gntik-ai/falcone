@@ -55,6 +55,12 @@ export function AdjustDialog({ target, onClose, onAdjusted }: { target: AdjustTa
   const planName = 'name' in resolution ? resolution.name : ''
   const variables = { dimension: target.dimension.displayName, plan: planName, value: limit(saved) }
   function close() { if (!inFlight.current) setOpen(false) }
+  function retryPlan() {
+    // Keep focus on the stable popup while the retry controls unmount, so the
+    // dialog does not schedule focus restoration over the resolved input.
+    panel.current?.focus()
+    setResolution({ state: 'resolving' }); setAttempt((count) => count + 1)
+  }
   function submit(event: FormEvent) {
     event.preventDefault()
     if (inFlight.current || resolution.state !== 'ready') return
@@ -92,7 +98,7 @@ export function AdjustDialog({ target, onClose, onAdjusted }: { target: AdjustTa
           <DialogFooter><Button ref={closeButton} type="button" onClick={close}>{t('close')}</Button></DialogFooter></> :
           resolution.state === 'resolving' ? <Text role="status" aria-live="polite">{t('resolving')}</Text> :
           resolution.state === 'plan-error' ? <><Alert tone="destructive" role="alert" title={t('planError')} description={resolution.message} actions={null} icon={undefined} onDismiss={undefined} dismissLabel={t('close')} />
-            <DialogFooter><Button ref={closeButton} type="button" variant="secondary" onClick={close}>{t('close')}</Button><Button type="button" onClick={() => { setResolution({ state: 'resolving' }); setAttempt((count) => count + 1) }}>{t('retry')}</Button></DialogFooter></> :
+            <DialogFooter><Button ref={closeButton} type="button" variant="secondary" onClick={close}>{t('close')}</Button><Button type="button" onClick={retryPlan}>{t('retry')}</Button></DialogFooter></> :
           resolution.state === 'no-plan' || resolution.state === 'frozen' ? <><Text>{t(resolution.state === 'no-plan' ? 'noPlan' : 'frozen', variables)}</Text>
             <DialogFooter><Button ref={closeButton} type="button" variant="secondary" onClick={close}>{t('close')}</Button>
               <Link href={resolution.state === 'no-plan' ? `/console/tenants/${target.tenantId}/plan` : `/console/plans/${resolution.planId}`} underline="always" external={false} externalLabel="">{t(resolution.state === 'no-plan' ? 'assignPlan' : 'openPlan')}</Link></DialogFooter></> :
