@@ -35,6 +35,7 @@
   "retryPrecheck": "Retry quota check",
   "closeWizard": "Close wizard",
   "close": "Close",
+  "notifications": "Notifications",
   "exit": "Exit",
   "wizardDescription": "Guided creation of an administrative organization.",
   "nameStep": "Name",

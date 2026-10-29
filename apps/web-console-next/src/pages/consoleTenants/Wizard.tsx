@@ -79,7 +79,7 @@ export function Wizard({ blockedReason, allowed, superadmin, close, trigger, pre
   return <Dialog open={open} modal={true} disablePointerDismissal={busy} onOpenChange={(nextOpen, event) => { if (!nextOpen && inFlight.current) event.cancel(); else setOpen(nextOpen) }}
     onOpenChangeComplete={(nextOpen) => { if (!nextOpen) close() }}>
     <DialogContent ref={panel} size="xl" presentation="fullscreen" showClose={false} closeLabel={t('closeWizard')} container={undefined}
-      initialFocus={() => stepBody.current?.querySelector<HTMLElement>('input, button') ?? panel.current} finalFocus={() => trigger.current} className="min-w-0 wrap-anywhere">
+      initialFocus={() => stepBody.current?.querySelector<HTMLElement>('input, button') ?? panel.current} finalFocus={() => trigger.current} className="console-tenants-portal min-w-0 wrap-anywhere">
       <DialogHeader><DialogTitle>{t('create')}</DialogTitle><DialogDescription>{t('wizardDescription')}</DialogDescription></DialogHeader>
       <DialogBody className="min-w-0 space-y-5">
         {!allowed ? <NoAccessEmpty resource={t('create')} owner="" showRequestAccess={false} onRequestAccess={undefined} defaultRequested={false} action={undefined} titleAs="h2" bordered={false}

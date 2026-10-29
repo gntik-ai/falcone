@@ -61,6 +61,7 @@ test.each(['es', 'en'] as const)('inventory and truncation use shell data with s
   mock({ [`GET ${tenantUrl}`]: { items: tenants, page: { after: 'next' } } })
   await open('superadmin', locale)
   await screen.findByRole('table')
+  expect(await screen.findByRole('region', { name: copy.notifications })).toBeInTheDocument()
   expect(screen.getByText(`3+ ${locale === 'es' ? 'organizaciones' : 'organizations'}`)).toBeVisible()
   expect(screen.getByText(copy.truncatedNote.replace('{count}', '3'))).toBeVisible()
   expect(screen.getAllByRole('rowheader')).toHaveLength(3)

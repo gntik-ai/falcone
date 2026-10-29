@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Badge, Button, I18nProvider, Link, LiveAnnouncer, Page, StatusTag, Text, Toaster, ToastProvider, useAnnounce } from '@gntik-ai/ui'
@@ -100,9 +100,26 @@ function TenantInventory() {
     {wizard && <Wizard blockedReason={blockedReason} allowed={allowed} superadmin={superadmin} close={() => setWizard(false)} trigger={trigger} precheck={precheck} retryPrecheck={() => setCheckAttempt((value) => value + 1)} />}
   </Page>
 }
+function LocalizedToaster() {
+  const { t } = useTranslation('pages.console-tenants-page')
+  const [container, setContainer] = useState<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    // Kit 0.11.0 exposes the close label but no toast viewport label prop.
+    if (!container) return
+    const translate = () => {
+      const viewport = container.querySelector('[role="region"]')
+      if (viewport && viewport.getAttribute('aria-label') !== t('notifications')) viewport.setAttribute('aria-label', t('notifications'))
+    }
+    translate()
+    const observer = new MutationObserver(translate)
+    observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label'] })
+    return () => observer.disconnect()
+  }, [container, t])
+  return <><div ref={setContainer} className="console-tenants-portal" />{container && <Toaster closeLabel={t('close')} container={container} className="console-tenants-portal" />}</>
+}
 export default function ConsoleTenantsPage() {
-  const { i18n: language, t } = useTranslation('pages.console-tenants-page')
-  return <I18nProvider locale={language.language}><LiveAnnouncer><ToastProvider timeout={5000} limit={3}>
-    <TenantInventory /><Toaster closeLabel={t('close')} />
+  const { i18n: language } = useTranslation('pages.console-tenants-page')
+  return <I18nProvider locale={language.language}><LiveAnnouncer className="console-tenants-portal"><ToastProvider timeout={5000} limit={3}>
+    <TenantInventory /><LocalizedToaster />
   </ToastProvider></LiveAnnouncer></I18nProvider>
 }
