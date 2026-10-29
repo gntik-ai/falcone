@@ -63,9 +63,15 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await parity.page.keyboard.press('Enter');
         await expect(parity.page).toHaveURL(/\/console\/my-plan$/);
       }
+      const beforeRefresh = parity.network.requests.length;
       await open(parity, 'workspace-consumption.401-refresh-ok');
       await expect(surface(parity).getByRole('table')).toBeVisible();
-      expect(parity.network.requests.filter((request) => request.method === 'POST')).toEqual([
+      const refreshed = parity.network.requests.slice(beforeRefresh);
+      expect(refreshed.filter((request) => request.path.endsWith('/consumption'))).toEqual([
+        { method: 'GET', path, body: undefined },
+        { method: 'GET', path, body: undefined },
+      ]);
+      expect(refreshed.filter((request) => request.method === 'POST')).toEqual([
         { method: 'POST', path: '/v1/auth/login-sessions/synthetic-session/refresh', body: { refreshToken: 'synthetic-refresh-token' } },
       ]);
     });
@@ -86,10 +92,18 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.page.goto(server.url(manifest.route.slice(1)));
       await expect(surface(parity).getByRole('status', { name: copy.loading, exact: true })).toBeVisible();
       await expect(surface(parity).getByRole('table')).toBeVisible();
-      const before = parity.network.requests.filter((request) => request.method === 'POST').length;
-      await parity.open(manifest.route, { workspaceConsumption: 'workspace-consumption.401-refresh-fail', refresh: '401' });
+      const before = parity.network.requests.length;
+      parity.network.setVariants({ workspaceConsumption: 'workspace-consumption.401-refresh-fail', refresh: '401' });
+      // Failed refresh removes the shell, so wait for login rather than shell readiness.
+      await parity.page.goto(server.url(manifest.route.slice(1)));
       await expect(parity.page).toHaveURL(/\/login$/);
-      expect(parity.network.requests.filter((request) => request.method === 'POST')).toHaveLength(before + 1);
+      const rejected = parity.network.requests.slice(before);
+      expect(rejected.filter((request) => request.path.endsWith('/consumption'))).toEqual([
+        { method: 'GET', path, body: undefined },
+      ]);
+      expect(rejected.filter((request) => request.method === 'POST')).toEqual([
+        { method: 'POST', path: '/v1/auth/login-sessions/synthetic-session/refresh', body: { refreshToken: 'synthetic-refresh-token' } },
+      ]);
       expect(await parity.page.evaluate(() => sessionStorage.getItem('in-falcone.console-shell-session'))).toBeNull();
       expect(await parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(manifest.route);
     });
