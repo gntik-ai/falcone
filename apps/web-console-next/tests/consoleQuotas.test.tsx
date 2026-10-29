@@ -7,7 +7,9 @@ import { login, renderWithSession, strictFetch } from './shell-support'
 import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-quotas-page.json'
 import en from '../src/locales/en/pages.console-quotas-page.json'
-import { overviewTenant, overviewWorkspace, quotasTenant, quotasWorkspace, tenantPlanReady } from './parity/pages/console-quotas-page.manifest'
+import { overviewTenant, overviewWorkspace, quotaEndpoints, quotasTenant, quotasWorkspace, tenantPlanReady } from './parity/pages/console-quotas-page.manifest'
+import { createEndpointRegistry } from './parity/endpoint-registry'
+import { endpoints, responseFor } from './parity/fixtures/shell'
 
 const context = vi.hoisted(() => ({ activeTenantId: 'synthetic-tenant' as string | null, activeWorkspaceId: 'synthetic-workspace' as string | null,
   loading: false, tenants: [{ tenantId: 'synthetic-tenant', displayName: 'Synthetic Organization' }] }))
@@ -45,6 +47,30 @@ async function review(value = '500') {
 async function confirm() { fireEvent.click(screen.getByRole('button', { name: es.confirm })) }
 function response(status: number, code = `HTTP_${status}`) { return Response.json({ code, message: 'synthetic-error', requestId: 'req_synthetic_quotas' }, { status }) }
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((done) => { resolve = done }); return { promise, resolve } }
+
+test('the parity registry serves every request from loading through a confirmed save and reload', async () => {
+  const registry = createEndpointRegistry(endpoints, (name, variant, role) => responseFor(name, variant as Parameters<typeof responseFor>[1], role), quotaEndpoints)
+  const pageRequests = [
+    ['GET', `${tenant}/quotas`], ['GET', `${tenant}/overview`],
+    ['GET', `${workspace}/quotas`], ['GET', `${workspace}/overview`],
+    ['GET', plan], ['PUT', put],
+  ]
+  setup(Object.fromEntries(pageRequests.map(([method, path]) => [`${method} ${path}`, () => {
+    const name = registry.find(method, path)
+    expect(name, `${method} ${path} must match a parity fixture`).toBeDefined()
+    const fixture = registry.responseFor(name!, 'superadmin', method === 'PUT' ? { value: 500 } : undefined)
+    return Response.json(fixture.body, { status: fixture.status })
+  }])))
+  open(); await review(); expect(puts()).toHaveLength(0); await confirm()
+  fireEvent.click(await screen.findByRole('button', { name: es.close }))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Ajustar cuota:/ })).not.toBeInTheDocument())
+  await ready()
+  expect(puts()).toHaveLength(1)
+  expect(calls('GET').map(([path]) => path)).toEqual([
+    `${tenant}/quotas`, `${tenant}/overview`, `${workspace}/quotas`, `${workspace}/overview`, plan,
+    `${tenant}/quotas`, `${tenant}/overview`, `${workspace}/quotas`, `${workspace}/overview`,
+  ])
+})
 
 test.each(['es', 'en'] as const)('renders both semantic tables, localized timestamp, levels and copy in %s', async (locale) => {
   await i18n.changeLanguage(locale); setup(); open(); await ready()

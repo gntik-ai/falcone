@@ -112,7 +112,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await open(parity);
       if (role !== 'superadmin') {
         await expect(surface(parity).getByRole('columnheader', { name: copy.action, exact: true })).toHaveCount(0);
-        await expect(surface(parity).getByRole('button', { name: copy.adjust, exact: true })).toHaveCount(0);
+        await expect(surface(parity).locator('button[data-quota-adjust-trigger]')).toHaveCount(0);
         for (let index = 0; index < 40; index++) await parity.page.keyboard.press('Tab');
         expect(puts(parity)).toHaveLength(0); allowlist(parity); return;
       }
@@ -125,7 +125,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await button(parity, copy.save).click(); await button(parity, copy.confirm).click();
       await expect(button(parity, copy.close)).toBeVisible();
       expect(puts(parity)).toEqual([{ method: 'PUT', path: '/v1/plans/synthetic-plan/limits/max_workspaces', body: { value: 500 } }]);
-      await expect(surface(parity).getByRole('table')).toHaveCount(2); await close(parity, copy);
+      await close(parity, copy); await expect(surface(parity).getByRole('table')).toHaveCount(2);
       expect(parity.network.requests.filter((request) => request.path === '/v1/metrics/tenants/synthetic-tenant/quotas')).toHaveLength(2);
       for (const variant of ['tenant-plan-draft', 'tenant-plan-deprecated', 'tenant-plan-archived']) {
         await open(parity, { 'quotas.plan': variant });
@@ -141,8 +141,8 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       }
       await open(parity, { 'quotas.tenant': ['success', 'quotas-tenant-after-unlimited'], 'quotas.put': 'plan-limit-put-unlimited-ok' });
       await review(parity, copy, '-1'); await button(parity, copy.confirm).click(); await expect(button(parity, copy.close)).toBeVisible();
-      await expect(surface(parity).getByRole('table').first().getByRole('row').filter({ has: parity.page.getByRole('rowheader', { name: 'Maximum Workspaces', exact: true }) })).toContainText(copy.unlimited);
       await close(parity, copy);
+      await expect(surface(parity).getByRole('table').first().getByRole('row').filter({ has: parity.page.getByRole('rowheader', { name: 'Maximum Workspaces', exact: true }) })).toContainText(copy.unlimited);
       for (const variant of ['plan-limit-put-slow', 'plan-limit-put-slow-500']) {
         await open(parity, { 'quotas.put': variant }); await review(parity, copy); await button(parity, copy.confirm).click();
         const before = puts(parity).length;
@@ -233,7 +233,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await target.click(); await expect(surface(parity).getByRole('table')).toHaveCount(2); await check.assertRuntimeHealth(parity);
       }
       await open(parity); await check.assertRuntimeHealth(parity);
-      await withRole(parity, server, ['platform_operator']); await expect(surface(parity).getByRole('button', { name: copy.adjust, exact: true })).toHaveCount(9);
+      await withRole(parity, server, ['platform_operator']); await expect(surface(parity).locator('button[data-quota-adjust-trigger]')).toHaveCount(9);
       await withRole(parity, server, ['member']); await expect(surface(parity).getByRole('columnheader', { name: copy.action, exact: true })).toHaveCount(0);
       await check.assertRuntimeHealth(parity); allowlist(parity);
     });

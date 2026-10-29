@@ -20,7 +20,7 @@ const ok = (body: unknown) => ({ status: 200, body })
 const error = (status: number, code = `HTTP_${status}`) => ({ status, body: { code, message: 'synthetic-error', requestId: `req_synthetic_quotas_${status}` } })
 const tenantOk = ok(quotasTenant)
 export const quotaEndpoints: Record<string, PageEndpoint> = {
-  'quotas.tenant': { method: 'GET', path: '/v1/metrics/tenants/{id}/quotas', fixtures: {
+  'quotas.tenant': { method: 'GET', path: '/v1/metrics/tenants/synthetic-tenant/quotas', fixtures: {
     success: tenantOk, 'quotas-tenant': tenantOk, empty: ok({ dimensions: [] }), 'quotas-empty': ok({ dimensions: [] }),
     'quotas-delayed': { ...tenantOk, delayMs: 1500 },
     'quotas-tenant-after-unlimited': ok({ ...quotasTenant, dimensions: quotasTenant.dimensions!.map((row, index) => index ? row : { ...row, hardLimit: null, policyMode: 'unbounded' }) }),
@@ -28,13 +28,13 @@ export const quotaEndpoints: Record<string, PageEndpoint> = {
     'quotas-401': error(401), 'quotas-403': error(403), 'quotas-404': error(404), 'quotas-500': error(500), 'quotas-network': { network: true },
     'quotas-500-then-ok': [error(500), tenantOk],
   } },
-  'quotas.tenantOverview': { method: 'GET', path: '/v1/metrics/tenants/{id}/overview', fixtures: {
+  'quotas.tenantOverview': { method: 'GET', path: '/v1/metrics/tenants/synthetic-tenant/overview', fixtures: {
     success: ok(overviewTenant), 'overview-tenant': ok(overviewTenant),
     ...Object.fromEntries(['healthy', 'hard_limit_reached', 'soft_limit_exceeded', 'evidence_degraded', 'evidence_unavailable', 'unbounded'].map((overallPosture) => [overallPosture, ok({ ...overviewTenant, overallPosture })])),
   } },
-  'quotas.workspace': { method: 'GET', path: '/v1/metrics/workspaces/{id}/quotas', fixtures: { success: ok(quotasWorkspace), 'quotas-workspace': ok(quotasWorkspace), empty: ok({ dimensions: [] }), '404': error(404), '500': error(500) } },
-  'quotas.workspaceOverview': { method: 'GET', path: '/v1/metrics/workspaces/{id}/overview', fixtures: { success: ok(overviewWorkspace), 'overview-workspace': ok(overviewWorkspace) } },
-  'quotas.plan': { method: 'GET', path: '/v1/tenants/{id}/plan', fixtures: {
+  'quotas.workspace': { method: 'GET', path: '/v1/metrics/workspaces/synthetic-workspace/quotas', fixtures: { success: ok(quotasWorkspace), 'quotas-workspace': ok(quotasWorkspace), empty: ok({ dimensions: [] }), '404': error(404), '500': error(500) } },
+  'quotas.workspaceOverview': { method: 'GET', path: '/v1/metrics/workspaces/synthetic-workspace/overview', fixtures: { success: ok(overviewWorkspace), 'overview-workspace': ok(overviewWorkspace) } },
+  'quotas.plan': { method: 'GET', path: '/v1/tenants/synthetic-tenant/plan', fixtures: {
     success: ok(tenantPlanReady), 'tenant-plan-ready': ok(tenantPlanReady),
     'tenant-plan-draft': ok({ ...tenantPlanReady, plan: { ...tenantPlanReady.plan, status: 'draft' } }),
     ...Object.fromEntries(['deprecated', 'archived', 'frozen'].map((state) => [`tenant-plan-${state}`, ok({ ...tenantPlanReady, plan: { ...tenantPlanReady.plan, status: state === 'frozen' ? 'deprecated' : state } })])),
@@ -42,7 +42,7 @@ export const quotaEndpoints: Record<string, PageEndpoint> = {
     'tenant-plan-500': error(500), 'tenant-plan-500-then-ready': [error(500), ok(tenantPlanReady)],
     'tenant-plan-delayed': { ...ok(tenantPlanReady), delayMs: 1500 }, 'tenant-plan-delayed-then-500': { ...error(500), delayMs: 1500 },
   } },
-  'quotas.put': { method: 'PUT', path: '/v1/plans/{id}/limits/{dimension}', fixtures: {
+  'quotas.put': { method: 'PUT', path: '/v1/plans/synthetic-plan/limits/max_workspaces', fixtures: {
     success: (_role, body) => ok({ planId: 'synthetic-plan', dimensionKey: 'max_workspaces', newValue: (body as { value: number }).value, source: 'explicit' }),
     'plan-limit-put-ok': ok({ newValue: 500 }), 'plan-limit-put-unlimited-ok': ok({ newValue: -1 }),
     'plan-limit-put-slow': { ...ok({ newValue: 500 }), delayMs: 2000 }, 'plan-limit-put-slow-500': { ...error(500), delayMs: 2000 },
