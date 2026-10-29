@@ -71,13 +71,71 @@ test.each(['es', 'en'] as const)('inventory and truncation use shell data with s
   expect(calls(quotas)).toHaveLength(1); expect(calls(overview)).toHaveLength(1)
 })
 test('operator activates rows, disables the active action and announces the new context', async () => {
-  mock(); await open('platform_operator')
-  await screen.findByRole('table')
-  fireEvent.click(screen.getByRole('button', { name: es.useActiveName.replace('{name}', 'Beta') }))
+  let resolve!: (response: Response) => void
+  mock({ [`GET ${workspaceUrl('t2')}`]: () => new Promise<Response>((done) => { resolve = done }) })
+  await open('platform_operator')
+  const table = await screen.findByRole('table')
+  const action = screen.getByRole('button', { name: es.useActiveName.replace('{name}', 'Beta') })
+  action.focus(); fireEvent.click(action)
+  await waitFor(() => expect(calls(workspaceUrl('t2'))).toHaveLength(1))
   await waitFor(() => expect(screen.getByRole('button', { name: es.alreadyActive.replace('{name}', 'Beta') })).toBeDisabled())
   await waitFor(() => expect(screen.getByRole('row', { current: true })).toHaveTextContent('Beta'))
+  expect(screen.getByRole('table')).toBe(table)
+  expect(screen.getByText('3 organizaciones')).toBeVisible()
+  expect(screen.queryByRole('status', { name: es.loading })).not.toBeInTheDocument()
+  expect(action).toHaveFocus()
   expect(screen.getAllByText(es.activated.replace('{name}', 'Beta')).length).toBeGreaterThan(0)
   expect(screen.queryByRole('link', { name: es.openPlan })).not.toBeInTheDocument()
+  await act(async () => resolve(Response.json({ items: [] })))
+  expect(screen.getByRole('table')).toBe(table)
+  expect(action).toHaveFocus()
+})
+test('the skeleton ends at the tenant result even while the first workspace request is pending', async () => {
+  let resolveTenants!: (response: Response) => void
+  let resolveWorkspaces!: (response: Response) => void
+  mock({
+    [`GET ${tenantUrl}`]: () => new Promise<Response>((done) => { resolveTenants = done }),
+    [`GET ${workspaceUrl('t1')}`]: () => new Promise<Response>((done) => { resolveWorkspaces = done }),
+  })
+  await open()
+  expect(screen.getByRole('status', { name: es.loading })).toBeVisible()
+  expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  await act(async () => resolveTenants(Response.json({ items: [tenants[0]], page: { after: null } })))
+  await waitFor(() => expect(calls(workspaceUrl('t1'))).toHaveLength(1))
+  const table = screen.getByRole('table')
+  expect(screen.getByText('1 organización')).toBeVisible()
+  expect(screen.queryByRole('status', { name: es.loading })).not.toBeInTheDocument()
+  await act(async () => resolveWorkspaces(Response.json({ items: [] })))
+  expect(screen.getByRole('table')).toBe(table)
+})
+test('successful create keeps the inventory mounted through the tenant reload and workspace resolution', async () => {
+  let resolveTenants!: (response: Response) => void
+  let resolveWorkspaces!: (response: Response) => void
+  let lists = 0
+  mock({
+    [`GET ${tenantUrl}`]: () => ++lists === 1 ? Response.json({ items: tenants, page: { after: null } }) : new Promise<Response>((done) => { resolveTenants = done }),
+    [`GET ${workspaceUrl('t1')}`]: () => new Promise<Response>((done) => { resolveWorkspaces = done }),
+  })
+  await open()
+  const table = await screen.findByRole('table')
+  await summary(); fireEvent.click(button(es.createTenant))
+  await screen.findByRole('link', { name: es.openCreated })
+  await waitFor(() => expect(calls(tenantUrl)).toHaveLength(2))
+  expect(table).toBeInTheDocument()
+  fireEvent.click(button(es.exit))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: es.create })).not.toBeInTheDocument())
+  await waitFor(() => expect(button(es.create)).toHaveFocus())
+  expect(screen.getByRole('table')).toBe(table)
+  expect(screen.getByText('3 organizaciones')).toBeVisible()
+  await act(async () => resolveTenants(Response.json({ items: [tenants[0]], page: { after: null } })))
+  await waitFor(() => expect(calls(workspaceUrl('t1'))).toHaveLength(1))
+  expect(screen.getByRole('table')).toBe(table)
+  expect(screen.getByText('1 organización')).toBeVisible()
+  expect(screen.queryByRole('status', { name: es.loading })).not.toBeInTheDocument()
+  expect(button(es.create)).toHaveFocus()
+  await act(async () => resolveWorkspaces(Response.json({ items: [] })))
+  expect(screen.getByRole('table')).toBe(table)
+  expect(button(es.create)).toHaveFocus()
 })
 test('restricted roles still run the precheck and can open the blocked wizard without fetching plans', async () => {
   mock(); await open('tenant_owner')

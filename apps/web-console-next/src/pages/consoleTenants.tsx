@@ -46,6 +46,8 @@ function TenantInventory() {
   const [checkAttempt, setCheckAttempt] = useState(0)
   const checkRequest = useRef<{ attempt: number; promise: ReturnType<typeof checkPlatformQuotas> } | null>(null)
   const truncated = Boolean(context.tenantsPageInfo?.after)
+  // Shell loading also covers workspace resolution; keep a resolved inventory mounted.
+  const inventoryLoading = context.loading && context.tenantsPageInfo == null && !context.tenantsError && context.tenants.length === 0
   useEffect(() => {
     let cancelled = false
     setPrecheck(null)
@@ -60,7 +62,7 @@ function TenantInventory() {
       if (context.tenants[index]?.tenantId === context.activeTenantId) row.setAttribute('aria-current', 'true')
       else row.removeAttribute('aria-current')
     })
-  }, [context.tenants, context.activeTenantId, context.loading])
+  }, [context.tenants, context.activeTenantId, inventoryLoading])
   function activate(tenant: Tenant) {
     context.selectTenant(tenant.tenantId)
     announce(t('activated', { name: tenant.displayName || tenant.slug || tenant.tenantId }), 'polite')
@@ -81,11 +83,11 @@ function TenantInventory() {
     <PageToolbar search="" defaultSearch="" onSearchChange={undefined} searchLabel={t('inventory.title')} searchPlaceholder={t('inventory.title')} views={[]} view="" defaultView="" onViewChange={undefined}
       primaryAction={null} aria-label={t('inventory.title')} className="console-tenants-toolbar min-w-0"
       filters={<div className="flex min-w-0 flex-wrap items-center justify-between gap-4"><div><h2 className="font-medium">{t('inventory.title')}</h2>
-        {inventory && !context.loading && !error && <Text variant="supporting" tone="muted">{truncated ? t('truncatedCount', { count: context.tenants.length }) : t('count', { count: context.tenants.length })}</Text>}</div>
+        {inventory && !inventoryLoading && !error && <Text variant="supporting" tone="muted">{truncated ? t('truncatedCount', { count: context.tenants.length }) : t('count', { count: context.tenants.length })}</Text>}</div>
         <Button ref={trigger} type="button" variant="primary" onClick={() => setWizard(true)}>{t('create')}</Button></div>} />
     {!inventory ? <NoAccessEmpty resource={t('title')} owner="" showRequestAccess={false} onRequestAccess={undefined} defaultRequested={false} action={{ label: t('myPlan'), href: '/console/my-plan' }} titleAs="h2" bordered={false}
       labels={{ title: () => t('restricted'), description: () => t('restrictedDescription'), request: '', requested: '', sent: '' }} />
-      : context.loading ? <div role="status" aria-label={t('loading')} aria-busy={true}><div aria-hidden={true}><TableSkeleton rows={4} columns={4} label={t('loading')} className="min-w-0" /></div></div>
+      : inventoryLoading ? <div role="status" aria-label={t('loading')} aria-busy={true}><div aria-hidden={true}><TableSkeleton rows={4} columns={4} label={t('loading')} className="min-w-0" /></div></div>
         : error ? <Feedback failure={error} area="inventory" retry={reload} close={null} secondary={error.status === 404 ? <Link render={<RouterLink to="/console/overview" />} underline="always" external={false} externalLabel="">{t('overview')}</Link> : null} />
           : context.tenants.length ? <>
             <div ref={table} className="console-tenants-table min-w-0 max-w-full">

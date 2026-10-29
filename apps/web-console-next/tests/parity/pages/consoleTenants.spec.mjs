@@ -192,14 +192,19 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       p.testRole = 'superadmin'; await open(p);
       await expect(p.page.getByRole('row').and(p.page.locator('[aria-current="true"]'))).toContainText('Alpha');
       let selectionAtNavigation;
+      await p.page.exposeFunction('captureTenantSelection', (selection) => { selectionAtNavigation = selection; });
+      await p.page.evaluate(() => {
+        // Document bubbling follows React's activation handler and precedes document navigation.
+        document.addEventListener('click', () => {
+          void window.captureTenantSelection(JSON.parse(localStorage.getItem('in-falcone.console-active-context')));
+        }, { once: true });
+      });
       await p.page.route((url) => url.pathname === '/console/tenants/t2/plan', async (route) => {
-        // Capture activation before the destination document's harness init script clears storage.
-        selectionAtNavigation = await p.page.evaluate(() => JSON.parse(localStorage.getItem('in-falcone.console-active-context')));
         await route.fulfill({ contentType: 'text/html', body: `<html lang="${locale}"><body><main><h1>Beta</h1></main></body></html>` });
       });
       await p.page.getByRole('link', { name: copy(p).openPlanName.replace('{name}', 'Beta'), exact: true }).click();
       await expect(p.page).toHaveURL(/\/console\/tenants\/t2\/plan$/);
-      expect(selectionAtNavigation).toMatchObject({ tenantId: 't2', workspaceId: null });
+      await expect.poll(() => selectionAtNavigation).toMatchObject({ tenantId: 't2', workspaceId: null });
     });
     test('error-empty', async ({ parity: p }) => {
       test.setTimeout(180_000);
