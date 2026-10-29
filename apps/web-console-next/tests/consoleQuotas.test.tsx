@@ -245,16 +245,20 @@ test('plan resolution errors keep focus inside and retry only the plan request',
   fireEvent.click(screen.getByRole('button', { name: es.retry }))
   expect(await screen.findByRole('spinbutton')).toHaveValue(5); expect(count).toBe(2); expect(calls('GET')).toHaveLength(6)
 })
-test.each([false, true])('retrying a failed plan focuses the resolved spinbutton; delayed=%s', async (delayed) => {
+test.each([['es', false], ['es', true], ['en', false], ['en', true]] as const)('retrying a failed plan focuses the resolved spinbutton in %s; delayed=%s', async (locale, delayed) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
   const pending = deferred<Response>(); let count = 0
   setup({ [`GET ${plan}`]: () => ++count === 1 ? response(500) : delayed ? pending.promise : Response.json(tenantPlanReady) }); open(); await ready()
-  fireEvent.click(screen.getAllByRole('button', { name: 'Ajustar cuota de Maximum Workspaces' })[0])
-  expect(await screen.findByText(es.planError)).toBeVisible()
-  const retry = screen.getByRole('button', { name: es.retry })
+  fireEvent.click(screen.getAllByRole('button', { name: copy.adjustName.replace('{dimension}', 'Maximum Workspaces') })[0])
+  expect(await screen.findByText(copy.planError)).toBeVisible()
+  const dialog = screen.getByRole('dialog')
+  const retry = screen.getByRole('button', { name: copy.retry })
   retry.focus(); fireEvent.click(retry)
+  // Focus must leave the retry control before it unmounts, even for an immediate response.
+  expect(dialog).toHaveFocus()
   if (delayed) {
-    expect(screen.getByText(es.resolving)).toBeVisible()
-    await waitFor(() => expect(screen.getByRole('dialog', { name: /^Ajustar cuota:/ })).toHaveFocus())
+    expect(screen.getByText(copy.resolving)).toBeVisible()
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
     await act(async () => pending.resolve(Response.json(tenantPlanReady)))
   }
