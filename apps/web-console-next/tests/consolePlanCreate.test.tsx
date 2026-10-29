@@ -126,7 +126,7 @@ test.each([500, 'network'] as const)('only explicit retry resends after %s, with
   mock(() => { if (kind === 'network') throw new TypeError('PRIVATE_MARKER'); return errorResponse(500, { requestId: 'req_synthetic' }) })
   open(); await fill(); submit()
   await screen.findByRole('heading', { name: es.errorTitle })
-  expect(screen.getByTestId('error-panel')).toHaveFocus()
+  await waitFor(() => expect(screen.getByTestId('error-panel')).toHaveFocus())
   expect(screen.getByRole('button', { name: es.create })).toBeDisabled()
   if (kind === 'network') {
     expect(screen.getByText(es.outcomeUnknown)).toBeVisible()

@@ -1,0 +1,5 @@
+/* Resource-index has no search in the legacy tenant inventory. */
+.console-tenants-toolbar div:has(> input[type="search"]) { display: none; }
+.console-tenants-toolbar > div:first-child { display: block; flex-basis: 100%; }
+.console-tenants-toolbar > div:last-child { display: none; }
+.console-tenants-table [role="rowheader"] { font-weight: var(--font-weight-medium); }
