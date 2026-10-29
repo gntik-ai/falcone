@@ -18,6 +18,10 @@ import './consoleTenants/page.css'
 i18n.addResourceBundle('es', 'pages.console-tenants-page', es)
 i18n.addResourceBundle('en', 'pages.console-tenants-page', en)
 
+function deriveUtilizationPercent(limit: number, used: number) {
+  if (limit <= 0) return used > 0 ? 100 : 0
+  return Math.round((used / limit) * 1000) / 10
+}
 function tenantStatus(tenant: Tenant) {
   const governance = tenant.governance?.governanceStatus ?? tenant.quotaProfile?.governanceStatus
   if (tenant.state === 'suspended' || tenant.state === 'deleted') return { key: tenant.state, tone: 'destructive' as const }
@@ -26,7 +30,7 @@ function tenantStatus(tenant: Tenant) {
   const quotas = tenant.quotaProfile?.limits ?? []
   const exhausted = quotas.some((limit) => limit.remaining <= 0 || (limit.limit > 0 && limit.used >= limit.limit))
   if (exhausted) return { key: 'blocked', tone: 'destructive' as const }
-  if (governance === 'warning' || quotas.some((limit) => typeof limit.limit === 'number' && limit.limit > 0 && typeof limit.used === 'number' && limit.used / limit.limit >= .8) || ['pending', 'in_progress', 'partially_failed'].includes(tenant.provisioning?.status ?? '')) return { key: governance === 'warning' ? 'warning' : 'attention', tone: 'warning' as const }
+  if (governance === 'warning' || quotas.some((limit) => deriveUtilizationPercent(limit.limit, limit.used) >= 80) || ['pending', 'in_progress', 'partially_failed'].includes(tenant.provisioning?.status ?? '')) return { key: governance === 'warning' ? 'warning' : 'attention', tone: 'warning' as const }
   return { key: 'operational', tone: 'success' as const }
 }
 function TenantInventory() {

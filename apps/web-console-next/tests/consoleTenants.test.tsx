@@ -70,6 +70,24 @@ test.each(['es', 'en'] as const)('inventory and truncation use shell data with s
   expect(calls(tenantUrl)).toHaveLength(1); expect(calls(plans)).toHaveLength(0)
   expect(calls(quotas)).toHaveLength(1); expect(calls(overview)).toHaveLength(1)
 })
+test.each([
+  [7994, 10000, 2006, 'operational'],
+  [7995, 10000, 2005, 'attention'],
+  [7996, 10000, 2004, 'attention'],
+  [7999, 10000, 2001, 'attention'],
+  [8000, 10000, 2000, 'attention'],
+  [10000, 10000, 0, 'blocked'],
+  [1, 0, 1, 'attention'],
+  [1, -1, 1, 'attention'],
+  [0, 0, 1, 'operational'],
+  [0, -1, 1, 'operational'],
+  [1, 0, 0, 'blocked'],
+] as const)('quota status with used %i, limit %i and remaining %i follows legacy utilization as %s', async (used, limit, remaining, status) => {
+  mock({ [`GET ${tenantUrl}`]: { items: [{ ...tenants[0], quotaProfile: { limits: [{ metricKey: 'storage', scope: 'tenant', used, limit, remaining }] } }], page: { after: null } } })
+  await open()
+  const table = await screen.findByRole('table')
+  expect(within(table).getByText(es.status[status], { exact: true })).toBeVisible()
+})
 test('operator activates rows, disables the active action and announces the new context', async () => {
   let resolve!: (response: Response) => void
   mock({ [`GET ${workspaceUrl('t2')}`]: () => new Promise<Response>((done) => { resolve = done }) })
