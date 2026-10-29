@@ -234,6 +234,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await open(p, { 'tenants.create': status }); await summary(p); await button(p, 'createTenant').click();
         await expect(p.page.getByRole('dialog', { name: copy(p).create, exact: true }).getByRole('heading', { name: status === '403' ? copy(p).submit.noAccess : status === '404' ? copy(p).submit.notFound : copy(p).submit.error, exact: true })).toBeVisible();
         await expect(p.page.getByText(tenantBody.name, { exact: true })).toBeVisible();
+        if (status === '409' || status === '422') {
+          await expect(p.page.getByRole('dialog', { name: copy(p).create, exact: true }).getByText('PRIVATE_MARKER', { exact: true })).toBeVisible();
+          await expect(p.page.getByText(copy(p)[status === '409' ? 'conflict' : 'invalidData'], { exact: true })).toHaveCount(0);
+        }
         if (status === '403' || status === '404') await button(p, 'closeWizard').click(); else await button(p, 'exit').click();
         await expect(button(p, 'create')).toBeFocused();
       }

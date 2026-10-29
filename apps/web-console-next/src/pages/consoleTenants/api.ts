@@ -3,10 +3,11 @@ import { ensureConsoleSession, refreshConsoleShellSession, requestConsoleSession
 
 export interface TenantBody { name: string; planId: string; region: string; preferences: { locale: string } }
 export interface ActivePlan { id: string; slug: string; displayName: string }
-export type Failure = { status?: number; requestId?: string; renewed?: boolean }
+export type Failure = { status?: number; requestId?: string; renewed?: boolean; message?: string }
 export function failureOf(cause: unknown): Failure {
   const error = (cause && typeof cause === 'object' ? cause : {}) as Partial<ApiError> & { renewed?: boolean }
-  return { status: typeof error.status === 'number' ? error.status : undefined, requestId: typeof error.requestId === 'string' ? error.requestId : '', renewed: error.renewed === true }
+  return { status: typeof error.status === 'number' ? error.status : undefined, requestId: typeof error.requestId === 'string' ? error.requestId : '', renewed: error.renewed === true,
+    message: (error.status === 409 || error.status === 422) && typeof error.message === 'string' ? error.message : undefined }
 }
 export async function listActivePlans() {
   const response = await requestConsoleSessionJson<{ items?: ActivePlan[]; plans?: ActivePlan[] }>('/v1/plans?status=active&page=1&pageSize=100', { method: 'GET' })

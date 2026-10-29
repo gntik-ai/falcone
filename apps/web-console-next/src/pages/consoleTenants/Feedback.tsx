@@ -16,7 +16,9 @@ export function Feedback({ failure, area, retry, close, secondary = null, polite
     else panel.current?.focus()
   }, [failure, polite])
   const title = t(`${area}.${failure.status === 403 ? 'noAccess' : failure.status === 404 ? 'notFound' : 'error'}`)
-  const message = t(failure.status === 409 ? 'conflict' : failure.status === 422 ? 'invalidData' : `${area}.description`)
+  const message = area === 'submit' && (failure.status === 409 || failure.status === 422)
+    ? failure.message || t(failure.status === 409 ? 'conflict' : 'invalidData')
+    : t(failure.status === 409 ? 'conflict' : failure.status === 422 ? 'invalidData' : `${area}.description`)
   if (failure.status === 401) return failure.renewed ? <Text role="status">{t('sessionRenewed')}</Text> : null
   return <div ref={panel} tabIndex={-1} role={polite ? 'status' : 'region'} aria-label={title} aria-live={polite ? 'polite' : undefined}
     className="min-w-0 space-y-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring">

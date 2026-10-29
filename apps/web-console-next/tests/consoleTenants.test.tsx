@@ -261,9 +261,31 @@ test.each([403, 409, 422, 0])('submit %s preserves fields and offers only the ap
   expect(within(modal()).getByText(body.name.trim())).toBeVisible()
   if (status === 403) { expect(screen.queryByRole('button', { name: es.retry })).not.toBeInTheDocument(); expect(button(es.closeWizard)).toBeEnabled() }
   else expect(button(es.retry)).toBeEnabled()
-  if (status === 409) expect(screen.getByText(es.conflict)).toBeVisible()
-  if (status === 422) expect(screen.getByText(es.invalidData)).toBeVisible()
+  if (status === 409 || status === 422) expect(within(modal()).getByText('PRIVATE_MARKER')).toBeVisible()
+  else expect(within(modal()).queryByText('PRIVATE_MARKER')).not.toBeInTheDocument()
   expect(calls(create)).toHaveLength(1)
+})
+test.each(['es', 'en'] as const)('submit conflict and validation messages preserve server copy and translated fallbacks in %s', async (locale) => {
+  const copy = locale === 'es' ? es : en
+  let status = 409
+  let message = 'The organization name is already in use.'
+  mock({ [`POST ${create}`]: () => Response.json({ message, requestId: 'req_validation' }, { status }) })
+  await open('superadmin', locale); await summary(copy)
+  fireEvent.click(button(copy.createTenant))
+  await within(modal()).findByText(message)
+  expect(screen.queryByText(copy.conflict)).not.toBeInTheDocument()
+  message = ''
+  fireEvent.click(button(copy.retry))
+  await within(modal()).findByText(copy.conflict)
+  status = 422; message = 'The selected region is not available for this plan.'
+  fireEvent.click(button(copy.retry))
+  await within(modal()).findByText(message)
+  expect(screen.queryByText(copy.invalidData)).not.toBeInTheDocument()
+  message = ''
+  fireEvent.click(button(copy.retry))
+  await within(modal()).findByText(copy.invalidData)
+  expect(within(modal()).getByText(body.name.trim())).toBeVisible()
+  expect(calls(create)).toHaveLength(4)
 })
 test('successful 401 refresh never replays a create and retains the key until explicit Create', async () => {
   let count = 0
