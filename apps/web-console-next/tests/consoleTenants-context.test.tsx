@@ -1,7 +1,9 @@
 import { StrictMode } from 'react'
-import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test } from 'vitest'
+import { readConsoleShellSession } from '@in-falcone/console-api/session'
 import { ConsoleContextProvider, useConsoleContext } from '../src/shell/context'
+import { SessionProvider } from '../src/shell/session'
 import { login, renderWithSession, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
 
 let requests: ReturnType<typeof strictFetch>
@@ -67,4 +69,46 @@ test('a later reload wins over an older bootstrap or overlapping reload response
   await act(async () => resolvers[2](Response.json({ items: [], page: { after: 'winner' } })))
   await act(async () => { resolvers[0](Response.json({ items: [tenant('stale')], page: { after: null } })); resolvers[1](Response.json({ items: [tenant('older')], page: { after: null } })) })
   expect(value().tenants).toEqual([]); expect(value().tenantsPageInfo).toEqual({ after: 'winner' })
+})
+test('a new session bootstrap clears superseded reload loading and ignores its stale response', async () => {
+  let count = 0
+  let finishReload!: (response: Response) => void
+  requests = strictFetch({ [`GET ${tenantUrl}`]: () => {
+    if (++count === 2) return new Promise<Response>((resolve) => { finishReload = resolve })
+    return Response.json({ items: [tenant('t1'), tenant('t2')], page: { after: count === 1 ? 'initial' : 'current' } })
+  } })
+  login()
+  const tree = () => <StrictMode><SessionProvider value={readConsoleShellSession()}><ConsoleContextProvider><Probe /></ConsoleContextProvider></SessionProvider></StrictMode>
+  const view = render(tree())
+  await waitFor(() => expect(value().loading).toBe(false))
+  expect(count).toBe(1)
+  fireEvent.click(screen.getByText('Reload'))
+  await waitFor(() => expect(count).toBe(2))
+  expect(value().loading).toBe(true)
+
+  // ProtectedRoute supplies a fresh session object on navigation without remounting the provider.
+  view.rerender(tree())
+  await waitFor(() => expect(value().tenantsPageInfo).toEqual({ after: 'current' }))
+  expect(count).toBe(3)
+  await waitFor(() => expect(value().loading).toBe(false))
+  await act(async () => finishReload(Response.json({ items: [tenant('stale')], page: { after: 'stale' } })))
+  expect(value().tenants.map((item: { tenantId: string }) => item.tenantId)).toEqual(['t1', 't2'])
+  expect(value().tenantsPageInfo).toEqual({ after: 'current' })
+  expect(value().loading).toBe(false)
+})
+test('an older reload finishing cannot clear loading for the current reload', async () => {
+  const resolvers: ((response: Response) => void)[] = []
+  requests = strictFetch({ [`GET ${tenantUrl}`]: () => new Promise<Response>((resolve) => resolvers.push(resolve)) })
+  open()
+  await waitFor(() => expect(resolvers).toHaveLength(1))
+  await act(async () => resolvers[0](Response.json({ items: [], page: { after: null } })))
+  await waitFor(() => expect(value().loading).toBe(false))
+  fireEvent.click(screen.getByText('Reload')); fireEvent.click(screen.getByText('Reload'))
+  await waitFor(() => expect(resolvers).toHaveLength(3))
+  await act(async () => resolvers[1](Response.json({ items: [tenant('stale')], page: { after: 'stale' } })))
+  expect(value().loading).toBe(true)
+  expect(value().tenants).toEqual([])
+  await act(async () => resolvers[2](Response.json({ items: [], page: { after: 'current' } })))
+  await waitFor(() => expect(value().loading).toBe(false))
+  expect(value().tenantsPageInfo).toEqual({ after: 'current' })
 })

@@ -104,6 +104,8 @@ export function ConsoleContextProvider({ children, routeWorkspaceId }: { childre
   useEffect(() => {
     let cancelled = false
     const token = ++tenantToken.current
+    // This bootstrap owns tenant loading now; a superseded reload cannot clear its own flag.
+    setTenantsReloading(false)
     if (!userId) { setTenants([]); setLoading(false); return }
     const roles = session.principal?.platformRoles ?? []
     const platform = roles.some((role) => ['superadmin', 'platform_admin', 'platform_operator'].includes(role))
