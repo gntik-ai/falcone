@@ -5,8 +5,9 @@ import { buildConsoleRefreshSessionFixture } from '@in-falcone/console-api/fixtu
 import { readConsoleShellSession, readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import WorkspacePage from '../src/pages/consoleWorkspaceDashboard'
 import { consumption, consumptionFixtures, meterEdges } from './parity/pages/console-workspace-dashboard-page.manifest'
-import { login, strictFetch } from './shell-support'
+import { login, renderWithSession, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
 import { ProtectedRoute } from '../src/shell/session'
+import { Shell } from '../src/shell/Shell'
 import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-workspace-dashboard-page.json'
 import en from '../src/locales/en/pages.console-workspace-dashboard-page.json'
@@ -203,20 +204,36 @@ test.each(['synthetic/with space', 'synthetic space'])('encodes the route ID con
 })
 
 test('route param wins over a stored workspace selection', async () => {
-  localStorage.setItem('in-falcone.console-active-context', JSON.stringify({ userId: 'synthetic-user', tenantId: 'stored-tenant', workspaceId: 'stored-workspace' }))
-  open()
+  login(['workspace_viewer'], ['synthetic-tenant'], ['synthetic-workspace', 'stored-workspace'])
+  localStorage.setItem('in-falcone.console-active-context', JSON.stringify({
+    userId: 'synthetic-user', tenantId: 'synthetic-tenant', workspaceId: 'stored-workspace', updatedAt: '2026-01-01T00:00:00Z',
+  }))
+  requests = strictFetch({
+    [`GET ${path}`]: consumption,
+    [`GET ${tenantUrl}`]: { items: [{ tenantId: 'synthetic-tenant', displayName: 'Synthetic tenant' }] },
+    [`GET ${workspaceUrl('synthetic-tenant')}`]: { items: [
+      { workspaceId: 'synthetic-workspace', tenantId: 'synthetic-tenant', displayName: 'Route workspace' },
+      { workspaceId: 'stored-workspace', tenantId: 'synthetic-tenant', displayName: 'Stored workspace' },
+    ] },
+  })
+  renderWithSession(<Routes><Route path="/console" element={<Shell />}>
+    <Route path="workspaces/:workspaceId" element={<WorkspacePage />} />
+  </Route></Routes>, { route: '/console/workspaces/synthetic-workspace' })
   await screen.findByRole('table')
+  await waitFor(() => expect(screen.getByRole('region', { name: 'Contexto activo' })).toHaveAttribute('aria-busy', 'false'))
+  expect(JSON.parse(localStorage.getItem('in-falcone.console-active-context')!).workspaceId).toBe('synthetic-workspace')
+  expect(screen.getByRole('button', { name: 'Route workspace, Área de trabajo activa' })).toBeVisible()
   assertGet(1)
 })
 
-test.each(['delayed', 'loaded', 'error'] as const)('pushState and popstate clear the previous %s workspace and ignore its late response', async (previous) => {
+test.each(['delayed', 'delayed-error', 'loaded', 'error'] as const)('pushState and popstate clear the previous %s workspace and ignore its late response', async (previous) => {
   login(['workspace_viewer'])
   let releaseOld!: () => void
   let releaseNew!: () => void
   requests = strictFetch({
     'GET /v1/workspaces/a/consumption': async () => {
-      if (previous === 'delayed') await new Promise<void>((resolve) => { releaseOld = resolve })
-      return previous === 'error' ? fail(500) : Response.json({ ...consumption, workspaceId: 'Old workspace' })
+      if (previous.startsWith('delayed')) await new Promise<void>((resolve) => { releaseOld = resolve })
+      return previous.endsWith('error') ? fail(500) : Response.json({ ...consumption, workspaceId: 'Old workspace' })
     },
     'GET /v1/workspaces/b/consumption': async () => {
       await new Promise<void>((resolve) => { releaseNew = resolve })
@@ -228,7 +245,7 @@ test.each(['delayed', 'loaded', 'error'] as const)('pushState and popstate clear
   render(<BrowserRouter>{routes()}</BrowserRouter>)
   if (previous === 'loaded') await screen.findByText('Old workspace')
   if (previous === 'error') await screen.findByRole('button', { name: es.retry })
-  if (previous === 'delayed') await waitFor(() => expect(releaseOld).toBeTypeOf('function'))
+  if (previous.startsWith('delayed')) await waitFor(() => expect(releaseOld).toBeTypeOf('function'))
   act(() => { window.history.pushState({}, '', '/console/workspaces/b'); window.dispatchEvent(new PopStateEvent('popstate')) })
   expect(screen.queryByText('Old workspace')).not.toBeInTheDocument()
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
@@ -237,8 +254,9 @@ test.each(['delayed', 'loaded', 'error'] as const)('pushState and popstate clear
   await waitFor(() => expect(releaseNew).toBeTypeOf('function'))
   await act(async () => releaseNew())
   expect(await screen.findByText('New workspace')).toBeVisible()
-  if (previous === 'delayed') await act(async () => releaseOld())
+  if (previous.startsWith('delayed')) await act(async () => releaseOld())
   expect(screen.queryByText('Old workspace')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: es.retry })).not.toBeInTheDocument()
   expect(screen.getByText('New workspace')).toBeVisible()
   expect(calls().map(([url]) => url)).toEqual(['/v1/workspaces/a/consumption', '/v1/workspaces/b/consumption'])
   expect(errors).not.toHaveBeenCalled()
