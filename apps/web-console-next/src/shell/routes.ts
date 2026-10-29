@@ -43,7 +43,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'observability' },
   { path: 'runtime', migrated: true, guard: 'observer', handle: { platformGlobal: true } },
   { path: 'service-accounts' },
-  { path: 'quotas' },
+  { path: 'quotas', migrated: true },
   { path: 'operations', migrated: true },
   { path: 'mcp/servers/:mcpServerId' },
   { path: 'workspaces/:workspaceId/realtime' },
