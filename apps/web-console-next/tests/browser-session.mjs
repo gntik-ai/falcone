@@ -1,3 +1,4 @@
+import { tenantMetricsEndpoints } from './parity/pages/consoleTenants.manifest.ts';
 import { catalogEndpoints, catalogResponse, isPlansQuery } from './parity/pages/console-plan-catalog-page.manifest.ts';
 import { allocationEndpoints } from './parity/pages/console-tenant-allocation-summary-page.manifest.ts';
 import { createEndpointRegistry } from './parity/endpoint-registry.ts';
@@ -10,7 +11,7 @@ import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixture
 export async function installSession(page, roles = ['superadmin']) {
   const unmatched = [];
   const endpoints = createEndpointRegistry({}, () => ({}), {
-    ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints),
+    ...tenantMetricsEndpoints, ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints),
     signupPolicy: { method: 'GET', path: '/v1/auth/signups/policy', fixtures: {
       success: { status: 200, body: buildConsoleSignupPolicyFixture() },
     } },
