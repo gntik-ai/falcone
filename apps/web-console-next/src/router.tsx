@@ -76,6 +76,7 @@ export const appRoutes: RouteObject[] = [
       ...pendingConsoleRoutes.map(({ guard, ...route }) => {
         if (route.path === 'operations') return { ...route, element: lazyPage('pages.console-operations-page', () => import('./pages/consoleOperations')) }
         if (route.path === 'overview') return { ...route, element: lazyPage('pages.console-overview-page', () => import('./pages/overview')) }
+        if (route.path === 'plans') return { ...route, element: <Guard kind="superadmin">{lazyPage('pages.console-plan-catalog-page', () => import('./pages/consolePlanCatalog'))}</Guard> }
         if (route.path === 'plans/new') return { ...route, element: lazyPage('pages.console-plan-create-page', () => import('./pages/consolePlanCreate')) }
         if (route.path === 'runtime') return { ...route, element: lazyPage('pages.console-runtime-page', () => import('./pages/consoleRuntime')) }
         if (route.path === 'my-plan/allocation') return { ...route, element: lazyPage('pages.console-tenant-allocation-summary-page', () => import('./pages/consoleTenantAllocationSummary')) }

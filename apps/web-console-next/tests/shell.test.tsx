@@ -65,9 +65,9 @@ test.each(['iam-access', 'plans', 'auth', 'tenants/t1/plan'].flatMap((path) =>
   [['superadmin'], ['platform_auditor'], ['tenant_owner'], []].map((roles) => ({ path, roles }))
 ))('$path keeps navigation visible and gates $roles by superadmin', async ({ path, roles }) => {
   login(roles)
-  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
+  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] }, 'GET /v1/plans?page=1&pageSize=20': { items: [], total: 0, page: 1, pageSize: 20 } })
   open(`/console/${path}`)
-  expect(await screen.findByRole('heading', { name: roles.includes('superadmin') ? 'Página pendiente' : 'Acceso denegado' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: roles.includes('superadmin') ? path === 'plans' ? 'Catálogo de planes' : 'Página pendiente' : 'Acceso denegado' })).toBeVisible()
   expect(screen.getByRole('navigation', { name: 'Navegación de consola' })).toBeVisible()
 })
 
@@ -242,9 +242,9 @@ test('a tenant route parameter does not replace stored context', async () => {
 
 test.each(['plans', 'runtime'])('platform-global %s hides context controls', async (path) => {
   login()
-  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] }, 'GET /v1/platform/runtime/knative': ready })
+  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] }, 'GET /v1/platform/runtime/knative': ready, 'GET /v1/plans?page=1&pageSize=20': { items: [], total: 0, page: 1, pageSize: 20 } })
   open(`/console/${path}`)
-  await screen.findByRole('heading', { name: path === 'runtime' ? 'Runtime de funciones' : 'Página pendiente' })
+  await screen.findByRole('heading', { name: path === 'runtime' ? 'Runtime de funciones' : 'Catálogo de planes' })
   expect(screen.queryByLabelText('Organización activa')).not.toBeInTheDocument()
 })
 

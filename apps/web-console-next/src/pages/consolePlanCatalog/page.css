@@ -1,0 +1,15 @@
+/* PageToolbar always renders search; the catalog only exposes the status filter. */
+.console-plan-catalog-toolbar div:has(> input[type="search"]) {
+  display: none;
+}
+.console-plan-catalog-toolbar > div:first-child {
+  display: block;
+  flex-basis: 100%;
+}
+.console-plan-catalog-toolbar > div:last-child {
+  display: none;
+}
+.console-plan-catalog caption:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}

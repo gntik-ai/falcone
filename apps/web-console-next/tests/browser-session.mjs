@@ -1,3 +1,4 @@
+import { catalogEndpoints, catalogResponse, isPlansQuery } from './parity/pages/console-plan-catalog-page.manifest.ts';
 import { allocationEndpoints } from './parity/pages/console-tenant-allocation-summary-page.manifest.ts';
 import { createEndpointRegistry } from './parity/endpoint-registry.ts';
 import { operationEndpoints } from './parity/pages/operationDetail.manifest.ts';
@@ -9,7 +10,7 @@ import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixture
 export async function installSession(page, roles = ['superadmin']) {
   const unmatched = [];
   const endpoints = createEndpointRegistry({}, () => ({}), {
-    ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints),
+    ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints),
     signupPolicy: { method: 'GET', path: '/v1/auth/signups/policy', fixtures: {
       success: { status: 200, body: buildConsoleSignupPolicyFixture() },
     } },
@@ -41,7 +42,12 @@ export async function installSession(page, roles = ['superadmin']) {
       let body;
       try { body = request.postDataJSON(); } catch { /* Invalid bodies remain unmatched. */ }
       const name = endpoints.find(request.method(), url.pathname, body);
-      if (name && !url.search) {
+      if (name === 'plans.list' && isPlansQuery(request.method(), url)) {
+        const response = catalogResponse('45-mixed', url);
+        await route.fulfill({ status: response.status, json: response.body });
+        return;
+      }
+      if (name && name !== 'plans.list' && !url.search) {
         const response = endpoints.responseFor(name, 'superadmin', body);
         await route.fulfill({ status: response.status, json: response.body });
         return;
