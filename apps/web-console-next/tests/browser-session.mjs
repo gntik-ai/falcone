@@ -11,7 +11,7 @@ import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixture
 export async function installSession(page, roles = ['superadmin']) {
   const unmatched = [];
   const endpoints = createEndpointRegistry({}, () => ({}), {
-    ...tenantMetricsEndpoints, ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints),
+    ...(typeof tenantMetricsEndpoints === 'undefined' ? {} : tenantMetricsEndpoints), ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints),
     signupPolicy: { method: 'GET', path: '/v1/auth/signups/policy', fixtures: {
       success: { status: 200, body: buildConsoleSignupPolicyFixture() },
     } },
