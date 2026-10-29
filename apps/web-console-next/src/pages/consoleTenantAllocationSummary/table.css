@@ -1,0 +1,9 @@
+/* Compose the kit table as stacked label/value rows below its tablet breakpoint. */
+.allocation-table table { width: 100%; table-layout: fixed; }
+.allocation-table th, .allocation-table td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+@media (max-width: 767px) {
+  .allocation-table table, .allocation-table tbody { display: block; }
+  .allocation-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .allocation-table tbody tr { display: block; margin-bottom: 1rem; }
+  .allocation-table tbody th, .allocation-table tbody td { display: block; width: 100%; }
+}
