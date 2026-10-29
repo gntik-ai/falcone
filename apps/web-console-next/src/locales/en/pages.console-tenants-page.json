@@ -70,14 +70,14 @@
     "description": "Could not complete the requested operation. Review the data or close the wizard."
   },
   "creating": "Creating",
-  "success": "Operation completed",
-  "openCreated": "Open created resource",
+  "success": "Resource created successfully: {id}",
+  "openCreated": "Open resource",
   "sessionRenewed": "Your session has been renewed. Review the summary and click Create to send the request.",
   "conflict": "The resource already exists or conflicts with another.",
   "invalidData": "The submitted data is invalid.",
-  "steps": "Wizard steps",
+  "steps": "Wizard progress",
   "stepComplete": "Complete",
-  "stepCurrent": "Current",
+  "stepCurrent": "Current step",
   "stepUpcoming": "Upcoming",
   "stepError": "Error",
   "stepCount": "Step {current} of {total}",
@@ -111,5 +111,9 @@
     "error": "Could not check quotas",
     "description": "Could not complete the quota check. You can retry the check or continue creating the organization."
   },
-  "createTenant": "Create"
+  "createTenant": "Create",
+  "blockedGeneric": "Your current role does not include this permission. Contact an organization or workspace administrator if you need this access.",
+  "blockedUnknown": "Your current session has no recognized role with write permissions. Contact an organization administrator if you believe this is an error.",
+  "blockedDeveloper": "Your role (Developer · read-only) lets you view organization and workspace context, but not create, modify or delete resources. Contact an organization administrator if you need this access.",
+  "blockedViewer": "Your role (Viewer · read-only) lets you view dashboards, audit data and effective permissions, but not create, modify or delete resources. Contact an organization administrator if you need this access."
 }

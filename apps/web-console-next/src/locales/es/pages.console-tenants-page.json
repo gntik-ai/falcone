@@ -70,14 +70,14 @@
     "description": "No se pudo completar la operación solicitada. Revisa los datos o cierra el asistente."
   },
   "creating": "Creando",
-  "success": "Operación completada",
-  "openCreated": "Abrir recurso creado",
+  "success": "Recurso creado correctamente: {id}",
+  "openCreated": "Abrir recurso",
   "sessionRenewed": "Tu sesión se ha renovado. Revisa el resumen y pulsa Crear para enviar la solicitud.",
   "conflict": "El recurso ya existe o entra en conflicto con otro.",
   "invalidData": "Los datos enviados no son válidos.",
-  "steps": "Pasos del asistente",
+  "steps": "Progreso del asistente",
   "stepComplete": "Completado",
-  "stepCurrent": "Actual",
+  "stepCurrent": "Paso actual",
   "stepUpcoming": "Pendiente",
   "stepError": "Error",
   "stepCount": "Paso {current} de {total}",
@@ -111,5 +111,9 @@
     "error": "No se pudo comprobar la cuota",
     "description": "No se pudo completar la comprobación de cuotas. Puedes reintentar la comprobación o continuar con el alta."
   },
-  "createTenant": "Crear"
+  "createTenant": "Crear",
+  "blockedGeneric": "Tu rol actual no incluye este permiso. Contacta con un administrador de la organización o del área de trabajo si necesitas este acceso.",
+  "blockedUnknown": "Tu sesión actual no tiene un rol con permisos de escritura reconocido. Contacta con un administrador de la organización si crees que esto es un error.",
+  "blockedDeveloper": "Tu rol (Developer · solo lectura) permite consultar el contexto de la organización y del área de trabajo, pero no crear, modificar ni eliminar recursos. Contacta con un administrador de la organización si necesitas este acceso.",
+  "blockedViewer": "Tu rol (Viewer · solo lectura) permite consultar dashboards, auditoría y permisos efectivos, pero no crear, modificar ni eliminar recursos. Contacta con un administrador de la organización si necesitas este acceso."
 }

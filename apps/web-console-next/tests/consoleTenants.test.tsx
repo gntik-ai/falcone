@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test } from 'vitest'
+import { getConsolePermissions } from '@in-falcone/console-api/permissions'
 import { buildConsoleRefreshSessionFixture } from '@in-falcone/console-api/fixtures'
 import ConsoleTenantsPage from '../src/pages/consoleTenants'
 import { ConsoleContextProvider } from '../src/shell/context'
@@ -154,6 +155,7 @@ test.each(['es', 'en'] as const)('create retry retains body and idempotency key,
   expect(new Headers(sent[0][1]!.headers).get('X-Request-Id')).toMatch(/^wiz_/)
   await act(async () => resolve(Response.json({ tenantId: 'created' })))
   await screen.findByRole('link', { name: copy.openCreated })
+  expect(within(modal()).getByText(copy.success.replace('{id}', 'created'))).toBeVisible()
   expect(screen.getByRole('link', { name: copy.openCreated })).toHaveAttribute('href', '/console/tenants/created/plan')
   await waitFor(() => expect(calls(tenantUrl)).toHaveLength(2))
 })
@@ -228,4 +230,11 @@ test('the active catalog accepts the legacy plans response envelope', async () =
   await open(); await summary()
   expect(within(modal()).getByText('Starter')).toBeVisible()
   expect(calls(create)).toHaveLength(0)
+})
+
+
+test.each(['tenant_owner', 'tenant_developer', 'tenant_viewer', 'unrecognized'])('the blocked wizard preserves the shared permission explanation for %s', async (role) => {
+  mock(); await open(role); fireEvent.click(button(es.create))
+  await screen.findByRole('heading', { name: es.blocked })
+  expect(screen.getByText(getConsolePermissions([role]).denyReason('tenant.create')!)).toBeVisible()
 })

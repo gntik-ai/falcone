@@ -7,8 +7,8 @@ import { useConsoleContext } from '../../shell/context'
 import { Feedback } from './Feedback'
 import { createTenant, failureOf, listActivePlans, type ActivePlan, type Failure, type TenantBody } from './api'
 
-export function Wizard({ allowed, superadmin, close, trigger, precheck, retryPrecheck }: {
-  allowed: boolean; superadmin: boolean; close: () => void; trigger: RefObject<HTMLButtonElement | null>; precheck: Failure | null; retryPrecheck: () => void
+export function Wizard({ blockedReason, allowed, superadmin, close, trigger, precheck, retryPrecheck }: {
+  blockedReason: 'blockedGeneric' | 'blockedDeveloper' | 'blockedViewer' | 'blockedUnknown'; allowed: boolean; superadmin: boolean; close: () => void; trigger: RefObject<HTMLButtonElement | null>; precheck: Failure | null; retryPrecheck: () => void
 }) {
   const { t } = useTranslation('pages.console-tenants-page')
   const { reloadTenants } = useConsoleContext()
@@ -68,14 +68,14 @@ export function Wizard({ allowed, superadmin, close, trigger, precheck, retryPre
       const result = await createTenant(retained.body, retained.key)
       if (!mounted.current) return
       setCreated(result.tenantId); setFailure(null)
-      announce(t('success'), 'polite'); toast.add({ title: t('success'), description: undefined, tone: 'success', priority: 'low' })
+      announce(t('success', { id: result.tenantId }), 'polite'); toast.add({ title: t('success', { id: result.tenantId }), description: undefined, tone: 'success', priority: 'low' })
       void reloadTenants?.()
     } catch (cause) {
       if (mounted.current) { const error = failureOf(cause); setFailure(error); if (error.status !== 401) toast.add({ title: t('submit.error'), description: undefined, tone: 'destructive', priority: 'low' }) }
     } finally { inFlight.current = false; if (mounted.current) setBusy(false) }
   }
   const retrySubmit = failure && ![401, 403, 404].includes(failure.status ?? 0)
-  const summary = ['name', 'planId', 'region', 'locale'].map((field) => ({ id: field, label: t(field), value: field === 'planId' ? catalog.items.find((plan) => plan.id === values.planId)?.displayName ?? values.planId : values[field as keyof typeof values] }))
+  const summary = ['name', 'planId', 'region', 'locale'].map((field) => ({ id: field, label: t(field === 'name' ? 'nameStep' : field), value: field === 'planId' ? catalog.items.find((plan) => plan.id === values.planId)?.displayName ?? values.planId : values[field as keyof typeof values] }))
   return <Dialog open={open} modal={true} disablePointerDismissal={busy} onOpenChange={(nextOpen, event) => { if (!nextOpen && inFlight.current) event.cancel(); else setOpen(nextOpen) }}
     onOpenChangeComplete={(nextOpen) => { if (!nextOpen) close() }}>
     <DialogContent ref={panel} size="xl" presentation="fullscreen" showClose={false} closeLabel={t('closeWizard')} container={undefined}
@@ -83,7 +83,7 @@ export function Wizard({ allowed, superadmin, close, trigger, precheck, retryPre
       <DialogHeader><DialogTitle>{t('create')}</DialogTitle><DialogDescription>{t('wizardDescription')}</DialogDescription></DialogHeader>
       <DialogBody className="min-w-0 space-y-5">
         {!allowed ? <NoAccessEmpty resource={t('create')} owner="" showRequestAccess={false} onRequestAccess={undefined} defaultRequested={false} action={undefined} titleAs="h2" bordered={false}
-          labels={{ title: () => t('blocked'), description: () => t('blockedDescription'), request: '', requested: '', sent: '' }} /> : <>
+          labels={{ title: () => t('blocked'), description: () => t(blockedReason), request: '', requested: '', sent: '' }} /> : <>
           <Stepper steps={steps.map((label) => ({ id: label, label: t(label) }))} current={step} orientation="horizontal" compact={true} onStepClick={undefined}
             label={t('steps')} statusText={{ complete: t('stepComplete'), current: t('stepCurrent'), upcoming: t('stepUpcoming'), error: t('stepError') }} formatCount={(current, total) => t('stepCount', { current, total })} />
           <div ref={stepBody} className="min-w-0 space-y-4">
@@ -114,7 +114,7 @@ export function Wizard({ allowed, superadmin, close, trigger, precheck, retryPre
             {step === 3 && <>
               <DescriptionListCard title={t('summary')} description="" items={summary} columns={1} wrap={true} titleAs="h2" onEdit={undefined} onCopy={undefined} editLabel=""
                 labels={{ title: t('summary'), description: '', edit: '', copy: () => '', copied: () => '', copiedToClipboard: '' }} />
-              {created ? <><Text role="status">{t('success')}</Text><Link href={superadmin ? `/console/tenants/${created}/plan` : '/console/tenants'} underline="always" external={false} externalLabel="">{t('openCreated')}</Link></>
+              {created ? <><Text role="status">{t('success', { id: created })}</Text><Link href={superadmin ? `/console/tenants/${created}/plan` : '/console/tenants'} underline="always" external={false} externalLabel="">{t('openCreated')}</Link></>
                 : failure && !busy ? <Feedback area="submit" failure={failure} retry={null} close={failure.status === 403 || failure.status === 404 ? dismiss : null} /> : null}
             </>}
           </div>

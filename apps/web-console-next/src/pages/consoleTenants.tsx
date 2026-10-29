@@ -35,7 +35,9 @@ function TenantInventory() {
   const roles = useSession()?.principal?.platformRoles ?? []
   const inventory = roles.some((role) => ['superadmin', 'platform_admin', 'platform_operator'].includes(role))
   const superadmin = roles.includes('superadmin')
-  const allowed = getConsolePermissions(roles).can('tenant.create')
+  const permissions = getConsolePermissions(roles)
+  const allowed = permissions.can('tenant.create')
+  const blockedReason = !permissions.isReadOnly ? 'blockedGeneric' : roles.includes('tenant_developer') ? 'blockedDeveloper' : roles.includes('tenant_viewer') ? 'blockedViewer' : 'blockedUnknown'
   const announce = useAnnounce()
   const [wizard, setWizard] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
@@ -55,7 +57,6 @@ function TenantInventory() {
     // The pinned DataTable has no row-header/current-row props. Add semantics to its real cells.
     table.current?.querySelectorAll('tbody tr').forEach((row, index) => {
       row.firstElementChild?.setAttribute('role', 'rowheader')
-      row.firstElementChild?.setAttribute('scope', 'row')
       if (context.tenants[index]?.tenantId === context.activeTenantId) row.setAttribute('aria-current', 'true')
       else row.removeAttribute('aria-current')
     })
@@ -96,7 +97,7 @@ function TenantInventory() {
             {truncated && <Text variant="supporting" tone="muted">{t('truncatedNote', { count: context.tenants.length })}</Text>}
           </> : <FirstRunEmpty title={t('empty')} description={t('emptyDescription')} steps={[]} actionLabel={t('firstCreate')} onAction={() => setWizard(true)} secondary={null} titleAs="h2" bordered={false}
             labels={{ title: t('empty'), description: t('emptyDescription'), action: t('firstCreate'), guide: '' }} />}
-    {wizard && <Wizard allowed={allowed} superadmin={superadmin} close={() => setWizard(false)} trigger={trigger} precheck={precheck} retryPrecheck={() => setCheckAttempt((value) => value + 1)} />}
+    {wizard && <Wizard blockedReason={blockedReason} allowed={allowed} superadmin={superadmin} close={() => setWizard(false)} trigger={trigger} precheck={precheck} retryPrecheck={() => setCheckAttempt((value) => value + 1)} />}
   </Page>
 }
 export default function ConsoleTenantsPage() {
