@@ -1,3 +1,4 @@
+import { workspaceConsumptionEndpoints } from './parity/pages/console-workspace-dashboard-page.manifest.ts';
 import { tenantMetricsEndpoints } from './parity/pages/consoleTenants.manifest.ts';
 import { catalogEndpoints, catalogResponse, isPlansQuery } from './parity/pages/console-plan-catalog-page.manifest.ts';
 import { allocationEndpoints } from './parity/pages/console-tenant-allocation-summary-page.manifest.ts';
@@ -12,6 +13,7 @@ export async function installSession(page, roles = ['superadmin']) {
   const unmatched = [];
   const endpoints = createEndpointRegistry({}, () => ({}), {
     ...(typeof tenantMetricsEndpoints === 'undefined' ? {} : tenantMetricsEndpoints), ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints),
+    ...(typeof workspaceConsumptionEndpoints === 'undefined' ? {} : workspaceConsumptionEndpoints),
     signupPolicy: { method: 'GET', path: '/v1/auth/signups/policy', fixtures: {
       success: { status: 200, body: buildConsoleSignupPolicyFixture() },
     } },

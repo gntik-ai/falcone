@@ -84,6 +84,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'my-plan/allocation') return { ...route, element: lazyPage('pages.console-tenant-allocation-summary-page', () => import('./pages/consoleTenantAllocationSummary')) }
         if (route.path === 'profile') return { ...route, element: lazyPage('pages.console-profile-page', () => import('./pages/consoleProfile')) }
         if (route.path === 'workspaces/:workspaceId/docs') return { ...route, element: lazyPage('pages.console-docs-page', () => import('./pages/consoleDocs')) }
+        if (route.path === 'workspaces/:workspaceId' && route.migrated) return { ...route, element: lazyPage('pages.console-workspace-dashboard-page', () => import('./pages/consoleWorkspaceDashboard')) }
         const page = lazyPage('pendingPage', () => import('./pages/pendingPage'))
         return { ...route, element: guard ? <Guard kind={guard}>{page}</Guard> : page }
       }),
