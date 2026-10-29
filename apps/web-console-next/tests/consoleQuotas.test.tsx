@@ -80,6 +80,7 @@ test.each(['es', 'en'] as const)('renders both semantic tables, localized timest
   expect(screen.getAllByRole('rowheader')).toHaveLength(9)
   expect(screen.getAllByText(copy.unlimited).length).toBeGreaterThan(0)
   expect(screen.getByText(copy.exceeded, { exact: true })).toBeVisible()
+  expect(screen.getByRole('region', { name: copy.notifications })).toBeInTheDocument()
   expect(screen.getAllByText('2.0 KB')).toHaveLength(2)
   expect(screen.getAllByRole('meter').map((node) => node.getAttribute('aria-valuetext'))).toContain('110%')
   expect(document.querySelector('time')).toHaveTextContent(new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(quotasTenant.evaluatedAt!)))
@@ -141,6 +142,7 @@ test.each(['superadmin', 'platform_operator'])('%s has the action column and pla
   setup(); open(role); await review()
   expect(puts()).toHaveLength(0)
   const dialog = screen.getByRole('dialog', { name: /^Ajustar cuota:/ })
+  expect(dialog).toHaveAttribute('aria-modal', 'true')
   expect(dialog).toHaveTextContent('Synthetic Shared Plan')
   expect(dialog).toHaveTextContent('todas las organizaciones')
   fireEvent.click(screen.getByRole('button', { name: es.back }))
@@ -153,6 +155,15 @@ test.each(['superadmin', 'platform_operator'])('%s has the action column and pla
   await waitFor(() => expect(screen.getByRole('button', { name: es.close })).toHaveFocus())
   expect(requests.mock.mock.calls.filter(([path]) => path === plan)).toHaveLength(1)
   expect(screen.getByRole('dialog', { name: /^Ajustar cuota:/ })).toHaveTextContent(es.saved)
+  expect(within(screen.getByRole('region', { name: es.notifications })).getAllByText(es.saved, { exact: true })).toHaveLength(1)
+})
+
+test('the toast viewport label follows a locale change without remounting the page', async () => {
+  setup(); open(); await ready()
+  expect(screen.getByRole('region', { name: es.notifications })).toBeInTheDocument()
+  await act(async () => { await i18n.changeLanguage('en') })
+  expect(screen.getByRole('region', { name: en.notifications })).toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: es.notifications })).not.toBeInTheDocument()
 })
 test.each(['tenant_viewer', 'member', 'platform_admin'])('%s has no action column and sends no plan or save requests', async (role) => {
   setup(); open(role); await ready()

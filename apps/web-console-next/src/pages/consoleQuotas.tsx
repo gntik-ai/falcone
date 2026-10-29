@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle } from 'lucide-react'
@@ -122,9 +122,26 @@ function QuotaTable({ scope, posture, canAdjust, onAdjust }: { scope: 'tenant' |
     </Table>}
   </section>
 }
+function LocalizedToaster() {
+  const { t } = useTranslation('pages.console-quotas-page')
+  const [container, setContainer] = useState<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    // Kit 0.11.0 exposes the close label but no toast viewport label prop.
+    if (!container) return
+    const translate = () => {
+      const viewport = container.querySelector('[role="region"]')
+      if (viewport && viewport.getAttribute('aria-label') !== t('notifications')) viewport.setAttribute('aria-label', t('notifications'))
+    }
+    translate()
+    const observer = new MutationObserver(translate)
+    observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label'] })
+    return () => observer.disconnect()
+  }, [container, t])
+  return <><div ref={setContainer} />{container && <Toaster closeLabel={t('close')} container={container} className="" />}</>
+}
 export default function ConsoleQuotasPage() {
-  const { t, i18n: language } = useTranslation('pages.console-quotas-page')
+  const { i18n: language } = useTranslation('pages.console-quotas-page')
   return <I18nProvider locale={language.language}><LiveAnnouncer><ToastProvider timeout={5000} limit={1}>
-    <Quotas /><Toaster closeLabel={t('close')} container={undefined} className="" />
+    <Quotas /><LocalizedToaster />
   </ToastProvider></LiveAnnouncer></I18nProvider>
 }

@@ -91,5 +91,6 @@
   "confirm": "Confirmar",
   "back": "Volver",
   "confirmDescription": "Confirma el límite {value} para {dimension} en el plan «{plan}». Se aplica a todas las organizaciones que usan ese plan.",
-  "postureLabel": "Postura"
+  "postureLabel": "Postura",
+  "notifications": "Notificaciones"
 }

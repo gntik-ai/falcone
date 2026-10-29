@@ -83,7 +83,7 @@ export function AdjustDialog({ target, onClose, onAdjusted }: { target: AdjustTa
   return <Dialog open={open} modal={true} disablePointerDismissal={busy}
     onOpenChange={(next, event) => { if (!next && inFlight.current) { event.cancel(); return } setOpen(next) }}
     onOpenChangeComplete={(next) => { if (!next) onClose() }}>
-    <DialogContent ref={panel} size="md" presentation="responsive" showClose={false} closeLabel={t('close')}
+    <DialogContent ref={panel} aria-modal={true} size="md" presentation="responsive" showClose={false} closeLabel={t('close')}
       initialFocus={() => panel.current} finalFocus={() => Array.from(document.querySelectorAll<HTMLElement>('[data-quota-adjust-trigger]')).find((node) => node.dataset.quotaAdjustTrigger === target.key) ?? null}
       className="min-w-0 max-w-full wrap-anywhere">
       <DialogHeader><DialogTitle>{t('adjustTitle', variables)}</DialogTitle><DialogDescription>{t('adjustDescription')}</DialogDescription></DialogHeader>

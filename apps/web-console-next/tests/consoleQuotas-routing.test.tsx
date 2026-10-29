@@ -10,6 +10,11 @@ import { pendingConsoleRoutes } from '../src/shell/routes'
 import { isMigratedRoute } from '../src/shell/navigation'
 import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
 import { overviewTenant, overviewWorkspace, quotasTenant, quotasWorkspace } from './parity/pages/console-quotas-page.manifest'
+import i18n from '../src/i18n'
+
+const catalogs = import.meta.glob('../src/locales/*/*.json', { eager: true, import: 'default' })
+const flatten = (data: object, prefix = ''): [string, string][] => Object.entries(data).flatMap(([key, value]) =>
+  typeof value === 'string' ? [[prefix + key, value]] : flatten(value, `${prefix}${key}.`))
 
 let requests: ReturnType<typeof strictFetch>
 afterEach(() => requests?.verify())
@@ -25,6 +30,27 @@ function setup(extra: Parameters<typeof strictFetch>[0] = {}) {
 }
 function open(path = '/next/console/quotas') { return render(<MemoryRouter basename="/next" initialEntries={[path]}><App /></MemoryRouter>) }
 const fixture = { path: '__fixture/*', element: <FixtureRoutes /> }
+
+test.each(['es', 'en'])('the quotas shell exposes translated text and accessible labels in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  setup(); open(); await screen.findAllByRole('table', {}, { timeout: 10000 })
+  const forbidden = new Set(['Search...', 'Search…', 'No results found.', 'No results found', 'Loading...', 'Loading…'])
+  if (locale === 'es') for (const [path, catalog] of Object.entries(catalogs)) {
+    if (!path.includes('/en/')) continue
+    const spanish = new Map(flatten(catalogs[path.replace('/en/', '/es/')] as object))
+    for (const [key, value] of flatten(catalog as object)) if (value !== spanish.get(key) && !value.includes('{')) forbidden.add(value)
+  }
+  const text: string[] = []
+  for (const node of document.body.querySelectorAll('*')) {
+    if (['SCRIPT', 'STYLE'].includes(node.tagName)) continue
+    for (const attribute of ['aria-label', 'title', 'placeholder', 'alt']) if (node.hasAttribute(attribute)) text.push(node.getAttribute(attribute)!)
+    for (const child of node.childNodes) if (child.nodeType === Node.TEXT_NODE) text.push(child.textContent ?? '')
+  }
+  const unexpected = text.map((value) => value.replace(/\s+/g, ' ').trim()).filter((value) =>
+    /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/.test(value) || (locale === 'es' && forbidden.has(value)))
+  expect(unexpected).toEqual([])
+  expect(document.documentElement.lang).toBe(locale)
+})
 
 test.each(['link', 'navigate'])('the fixture %s reaches the lazy quotas page inside the shell', async (method) => {
   setup(); children.push(fixture)
