@@ -48,6 +48,17 @@ async function review(parity, copy, value = '500') {
   return trigger;
 }
 async function close(parity, copy) { await button(parity, copy.close).click(); await expect(dialog(parity)).toHaveCount(0); }
+async function assertDialogResponsive(parity, width) {
+  // A modal removes the background main landmark from accessibility queries.
+  await expect(dialog(parity)).toBeVisible();
+  const sizes = await parity.page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+  expect(sizes.scrollWidth, `responsive: horizontal overflow at ${width}px`).toBeLessThanOrEqual(sizes.clientWidth);
+  const bounds = await dialog(parity).boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(parity.page.viewportSize().height);
+}
 async function keyboardActivate(page, target) {
   await page.evaluate(() => document.activeElement?.blur());
   for (let index = 0; index < 100; index++) {
@@ -239,7 +250,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
     });
     test('responsive', async ({ parity }) => {
       await open(parity); await check.assertResponsive(parity, width);
-      if (role === 'superadmin') { await adjust(parity); await check.assertResponsive(parity, width); await button(parity, copy.save).click(); await check.assertResponsive(parity, width); }
+      if (role === 'superadmin') { await adjust(parity); await assertDialogResponsive(parity, width); await button(parity, copy.save).click(); await assertDialogResponsive(parity, width); }
     });
     test('visual-review', async ({ parity, server }, info) => {
       async function capture(name) {
