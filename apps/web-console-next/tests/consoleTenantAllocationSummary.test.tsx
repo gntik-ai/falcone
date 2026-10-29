@@ -35,6 +35,9 @@ test.each(['es', 'en'] as const)('ports legacy data, labels, five columns and lo
   const table = await screen.findByRole('table', { name: copy.tableTitle })
   expect(within(table).getAllByRole('columnheader')).toHaveLength(5)
   expect(within(table).getAllByRole('rowheader')).toHaveLength(3)
+  for (const dimension of allocationMixed.dimensions) {
+    expect(within(table).getByText(dimension.displayLabel, { exact: true }).closest('th')).toHaveAttribute('scope', 'row')
+  }
   expect(within(table).getByText('Synthetic Production')).toBeVisible()
   expect(within(table).getByText(locale === 'es' ? 'Área de trabajo 2' : 'Workspace 2')).toBeVisible()
   expect(within(table).getByText(copy.fullyAllocated)).toBeVisible()

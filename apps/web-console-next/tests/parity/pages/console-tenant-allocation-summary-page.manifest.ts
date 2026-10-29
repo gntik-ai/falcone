@@ -7,7 +7,7 @@ export const allocationMixed: AllocationSummary = {
     { dimensionKey: 'max_pg_databases', displayLabel: 'PostgreSQL Databases', unit: 'count', tenantEffectiveValue: 5, totalAllocated: 5, unallocated: 0, isFullyAllocated: true,
       workspaces: [{ workspaceId: 'synthetic-production', displayLabel: 'Synthetic Production', workspaceName: 'Ignored name', allocatedValue: 3 },
         { workspaceId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479', displayLabel: '   ', workspaceName: 'f47ac10b-58cc-4372-a567-0e02b2c3d479', allocatedValue: 2 }] },
-    { dimensionKey: 'max_storage_bytes', displayLabel: 'Storage', unit: 'bytes', tenantEffectiveValue: 8192, totalAllocated: 2048, unallocated: 6144, isFullyAllocated: false,
+    { dimensionKey: 'max_storage_bytes', displayLabel: 'Synthetic Storage', unit: 'bytes', tenantEffectiveValue: 8192, totalAllocated: 2048, unallocated: 6144, isFullyAllocated: false,
       workspaces: [{ workspaceId: 'synthetic-storage', workspaceSlug: 'synthetic-storage', allocatedValue: 2048 }] },
     { dimensionKey: 'max_requests', displayLabel: 'Requests', unit: 'requests', tenantEffectiveValue: -1, totalAllocated: 12345, unallocated: null, isFullyAllocated: false, workspaces: [] },
   ],

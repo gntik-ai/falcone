@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import manifest from './console-tenant-allocation-summary-page.manifest.ts';
+import manifest, { allocationMixed } from './console-tenant-allocation-summary-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 
@@ -56,6 +56,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       const table = surface(parity).getByRole('table', { name: copy.tableTitle });
       await expect(table.getByRole('columnheader')).toHaveCount(5);
       await expect(table.getByRole('rowheader')).toHaveCount(3);
+      for (const dimension of allocationMixed.dimensions) await expect(table.getByRole('rowheader').getByText(dimension.displayLabel, { exact: true })).toBeVisible();
       for (const text of [copy.unlimited, copy.dash, copy.fullyAllocated, copy.sharedPool, 'Synthetic Production', locale === 'es' ? 'Área de trabajo 2' : 'Workspace 2']) await expect(table.getByText(text, { exact: true })).toBeVisible();
       await expect(table.getByText(locale === 'es' ? '2,0 KB' : '2.0 KB', { exact: true })).toHaveCount(2);
       await expect(table.getByText(`${new Intl.NumberFormat(locale).format(12345)} requests`, { exact: true })).toBeVisible();
