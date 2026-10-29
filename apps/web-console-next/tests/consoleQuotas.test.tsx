@@ -74,6 +74,43 @@ test('filters one scope without requests or changing the full count and clears w
   expect(search).toHaveFocus(); expect(search).toHaveValue('')
   expect(requests.mock.mock.calls).toHaveLength(before)
 })
+test.each(['es', 'en'] as const)('preserves live and documented posture values with the legacy fallback in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
+  let overallPosture = 'critical'
+  setup({ [`GET ${tenant}/overview`]: () => Response.json({ ...overviewTenant, overallPosture }) })
+  const view = open(); await ready()
+  for (const posture of ['critical', 'healthy', 'hard_limit_reached', 'soft_limit_exceeded', 'evidence_degraded', 'evidence_unavailable', 'unbounded', 'future_posture_value', 'within_limit', 'unknown']) {
+    overallPosture = posture
+    // A scope change reloads the overview without remounting the page.
+    context.activeWorkspaceId = context.activeWorkspaceId ? null : 'synthetic-workspace'
+    view.rerender(<MemoryRouter><ConsoleQuotasPage /></MemoryRouter>)
+    await ready()
+    await waitFor(() => expect(screen.getByText(Object.hasOwn(copy.posture, posture) ? copy.posture[posture as keyof typeof copy.posture] : posture.replace(/_/g, ' '), { exact: true })).toBeVisible())
+    expect(document.body).not.toHaveTextContent('pages.console-quotas-page.')
+  }
+})
+test.each(['es', 'en'] as const)('an empty workspace keeps its table until a search has no results in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
+  setup({ [`GET ${workspace}/quotas`]: { dimensions: [] } }); open(); await ready()
+  const section = screen.getByRole('region', { name: copy.workspace })
+  expect(within(section).getByText(locale === 'es' ? '0 dimensiones' : '0 dimensions')).toBeVisible()
+  const table = within(section).getByRole('table')
+  expect(within(table).getByRole('columnheader', { name: copy.dimension })).toBeVisible()
+  expect(within(table).queryAllByRole('rowheader')).toHaveLength(0)
+  expect(within(section).queryByText(copy.noResults)).not.toBeInTheDocument()
+  expect(within(section).queryByRole('button', { name: copy.clear })).not.toBeInTheDocument()
+  const before = requests.mock.mock.calls.length
+  const search = within(section).getByRole('searchbox')
+  fireEvent.change(search, { target: { value: 'unmatched' } })
+  expect(within(section).getByText(copy.noResults)).toBeVisible()
+  fireEvent.click(within(section).getByRole('button', { name: copy.clear }))
+  expect(search).toHaveFocus(); expect(search).toHaveValue('')
+  expect(within(section).getByRole('table')).toBeVisible()
+  expect(within(section).queryByText(copy.noResults)).not.toBeInTheDocument()
+  expect(requests.mock.mock.calls).toHaveLength(before)
+})
 test.each(['superadmin', 'platform_operator'])('%s has the action column and plan-wide two-step save', async (role) => {
   setup(); open(role); await review()
   expect(puts()).toHaveLength(0)

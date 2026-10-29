@@ -65,11 +65,11 @@ function Quotas() {
   function reload() { setAttempt((count) => count + 1) }
   const data = result?.context === context ? result : null
   const posture = data?.tenant.overallPosture ?? 'unknown'
-  const knownPosture = Object.hasOwn(es.posture, posture) ? posture : 'unknown'
+  const postureLabel = Object.hasOwn(es.posture, posture) ? t(`posture.${posture}`) : posture.replace(/_/g, ' ')
   const tone = posture.includes('breach') || posture.includes('exceeded') ? 'destructive' : posture.includes('warning') ? 'warning' : posture === 'within_limit' ? 'success' : 'neutral'
   const header = <PageHeader as="div" wrapTitle={true} title={t('title')} titleRef={heading} description={tenants.find((tenant) => tenant.tenantId === activeTenantId)?.displayName ?? t('activeTenant')}
     breadcrumbs={null} status="" statuses={{}} actions={[]} tabs={null}
-    meta={[{ label: t('postureLabel'), value: <StatusTag status={posture} label={t(`posture.${knownPosture}`)} statuses={{ [posture]: { label: t(`posture.${knownPosture}`), tone } }} uppercase={false} />, mono: false },
+    meta={[{ label: t('postureLabel'), value: <StatusTag status={posture} label={postureLabel} statuses={{ [posture]: { label: postureLabel, tone } }} uppercase={false} />, mono: false },
       { label: t('evaluated'), value: <Timestamp value={data?.tenant.evaluatedAt ?? ''} locale={language.language} format="absolute" dateOptions={{ dateStyle: 'medium', timeStyle: 'short' }} live={false} tooltip={false} fallback={t('missing')} />, mono: false }]}
     labels={{ title: t('title'), description: t('activeTenant'), moreActions: t('actions'), sections: t('title') }} />
   return <Page width="full" header={header} title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} className="console-quotas min-w-0 space-y-6 wrap-anywhere">
@@ -104,7 +104,7 @@ function QuotaTable({ scope, posture, canAdjust, onAdjust }: { scope: 'tenant' |
     <SectionHeader title={t(scope)} description={t('count', { count: posture.dimensions.length })} count={undefined} actions={[]} as="h2" bordered={true} headingId={`quota-${scope}`} className="min-w-0" />
     <PageToolbar search={search} defaultSearch="" onSearchChange={setSearch} searchLabel={t('searchLabel', { scope: t(scope) })} searchPlaceholder={t('searchPlaceholder')}
       views={[]} view="" defaultView="" onViewChange={undefined} filters={null} primaryAction={null} aria-label={t('searchLabel', { scope: t(scope) })} className="min-w-0" />
-    {!rows.length ? <EmptyState title={t('noResults')} description={t('noResultsDescription')} icon={undefined} primaryAction={null} secondaryAction={null} titleAs="h3" bordered={false}>
+    {!rows.length && search !== '' ? <EmptyState title={t('noResults')} description={t('noResultsDescription')} icon={undefined} primaryAction={null} secondaryAction={null} titleAs="h3" bordered={false}>
       <Button type="button" variant="secondary" onClick={() => { setSearch(''); section.current?.querySelector<HTMLInputElement>('input')?.focus() }}>{t('clear')}</Button>
     </EmptyState> : <Table aria-label={caption} containerLabel={caption} density="comfortable" stickyHeader={false} className="quota-table w-full" containerClassName="min-w-0 max-w-full">
       <TableCaption>{caption}</TableCaption>

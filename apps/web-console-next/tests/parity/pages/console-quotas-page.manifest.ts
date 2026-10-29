@@ -13,8 +13,8 @@ export const quotasTenant: QuotaPostureResponse = {
   ],
 }
 export const quotasWorkspace: QuotaPostureResponse = { ...quotasTenant, hardLimitBreaches: [], dimensions: quotasTenant.dimensions!.filter((_, index) => [0, 3, 4].includes(index)) }
-export const overviewTenant = { generatedAt: '2026-06-01T12:00:00Z', overallPosture: 'hard_limit_breached', hardLimitDimensions: ['max_requests'] }
-export const overviewWorkspace = { ...overviewTenant, overallPosture: 'within_limit', hardLimitDimensions: [] }
+export const overviewTenant = { generatedAt: '2026-06-01T12:00:00Z', overallPosture: 'critical', hardLimitDimensions: ['max_requests'] }
+export const overviewWorkspace = { ...overviewTenant, overallPosture: 'healthy', hardLimitDimensions: [] }
 export const tenantPlanReady = { assignment: { planId: 'synthetic-plan' }, plan: { id: 'synthetic-plan', displayName: 'Synthetic Shared Plan', status: 'active' } }
 const ok = (body: unknown) => ({ status: 200, body })
 const error = (status: number, code = `HTTP_${status}`) => ({ status, body: { code, message: 'synthetic-error', requestId: `req_synthetic_quotas_${status}` } })
@@ -28,8 +28,11 @@ export const quotaEndpoints: Record<string, PageEndpoint> = {
     'quotas-401': error(401), 'quotas-403': error(403), 'quotas-404': error(404), 'quotas-500': error(500), 'quotas-network': { network: true },
     'quotas-500-then-ok': [error(500), tenantOk],
   } },
-  'quotas.tenantOverview': { method: 'GET', path: '/v1/metrics/tenants/{id}/overview', fixtures: { success: ok(overviewTenant), 'overview-tenant': ok(overviewTenant) } },
-  'quotas.workspace': { method: 'GET', path: '/v1/metrics/workspaces/{id}/quotas', fixtures: { success: ok(quotasWorkspace), 'quotas-workspace': ok(quotasWorkspace), '404': error(404), '500': error(500) } },
+  'quotas.tenantOverview': { method: 'GET', path: '/v1/metrics/tenants/{id}/overview', fixtures: {
+    success: ok(overviewTenant), 'overview-tenant': ok(overviewTenant),
+    ...Object.fromEntries(['healthy', 'hard_limit_reached', 'soft_limit_exceeded', 'evidence_degraded', 'evidence_unavailable', 'unbounded'].map((overallPosture) => [overallPosture, ok({ ...overviewTenant, overallPosture })])),
+  } },
+  'quotas.workspace': { method: 'GET', path: '/v1/metrics/workspaces/{id}/quotas', fixtures: { success: ok(quotasWorkspace), 'quotas-workspace': ok(quotasWorkspace), empty: ok({ dimensions: [] }), '404': error(404), '500': error(500) } },
   'quotas.workspaceOverview': { method: 'GET', path: '/v1/metrics/workspaces/{id}/overview', fixtures: { success: ok(overviewWorkspace), 'overview-workspace': ok(overviewWorkspace) } },
   'quotas.plan': { method: 'GET', path: '/v1/tenants/{id}/plan', fixtures: {
     success: ok(tenantPlanReady), 'tenant-plan-ready': ok(tenantPlanReady),

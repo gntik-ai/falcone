@@ -86,6 +86,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       try { await open(parity); }
       finally { if (locale === 'en') await parity.page.unroute(`**/${entry}`, clearPreference); }
       await expect(surface(parity).getByRole('table')).toHaveCount(2);
+      await expect(surface(parity).getByText('critical', { exact: true })).toBeVisible();
       await expect(surface(parity).getByRole('rowheader')).toHaveCount(9);
       const tenantTable = surface(parity).getByRole('table').first();
       for (const row of quotasTenant.dimensions) await expect(tenantTable.getByRole('rowheader', { name: row.displayName, exact: true })).toBeVisible();
@@ -101,6 +102,11 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(search).toBeFocused(); await expect(tenantTable.getByRole('rowheader')).toHaveCount(6);
       expect(parity.network.requests).toHaveLength(before);
       allowlist(parity); await check.assertLocale(parity);
+      for (const posture of ['healthy', 'hard_limit_reached', 'soft_limit_exceeded', 'evidence_degraded', 'evidence_unavailable', 'unbounded']) {
+        await open(parity, { 'quotas.tenantOverview': posture });
+        await expect(surface(parity).getByText(posture.replace(/_/g, ' '), { exact: true })).toBeVisible();
+        await check.assertLocale(parity);
+      }
     });
     test('action', async ({ parity }) => {
       await open(parity);
@@ -158,6 +164,19 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       }
       await open(parity, { tenants: 'empty' }); await expect(surface(parity).getByText(copy.blocked, { exact: true })).toBeVisible();
       await open(parity, { workspaces: 'empty' }); await expect(surface(parity).getByRole('table')).toHaveCount(1);
+      await open(parity, { 'quotas.workspace': 'empty' });
+      const workspace = surface(parity).getByRole('region', { name: copy.workspace });
+      await expect(workspace.getByText(locale === 'es' ? '0 dimensiones' : '0 dimensions', { exact: true })).toBeVisible();
+      await expect(workspace.getByRole('table')).toBeVisible();
+      await expect(workspace.getByRole('rowheader')).toHaveCount(0);
+      await expect(workspace.getByText(copy.noResults, { exact: true })).toHaveCount(0);
+      await expect(workspace.getByRole('button', { name: copy.clear })).toHaveCount(0);
+      const beforeSearch = parity.network.requests.length;
+      const search = workspace.getByRole('searchbox');
+      await search.fill('unmatched'); await expect(workspace.getByText(copy.noResults, { exact: true })).toBeVisible();
+      await workspace.getByRole('button', { name: copy.clear }).click();
+      await expect(search).toBeFocused(); await expect(search).toHaveValue(''); await expect(workspace.getByRole('table')).toBeVisible();
+      expect(parity.network.requests).toHaveLength(beforeSearch);
       await open(parity, { 'quotas.tenant': 'quotas-500-then-ok' });
       await surface(parity).getByRole('button', { name: copy.retry }).click(); await expect(surface(parity).getByRole('table')).toHaveCount(2);
       if (role === 'superadmin') {
@@ -228,6 +247,9 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await info.attach(`${name}-${locale}-${width}-${createHash('sha256').update(body).digest('hex')}`, { body, contentType: 'image/png' });
       }
       for (const variant of ['success', 'empty', '404', '500']) { await open(parity, { 'quotas.tenant': variant }); await capture(variant); }
+      await open(parity, { 'quotas.workspace': 'empty' }); await capture('empty-workspace');
+      await open(parity, { 'quotas.tenantOverview': 'healthy' }); await capture('healthy-posture');
+      await open(parity, { 'quotas.tenantOverview': 'hard_limit_reached' }); await capture('hard-limit-reached-posture');
       await open(parity, { tenants: 'empty' }); await capture('blocked');
       await open(parity); await capture(role);
       await withRole(parity, server, ['member']); await capture('plain-member');
