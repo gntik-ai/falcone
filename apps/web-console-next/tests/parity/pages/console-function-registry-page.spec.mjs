@@ -80,7 +80,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         const retry = surface(parity).getByRole('button', { name: copy(parity).retry, exact: true });
         await expect(retry).toBeFocused();
         for (const [key, value] of [['name', 'billing-sync'], ['runtime', 'nodejs:18'], ['handler', 'run']]) await expect(input(parity, key)).toHaveValue(value);
-        await expect(parity.page.locator('[aria-live="assertive"]')).toContainText(copy(parity).registerError);
+        // The shell and page each own a live region; exactly one must announce this failure.
+        await expect(parity.page.locator('[aria-live="assertive"]').filter({ hasText: copy(parity).registerError })).toHaveCount(1);
         if (variant === 'register-500') await expect(surface(parity).getByText('req_synthetic_register', { exact: true })).toBeVisible();
         await check.assertAccessibility(parity); await retry.click(); await expect(input(parity, 'name')).toHaveValue(''); await expect(input(parity, 'name')).toBeFocused();
         expect(calls(parity).slice(start)).toEqual([{ method: 'POST', path: functionsPath, body: { name: 'billing-sync', runtime: 'nodejs:18', handler: 'run' } }, { method: 'POST', path: functionsPath, body: { name: 'billing-sync', runtime: 'nodejs:18', handler: 'run' } }, { method: 'GET', path: functionsPath, body: undefined }]);
