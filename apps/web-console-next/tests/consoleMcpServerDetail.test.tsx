@@ -10,6 +10,7 @@ import { login, strictFetch } from './shell-support'
 import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-mcp-server-detail-page.json'
 import en from '../src/locales/en/pages.console-mcp-server-detail-page.json'
+import { forbiddenMcpCopy, mcpLocaleValues } from './parity/pages/consoleMcpServerDetail.locale'
 const context = vi.hoisted(() => ({ value: {} as Record<string, unknown>, roles: ['superadmin'] }))
 vi.mock('../src/shell/context', () => ({ useConsoleContext: () => context.value }))
 vi.mock('../src/shell/permissions', () => ({ usePermissions: () => getConsolePermissions(context.roles) }))
@@ -110,6 +111,28 @@ test.each([403, 404, 500, 'network'] as const)('load %s shows its approved state
 test('500 without a gateway request id leaves diagnostics absent', async () => {
   setup({ [`GET ${detailPath}`]: () => Response.json({}, { status: 500 }) }); open(); await screen.findByRole('heading', { name: es.errorTitle })
   expect(screen.queryByText(es.requestId)).toBeNull(); expect(screen.queryByText('req_synthetic_mcp')).toBeNull()
+})
+
+const errorLocaleCases = (['es', 'en'] as const).flatMap((locale) =>
+  ['403', '404', '500', 'network'].map((variant) => ({ locale, variant })))
+test.each(errorLocaleCases)('load $variant copy is localized in $locale before any retry', async ({ locale, variant }) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
+  const response = detailResponse(variant)
+  setup({ [`GET ${detailPath}`]: () => {
+    if (response.network) throw new TypeError('Raw network failure')
+    return Response.json(response.body, { status: response.status })
+  } })
+  vi.spyOn(Element.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  open()
+  const title = copy[variant === '403' ? 'noAccess' : variant === '404' ? 'notFound' : 'errorTitle']
+  await screen.findByRole('heading', { name: title })
+  const values = mcpLocaleValues(), forbidden = await forbiddenMcpCopy(locale)
+  expect(values).toContain(title)
+  expect(values.filter((text) => /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/.test(text) || (locale === 'es' && forbidden.has(text)))).toEqual([])
+  expect(screen.queryByTestId('mcp-server-detail')).toBeNull()
+  expect(screen.queryByText('synthetic-backend-reason')).toBeNull()
+  expect(calls()).toEqual([{ method: 'GET', path: detailPath, body: undefined }])
 })
 
 test('shows the server skeleton until the single GET resolves under StrictMode', async () => {

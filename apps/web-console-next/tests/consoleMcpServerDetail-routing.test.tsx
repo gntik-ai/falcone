@@ -72,10 +72,12 @@ test.each(['link', 'navigate'])('%s arrival resolves the lazy page through the s
   await screen.findByRole('heading', { name: 'Acme Orders' }, routeWait)
 })
 
-test.each(['es', 'en'] as const)('workspace-required copy belongs to the MCP page in %s without sending a detail GET', async (locale) => {
+const workspaceLocaleCases = (['es', 'en'] as const).flatMap((locale) =>
+  ['superadmin', 'tenant_owner', 'tenant_viewer'].map((role) => ({ locale, role })))
+test.each(workspaceLocaleCases)('workspace-required copy belongs to the MCP page in $locale for $role without sending a detail GET', async ({ locale, role }) => {
   await i18n.changeLanguage(locale)
   const copy = locale === 'es' ? es : en
-  setup()
+  setup('success', [role])
   requests = strictFetch({
     [`GET ${tenantUrl}`]: buildTenantCollectionFixture(),
     [`GET ${workspaceUrl('synthetic-tenant')}`]: { items: [] },
@@ -86,9 +88,13 @@ test.each(['es', 'en'] as const)('workspace-required copy belongs to the MCP pag
     await screen.findByRole('heading', { name: copy.workspaceRequired }, routeWait)
     expect(screen.getByRole('heading', { level: 1, name: copy.title })).toBeVisible()
     expect(screen.getByText(copy.workspaceDescription)).toBeVisible()
-    expect(screen.getByRole('link', { name: copy.createWorkspace })).toHaveAttribute('href', '/console/workspaces')
+    if (role === 'tenant_viewer') {
+      expect(screen.getByText(copy.workspaceDenied)).toBeVisible()
+      expect(screen.queryByRole('link', { name: copy.createWorkspace })).toBeNull()
+    } else expect(screen.getByRole('link', { name: copy.createWorkspace })).toHaveAttribute('href', '/console/workspaces')
     const values = mcpLocaleValues(), forbidden = await forbiddenMcpCopy(locale)
     expect(values).toContain(copy.workspaceRequired)
+    expect(values).not.toContain('Select workspace')
     expect(values.filter((text) => /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/.test(text) || (locale === 'es' && forbidden.has(text)))).toEqual([])
     expect(document.documentElement.lang).toBe(locale)
     expect(requests.mock.mock.calls.filter(([url]) => url === detailPath)).toHaveLength(0)

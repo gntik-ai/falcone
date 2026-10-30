@@ -117,6 +117,8 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
           await expect(surface(parity).getByText('synthetic-backend-reason', { exact: true })).toHaveCount(0);
           if (variant === '404') await expect(surface(parity).getByRole('link', { name: copy(parity).backOverview, exact: true })).toHaveAttribute('href', '/console/overview');
           if (variant === '500') await expect(surface(parity).getByText('req_synthetic_mcp', { exact: true })).toBeVisible();
+          // Validate the failure itself before retry replaces it with the loaded detail.
+          await check.assertLocale(parity);
           if (variant === '500' || variant === 'network') { state.get(parity).variant = 'success'; await button(parity, 'retry').click(); await ready(parity); expect(state.get(parity).reads).toBe(2); }
         }
         await check.assertLocale(parity);
