@@ -50,7 +50,7 @@ env:
 
 jobs:
   preflight:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions: {}
     steps:
       - name: Check Docker Hub credentials
@@ -80,7 +80,7 @@ jobs:
       group: release-images-publish-${{ matrix.image }}
       cancel-in-progress: false
       queue: max
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -364,7 +364,7 @@ jobs:
   # Registry work is isolated: this queue never holds the GHCR build/push group.
   dockerhub-publish:
     needs: build-push
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read

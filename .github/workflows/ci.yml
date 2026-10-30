@@ -18,7 +18,7 @@ env:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -308,7 +308,7 @@ jobs:
           if-no-files-found: error
 
   http-idempotency:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       HTTP_IDEMPOTENCY_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
       HTTP_IDEMPOTENCY_TEST_REQUIRED: '1'
@@ -392,7 +392,7 @@ jobs:
         run: node --test tests/unit/http-idempotency-server.test.mjs
 
   web-console:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -418,7 +418,7 @@ jobs:
         run: pnpm --filter @in-falcone/web-console test
 
   web-console-next:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -509,7 +509,7 @@ jobs:
         run: docker build -f apps/web-console/Dockerfile .
 
   ui-parity-structure:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -536,7 +536,7 @@ jobs:
           pnpm --filter @in-falcone/web-console-next parity:validate
 
   ui-parity-shards:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -577,7 +577,7 @@ jobs:
           retention-days: 7
 
   ui-parity-negatives:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -614,7 +614,7 @@ jobs:
           retention-days: 7
 
   ui-parity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [ui-parity-structure, ui-parity-shards, ui-parity-negatives]
     if: always()
     steps:
@@ -629,7 +629,7 @@ jobs:
           done
 
   security:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -682,7 +682,7 @@ jobs:
     # executor real-stack slice — incl. the vector-search cross-tenant KNN probe,
     # RLS, data/DDL/realtime executors — against a REAL database. These prove the
     # tenant-isolation guarantees that in-memory unit tests cannot.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # The tests/env compose stack uses a FIXED compose project name (falcone-testenv) and a
     # FIXED host port (55432). On a shared Docker host (self-hosted runners), two concurrent
     # real-stack runs collide ("address already in use" / container-name conflict, issue #413).
