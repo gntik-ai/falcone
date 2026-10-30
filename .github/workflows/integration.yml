@@ -19,7 +19,7 @@ env:
 jobs:
   plan-enforcement:
     name: Plan-enforcement integration
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # The kind cluster name is fixed, so scheduled and manually dispatched runs
     # must not overlap on a shared runner.
     concurrency:

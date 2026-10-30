@@ -103,7 +103,7 @@ function assertParityWorkflow(ci) {
   for (const name of [...names, 'ui-parity']) {
     const job = ci.jobs[name];
     assert.ok(job, `${name} must run on every PR and push`);
-    assert.equal(job['runs-on'], 'ubuntu-latest');
+    assert.equal(job['runs-on'], 'ubuntu-24.04');
     const { steps, ...properties } = job;
     inspect(properties, name === 'ui-parity');
     for (const step of steps) inspect(step, step.uses?.startsWith('actions/upload-artifact@'));

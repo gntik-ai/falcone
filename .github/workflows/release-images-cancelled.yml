@@ -10,7 +10,7 @@ permissions: {}
 jobs:
   report-cancellation:
     if: github.event.workflow_run.conclusion == 'cancelled'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Fail on cancelled release run
         env:

@@ -157,7 +157,7 @@ test('bbx-1026-001: release images publishes tag pushes and serializes duplicate
   assert.deepEqual(buildPush.concurrency, {
     group: 'release-images-publish-${{ matrix.image }}', 'cancel-in-progress': false, queue: 'max',
   });
-  assert.equal(buildPush?.['runs-on'], 'ubuntu-latest');
+  assert.equal(buildPush?.['runs-on'], 'ubuntu-24.04');
   assert.equal(buildPush?.strategy?.matrix?.include?.length, 6);
   assert.doesNotMatch(workflowText, /self-hosted/i);
 });
