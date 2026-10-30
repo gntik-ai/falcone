@@ -156,8 +156,8 @@ function assertParityWorkflow(ci) {
 test('ui-parity is an unconditional isolated job with pinned actions and downloadable reports', () => {
   assertParityWorkflow(YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8')));
   const config = readFileSync('apps/web-console-next/tests/parity/playwright.config.mjs', 'utf8');
-  assert.match(config, /workers: 1/);
-  assert.match(config, /retries: 0/);
+  assert.match(config, /\bworkers: 1,/);
+  assert.match(config, /\bretries: 0,/);
   assert.match(config, /fullyParallel: true/);
 });
 
