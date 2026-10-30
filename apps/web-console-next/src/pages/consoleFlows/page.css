@@ -1,0 +1,20 @@
+/* Creation is click-only; hide the kit search and saved-view controls. */
+.console-flows-toolbar div:has(> input[type="search"]) {
+  display: none;
+}
+.console-flows-toolbar > div:first-child {
+  display: block;
+  flex-basis: 100%;
+}
+.console-flows-toolbar > div:last-child {
+  display: none;
+}
+.console-flows table {
+  table-layout: fixed;
+  width: 100%;
+}
+@media (min-width: 640px) {
+  .console-flows table {
+    table-layout: auto;
+  }
+}
