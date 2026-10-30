@@ -12,6 +12,8 @@ import { isMigratedRoute } from '../src/shell/navigation'
 let requests: ReturnType<typeof strictFetch>
 afterEach(() => requests?.verify())
 const calls = () => requests.mock.mock.calls
+// Route arrivals include lazy modules, shell bootstrap and (for 401) refresh/replay.
+const routeWait = { timeout: 5000 }
 function setup(variant = 'success', roles = ['superadmin']) {
   const initial = login(roles)
   const fresh = buildConsoleRefreshSessionFixture(); fresh.principal = initial.principal
@@ -30,7 +32,7 @@ function open(basename?: string) { return render(<MemoryRouter basename={basenam
 
 test.each(['superadmin', 'tenant_viewer', 'workspace_viewer'])('the history route has no role gate for %s, and resolves under /next', async (role) => {
   setup('success', [role])
-  open('/next'); await screen.findByTitle(executionId)
+  open('/next'); await screen.findByTitle(executionId, {}, routeWait)
   expect(calls().filter(([url]) => url === historyPath)).toHaveLength(1)
   expect(pendingConsoleRoutes.find(({ path }) => path === 'flows')?.migrated).not.toBe(true)
   expect(isMigratedRoute('/console/flows/f1/runs')).toBe(true)
@@ -43,14 +45,14 @@ test.each(['ok', 'rejected', 'repeat'])('401 %s refreshes once with the correct 
   const unsubscribe = subscribeConsoleSessionInvalidated(() => invalidations++)
   try {
     open()
-    if (variant === 'ok') await screen.findByTitle(executionId)
+    if (variant === 'ok') await screen.findByTitle(executionId, {}, routeWait)
     else if (variant === 'rejected') {
-      await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })
+      await screen.findByRole('heading', { name: 'Accede a In Falcone Console' }, routeWait)
       expect(readProtectedRouteIntent()).toBe('/console/flows/f1/runs')
       expect(readConsoleShellSession()).toBeNull()
       expect(invalidations).toBe(1)
     } else {
-      await screen.findByRole('heading', { name: 'No se pudieron cargar las ejecuciones' })
+      await screen.findByRole('heading', { name: 'No se pudieron cargar las ejecuciones' }, routeWait)
       expect(readConsoleShellSession()?.tokenSet?.accessToken).toBe(fresh.tokenSet?.accessToken)
       expect(invalidations).toBe(0)
       expect(screen.queryByRole('heading', { name: 'Accede a In Falcone Console' })).toBeNull()
@@ -76,8 +78,8 @@ function TriggerArrival() {
 test('navigate arrival preserves the trigger state without a synchronous suspension error', async () => {
   setup(); render(<MemoryRouter initialEntries={['/console/profile']}><TriggerArrival /></MemoryRouter>)
   fireEvent.click(screen.getByRole('button', { name: 'Open triggered history' }))
-  await waitFor(() => expect(screen.getByTestId('flow-trigger-success')).toHaveTextContent('synthetic-schedule'))
-  await screen.findByTitle(executionId)
+  await waitFor(() => expect(screen.getByTestId('flow-trigger-success')).toHaveTextContent('synthetic-schedule'), routeWait)
+  await screen.findByTitle(executionId, {}, routeWait)
 })
 
 test('workspace retry recovers the shell bootstrap and waits for a picker before listing executions', async () => {
@@ -92,15 +94,15 @@ test('workspace retry recovers the shell bootstrap and waits for a picker before
     [`GET ${historyPath}`]: firstPage,
   })
   open()
-  const pageTitle = await screen.findByRole('heading', { name: 'No se pudieron cargar las áreas de trabajo' })
+  const pageTitle = await screen.findByRole('heading', { name: 'No se pudieron cargar las áreas de trabajo' }, routeWait)
   const panel = pageTitle.closest('section')!
   fireEvent.click(within(panel).getByRole('button', { name: 'Reintentar' }))
-  const picker = await screen.findByRole('combobox', { name: 'Seleccionar área de trabajo' })
+  const picker = await screen.findByRole('combobox', { name: 'Seleccionar área de trabajo' }, routeWait)
   expect(calls().filter(([url]) => url === historyPath)).toHaveLength(0)
   fireEvent.click(picker)
-  const item = await screen.findByRole('option', { name: 'Synthetic Workspace' })
+  const item = await screen.findByRole('option', { name: 'Synthetic Workspace' }, routeWait)
   fireEvent.pointerDown(item); fireEvent.click(item)
-  await screen.findByTitle(executionId)
+  await screen.findByTitle(executionId, {}, routeWait)
   expect(calls().filter(([url]) => url === historyPath)).toHaveLength(1)
   expect(loads).toBe(2)
 })

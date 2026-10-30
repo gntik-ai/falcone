@@ -12,6 +12,8 @@ import en from '../src/locales/en/pages.console-flow-history-page.json'
 import { getConsolePermissions } from '@in-falcone/console-api/permissions'
 // @ts-expect-error Browser helpers intentionally use native JavaScript modules.
 import { installSession } from './browser-session.mjs'
+// @ts-expect-error Browser helpers intentionally use native JavaScript modules.
+import { seedHistoryPrincipal } from './parity/pages/console-flow-history-page.session.mjs'
 
 const context = vi.hoisted(() => ({ value: {} as Record<string, unknown> }))
 let canCreate = true
@@ -42,6 +44,22 @@ beforeEach(() => {
   context.value = { activeWorkspaceId: 'synthetic-workspace', loading: false, error: null, workspaces: [], selectWorkspace: vi.fn(), reloadTenants: vi.fn() }
 })
 afterEach(() => requests?.verify())
+
+test.each(['before', 'after'])('browser principal overrides survive harness seeding %s their registration', (order) => {
+  const key = 'in-falcone.console-shell-session'
+  const readyState = vi.spyOn(document, 'readyState', 'get').mockReturnValue('loading')
+  const seed = () => { login(['superadmin'], ['synthetic-tenant'], ['synthetic-workspace']) }
+  if (order === 'before') seed()
+  seedHistoryPrincipal({ workspaceIds: ['synthetic-workspace', 'synthetic-other'], platformRoles: ['tenant_viewer'] })
+  if (order === 'after') seed()
+  expect(JSON.parse(sessionStorage.getItem(key)!).principal.workspaceIds).toEqual(['synthetic-workspace'])
+  readyState.mockReturnValue('interactive')
+  document.dispatchEvent(new Event('readystatechange'))
+  const principal = JSON.parse(sessionStorage.getItem(key)!).principal
+  expect(principal.workspaceIds).toEqual(['synthetic-workspace', 'synthetic-other'])
+  expect(principal.platformRoles).toEqual(['tenant_viewer'])
+  expect(principal.tenantIds).toEqual(['synthetic-tenant'])
+})
 
 test.each(['es', 'en'] as const)('renders the legacy fields, links and localized controls in %s without sample copy', async (locale) => {
   await i18n.changeLanguage(locale); setup(); open(); await ready()

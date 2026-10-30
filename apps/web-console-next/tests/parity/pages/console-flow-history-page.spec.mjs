@@ -4,6 +4,7 @@ import manifest, { historyPath, historyResponse, executionId } from './console-f
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
+import { seedHistoryPrincipal } from './console-flow-history-page.session.mjs';
 
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale,
   JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-flow-history-page.json`, import.meta.url), 'utf8')),
@@ -202,13 +203,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await check.assertRuntimeHealth(parity);
     });
     test('workspace loading, picker and activation', async ({ parity, server }) => {
-      await parity.page.addInitScript(() => {
-        const key = 'in-falcone.console-shell-session';
-        const session = JSON.parse(sessionStorage.getItem(key));
-        // Both options must survive the shell's membership filter to require a choice.
-        session.principal.workspaceIds = ['synthetic-workspace', 'synthetic-other'];
-        sessionStorage.setItem(key, JSON.stringify(session));
-      });
+      // Both options must survive the shell's membership filter to require a choice.
+      const workspaceIds = ['synthetic-workspace', 'synthetic-other'];
+      await parity.page.addInitScript(seedHistoryPrincipal, { workspaceIds });
       let release;
       const waiting = new Promise((resolve) => { release = resolve; });
       await parity.page.route((url) => url.pathname === '/v1/workspaces', async (route) => {
@@ -223,6 +220,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       states.set(parity, { variant: 'page1-with-token', attempt: 0, authorizations: [] });
       await parity.page.goto(server.url('console/flows/f1/runs'));
       await expect(parity.page.getByRole('status', { name: copy(parity).workspaceLoading, exact: true })).toBeVisible();
+      expect(await parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-shell-session')).principal.workspaceIds)).toEqual(workspaceIds);
       expect(calls(parity)).toHaveLength(0);
       release();
       const picker = parity.page.getByRole('combobox', { name: copy(parity).workspaceLabel, exact: true });
@@ -238,12 +236,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await open(parity, 'page1-with-token', { workspaces: 'empty' });
       await expect(parity.page.getByRole('link', { name: copy(parity).createWorkspace, exact: true })).toHaveAttribute('href', '/console/workspaces');
       expect(calls(parity)).toHaveLength(0);
-      await parity.page.addInitScript(() => {
-        const key = 'in-falcone.console-shell-session';
-        const session = JSON.parse(sessionStorage.getItem(key));
-        session.principal.platformRoles = ['tenant_viewer'];
-        sessionStorage.setItem(key, JSON.stringify(session));
-      });
+      await parity.page.addInitScript(seedHistoryPrincipal, { platformRoles: ['tenant_viewer'] });
       await open(parity, 'page1-with-token', { workspaces: 'empty' });
       await expect(parity.page.getByText(copy(parity).workspaceDenied, { exact: true })).toBeVisible();
       await expect(parity.page.getByRole('link', { name: copy(parity).createWorkspace, exact: true })).toHaveCount(0);
