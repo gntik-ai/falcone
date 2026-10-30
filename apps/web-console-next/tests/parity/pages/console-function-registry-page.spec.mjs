@@ -137,7 +137,13 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     test('visual-review', async ({ parity }, info) => {
       for (const [name, variants] of [['populated', {}], ['empty', { 'function-registry': 'list-empty' }], ['list-500', { 'function-registry': 'list-500' }], ['register-500', { 'function-register': 'register-500' }]]) {
         await parity.open(manifest.route, variants);
-        if (name === 'register-500') { await input(parity, 'name').fill('billing-sync'); await form(parity).getByRole('button', { name: copy(parity).register, exact: true }).click(); await expect(surface(parity).getByRole('button', { name: copy(parity).retry, exact: true })).toBeFocused(); }
+        if (name === 'populated' || name === 'register-500') await ready(parity);
+        if (name === 'empty') await expect(surface(parity).getByText(copy(parity).empty, { exact: true })).toBeVisible();
+        if (name === 'list-500') {
+          await expect(surface(parity).getByRole('heading', { name: copy(parity).listError, exact: true })).toBeVisible();
+          await expect(surface(parity).getByText('req_synthetic_functions', { exact: true })).toBeVisible();
+        }
+        if (name === 'register-500') { await input(parity, 'name').fill('billing-sync'); await form(parity).getByRole('button', { name: copy(parity).register, exact: true }).click(); await expect(surface(parity).getByRole('button', { name: copy(parity).retry, exact: true })).toBeFocused(); await expect(surface(parity).getByText('req_synthetic_register', { exact: true })).toBeVisible(); }
         await check.assertLocale(parity); await screenshot(parity, info, name);
       }
     });
@@ -146,11 +152,26 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(surface(parity).getByRole('searchbox')).toHaveCount(0); await check.assertLocale(parity);
     });
     test('standalone list loading permits registration', async ({ parity, server }) => {
-      parity.network.setVariants({ 'function-registry': 'list-pending' });
-      await parity.page.goto(server.url('console/functions-registry'));
-      await expect(surface(parity).locator('[aria-busy="true"]').first()).toBeVisible();
-      await input(parity, 'name').fill('   '); await expect(form(parity).getByRole('button')).toBeDisabled();
-      await input(parity, 'name').fill('new-function'); await expect(form(parity).getByRole('button')).toBeEnabled();
+      let release;
+      const held = new Promise((resolve) => { release = resolve; });
+      await parity.page.route((url) => url.pathname === functionsPath && !url.search, async (route) => {
+        if (route.request().method() !== 'GET') return route.fallback();
+        parity.network.requests.push({ method: 'GET', path: functionsPath, body: undefined });
+        await held;
+        await route.fulfill({ json: functionRows });
+      });
+      try {
+        await parity.page.goto(server.url('console/functions-registry'));
+        const loading = surface(parity).locator('[aria-busy="true"]').first();
+        await expect(loading).toBeVisible();
+        await input(parity, 'name').fill('   '); await expect(form(parity).getByRole('button')).toBeDisabled();
+        await input(parity, 'name').fill('new-function'); await expect(form(parity).getByRole('button')).toBeEnabled();
+        await expect(loading).toBeVisible();
+        expect(calls(parity)).toEqual([{ method: 'GET', path: functionsPath, body: undefined }]);
+        release(); await ready(parity);
+      } finally {
+        release();
+      }
     });
     test('workspace retry, picker and activation', async ({ parity }) => {
       await parity.page.addInitScript(seedHistoryPrincipal, { workspaceIds: ['synthetic-workspace', 'synthetic-other'] });
