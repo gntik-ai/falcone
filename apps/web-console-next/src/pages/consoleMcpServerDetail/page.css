@@ -1,0 +1,11 @@
+/* The shell owns the landmark; long resource names must remain readable. */
+.console-mcp-server-detail h1 {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* DescriptionListCard uses sm columns; this page's approved breakpoint is md. */
+@media (width < 768px) {
+  .mcp-description > div:last-child {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
