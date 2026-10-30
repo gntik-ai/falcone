@@ -108,3 +108,31 @@ export function setQuotaPlanLimit(planId: string, dimensionKey: string, value: n
   return requestConsoleSessionJson<{ planId: string; dimensionKey: string; newValue: number; source: string }>(
     `/v1/plans/${planId}/limits/${dimensionKey}`, { method: 'PUT', body: { value } })
 }
+
+// Pinned to planManagementApi's workspace consumption contract until OpenAPI publication.
+export interface WorkspaceConsumptionResponse {
+  tenantId: string
+  workspaceId: string
+  snapshotAt: string
+  dimensions: Array<{
+    dimensionKey: string
+    displayLabel: string
+    unit?: string | null
+    tenantEffectiveValue: number
+    workspaceLimit: number | null
+    workspaceSource: 'workspace_sub_quota' | 'tenant_shared_pool'
+    currentUsage: number | null
+    usageStatus: 'within_limit' | 'approaching_limit' | 'at_limit' | 'over_limit' | 'unknown'
+    usageUnknownReason?: string | null
+  }>
+  capabilities?: Array<{
+    capabilityKey: string
+    displayLabel?: string
+    enabled: boolean
+    source?: 'plan' | 'catalog_default'
+  }>
+}
+export function getWorkspaceConsumption(workspaceId: string, signal?: AbortSignal): Promise<WorkspaceConsumptionResponse> {
+  return requestConsoleSessionJson<WorkspaceConsumptionResponse>(
+    `/v1/workspaces/${encodeURIComponent(workspaceId)}/consumption`, { method: 'GET', signal })
+}

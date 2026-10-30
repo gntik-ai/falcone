@@ -116,6 +116,7 @@ test('route workspace overrides stored context, then tenant switching clears it 
   login(['tenant_owner'], ['t1', 't2'])
   localStorage.setItem('in-falcone.console-active-context', JSON.stringify({ userId: 'synthetic-user', tenantId: 't1', workspaceId: 'w1', updatedAt: '2026-01-01' }))
   requests = strictFetch({
+    'GET /v1/workspaces/w2/consumption': { workspaceId: 'w2', tenantId: 't1', snapshotAt: '2026-06-01T12:00:00Z', dimensions: [] },
     'GET /v1/tenants/t1': { tenantId: 't1', displayName: 'Tenant One' },
     'GET /v1/tenants/t2': { tenantId: 't2', displayName: 'Tenant Two' },
     [`GET ${workspaceUrl('t1')}`]: { items: [{ workspaceId: 'w1', tenantId: 't1', displayName: 'Workspace One' }, { workspaceId: 'w2', tenantId: 't1', displayName: 'Workspace Two' }] },

@@ -292,7 +292,7 @@ test('the next shell honors the route workspace over stored selection, renders o
   expect(JSON.parse(localStorage.getItem('in-falcone.console-active-context')!).workspaceId).toBe('wrk-1')
   const breadcrumb = screen.getAllByRole('navigation').filter((nav) => nav.querySelector('ol [aria-current="page"]'))
   expect(breadcrumb).toHaveLength(1)
-  for (const href of ['/next/console/overview', '/console/workspaces', '/console/workspaces/wrk-1']) expect(breadcrumb[0].querySelector(`a[href="${href}"]`)).toBeInTheDocument()
+  for (const href of ['/next/console/overview', '/console/workspaces', '/next/console/workspaces/wrk-1']) expect(breadcrumb[0].querySelector(`a[href="${href}"]`)).toBeInTheDocument()
   expect(breadcrumb[0].querySelector('[aria-current="page"]')).toHaveTextContent('Documentación')
   expect(screen.getAllByRole('heading', { level: 1, name: es.title })).toHaveLength(1)
   expect(network.mock.mock.calls.filter(([path]) => String(path).includes('/docs')).map(([path]) => path)).toEqual([url])
