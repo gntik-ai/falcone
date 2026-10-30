@@ -54,7 +54,7 @@ function useErrorMessage() {
   const { t } = useCopy()
   return (cause: unknown, fallback: string, server = false) => {
     const error = failureFrom(cause)
-    // Only trigger failures echo a server message, as the legacy trigger control does.
+    // List access and trigger failures may show server reasons, but never transport defaults.
     if (server && error.status && error.message && !/^HTTP_\d+$/.test(error.message) && !['Request failed', 'Unauthorized', 'Forbidden', 'Not Found', 'Conflict', 'Too Many Requests', 'Internal Server Error', 'Bad Gateway', 'Service Unavailable', 'Gateway Timeout'].includes(error.message)) return error.message
     const status = error.status
     return t(status && [401, 403, 404, 409, 429].includes(status) ? `errors.${status}` : status && status >= 500 ? 'errors.server' : fallback)
@@ -175,7 +175,7 @@ function Flows({ workspaceId }: { workspaceId: string }) {
         <Badge tone="warning" variant="outline" size="md" shape="rounded" dot={false} onRemove={undefined} removeLabel="" tabIndex={0} title={reason} data-testid="flows-read-only-indicator" className={`whitespace-normal wrap-anywhere ${focus}`}>{t('readOnly', { role })}<span className="sr-only"> {reason}</span></Badge>
       </SimpleTooltip>} />
     {createError && (denied ? <Callout title={t('restricted')} description={createError} /> : <Text as="p" variant="body" tone="destructive">{createError}</Text>)}
-    {error?.status === 403 ? <NoAccessEmpty resource={t('title')} owner="" showRequestAccess={false} onRequestAccess={undefined} action={undefined} defaultRequested={false} titleAs="h2" bordered={false} className="min-w-0" labels={{ title: () => t('noAccess'), description: () => error.message || t('errors.403'), request: '', requested: '', sent: '' }} />
+    {error?.status === 403 ? <NoAccessEmpty resource={t('title')} owner="" showRequestAccess={false} onRequestAccess={undefined} action={undefined} defaultRequested={false} titleAs="h2" bordered={false} className="min-w-0" labels={{ title: () => t('noAccess'), description: () => message(error, 'errors.403', true), request: '', requested: '', sent: '' }} />
       : error?.status === 404 ? <NotFoundEmpty icon={undefined} title={t('notFound')} description={t('notFoundDescription')} action={<Link href="/console/workspaces" tone="primary" underline="always" external={false} externalLabel="" className={focus}>{t('backWorkspaces')}</Link>} titleAs="h2" bordered={false} className="min-w-0" />
       : error ? <FailurePanel failure={error} retry={() => setAttempt((current) => current + 1)} />
       : busy ? <section role="status" aria-label={t('loading')} aria-busy={true}><Text variant="body" tone="muted">{t('loadingDescription')}</Text><TableSkeleton rows={6} columns={4} label={t('loading')} className="min-w-0" /></section>

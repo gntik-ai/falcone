@@ -92,6 +92,11 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await check.errorEmpty(parity, manifest);
       await expect(surface(parity).getByText('req_synthetic_flows', { exact: true })).toBeVisible();
       parity.network.setVariants({ 'flows.list': 'success' }); await button(parity, 'retry').click(); await ready(parity);
+      await parity.open(manifest.route, { 'flows.list': '403-empty' });
+      await expect(surface(parity).getByRole('heading', { name: copy(parity).noAccess, exact: true })).toBeVisible();
+      await expect(surface(parity).getByText(copy(parity).errors['403'], { exact: true })).toBeVisible();
+      await expect(surface(parity).getByText(/^(Forbidden|Request failed|HTTP_403)$/)).toHaveCount(0);
+      await expect(surface(parity).getByRole('table')).toHaveCount(0);
       await parity.open(manifest.route, { 'flows.list': 'network' }); await expect(surface(parity).getByRole('heading', { name: copy(parity).errorTitle, exact: true })).toBeVisible();
       await expect(surface(parity).getByRole('table')).toHaveCount(0);
       await parity.open(manifest.route, { 'flows.list': 'empty' });

@@ -13,7 +13,7 @@ export function flowResponse(variant: string, success: unknown = flowRows): Endp
   return { status: 200, body: variant === 'empty' ? { items: [] } : success, ...(variant === 'loading' ? { delayMs: 1500 } : {}) }
 }
 export const flowsEndpoints: Record<string, PageEndpoint> = {
-  'flows.list': { method: 'GET', path: flowsPath, fixtures: Object.fromEntries([...variants, 'success-draft-and-published'].map((variant) => [variant, flowResponse(variant)])) },
+  'flows.list': { method: 'GET', path: flowsPath, fixtures: { ...Object.fromEntries([...variants, 'success-draft-and-published'].map((variant) => [variant, flowResponse(variant)])), '403-empty': { status: 403 } } },
   'flows.post': { method: 'POST', path: flowsPath, fixtures: Object.fromEntries(variants.map((variant) => [variant, flowResponse(variant, { flowId: 'created/1', name: 'Trimmed' })])) },
   'flows.schedule.trigger': { method: 'POST', path: triggerPath, fixtures: Object.fromEntries(variants.map((variant) => [variant, flowResponse(variant, { status: 'triggered', scheduleId: 'synthetic-schedule' })])) },
   ...historyEndpoints,
@@ -25,7 +25,7 @@ export const deliberateChanges = [
 ]
 const manifest: ParityManifest = {
   route: '/console/flows', roles: ['superadmin', 'tenant_owner', 'tenant_viewer', 'workspace_admin', 'workspace_viewer'], endpoints: flowsEndpoints,
-  fixtures: ['flows.list:success-draft-and-published', 'shell:no-workspace', 'shell:workspace-viewer', 'refresh:success', 'refresh:401', ...['flows.list', 'flows.post', 'flows.schedule.trigger'].flatMap((name) => variants.map((variant) => `${name}:${variant}`))],
+  fixtures: ['flows.list:success-draft-and-published', 'flows.list:403-empty', 'shell:no-workspace', 'shell:workspace-viewer', 'refresh:success', 'refresh:401', ...['flows.list', 'flows.post', 'flows.schedule.trigger'].flatMap((name) => variants.map((variant) => `${name}:${variant}`))],
   sources: ['src/pages/consoleFlows.tsx', 'src/pages/consoleFlows'],
   data: [{ name: 'flows title', locator: { es: 'h1:text-is("Flujos")', en: 'h1:text-is("Flows")' } }], actions: [],
   states: [

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { getConsolePermissions } from '@in-falcone/console-api/permissions'
 import ConsoleFlowsPage from '../src/pages/consoleFlows'
 import { createFlowDraft, designerNavigation, flowsPath as pathFor, listFlows, triggerFlowSchedule } from '../src/pages/consoleFlows/api'
-import { flowRows, flowsPath, triggerPath } from './parity/pages/console-flows-page.manifest'
+import { flowRows, flowsPath, triggerPath, flowsEndpoints } from './parity/pages/console-flows-page.manifest'
 import { login, strictFetch } from './shell-support'
 import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-flows-page.json'
@@ -97,6 +97,23 @@ test.each([403, 404, 500, 'network'] as const)('list %s renders the approved sta
   if (status === 404) expect(screen.getByRole('link', { name: es.backWorkspaces })).toHaveAttribute('href', '/console/workspaces')
   if (status === 500) { expect(screen.getByText('500')).toBeVisible(); expect(screen.getByText('req_synthetic_flows')).toBeVisible() }
   if (status === 500 || status === 'network') { fireEvent.click(screen.getByRole('button', { name: es.retry })); await ready(); expect(calls()).toHaveLength(2) }
+})
+
+for (const locale of ['es', 'en'] as const) test.each(['empty', 'status-text', 'missing-message', 'generic-code', 'server'])(`list 403 %s uses localized copy or a real server reason in ${locale}`, async (variant) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
+  setup({ [`GET ${flowsPath}`]: () => {
+    if (variant === 'empty' || variant === 'status-text') {
+      const fixture = flowsEndpoints['flows.list'].fixtures['403-empty'] as { status: number }
+      return new Response(null, { status: fixture.status, statusText: variant === 'status-text' ? 'Forbidden' : '' })
+    }
+    return Response.json(variant === 'missing-message' ? {} : { message: variant === 'server' ? 'synthetic-backend-reason' : 'HTTP_403' }, { status: 403 })
+  } }); open()
+  await screen.findByRole('heading', { name: copy.noAccess })
+  expect(screen.getByText(variant === 'server' ? 'synthetic-backend-reason' : copy.errors['403'])).toBeVisible()
+  expect(screen.queryByText(/^(Forbidden|Request failed|HTTP_403)$/)).toBeNull()
+  expect(screen.queryByRole('table')).toBeNull()
+  expect(calls()).toEqual([{ method: 'GET', path: flowsPath, body: undefined }])
 })
 
 test('loading uses a labelled skeleton and one request even under StrictMode', async () => {
