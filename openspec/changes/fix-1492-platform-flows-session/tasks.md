@@ -24,7 +24,6 @@
 
 Node's default test subprocess isolation is unavailable in this sandbox, so passing executor commands disable that isolation while retaining the actual test runner and HTTP parser. The initial console run using a root-level `--root` invocation could not import the existing legacy-client fixture via Vite's `/@fs` URL; rerunning the scoped suite from the app directory passed all 56 tests. No failing pre-fix run is counted as final test evidence.
 
-
 ## Full console suite
 
 The normal full suite ran from `apps/web-console-next` using `node node_modules/vitest/vitest.mjs run --pool=threads --maxWorkers=1 --configLoader=runner` with `SHELL_TEST_FIXTURES` unset. Result: 1187 passed, 1 failed, 3 skipped across 62 files (571.39 seconds). The real assertion failure is in the unchanged `tests/consoleQuotas-routing.test.tsx:99`, `posture 401 refresh rejected=false preserves shell authorization behavior`: Testing Library could not find a table after the refresh. This is reported as FAIL against the configured `pnpm --filter @in-falcone/web-console-next test` command so the platform can rerun the same suite at base. Its pnpm entrypoint itself cannot execute here because of the separate `spawnSync EPERM` limit above. No base-commit result is claimed and the quotas page is outside this ChangeSet. All flows tests passed in the full run and in the separate 56-test scoped run.
