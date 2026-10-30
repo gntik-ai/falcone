@@ -1,0 +1,5 @@
+/* The legacy registry has no search. Supply a title and a keyboard-reachable focus action. */
+.function-registry-toolbar div:has(> input[type="search"]) { display: none; }
+.function-registry-toolbar > div:first-child { display: block; min-width: 0; flex-basis: 100%; }
+.function-registry-toolbar > div:last-child { display: none; }
+.function-registry table { white-space: nowrap; }
