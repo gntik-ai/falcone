@@ -54,8 +54,14 @@ test('history stays in-router while designer is a root-relative legacy anchor', 
   const designer = screen.getByRole('link', { name: 'Abrir diseñador para Synthetic published flow' })
   expect(designer).toHaveAttribute('href', '/console/flows/f1')
   // A normal browser activation is not intercepted by React Router.
-  const documentLoad = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }); designer.dispatchEvent(documentLoad)
-  expect(documentLoad.defaultPrevented).toBe(false)
+  let intercepted: boolean | undefined
+  window.addEventListener('click', (event) => {
+    intercepted = event.defaultPrevented
+    // Observe the router first, then stop the document load jsdom cannot perform.
+    event.preventDefault()
+  }, { once: true })
+  designer.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))
+  expect(intercepted).toBe(false)
   const history = screen.getByRole('link', { name: 'Ver historial de ejecuciones para Synthetic published flow' })
   expect(history).toHaveAttribute('href', '/next/console/flows/f1/runs')
   expect(fireEvent.click(history)).toBe(false); await screen.findByTitle(executionId, {}, routeWait)
