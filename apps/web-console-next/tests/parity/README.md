@@ -22,7 +22,9 @@ an isolated suite whose seeded faults must fail with specific diagnostics.
 rejects missing tests, infrastructure failures and missing traces. Inspect both
 positive and negative HTML/JSON reports and traces under `test-results/parity/`.
 Only complete all-passed groups get `PARITY_PASS` in per-page JSON. A filtered
-run cannot certify a page. Screenshots are recorded and compared within each
+run cannot certify a page. Each CI shard artifact's per-page JSON covers only
+that shard's tests, so an incomplete group may lack `PARITY_PASS` even when all
+tests in the shard pass. Screenshots are recorded and compared within each
 visual check under the ignored output directory, with a fresh navigation before
 the comparison; no baseline is committed.
 The clock is fixed and randomness is seeded before any application script.

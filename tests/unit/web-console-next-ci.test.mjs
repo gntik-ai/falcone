@@ -83,7 +83,7 @@ function assertParityWorkflow(ci) {
   const shards = ci.jobs[names[1]];
   const negatives = ci.jobs[names[2]];
   const aggregate = ci.jobs['ui-parity'];
-  assert.deepEqual(shards?.strategy, { 'fail-fast': false, matrix: { shard: [1, 2, 3, 4] } });
+  assert.deepEqual(shards?.strategy, { 'fail-fast': false, matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8] } });
   for (const event of ['pull_request', 'push']) {
     assert.ok(Object.hasOwn(ci.on, event), `${event} must trigger parity`);
     assert.equal(ci.on[event]?.paths, undefined);
@@ -131,7 +131,8 @@ function assertParityWorkflow(ci) {
     assert.ok(commands(job).includes('exec playwright install --with-deps chromium'));
     assert.match(commands(job), /SHELL_TEST_FIXTURES=true VITE_BASE_PATH=\/ pnpm --filter @in-falcone\/web-console-next build/);
   }
-  assert.ok(commands(shards).includes('pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/4'));
+  const shardTest = shards.steps.find((step) => step.name === 'Test parity shard');
+  assert.equal(shardTest?.run, 'pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/8');
   assert.doesNotMatch(commands(shards), /--grep|--test-list|test:parity|verify-negatives/);
   assert.equal(negatives.strategy, undefined, 'seeded faults run once');
   assert.ok(commands(negatives).includes('pnpm --filter @in-falcone/web-console-next exec node tests/parity/verify-negatives.mjs'));
@@ -156,14 +157,16 @@ function assertParityWorkflow(ci) {
 test('ui-parity is an unconditional isolated job with pinned actions and downloadable reports', () => {
   assertParityWorkflow(YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8')));
   const config = readFileSync('apps/web-console-next/tests/parity/playwright.config.mjs', 'utf8');
-  assert.match(config, /workers: 1/);
-  assert.doesNotMatch(config, /fullyParallel/);
+  assert.match(config, /\bworkers: 1,/);
+  assert.match(config, /\bretries: 0,/);
+  assert.match(config, /fullyParallel: true/);
 });
 
 test('ui-parity structure checks reject coverage loss and a bypassed aggregate', () => {
   const mutations = [
     (jobs) => { jobs['ui-parity-shards'].strategy.matrix.shard.pop(); },
     (jobs) => { jobs['ui-parity-shards'].steps.find((s) => s.run?.includes('--shard=')).run = 'pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs'; },
+    (jobs) => { jobs['ui-parity-shards'].steps.find((s) => s.run?.includes('--shard=')).run += ' --shard=1/8'; },
     (jobs) => { delete jobs['ui-parity-shards'].steps.at(-1).if; },
     (jobs) => { jobs['ui-parity-shards'].steps.at(-1).with.name = 'ui-parity-negatives'; },
     (jobs) => { jobs['ui-parity'].needs.pop(); },

@@ -6,6 +6,7 @@ export default defineConfig({
   testDir: '.',
   testMatch: process.env.PARITY_NEGATIVE === 'true' ? 'negative.spec.mjs' : ['pages/*.spec.mjs', 'endpoints.spec.mjs', 'harness.spec.mjs'],
   timeout: 60_000, expect: { timeout: 7_000 },
+  fullyParallel: true,
   workers: 1, retries: 0, forbidOnly: true, updateSnapshots: 'none',
   outputDir: resolve(reports, 'traces'),
   snapshotPathTemplate: resolve(reports, 'snapshots/{testFilePath}/{testName}/{arg}{ext}'),
