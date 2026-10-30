@@ -114,7 +114,15 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.open(manifest.route); await ready(parity);
       const run = surface(parity).getByRole('button', { name: copy(parity).runNamed.replace('{name}', 'Synthetic published flow'), exact: true });
       await run.focus(); await parity.page.keyboard.press('Enter');
-      const dialog = parity.page.getByRole('alertdialog'); await expect(dialog).toBeVisible(); await check.assertAccessibility(parity);
+      const dialog = parity.page.getByRole('alertdialog');
+      await expect(dialog).toBeVisible();
+      // Visibility includes the kit's opening frame; axe needs the settled surface.
+      await expect(dialog).not.toHaveAttribute('data-starting-style', '');
+      await expect(dialog).toHaveCSS('opacity', '1');
+      await dialog.evaluate(async (popup) => {
+        await Promise.all(popup.getAnimations({ subtree: true }).map((animation) => animation.finished));
+      });
+      await check.assertAccessibility(parity);
       await dialog.getByRole('button', { name: copy(parity).cancel, exact: true }).click(); await expect(run).toBeFocused();
       const draft = surface(parity).getByRole('button', { name: copy(parity).runDisabled.replace('{name}', 'Synthetic draft flow'), exact: true });
       const described = await draft.getAttribute('aria-describedby'); await expect(parity.page.locator(`[id="${described}"]`)).toHaveText(copy(parity).disabledReason);
