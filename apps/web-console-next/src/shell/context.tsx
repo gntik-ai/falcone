@@ -40,6 +40,7 @@ interface ContextValue {
   selectTenant: (id: string | null) => void; selectWorkspace: (id: string | null) => void
   // Optional in the interface for existing structural consumers; the provider always supplies these.
   reloadTenants?: () => Promise<void>
+  reloadWorkspaces?: () => Promise<void>
   tenantsPageInfo?: { after?: string | null } | null
   tenantsRequestId?: string | null
   tenantsError?: { status?: number } | null
@@ -121,9 +122,10 @@ export function ConsoleContextProvider({ children, routeWorkspaceId }: { childre
     return () => { cancelled = true; tenantToken.current++ }
   }, [session, userId, acceptTenants, rejectTenants])
 
-  useEffect(() => {
+  const workspaceToken = useRef(0)
+  const resolveWorkspaces = useCallback(async () => {
     if (!tenants || !userId) return
-    let cancelled = false
+    const token = ++workspaceToken.current
     const stored = readSelection(userId)
     const membership = session.principal?.workspaceIds?.filter(Boolean) ?? []
     const load = async (tenantId: string) => {
@@ -141,7 +143,7 @@ export function ConsoleContextProvider({ children, routeWorkspaceId }: { childre
           if (!membership.length || membership.includes(routeId)) {
             for (const tenant of tenants!) {
               const candidates = await load(tenant.tenantId)
-              if (cancelled) return
+              if (token !== workspaceToken.current) return
               if (candidates.some((workspace) => workspace.workspaceId === routeId)) {
                 tenantId = tenant.tenantId; workspaceId = routeId; options = candidates; break
               }
@@ -157,16 +159,23 @@ export function ConsoleContextProvider({ children, routeWorkspaceId }: { childre
               : options.length === 1 ? options[0].workspaceId : null
           }
         }
-        if (cancelled) return
+        if (token !== workspaceToken.current) return
         setTenant(tenantId); setWorkspace(workspaceId); setWorkspaces(options)
         persist(userId, tenantId, workspaceId)
       } catch (cause) {
-        if (!cancelled) { setWorkspace(null); setWorkspaces([]); setError(contextError(cause)); tenantFailure.current = null }
-      } finally { if (!cancelled) setLoading(false) }
+        if (token === workspaceToken.current) { setWorkspace(null); setWorkspaces([]); setError(contextError(cause)); tenantFailure.current = null }
+      } finally { if (token === workspaceToken.current) setLoading(false) }
     }
-    void resolve()
-    return () => { cancelled = true }
+    await resolve()
   }, [tenants, userId, session, routeId, selection])
+  useEffect(() => {
+    void resolveWorkspaces()
+    return () => { workspaceToken.current++ }
+  }, [resolveWorkspaces])
+  const reloadWorkspaces = useCallback(async () => {
+    setError(null)
+    await resolveWorkspaces()
+  }, [resolveWorkspaces])
 
   function selectTenant(id: string | null) {
     const tenantId = normalizeId(id)
@@ -181,5 +190,5 @@ export function ConsoleContextProvider({ children, routeWorkspaceId }: { childre
     if (workspaceId && !workspaces.some((workspace) => workspace.workspaceId === workspaceId)) return
     setWorkspace(workspaceId); persist(userId, activeTenantId, workspaceId)
   }
-  return <Context.Provider value={{ tenants: tenants ?? [], workspaces, activeTenantId, activeWorkspaceId, loading: loading || tenantsReloading, error, selectTenant, selectWorkspace, reloadTenants, tenantsPageInfo, tenantsRequestId, tenantsError }}>{children}</Context.Provider>
+  return <Context.Provider value={{ tenants: tenants ?? [], workspaces, activeTenantId, activeWorkspaceId, loading: loading || tenantsReloading, error, selectTenant, selectWorkspace, reloadTenants, reloadWorkspaces, tenantsPageInfo, tenantsRequestId, tenantsError }}>{children}</Context.Provider>
 }

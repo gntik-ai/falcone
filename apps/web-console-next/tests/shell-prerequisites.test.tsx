@@ -83,7 +83,7 @@ test('sidebar uses the router for opted-in routes and root-relative legacy ancho
     const nav = screen.getByRole('navigation', { name: 'Navegación de consola' })
     const migrated = within(nav).getByRole('link', { name: /Vista general/ })
     expect(migrated).toHaveAttribute('href', '/next/console/overview')
-    expect(within(nav).getByRole('link', { name: /Flujos/ })).toHaveAttribute('href', '/console/flows')
+    expect(within(nav).getByRole('link', { name: /Flujos/ })).toHaveAttribute('href', '/next/console/flows')
     const documentLocation = window.location.href
     expect(fireEvent.click(migrated)).toBe(false) // Router consumes document navigation.
     expect(await screen.findByRole('heading', { name: 'Migrated overview test page' })).toBeVisible()
@@ -112,7 +112,7 @@ test.each(['/next', '/preview'])('mobile navigation respects route opt-in under 
     const migrated = within(drawer).getByRole('link', { name: 'Funciones: administrar' })
     expect(migrated).toHaveAttribute('href', `${basename}/console/functions`)
     expect(within(drawer).getByRole('link', { name: 'Funciones: despliegue rápido' })).toHaveAttribute('href', '/console/functions/data')
-    expect(within(drawer).getByRole('link', { name: /Flujos/ })).toHaveAttribute('href', '/console/flows')
+    expect(within(drawer).getByRole('link', { name: /Flujos/ })).toHaveAttribute('href', `${basename}/console/flows`)
     const documentLocation = window.location.href
     expect(fireEvent.click(migrated)).toBe(false)
     expect(await screen.findByRole('heading', { name: 'Migrated functions test page' })).toBeVisible()

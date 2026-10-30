@@ -34,7 +34,7 @@ test.each(['superadmin', 'tenant_viewer', 'workspace_viewer'])('the history rout
   setup('success', [role])
   open('/next'); await screen.findByTitle(executionId, {}, routeWait)
   expect(calls().filter(([url]) => url === historyPath)).toHaveLength(1)
-  expect(pendingConsoleRoutes.find(({ path }) => path === 'flows')?.migrated).not.toBe(true)
+  expect(pendingConsoleRoutes.find(({ path }) => path === 'flows')?.migrated).toBe(true)
   expect(isMigratedRoute('/console/flows/f1/runs')).toBe(true)
   expect(isMigratedRoute('/console/flows/f1/runs/e1')).toBe(false)
 })

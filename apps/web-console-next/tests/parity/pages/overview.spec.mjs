@@ -68,7 +68,7 @@ async function assertNoPageRequests(parity) {
 
 for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`overview | ${role} | ${locale} | ${width}`, () => {
-    test.use({ role, locale, viewport: { width, height: 900 } });
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: { 'flows.list': { method: 'GET', path: '/v1/flows/workspaces/synthetic-workspace/flows', fixtures: { success: { status: 200, body: { items: [] } } } } } });
     test.beforeEach(async ({ parity }) => {
       const open = parity.open.bind(parity);
       parity.open = async (route, selected = {}) => {
@@ -130,6 +130,14 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       for (const key of quickLinks) {
         await parity.open(manifest.route);
         const link = overview(parity).getByRole('link', { name: copy(parity).quick[key].label, exact: true });
+        if (key === 'flows') {
+          await expect(link).toHaveAttribute('href', new URL(server.url('console/flows')).pathname);
+          await link.focus(); await parity.page.keyboard.press('Enter');
+          await expect(parity.page.getByTestId('console-flows-page')).toBeVisible();
+          await expect(parity.page).toHaveURL(server.url('console/flows'));
+          await check.assertRuntimeHealth(parity);
+          continue;
+        }
         await expect(link).toHaveAttribute('href', `/console/${key}`);
         // The destination is a legacy full load. Fulfil its document locally.
         const target = new URL(`/console/${key}`, server.origin).href;

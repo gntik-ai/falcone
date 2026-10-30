@@ -85,6 +85,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'profile') return { ...route, element: lazyPage('pages.console-profile-page', () => import('./pages/consoleProfile')) }
         if (route.path === 'workspaces/:workspaceId/docs') return { ...route, element: lazyPage('pages.console-docs-page', () => import('./pages/consoleDocs')) }
         if (route.path === 'workspaces/:workspaceId' && route.migrated) return { ...route, element: lazyPage('pages.console-workspace-dashboard-page', () => import('./pages/consoleWorkspaceDashboard')) }
+        if (route.path === 'flows' && route.migrated) return { ...route, element: lazyPage('pages.console-flows-page', () => import('./pages/consoleFlows')) }
         if (route.path === 'flows/:flowId/runs' && route.migrated) return { ...route, element: lazyPage('pages.console-flow-history-page', () => import('./pages/consoleFlowHistory')) }
         const page = lazyPage('pendingPage', () => import('./pages/pendingPage'))
         return { ...route, element: guard ? <Guard kind={guard}>{page}</Guard> : page }
