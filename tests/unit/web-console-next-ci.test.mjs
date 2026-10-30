@@ -131,7 +131,8 @@ function assertParityWorkflow(ci) {
     assert.ok(commands(job).includes('exec playwright install --with-deps chromium'));
     assert.match(commands(job), /SHELL_TEST_FIXTURES=true VITE_BASE_PATH=\/ pnpm --filter @in-falcone\/web-console-next build/);
   }
-  assert.ok(commands(shards).includes('pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/8'));
+  const shardTest = shards.steps.find((step) => step.name === 'Test parity shard');
+  assert.equal(shardTest?.run, 'pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/8');
   assert.doesNotMatch(commands(shards), /--grep|--test-list|test:parity|verify-negatives/);
   assert.equal(negatives.strategy, undefined, 'seeded faults run once');
   assert.ok(commands(negatives).includes('pnpm --filter @in-falcone/web-console-next exec node tests/parity/verify-negatives.mjs'));
@@ -165,6 +166,7 @@ test('ui-parity structure checks reject coverage loss and a bypassed aggregate',
   const mutations = [
     (jobs) => { jobs['ui-parity-shards'].strategy.matrix.shard.pop(); },
     (jobs) => { jobs['ui-parity-shards'].steps.find((s) => s.run?.includes('--shard=')).run = 'pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs'; },
+    (jobs) => { jobs['ui-parity-shards'].steps.find((s) => s.run?.includes('--shard=')).run += ' --shard=1/8'; },
     (jobs) => { delete jobs['ui-parity-shards'].steps.at(-1).if; },
     (jobs) => { jobs['ui-parity-shards'].steps.at(-1).with.name = 'ui-parity-negatives'; },
     (jobs) => { jobs['ui-parity'].needs.pop(); },
