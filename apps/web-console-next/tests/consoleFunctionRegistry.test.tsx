@@ -21,6 +21,22 @@ function form() { return field(es.name).closest('form')! }
 async function ready() { await screen.findByRole('table') }
 const change = (label: string, value: string) => fireEvent.change(field(label), { target: { value } })
 const send = () => fireEvent.submit(form())
+const legacyWorkspaceCopy = {
+  es: {
+    loading: 'Cargando áreas de trabajo',
+    loadingDescription: 'Consultando las áreas de trabajo accesibles de la organización activa.',
+    label: 'Seleccionar área de trabajo',
+    placeholder: 'Selecciona un área de trabajo…',
+    denied: 'Esta organización todavía no tiene áreas de trabajo. Pide a un propietario o administrador de la organización (o del área de trabajo) que cree la primera.',
+  },
+  en: {
+    loading: 'Loading workspaces',
+    loadingDescription: 'Loading accessible workspaces for the active organization.',
+    label: 'Select workspace',
+    placeholder: 'Select a workspace…',
+    denied: 'This organization has no workspaces yet. Ask an organization or workspace owner or administrator to create the first one.',
+  },
+}
 beforeEach(() => {
   login(); context.roles = ['superadmin']
   context.value = { activeWorkspaceId: 'synthetic-workspace', loading: false, error: null, workspaces: [{ workspaceId: 'synthetic-workspace', displayName: 'Synthetic Workspace' }], selectWorkspace: vi.fn(), reloadWorkspaces: vi.fn() }
@@ -124,13 +140,22 @@ test('list retry and toolbar focus send only their intended requests', async () 
 
 for (const locale of ['es', 'en'] as const) test.each(['loading', 'error', 'picker', 'create', 'denied'])(`workspace %s in ${locale} sends no functions request`, async (state) => {
   await i18n.changeLanguage(locale); const copy = locale === 'es' ? es : en
+  const workspaceCopy = legacyWorkspaceCopy[locale]
   setup(); context.value.activeWorkspaceId = null; context.value.loading = state === 'loading'; context.value.error = state === 'error' ? { status: 500 } : null
   context.value.workspaces = state === 'picker' ? [{ workspaceId: 'synthetic-workspace', displayName: 'Synthetic Workspace' }] : []; context.roles = state === 'denied' ? ['tenant_viewer'] : ['superadmin']; open()
-  if (state === 'loading') expect(screen.getByRole('status', { name: copy.workspaceLoading })).toBeVisible()
+  if (state === 'loading') {
+    const status = screen.getByRole('status', { name: workspaceCopy.loading })
+    expect(within(status).getByText(workspaceCopy.loading, { exact: true })).toBeVisible()
+    expect(within(status).getByText(workspaceCopy.loadingDescription, { selector: 'p' })).toBeVisible()
+  }
   if (state === 'error') { fireEvent.click(screen.getByRole('button', { name: copy.retry })); expect(context.value.reloadWorkspaces).toHaveBeenCalledTimes(1) }
-  if (state === 'picker') { fireEvent.click(screen.getByRole('combobox', { name: copy.workspaceLabel })); const option = await screen.findByRole('option', { name: 'Synthetic Workspace' }); fireEvent.pointerDown(option); fireEvent.click(option); expect(context.value.selectWorkspace).toHaveBeenCalledWith('synthetic-workspace') }
+  if (state === 'picker') {
+    const picker = screen.getByRole('combobox', { name: workspaceCopy.label })
+    expect(picker).toHaveTextContent(workspaceCopy.placeholder)
+    fireEvent.click(picker); const option = await screen.findByRole('option', { name: 'Synthetic Workspace' }); fireEvent.pointerDown(option); fireEvent.click(option); expect(context.value.selectWorkspace).toHaveBeenCalledWith('synthetic-workspace')
+  }
   if (state === 'create') expect(screen.getByRole('link', { name: copy.createWorkspace })).toHaveAttribute('href', '/console/workspaces')
-  if (state === 'denied') expect(screen.getByText(copy.workspaceDenied)).toBeVisible()
+  if (state === 'denied') expect(screen.getByText(workspaceCopy.denied)).toBeVisible()
   expect(screen.queryByRole('textbox', { name: copy.name })).toBeNull(); expect(calls()).toEqual([])
 })
 

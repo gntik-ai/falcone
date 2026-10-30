@@ -117,7 +117,7 @@ function Registry({ workspaceId }: { workspaceId: string }) {
 function WorkspaceGate() {
   const { t } = useCopy(), context = useConsoleContext(), { can } = usePermissions()
   const [workspace, setWorkspace] = useState('')
-  if (context.loading) return <section role="status" aria-label={t('workspaceLoading')}><TableSkeleton rows={2} columns={1} label={t('workspaceLoading')} className="min-w-0" /></section>
+  if (context.loading) return <section role="status" aria-label={t('workspaceLoading')}><Text variant="body" tone="default">{t('workspaceLoading')}</Text><Text variant="body" tone="muted">{t('workspaceLoadingDescription')}</Text><div aria-hidden={true}><TableSkeleton rows={2} columns={1} label={t('workspaceLoadingDescription')} className="min-w-0" /></div></section>
   if (context.error) return <FailurePanel failure={context.error} kind="workspace" retry={() => { void context.reloadWorkspaces?.() }} />
   return <EmptyState icon={undefined} title={t('workspaceRequired')} description={t('workspaceDescription')} titleAs="h2" bordered={false} secondaryAction={null} className="min-w-0" primaryAction={context.workspaces.length ?
     <Field invalid={false} className="w-full min-w-0"><FieldLabel htmlFor="registry-workspace">{t('workspaceLabel')}</FieldLabel><SimpleSelect id="registry-workspace" value={workspace} defaultValue="" placeholder={t('workspacePlaceholder')} clearable={false} size="md" className="w-full min-w-0" items={context.workspaces.map((item) => ({ value: item.workspaceId, label: item.displayName }))} onValueChange={(value) => { if (value) { setWorkspace(value); context.selectWorkspace(value) } }} /></Field>
