@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import manifest, { functionRows, functionsPath } from './console-function-registry-page.manifest.ts';
+import manifest, { functionRows, functionRows4, functionsPath, registeredFunction } from './console-function-registry-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
@@ -44,19 +44,37 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.open(manifest.route); await ready(parity);
       await surface(parity).getByRole('toolbar').getByRole('button', { name: copy(parity).register, exact: true }).click();
       await expect(input(parity, 'name')).toBeFocused();
-      parity.network.setVariants({ 'function-register': { variant: 'register-accepted', delayMs: 1000 }, 'function-registry': { variant: 'list-4', delayMs: 1000 } });
-      await input(parity, 'name').fill('  on-user-created  ');
-      await form(parity).getByRole('button', { name: copy(parity).register, exact: true }).click();
-      await input(parity, 'name').fill('during-post');
-      await expect(form(parity).getByRole('button', { name: copy(parity).registering, exact: true })).toBeDisabled();
-      await expect.poll(() => calls(parity).length).toBe(3);
-      await input(parity, 'name').fill('during-refetch');
-      await expect(form(parity).getByRole('button', { name: copy(parity).registering, exact: true })).toBeDisabled();
-      await expect(form(parity).getByRole('button', { name: copy(parity).register, exact: true })).toBeEnabled();
-      await expect(input(parity, 'name')).toHaveValue('during-refetch'); await expect(input(parity, 'name')).toBeFocused();
-      expect(calls(parity)).toEqual([{ method: 'GET', path: functionsPath, body: undefined }, { method: 'POST', path: functionsPath, body: { name: 'on-user-created', runtime: 'nodejs:20', handler: 'main' } }, { method: 'GET', path: functionsPath, body: undefined }]);
-      await expect(surface(parity).getByRole('table')).toContainText('on-user-created');
-      await expect(parity.page.getByText(copy(parity).registered, { exact: true }).first()).toBeAttached();
+      let releasePost, releaseGet;
+      const heldPost = new Promise((resolve) => { releasePost = resolve; });
+      const heldGet = new Promise((resolve) => { releaseGet = resolve; });
+      // Hold each response until its busy-state assertions finish, regardless of runner speed.
+      await parity.page.route((url) => url.pathname === functionsPath, async (route) => {
+        const request = route.request(), method = request.method(), url = new URL(request.url());
+        if (!['POST', 'GET'].includes(method)) return route.fallback();
+        parity.network.requests.push({ method, path: url.pathname + url.search, body: request.postDataJSON() ?? undefined });
+        await (method === 'POST' ? heldPost : heldGet);
+        await route.fulfill({ json: method === 'POST' ? registeredFunction : functionRows4 });
+      });
+      try {
+        await input(parity, 'name').fill('  on-user-created  ');
+        await form(parity).getByRole('button', { name: copy(parity).register, exact: true }).click();
+        await expect.poll(() => calls(parity).length).toBe(2);
+        await input(parity, 'name').fill('during-post');
+        await expect(form(parity).getByRole('button', { name: copy(parity).registering, exact: true })).toBeDisabled();
+        releasePost();
+        await expect.poll(() => calls(parity).length).toBe(3);
+        await expect(input(parity, 'name')).toHaveValue('');
+        await input(parity, 'name').fill('during-refetch');
+        await expect(form(parity).getByRole('button', { name: copy(parity).registering, exact: true })).toBeDisabled();
+        releaseGet();
+        await expect(form(parity).getByRole('button', { name: copy(parity).register, exact: true })).toBeEnabled();
+        await expect(input(parity, 'name')).toHaveValue('during-refetch'); await expect(input(parity, 'name')).toBeFocused();
+        expect(calls(parity)).toEqual([{ method: 'GET', path: functionsPath, body: undefined }, { method: 'POST', path: functionsPath, body: { name: 'on-user-created', runtime: 'nodejs:20', handler: 'main' } }, { method: 'GET', path: functionsPath, body: undefined }]);
+        await expect(surface(parity).getByRole('table')).toContainText('on-user-created');
+        await expect(parity.page.getByText(copy(parity).registered, { exact: true }).first()).toBeAttached();
+      } finally {
+        releasePost(); releaseGet();
+      }
     });
     test('error-empty', async ({ parity }) => {
       for (const variant of ['list-empty', 'list-403', 'list-404', 'list-500', 'list-network']) {
