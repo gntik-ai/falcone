@@ -29,6 +29,13 @@ test.each(['es', 'en'] as const)('renders all unpaged flows and localized contro
   expect(calls()).toEqual([{ method: 'GET', path: flowsPath, body: undefined }])
   expect(screen.getByRole('heading', { name: copy.title })).toBeVisible()
   expect(screen.getAllByRole('rowheader')).toHaveLength(2)
+  for (const [index, header] of screen.getAllByRole('rowheader').entries()) {
+    expect(header.tagName).toBe('TD')
+    expect(header.parentElement?.tagName).toBe('TR')
+    expect(header).toBe(header.parentElement?.firstElementChild)
+    expect(header).toHaveTextContent(flowRows.items[index].name)
+    expect(header.querySelector('[role="rowheader"]')).toBeNull()
+  }
   expect(screen.getByRole('table')).toHaveTextContent(copy.status.published)
   expect(screen.getByRole('table')).toHaveTextContent(copy.status.draft)
   expect(screen.getAllByRole('group', { name: /Synthetic/ })).toHaveLength(2)

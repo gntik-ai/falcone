@@ -109,6 +109,7 @@ function Flows({ workspaceId }: { workspaceId: string }) {
   const message = useErrorMessage()
   const toast = useToast()
   const input = useRef<HTMLInputElement>(null)
+  const table = useRef<HTMLDivElement>(null)
   const inFlight = useRef(false)
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -127,6 +128,12 @@ function Flows({ workspaceId }: { workspaceId: string }) {
     return () => { active = false }
   }, [workspaceId, attempt])
   useEffect(() => { if (error) announce(t('errorTitle'), 'assertive') }, [error, announce, t])
+  useLayoutEffect(() => {
+    // Kit 0.11.0 has no row-header prop; apply the role to its real cells.
+    table.current?.querySelectorAll('tbody tr').forEach((row) => {
+      row.firstElementChild?.setAttribute('role', 'rowheader')
+    })
+  }, [result, busy])
   async function create() {
     if (!canCreate || !name.trim() || inFlight.current) return
     inFlight.current = true; setCreating(true); setCreateError(''); setDenied(false)
@@ -142,7 +149,7 @@ function Flows({ workspaceId }: { workspaceId: string }) {
   }
   const hidden = 'hidden sm:table-cell'
   const columns: DataTableColumn<FlowSummary>[] = [
-    { id: 'name', header: t('name'), sortable: false, cell: (flow) => <span role="rowheader" className="block min-w-0 max-w-32 truncate sm:max-w-64" title={flow.name || flow.flowId}>{flow.name || flow.flowId}</span> },
+    { id: 'name', header: t('name'), sortable: false, cell: (flow) => <span className="block min-w-0 max-w-32 truncate sm:max-w-64" title={flow.name || flow.flowId}>{flow.name || flow.flowId}</span> },
     { id: 'status', header: t('statusLabel'), sortable: false, className: hidden, headClassName: hidden, cell: (flow) => {
       const status = flow.status?.trim() || 'draft'
       const known = Object.hasOwn(statusTones, status)
@@ -172,9 +179,9 @@ function Flows({ workspaceId }: { workspaceId: string }) {
       : error?.status === 404 ? <NotFoundEmpty icon={undefined} title={t('notFound')} description={t('notFoundDescription')} action={<Link href="/console/workspaces" tone="primary" underline="always" external={false} externalLabel="" className={focus}>{t('backWorkspaces')}</Link>} titleAs="h2" bordered={false} className="min-w-0" />
       : error ? <FailurePanel failure={error} retry={() => setAttempt((current) => current + 1)} />
       : busy ? <section role="status" aria-label={t('loading')} aria-busy={true}><Text variant="body" tone="muted">{t('loadingDescription')}</Text><TableSkeleton rows={6} columns={4} label={t('loading')} className="min-w-0" /></section>
-      : result.rows.length ? <DataTable rows={result.rows} columns={columns} getRowId={(flow) => flow.flowId} getRowLabel={(flow) => flow.name || flow.flowId} caption={t('caption')} showCaption={false}
+      : result.rows.length ? <div ref={table}><DataTable rows={result.rows} columns={columns} getRowId={(flow) => flow.flowId} getRowLabel={(flow) => flow.name || flow.flowId} caption={t('caption')} showCaption={false}
         paginated={false} selectable={false} selectionMode="none" selectedIds={[]} selectionSummary={false} rowActions={undefined} toolbar={null} sort={null} defaultSort={null} manualSorting={true} loading={false} loadingRows={0} emptyState={null} showDensityToggle={false} showColumnMenu={false} showViewSwitcher={false} views={[]} defaultViews={[]} hiddenColumns={[]} resizable={false} virtualize={false} groupBy={undefined} showPinMenu={false}
-        labels={{ scrollRegion: t('caption'), emptyTitle: t('empty'), emptyDescription: t('emptyDescription'), loading: () => t('loading') }} />
+        labels={{ scrollRegion: t('caption'), emptyTitle: t('empty'), emptyDescription: t('emptyDescription'), loading: () => t('loading') }} /></div>
       : <EmptyState icon={undefined} title={t('empty')} description={t(canCreate ? 'emptyDescription' : 'emptyReadOnly')} primaryAction={canCreate ? <Button type="button" variant="primary" size="md" disabled={false} loading={false} iconOnly={false} icon={undefined} trailingIcon={undefined} className={focus} onClick={() => input.current?.focus()}>{t('emptyAction')}</Button> : null} secondaryAction={null} titleAs="h2" bordered={false} className="min-w-0" />}
   </>
 }
