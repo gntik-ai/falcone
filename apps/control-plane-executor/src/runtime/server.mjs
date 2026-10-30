@@ -1530,6 +1530,20 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       // SSE routes accept the anon key via ?apikey= (EventSource can't set headers).
       const queryApiKey = opts?.sse ? url.searchParams.get('apikey') : undefined;
       const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore, jwtVerifier, queryApiKey, gatewaySharedSecret);
+      const workspaceInPath = workspaceIdFromPath(url.pathname);
+      let owningTenantId;
+      let checkedWorkspaceTenant = false;
+      // Only the verifier can mark a trusted platform caller. Scope a tenant-less
+      // platform session from the path's workspace record, never a claim or header.
+      if (!opts?.noAuth && !identity.tenantId && identity.platformCaller && workspaceInPath && resolveWorkspaceTenant) {
+        // An unresolved owner cannot grant a tenant scope, including on lookup failure.
+        try { owningTenantId = await resolveWorkspaceTenant(workspaceInPath); } catch { owningTenantId = undefined; }
+        checkedWorkspaceTenant = true;
+        if (!owningTenantId) {
+          return sendJson(res, 404, { code: 'NOT_FOUND', message: 'Workspace not found' });
+        }
+        identity.tenantId = owningTenantId;
+      }
       metric.tenantId = identity.tenantId ?? '';
       if (!opts?.noAuth && !identity.tenantId) {
         return sendJson(res, 401, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
@@ -1537,7 +1551,6 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       if (!opts?.noAuth && identity.invalidWorkspaceBinding) {
         return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Invalid workspace binding' });
       }
-      const workspaceInPath = workspaceIdFromPath(url.pathname);
       const structuralWrite = !opts?.noAuth && isStructuralWriteRequest(method, url.pathname);
       // Credential workspace binding check: when the authenticated credential explicitly
       // binds a workspace (identity.credentialWorkspaceId is set — from an API key or a JWT
@@ -1562,8 +1575,6 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
           && Array.isArray(identity.workspaceIds) && !identity.workspaceIds.includes(workspaceInPath)) {
         return sendJson(res, 403, { code: 'FORBIDDEN', message: 'Caller workspace scope does not include the requested workspace' });
       }
-      let owningTenantId;
-      let checkedWorkspaceTenant = false;
       const workspaceToCheck = workspaceInPath || identity.workspaceId;
       // Workspace-ownership check (fix-executor-apikey-cross-tenant-idor, #517): a caller may only
       // operate on a workspace owned by its own tenant. This closes a cross-tenant IDOR that the
@@ -1582,8 +1593,10 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
         // request (x-workspace-id = a foreign tenant's workspace) could run DDL on
         // that workspace's database (fix-executor-ddl-db-ownership-guard, B3).
         if (workspaceToCheck) {
-          owningTenantId = await resolveWorkspaceTenant(workspaceToCheck);
-          checkedWorkspaceTenant = true;
+          if (!checkedWorkspaceTenant) {
+            owningTenantId = await resolveWorkspaceTenant(workspaceToCheck);
+            checkedWorkspaceTenant = true;
+          }
           if (owningTenantId && owningTenantId !== identity.tenantId) {
             return sendJson(res, 403, { code: 'CROSS_TENANT_VIOLATION', message: "Workspace does not belong to the caller's tenant" });
           }

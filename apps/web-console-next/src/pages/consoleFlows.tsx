@@ -35,7 +35,7 @@ function usePermissionCopy() {
 function FailurePanel({ failure, workspace = false, retry }: { failure: Failure; workspace?: boolean; retry: () => void }) {
   const { t } = useCopy()
   const title = t(workspace ? 'workspaceError' : 'errorTitle')
-  const description = t(workspace ? 'workspaceErrorDescription' : 'errorDescription')
+  const description = t(workspace ? 'workspaceErrorDescription' : failure.status === 401 ? 'errors.401' : 'errorDescription')
   return <ErrorPanel title={title} message={description} code={failure.status ?? null} requestId={failure.requestId ?? ''} details="" secondaryAction={null} titleAs="h2" announce={false} retryLabel={t('retry')} retrying={false} onRetry={retry} className="min-w-0"
     labels={{ title, message: description, support: t('support'), retry: t('retry'), retrying: t('retrying'), retryingStatus: t('retrying'), requestId: t('requestId'), copyRequestId: t('copyRequestId'), copied: t('copied'), requestIdCopied: t('copied'), details: t('details') }} />
 }

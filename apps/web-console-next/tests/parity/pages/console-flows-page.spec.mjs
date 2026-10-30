@@ -59,6 +59,34 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       if (!writable(role)) { await expect(surface(parity).getByTestId('flows-read-only-indicator')).toBeVisible(); await expect(surface(parity).getByLabel(copy(parity).newName, { exact: true })).toHaveCount(0); }
       await check.assertLocale(parity);
     });
+    if (role === 'superadmin') test('platform superadmin session without tenant membership lists workspace flows', async ({ parity }) => {
+      await parity.page.addInitScript(seedHistoryPrincipal, { platformRoles: ['superadmin'], tenantIds: [], workspaceIds: [] });
+      await parity.open(manifest.route); await ready(parity);
+      await expect(surface(parity).getByRole('rowheader')).toHaveCount(2);
+      expect(new URL(parity.page.url()).pathname).toMatch(/\/console\/flows$/);
+      expect(calls(parity)).toEqual([{ method: 'GET', path: flowsPath, body: undefined }]);
+      await check.assertRuntimeHealth(parity);
+    });
+    for (const action of ['list', 'create', 'run-now']) test(`${action} repeated 401 stays on flows after refresh`, async ({ parity }) => {
+      if (action === 'create' && !writable(role)) return;
+      const endpoint = action === 'list' ? 'flows.list' : action === 'create' ? 'flows.post' : 'flows.schedule.trigger';
+      const path = action === 'run-now' ? triggerPath : flowsPath;
+      const method = action === 'list' ? 'GET' : 'POST';
+      await parity.open(manifest.route, { refresh: 'success', [endpoint]: '401' });
+      if (action !== 'list') {
+        await ready(parity);
+        if (action === 'create') {
+          await surface(parity).getByLabel(copy(parity).newName, { exact: true }).fill('Retained name');
+          await button(parity, 'create').click();
+        } else await confirm(parity);
+      }
+      const expected = action === 'run-now' ? 'synthetic-backend-reason' : copy(parity).errors['401'];
+      await expect(surface(parity).getByText(expected, { exact: true })).toBeVisible();
+      expect(new URL(parity.page.url()).pathname).toMatch(/\/console\/flows$/);
+      expect(calls(parity).filter((request) => request.path === path && request.method === method)).toHaveLength(2);
+      expect(parity.network.requests.filter(({ path }) => path.endsWith('/refresh'))).toHaveLength(1);
+      await check.assertRuntimeHealth(parity);
+    });
     test('action', async ({ parity, server }) => {
       await parity.open(manifest.route); await ready(parity);
       const designer = surface(parity).getByRole('link', { name: copy(parity).designerNamed.replace('{name}', 'Synthetic published flow'), exact: true });

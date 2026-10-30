@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
 import { buildConsoleRefreshSessionFixture, buildConsoleSignupPolicyFixture, buildTenantCollectionFixture, buildWorkspaceCollectionFixture } from '@in-falcone/console-api/fixtures'
-import { readConsoleShellSession, readProtectedRouteIntent } from '@in-falcone/console-api/session'
+import { invalidateConsoleShellSession, readConsoleShellSession, readProtectedRouteIntent, setConsoleSessionRetryUnauthorizedHandler } from '@in-falcone/console-api/session'
 import { App } from '../src/App'
 import { designerNavigation } from '../src/pages/consoleFlows/api'
 import { ConsoleContextProvider, useConsoleContext } from '../src/shell/context'
@@ -21,14 +21,15 @@ function setup(roles = ['superadmin'], variant = 'success', action = 'GET') {
   let attempts = 0
   requests = strictFetch({
     [`GET ${tenantUrl}`]: buildTenantCollectionFixture(), [`GET ${workspaceUrl('synthetic-tenant')}`]: buildWorkspaceCollectionFixture(),
-    [`GET ${flowsPath}`]: () => action === 'GET' && ++attempts === 1 && variant !== 'success' ? Response.json({}, { status: 401 }) : Response.json(flowRows),
-    [`POST ${flowsPath}`]: () => action === 'POST' && ++attempts === 1 && variant !== 'success' ? Response.json({}, { status: 401 }) : Response.json({ flowId: 'created/1' }),
-    [`POST ${triggerPath}`]: { status: 'triggered', scheduleId: 'synthetic-schedule' }, [`GET ${historyPath}`]: firstPage,
+    [`GET ${flowsPath}`]: () => action === 'GET' && (variant === 'repeat' || ++attempts === 1) && variant !== 'success' ? Response.json({}, { status: 401 }) : Response.json(flowRows),
+    [`POST ${flowsPath}`]: () => action === 'POST' && (variant === 'repeat' || ++attempts === 1) && variant !== 'success' ? Response.json({}, { status: 401 }) : Response.json({ flowId: 'created/1' }),
+    [`POST ${triggerPath}`]: () => action === 'RUN' ? Response.json({}, { status: 401 }) : Response.json({ status: 'triggered', scheduleId: 'synthetic-schedule' }), [`GET ${historyPath}`]: firstPage,
     'POST /v1/auth/login-sessions/synthetic-session/refresh': () => variant === 'rejected' ? Response.json({}, { status: 401 }) : Response.json(fresh),
     'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture(),
   }); return { initial, fresh }
 }
-function open(basename = '') { return render(<MemoryRouter basename={basename || undefined} initialEntries={[`${basename}/console/flows`]}><App /></MemoryRouter>) }
+function LocationProbe() { return <output data-testid="flows-location">{useLocation().pathname}</output> }
+function open(basename = '') { return render(<MemoryRouter basename={basename || undefined} initialEntries={[`${basename}/console/flows`]}><App /><LocationProbe /></MemoryRouter>) }
 async function ready() { await screen.findByTitle(flowRows.items[0].name, {}, routeWait) }
 
 test.each(['superadmin', 'tenant_viewer', 'workspace_viewer'])('flows has no role gate for %s under /next', async (role) => {
@@ -118,4 +119,36 @@ test('the provider exposes optional workspace retry and clears its error while t
   complete(Response.json(buildWorkspaceCollectionFixture()))
   await waitFor(() => expect(screen.getByTestId('context')).toHaveTextContent('"loading":false,"error":null'))
   expect(attempts).toBe(2); expect(calls().filter(([url]) => url === tenantUrl)).toHaveLength(1)
+})
+
+test.each(['GET', 'POST', 'RUN'])('%s repeated endpoint 401 keeps the flows route and session after exactly one refresh', async (action) => {
+  const { initial, fresh } = setup(['superadmin'], 'repeat', action)
+  const retryUnauthorizedHandler = vi.fn(invalidateConsoleShellSession)
+  setConsoleSessionRetryUnauthorizedHandler(retryUnauthorizedHandler)
+  const assign = vi.spyOn(designerNavigation, 'assign').mockImplementation(() => {})
+  open()
+  if (action !== 'GET') {
+    await ready()
+    if (action === 'POST') {
+      fireEvent.change(screen.getByLabelText(es.newName), { target: { value: 'Keep' } })
+      fireEvent.click(screen.getByRole('button', { name: es.create }))
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: 'Ejecutar ahora Synthetic published flow' }))
+      fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: es.run }))
+    }
+  }
+  const path = action === 'RUN' ? triggerPath : flowsPath
+  const method = action === 'GET' ? 'GET' : 'POST'
+  await waitFor(() => expect(calls().filter(([url, init]) => url === path && init?.method === method)).toHaveLength(2), routeWait)
+  expect(retryUnauthorizedHandler).not.toHaveBeenCalled()
+  await waitFor(() => expect(screen.getByTestId('console-flows-page')).toHaveTextContent(es.errors['401']))
+  expect(screen.getByTestId('flows-location')).toHaveTextContent(/^\/console\/flows$/)
+  expect(screen.queryByRole('heading', { name: 'Accede a In Falcone Console' })).toBeNull()
+  expect(readConsoleShellSession()?.tokenSet?.accessToken).toBe(fresh.tokenSet?.accessToken)
+  const requests = calls().filter(([url, init]) => url === path && init?.method === method)
+  expect(requests).toHaveLength(2)
+  expect(new Headers(requests[0][1]?.headers).get('Authorization')).toBe(`Bearer ${initial.tokenSet?.accessToken}`)
+  expect(new Headers(requests[1][1]?.headers).get('Authorization')).toBe(`Bearer ${fresh.tokenSet?.accessToken}`)
+  expect(calls().filter(([url]) => String(url).endsWith('/refresh'))).toHaveLength(1)
+  expect(assign).not.toHaveBeenCalled()
 })

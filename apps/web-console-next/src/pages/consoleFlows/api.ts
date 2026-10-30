@@ -6,14 +6,15 @@ export interface FlowSummary {
 }
 export interface TriggerAck { status: 'triggered'; scheduleId: string }
 export const flowsPath = (workspaceId: string) => `/v1/flows/workspaces/${encodeURIComponent(workspaceId)}/flows`
+// A repeated domain-route 401 belongs to the page; refresh failure still invalidates the session.
 export function listFlows(workspaceId: string) {
-  return requestConsoleSessionJson<{ items: FlowSummary[] }>(flowsPath(workspaceId), { method: 'GET' })
+  return requestConsoleSessionJson<{ items: FlowSummary[] }>(flowsPath(workspaceId), { method: 'GET', suppressUnauthorizedInvalidation: true })
 }
 export function createFlowDraft(workspaceId: string, name: string) {
-  return requestConsoleSessionJson<FlowSummary>(flowsPath(workspaceId), { method: 'POST', body: { name } })
+  return requestConsoleSessionJson<FlowSummary>(flowsPath(workspaceId), { method: 'POST', body: { name }, suppressUnauthorizedInvalidation: true })
 }
 export function triggerFlowSchedule(workspaceId: string, flowId: string) {
-  return requestConsoleSessionJson<TriggerAck>(`${flowsPath(workspaceId)}/${encodeURIComponent(flowId)}/schedule/trigger`, { method: 'POST' })
+  return requestConsoleSessionJson<TriggerAck>(`${flowsPath(workspaceId)}/${encodeURIComponent(flowId)}/schedule/trigger`, { method: 'POST', suppressUnauthorizedInvalidation: true })
 }
 // The designer remains in the legacy document until its own migration lands.
 export const designerNavigation = { assign: (href: string) => window.location.assign(href) }

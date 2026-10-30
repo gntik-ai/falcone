@@ -25,6 +25,20 @@ const b64urlToBuf = (s) => Buffer.from(s, 'base64url');
 const b64urlToJson = (s) => JSON.parse(b64urlToBuf(s).toString('utf8'));
 const ALG_DIGEST = { RS256: 'sha256', RS384: 'sha384', RS512: 'sha512' };
 
+// Mirror control-plane deriveActorType, including claim precedence. This mapping grants
+// platform scope only after issuer trust and signature validation below.
+const KNOWN_ROLE_TO_ACTORTYPE = [
+  ['superadmin', 'superadmin'], ['platform_admin', 'superadmin'], ['platform_operator', 'internal'],
+  ['tenant_owner', 'tenant_owner'], ['tenant_admin', 'tenant_owner'],
+  ['workspace_admin', 'workspace_admin'], ['workspace_owner', 'workspace_admin']
+];
+function deriveActorType(claims) {
+  if (claims.actor_type) return claims.actor_type;
+  const roles = claims?.realm_access?.roles ?? [];
+  for (const [role, type] of KNOWN_ROLE_TO_ACTORTYPE) if (roles.includes(role)) return type;
+  return 'tenant_member';
+}
+
 export function deriveIdentityFromClaims(claims, pathWorkspaceId) {
   const roles = claims.realm_access?.roles ?? [];
   const scopes = typeof claims.scope === 'string'
@@ -178,6 +192,10 @@ export function createJwtVerifier({
       // For a tenant realm the tenant id IS the realm name, taken from the verified issuer — it
       // cannot be forged by a claim, so a tenant-A token can never act as tenant B.
       if (trust.kind === 'tenant') identity.tenantId = trust.realm;
+      if (trust.kind === 'platform') {
+        identity.actorType = deriveActorType(claims);
+        identity.platformCaller = identity.actorType === 'superadmin' || identity.actorType === 'internal';
+      }
       return identity;
     },
   };
