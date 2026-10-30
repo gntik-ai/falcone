@@ -203,7 +203,7 @@ export default function ConsoleMcpServerDetailPage() {
   const { t, i18n: language } = useCopy()
   const { mcpServerId = '' } = useParams()
   const { activeWorkspaceId } = useConsoleContext()
-  return <I18nProvider locale={language.language}><LiveAnnouncer><div className="console-mcp-server-detail min-w-0 wrap-anywhere" data-testid="console-mcp-server-detail-page">
+  return <I18nProvider locale={language.language}><LiveAnnouncer className="console-mcp-server-detail-announcements"><div className="console-mcp-server-detail min-w-0 wrap-anywhere" data-testid="console-mcp-server-detail-page">
     {activeWorkspaceId ? <Content key={`${activeWorkspaceId}/${mcpServerId}`} workspaceId={activeWorkspaceId} serverId={mcpServerId} /> : <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} header={<Header />} className="min-w-0"><WorkspaceGate /></Page>}
   </div></LiveAnnouncer></I18nProvider>
 }

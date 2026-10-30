@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, NavLink, useNavigate } from 'react-router-dom'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { buildConsoleRefreshSessionFixture, buildConsoleSignupPolicyFixture, buildTenantCollectionFixture, buildWorkspaceCollectionFixture } from '@in-falcone/console-api/fixtures'
 import { readConsoleShellSession, readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import { App } from '../src/App'
@@ -9,6 +9,9 @@ import { pendingConsoleRoutes } from '../src/shell/routes'
 import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
 import { server, detailPath } from './parity/pages/console-mcp-server-detail-page.manifest'
 import es from '../src/locales/es/pages.console-mcp-server-detail-page.json'
+import en from '../src/locales/en/pages.console-mcp-server-detail-page.json'
+import i18n from '../src/i18n'
+import { mcpLocaleValues, forbiddenMcpCopy } from './parity/pages/consoleMcpServerDetail.locale'
 let requests: ReturnType<typeof strictFetch>
 afterEach(() => requests?.verify())
 const route = '/console/mcp/servers/srv_1'
@@ -67,4 +70,27 @@ test.each(['link', 'navigate'])('%s arrival resolves the lazy page through the s
   setup(); render(<MemoryRouter initialEntries={['/console/profile']}><Arrival /></MemoryRouter>)
   fireEvent.click(screen.getByRole(arrival === 'link' ? 'link' : 'button', { name: arrival === 'link' ? 'Open MCP link' : 'Open MCP programmatically' }))
   await screen.findByRole('heading', { name: 'Acme Orders' }, routeWait)
+})
+
+test.each(['es', 'en'] as const)('workspace-required copy belongs to the MCP page in %s without sending a detail GET', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
+  setup()
+  requests = strictFetch({
+    [`GET ${tenantUrl}`]: buildTenantCollectionFixture(),
+    [`GET ${workspaceUrl('synthetic-tenant')}`]: { items: [] },
+  })
+  const geometry = vi.spyOn(Element.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  try {
+    open()
+    await screen.findByRole('heading', { name: copy.workspaceRequired }, routeWait)
+    expect(screen.getByRole('heading', { level: 1, name: copy.title })).toBeVisible()
+    expect(screen.getByText(copy.workspaceDescription)).toBeVisible()
+    expect(screen.getByRole('link', { name: copy.createWorkspace })).toHaveAttribute('href', '/console/workspaces')
+    const values = mcpLocaleValues(), forbidden = await forbiddenMcpCopy(locale)
+    expect(values).toContain(copy.workspaceRequired)
+    expect(values.filter((text) => /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/.test(text) || (locale === 'es' && forbidden.has(text)))).toEqual([])
+    expect(document.documentElement.lang).toBe(locale)
+    expect(requests.mock.mock.calls.filter(([url]) => url === detailPath)).toHaveLength(0)
+  } finally { geometry.mockRestore() }
 })

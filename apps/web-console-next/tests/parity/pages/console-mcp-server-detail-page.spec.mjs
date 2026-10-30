@@ -4,6 +4,7 @@ import manifest, { detailPath, callPath, detailResponse, server, toolResult } fr
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
+import { mcpLocaleValues, forbiddenMcpCopy } from './consoleMcpServerDetail.locale.ts';
 
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale,
   JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-mcp-server-detail-page.json`, import.meta.url), 'utf8')),
@@ -18,6 +19,16 @@ async function ready(parity) { await expect(surface(parity).getByRole('heading',
 async function open(parity, variant = 'success', shell = {}) {
   state.set(parity, { variant, reads: 0, posts: 0, toolFailure: false });
   await parity.open(manifest.route, shell);
+}
+async function assertMcpLocale(parity) {
+  await expect(parity.page.locator('html')).toHaveAttribute('lang', parity.locale);
+  await expect(surface(parity)).toBeAttached();
+  // The shared shell's empty-workspace kit copy is outside this page's ownership.
+  // Apply the shared locale rules to every MCP surface, owned popup and announcement.
+  const values = await parity.page.evaluate(mcpLocaleValues);
+  expect(values.length, 'locale: MCP surfaces must contain copy').toBeGreaterThan(0);
+  const forbidden = await forbiddenMcpCopy(parity.locale);
+  expect(values.filter((text) => /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/.test(text) || (parity.locale === 'es' && forbidden.has(text))), 'locale: unexpected MCP page copy').toEqual([]);
 }
 async function snapshot(parity, info, name) {
   await check.assertLocale(parity);
@@ -112,7 +123,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       }
       await open(parity, 'success', { workspaces: 'empty' });
       await expect(surface(parity).getByRole('heading', { name: copy(parity).workspaceRequired, exact: true })).toBeVisible();
-      expect(state.get(parity).reads).toBe(0); await check.assertLocale(parity);
+      expect(state.get(parity).reads).toBe(0); await assertMcpLocale(parity);
     });
     test('accessibility', async ({ parity }) => {
       await open(parity); await ready(parity); await check.assertAccessibility(parity);
