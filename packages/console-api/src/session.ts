@@ -32,6 +32,8 @@ export interface ConsoleSessionRequestOptions {
   headers?: HeadersInit
   idempotent?: boolean
   signal?: AbortSignal
+  /** Keep a repeated 401 local to the caller after the single refresh and replay. */
+  suppressUnauthorizedInvalidation?: boolean
 }
 
 export function persistConsoleShellSession(session: ConsoleLoginSession, tenantId?: string): void {
@@ -263,7 +265,7 @@ export async function requestConsoleSessionJson<T>(
     try {
       return await performAuthenticatedRequest<T>(url, options, refreshedAccessToken)
     } catch (retryError) {
-      if ((retryError as ApiError).status === 401) {
+      if ((retryError as ApiError).status === 401 && !options.suppressUnauthorizedInvalidation) {
         retryUnauthorizedHandler?.()
       }
       throw retryError

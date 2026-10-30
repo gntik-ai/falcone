@@ -40,6 +40,8 @@ export async function installSession(page, roles = ['superadmin']) {
           clientSecretPlaceholder: '<SYNTHETIC_CLIENT_SECRET>', scopeHint: 'synthetic-scope', consoleRef: 'Synthetic console reference' },
         enabledServices: [], customNotes: [],
       } });
+    } else if (route.request().method() === 'GET' && /^\/v1\/flows\/workspaces\/[^/]+\/flows\/[^/]+\/executions$/.test(url.pathname) && !url.search) {
+      await route.fulfill({ json: { items: [], nextPageToken: null } });
     } else {
       const request = route.request();
       let body;
