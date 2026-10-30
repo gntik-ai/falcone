@@ -68,6 +68,39 @@ test.each(['default', 'empty', 'trimmed'])('registration sends the legacy %s pay
   expect(document.body).toHaveTextContent(es.registered)
 })
 
+test.each(['es', 'en'] as const)('switching from %s after registration preserves the refreshed list without another request', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en, nextLocale = locale === 'es' ? 'en' : 'es', nextCopy = nextLocale === 'es' ? es : en
+  let count = 0
+  setup({ [`GET ${functionsPath}`]: () => Response.json(++count === 1 ? functionRows : functionRows4), [`POST ${functionsPath}`]: functionFixtures['register-accepted'].body })
+  open(); await ready()
+  change(copy.name, 'on-user-created'); fireEvent.submit(field(copy.name).closest('form')!)
+  await screen.findByText('on-user-created')
+  await act(async () => { await i18n.changeLanguage(nextLocale) })
+  expect(screen.getByRole('heading', { name: nextCopy.title })).toBeVisible()
+  const table = screen.getByRole('table')
+  for (const fn of functionRows4.items) expect(within(table).getByText(fn.name)).toBeVisible()
+  expect(calls()).toEqual([
+    { method: 'GET', path: functionsPath, body: undefined },
+    { method: 'POST', path: functionsPath, body: { name: 'on-user-created', runtime: 'nodejs:20', handler: 'main' } },
+    { method: 'GET', path: functionsPath, body: undefined },
+  ])
+})
+
+test.each(['es', 'en'] as const)('switching from %s after a successful retry does not restore the initial error', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en, nextLocale = locale === 'es' ? 'en' : 'es', nextCopy = nextLocale === 'es' ? es : en
+  let count = 0
+  setup({ [`GET ${functionsPath}`]: () => ++count === 1 ? Response.json({}, { status: 500 }) : Response.json(functionRows) })
+  open(); fireEvent.click(await screen.findByRole('button', { name: copy.retry })); await ready()
+  await act(async () => { await i18n.changeLanguage(nextLocale) })
+  expect(screen.getByRole('heading', { name: nextCopy.title })).toBeVisible()
+  const table = screen.getByRole('table')
+  for (const fn of functionRows.items) expect(within(table).getByText(fn.name)).toBeVisible()
+  expect(screen.queryByRole('heading', { name: nextCopy.listError })).toBeNull()
+  expect(calls().map((call) => call.method)).toEqual(['GET', 'GET'])
+})
+
 test('registration stays busy through held POST and held GET while standalone GET allows submit', async () => {
   let finishPost!: (response: Response) => void, finishGet!: (response: Response) => void
   let count = 0

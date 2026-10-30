@@ -42,6 +42,9 @@ function FailurePanel({ failure, kind, retry, retrying = false }: { failure: Fai
 function Registry({ workspaceId }: { workspaceId: string }) {
   const { t } = useCopy()
   const announce = useAnnounce(), toast = useToast()
+  const feedback = useRef({ t, announce })
+  // Keep asynchronous feedback localized without restarting the workspace load.
+  useLayoutEffect(() => { feedback.current = { t, announce } }, [t, announce])
   const input = useRef<HTMLInputElement>(null)
   const mounted = useRef(false), inFlight = useRef(false)
   const request = useRef<Promise<ListResponse> | null>(null)
@@ -57,14 +60,14 @@ function Registry({ workspaceId }: { workspaceId: string }) {
   const load = useCallback(async (pending?: Promise<ListResponse>) => {
     const token = ++sequence.current
     setLoading(true); setListError(null)
-    if (!pending || announcedRequest.current !== pending) { announce(t('loading'), 'polite'); announcedRequest.current = pending ?? null }
+    if (!pending || announcedRequest.current !== pending) { feedback.current.announce(feedback.current.t('loading'), 'polite'); announcedRequest.current = pending ?? null }
     try {
       const result = await (pending ?? requestConsoleSessionJson<ListResponse>(path))
       if (mounted.current && token === sequence.current) setItems(result.items ?? [])
     } catch (cause) {
-      if (mounted.current && token === sequence.current) { setItems([]); setListError(failureFrom(cause)); announce(t('listError'), 'assertive') }
+      if (mounted.current && token === sequence.current) { setItems([]); setListError(failureFrom(cause)); feedback.current.announce(feedback.current.t('listError'), 'assertive') }
     } finally { if (mounted.current && token === sequence.current) setLoading(false) }
-  }, [path, announce, t])
+  }, [path])
   useEffect(() => {
     mounted.current = true
     // Reuse bootstrap across StrictMode effect replay, as in the shell.
