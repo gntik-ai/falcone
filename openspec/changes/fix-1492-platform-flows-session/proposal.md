@@ -4,7 +4,7 @@
 
 Issue #1492 has two confirmed causes. The executor verifies platform-realm console JWTs but derives their tenant only from `tenant_id`; a superadmin session without that claim therefore gets `401 UNAUTHENTICATED: Missing tenant identity` on the flows list. In web-console-next, a domain-route 401 that survives one refresh and replay invokes the session-ending handler because the three flows requests omit `suppressUnauthorizedInvalidation`.
 
-At immutable base `8bd1bc8a1db3a04652fe0acbd6044e073cdff06b`, `node tests/blackbox/executor-platform-caller-identity.test.mjs` reproduced the exact 401 twice using an RS256 platform token, stub JWKS and the real executor request listener. The public seam is HTTP routing and response, with the flow service replaced at its boundary. The reduced scenario needs only the trusted token, existing workspace owner resolver and flows list handler. Listening sockets are denied, so the regression uses the repository's in-memory HTTP parser helper.
+At immutable base `8bd1bc8a1db3a04652fe0acbd6044e073cdff06b`, the continuation review reproduced the exact 401 twice using an RS256 platform token, stub JWKS and the real executor request listener. The command was `node --test --experimental-test-isolation=none --test-name-pattern='platform superadmin without a tenant lists' tests/blackbox/executor-platform-caller-identity.test.mjs`, run in an isolated archive of that base with the regression test copied from HEAD. Both runs expected 200 and received `401 UNAUTHENTICATED: Missing tenant identity`; the same scenario passes at HEAD. The public seam is HTTP routing and response, with the flow service replaced at its boundary. The reduced scenario needs only the trusted token, existing workspace owner resolver and flows list handler. Listening sockets are denied, so the regression uses the repository's in-memory HTTP parser helper.
 
 The diagnostic hypotheses were: missing tenant derivation for platform sessions (predicts this 401 with a verified token); failed JWT trust/audience verification (predicts rejection before identity exists); and workspace credential mismatch (predicts 403 once identity exists). The deterministic 401 and successful verified platform identity establish the first cause. Console tests separately observed the session-ending handler called once after exactly two domain requests and one successful refresh.
 
@@ -33,11 +33,17 @@ All these existing web-console-next callers omit suppression and can invoke the 
 | `consoleOperations/query.ts` | Query operation lists |
 | `operationDetail/query.ts` | Query operation details/history |
 | `consoleOperations/reconnect.ts` | Probe `/v1/console/session` on reconnect (a session endpoint) |
+| `consoleQuotas.tsx` via shared clients | Read tenant/workspace quota posture and overview |
+| `consoleQuotas/AdjustDialog.tsx` via shared clients | Read the tenant plan; update a plan limit |
+| `consoleWorkspaceDashboard.tsx` via shared clients | Read workspace consumption |
+| `shell/context.tsx` via shared loaders and clients | List accessible tenants/workspaces; read a tenant for membership-scoped selection |
+
+The indirect callers above use `packages/console-api/src/clients.ts`, whose requests also omit suppression. This inventory does not change any caller or shared client outside flows.
 
 `consoleFlowHistory/api.ts` already suppresses domain-401 invalidation. The legacy `apps/web-console/src/services/flowsApi.ts` uses the same executor URL and shared client, so the backend bug affects it too and this backend fix covers it. Legacy bootstrap never installs `setConsoleSessionRetryUnauthorizedHandler`; a repeated endpoint 401 rejects the request without that next-only session-ending hook. A failed refresh still invalidates the shared session. No legacy change is needed.
 
 ## Limits and review
 
-The supplied risk policy is R1; the checker should assess the issue's R2 concern because all workspace-addressed executor routes share this gate. Legacy trust remains fail-closed. Accepting `actor_type` on its own follows the approved control-plane mapping and is limited to the verified platform issuer. No JWT is reparsed in the server. No Keycloak, gateway, Helm, dependency, workflow pin or deployment change is needed. The separate deployment worktree is untouched.
+The supplied risk policy is R1; the checker should assess the issue's R2 concern because all workspace-addressed executor routes share this gate. Legacy trust remains fail-closed. Accepting `actor_type` on its own follows the approved control-plane mapping and is limited to the verified platform issuer. Confirmation that the platform realm does not expose a user-editable `actor_type` mapper remains open: no realm export was supplied, and the source repository's Keycloak configuration contains scope definitions only. No JWT is reparsed in the server. No Keycloak, gateway, Helm, dependency, workflow pin or deployment change is needed. Existing Hermes pin commits are preserved. The separate deployment worktree is untouched.
 
 Browser parity, axe and viewport checks run in PR CI because Chromium is unavailable here. The independent checker and operator must assess parity screenshots. Live staging verification is operator-owned after normal delivery. Roll back by reverting the ChangeSet; no migration is needed.
