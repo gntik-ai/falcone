@@ -54,6 +54,8 @@ function useErrorMessage() {
   const { t } = useCopy()
   return (cause: unknown, fallback: string, server = false) => {
     const error = failureFrom(cause)
+    // A domain 401 uses the page's localized state after refresh, including for run-now.
+    if (error.status === 401) return t('errors.401')
     // List access and trigger failures may show server reasons, but never transport defaults.
     if (server && error.status && error.message && !/^HTTP_\d+$/.test(error.message) && !['Request failed', 'Unauthorized', 'Forbidden', 'Not Found', 'Conflict', 'Too Many Requests', 'Internal Server Error', 'Bad Gateway', 'Service Unavailable', 'Gateway Timeout'].includes(error.message)) return error.message
     const status = error.status

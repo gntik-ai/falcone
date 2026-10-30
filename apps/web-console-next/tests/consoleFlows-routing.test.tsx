@@ -23,7 +23,7 @@ function setup(roles = ['superadmin'], variant = 'success', action = 'GET') {
     [`GET ${tenantUrl}`]: buildTenantCollectionFixture(), [`GET ${workspaceUrl('synthetic-tenant')}`]: buildWorkspaceCollectionFixture(),
     [`GET ${flowsPath}`]: () => action === 'GET' && (variant === 'repeat' || ++attempts === 1) && variant !== 'success' ? Response.json({}, { status: 401 }) : Response.json(flowRows),
     [`POST ${flowsPath}`]: () => action === 'POST' && (variant === 'repeat' || ++attempts === 1) && variant !== 'success' ? Response.json({}, { status: 401 }) : Response.json({ flowId: 'created/1' }),
-    [`POST ${triggerPath}`]: () => action === 'RUN' ? Response.json({}, { status: 401 }) : Response.json({ status: 'triggered', scheduleId: 'synthetic-schedule' }), [`GET ${historyPath}`]: firstPage,
+    [`POST ${triggerPath}`]: () => action === 'RUN' ? Response.json({ code: 'UNAUTHENTICATED', message: 'Missing tenant identity' }, { status: 401 }) : Response.json({ status: 'triggered', scheduleId: 'synthetic-schedule' }), [`GET ${historyPath}`]: firstPage,
     'POST /v1/auth/login-sessions/synthetic-session/refresh': () => variant === 'rejected' ? Response.json({}, { status: 401 }) : Response.json(fresh),
     'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture(),
   }); return { initial, fresh }

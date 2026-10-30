@@ -80,7 +80,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
           await button(parity, 'create').click();
         } else await confirm(parity);
       }
-      const expected = action === 'run-now' ? 'synthetic-backend-reason' : copy(parity).errors['401'];
+      const expected = copy(parity).errors['401'];
       await expect(surface(parity).getByText(expected, { exact: true })).toBeVisible();
       expect(new URL(parity.page.url()).pathname).toMatch(/\/console\/flows$/);
       expect(calls(parity).filter((request) => request.path === path && request.method === method)).toHaveLength(2);
