@@ -202,6 +202,13 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await check.assertRuntimeHealth(parity);
     });
     test('workspace loading, picker and activation', async ({ parity, server }) => {
+      await parity.page.addInitScript(() => {
+        const key = 'in-falcone.console-shell-session';
+        const session = JSON.parse(sessionStorage.getItem(key));
+        // Both options must survive the shell's membership filter to require a choice.
+        session.principal.workspaceIds = ['synthetic-workspace', 'synthetic-other'];
+        sessionStorage.setItem(key, JSON.stringify(session));
+      });
       let release;
       const waiting = new Promise((resolve) => { release = resolve; });
       await parity.page.route((url) => url.pathname === '/v1/workspaces', async (route) => {
@@ -218,7 +225,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(parity.page.getByRole('status', { name: copy(parity).workspaceLoading, exact: true })).toBeVisible();
       expect(calls(parity)).toHaveLength(0);
       release();
-      await parity.page.getByRole('combobox', { name: copy(parity).workspaceLabel, exact: true }).click();
+      const picker = parity.page.getByRole('combobox', { name: copy(parity).workspaceLabel, exact: true });
+      await expect(picker).toBeVisible();
+      expect(calls(parity)).toHaveLength(0);
+      await picker.click();
       await parity.page.getByRole('option', { name: 'Synthetic Workspace', exact: true }).click();
       await ready(parity);
       expect(calls(parity)).toEqual([{ method: 'GET', path: historyPath, body: undefined }]);
