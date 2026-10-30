@@ -1,0 +1,20 @@
+/* The page has five explicit filters and no search or saved-view controls. */
+.console-flow-history-toolbar div:has(> input[type="search"]) {
+  display: none;
+}
+.console-flow-history-toolbar > div:first-child {
+  display: block;
+  flex-basis: 100%;
+}
+.console-flow-history-toolbar > div:last-child {
+  display: none;
+}
+.console-flow-history table {
+  table-layout: fixed;
+  width: 100%;
+}
+@media (min-width: 640px) {
+  .console-flow-history table {
+    table-layout: auto;
+  }
+}
