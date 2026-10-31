@@ -85,6 +85,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'profile') return { ...route, element: lazyPage('pages.console-profile-page', () => import('./pages/consoleProfile')) }
         if (route.path === 'workspaces/:workspaceId/docs') return { ...route, element: lazyPage('pages.console-docs-page', () => import('./pages/consoleDocs')) }
         if (route.path === 'workspaces/:workspaceId' && route.migrated) return { ...route, element: lazyPage('pages.console-workspace-dashboard-page', () => import('./pages/consoleWorkspaceDashboard')) }
+        if (route.path === 'mcp/servers' && route.migrated) return { ...route, element: lazyPage('pages.console-mcp-servers-page', () => import('./pages/consoleMcpServers')) }
         if (route.path === 'mcp/servers/:mcpServerId' && route.migrated) return { ...route, element: lazyPage('pages.console-mcp-server-detail-page', () => import('./pages/consoleMcpServerDetail')) }
         if (route.path === 'functions-registry' && route.migrated) return { ...route, element: lazyPage('pages.console-function-registry-page', () => import('./pages/consoleFunctionRegistry')) }
         if (route.path === 'flows' && route.migrated) return { ...route, element: lazyPage('pages.console-flows-page', () => import('./pages/consoleFlows')) }

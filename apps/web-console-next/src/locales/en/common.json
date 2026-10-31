@@ -44,7 +44,8 @@
       "newPlan": "New plan",
       "planId": "Plan {id}",
       "tenant": "Tenant {id}",
-      "plan": "Plan"
+      "plan": "Plan",
+      "mcpServer": "Server {id}"
     }
   },
   "locale": {
@@ -147,6 +148,7 @@
     "observability": "Observability",
     "service-accounts": "Service accounts",
     "workspace-secrets": "Workspace secrets",
-    "quotas": "Quotas"
+    "quotas": "Quotas",
+    "mcp-servers": "MCP servers"
   }
 }

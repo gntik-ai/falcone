@@ -20,6 +20,8 @@ export function buildBreadcrumbs(pathname: string, t: TFunction): BreadcrumbItem
     items.push({ label: translated('flow'), href: child ? `${base}/${id}` : undefined })
     if (child === 'runs') items.push({ label: translated('runs'), href: executionId ? `${base}/${id}/runs` : undefined })
     if (executionId) items.push({ label: translated('execution', executionId) })
+  } else if (base === '/console/mcp/servers') {
+    items.push({ label: translated('mcpServer') })
   } else if (base === '/console/workspaces') {
     items.push({ label: translated('workspace'), href: child ? `${base}/${id}` : undefined })
     if (child === 'realtime' || child === 'docs') items.push({ label: translated(child) })

@@ -1,6 +1,6 @@
 import { matchPath } from 'react-router-dom'
 import { pendingConsoleRoutes } from './routes'
-import { Activity, Database, FolderKanban, Gauge, KeyRound, KeySquare, LayoutDashboard, LogIn, PieChart, Rocket, Settings, Shield, Users, Workflow } from 'lucide-react'
+import { Activity, Database, FolderKanban, Gauge, KeyRound, KeySquare, LayoutDashboard, LogIn, PieChart, Rocket, Server, Settings, Shield, Users, Workflow } from 'lucide-react'
 
 // Application destinations and role visibility follow the legacy shell.
 export const navigation = [
@@ -11,6 +11,7 @@ export const navigation = [
   { path: '/console/tenants', key: 'tenants', group: 'main', icon: Shield, requiresPlatformInventoryAccess: true },
   { path: '/console/workspaces', key: 'workspaces', group: 'main', icon: FolderKanban, restrictedForAction: 'tenant.workspaces.create' },
   { path: '/console/database', key: 'database', group: 'workspace', icon: Database, restrictedForAction: 'workspace.write' },
+  { path: '/console/mcp/servers', key: 'mcp-servers', group: 'functions', icon: Server },
   { path: '/console/flows', key: 'flows', group: 'functions', icon: Workflow },
   { path: '/console/functions-registry', key: 'functions-registry', group: 'functions', icon: Settings, restrictedForAction: 'workspace.write' },
   { path: '/console/functions', key: 'functions', exactActive: true, group: 'functions', icon: Workflow, restrictedForAction: 'workspace.write' },
