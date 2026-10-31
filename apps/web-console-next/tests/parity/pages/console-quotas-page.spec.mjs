@@ -13,7 +13,6 @@ const puts = (parity) => parity.network.requests.filter((request) => request.met
 const button = (parity, name) => dialog(parity).getByRole('button', { name, exact: true });
 async function open(parity, variants = {}) {
   await parity.open(manifest.route, variants);
-  await expect(surface(parity)).toBeVisible();
   await expect(surface(parity).locator('section[aria-busy="true"]')).toHaveCount(0);
 }
 function allowlist(parity) {

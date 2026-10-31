@@ -25,8 +25,9 @@ The six tests named in issue #1487 SHALL wait for the rendered element, route co
 #### Scenario: Quotas error and empty states
 
 - **WHEN** the parity test opens a quota state
-- **THEN** it waits for the quotas surface and its loading completion, and observes the declared state before inspecting tables, request IDs or links
+- **THEN** it observes the declared state before inspecting tables, request IDs or links
 - **AND** a successful retry waits for the recovered two tables.
+- **AND** the 401 state waits for the login URL without requiring the quotas surface to remain mounted.
 
 #### Scenario: Signup success accessibility
 

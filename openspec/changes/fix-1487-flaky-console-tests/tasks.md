@@ -40,3 +40,16 @@ All unit runs use normal mode, with no fixture-mode full suite. Direct runner in
 - SKIPPED: browser repetitions, browser stress, axe, viewport and the longer-toast-transition negative check: Chromium unavailable; PR CI runs them.
 
 The pre-fix allocation failures, catch-all heading focus failure and deliberately removed-skeleton negative failure are red-before-green diagnostics, not final test results. Superseded full-suite runs were cancelled after changing the affected source or tests; only validation of the final implementation is reported above.
+
+## Checker follow-up
+
+- [x] Remove the added quotas-surface wait from the shared open helper, restoring that helper to the immutable base. The 401 case must reach login without requiring a quotas surface after navigation.
+- [x] Retain the declared state locators, organization-table wait, error request-ID wait, recovered two-table count, login URL and exact refresh-traffic assertions. No additional page change is needed.
+- [x] Update the proposal and quotas scenario to describe the per-state waits and the login redirect.
+- [x] Re-run parity fixture scan, manifest validation, quotas-spec syntax, scoped Markdown lint and the diff check; all pass. Verify that the shared helper matches the base and that the source/test additions contain no sleeps or timing, retry or worker configuration changes.
+- PASS: from `apps/web-console-next`, `node node_modules/vitest/vitest.mjs run tests/notFound.test.tsx tests/consoleTenantAllocationSummary.test.tsx --pool=threads --configLoader=runner --maxWorkers=1`: 48/48 tests.
+- PASS: from `apps/web-console-next`, `env -u SHELL_TEST_FIXTURES node node_modules/vitest/vitest.mjs run --pool=threads --maxWorkers=1 --configLoader=runner`: 65 files passed, one skipped; 1232 tests passed, three skipped.
+- PASS: from `apps/web-console`, `node node_modules/vitest/vitest.mjs run --pool=threads --maxWorkers=1 --configLoader=runner`: 195 files, 1400/1400 tests.
+- SKIPPED: both pnpm full-suite commands still encounter `spawnSync /usr/local/bin/node EPERM`; direct runner results are recorded separately.
+- SKIPPED: the quotas error-empty browser regression, all three parity specs with `--repeat-each=30`, browser stress, axe, viewport, detail-mount negative and longer-toast-transition negative checks: Chromium unavailable; PR CI runs them. No fresh browser reproduction or browser success is claimed.
+- The preceding maker's 30 fresh-process unit repetitions remain prior-attempt evidence; the checker follow-up changes only the quotas spec and OpenSpec documentation.
