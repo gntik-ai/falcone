@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { applyEdgeChanges, applyNodeChanges, Background, Controls, ReactFlow, useReactFlow, type Connection, type EdgeChange, type IsValidConnection, type Edge, type Node, type NodeChange, type AriaLabelConfig, type OnConnectEnd } from '@xyflow/react'
+import { applyEdgeChanges, applyNodeChanges, Background, Controls, ReactFlow, useReactFlow, useStoreApi, type Connection, type EdgeChange, type IsValidConnection, type Edge, type Node, type NodeChange, type AriaLabelConfig, type OnConnectEnd } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Badge, CanvasLayout, EmptyState, Link, StatusTag, Tabs, TabsList, TabsTab, Text } from '@gntik-ai/ui'
 import { PageHeader } from '@gntik-ai/blocks'
@@ -88,6 +88,7 @@ export function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; 
   const operation = useRef(false)
   const pendingFocus = useRef<string | null>(null)
   const { screenToFlowPosition } = useReactFlow()
+  const flowStore = useStoreApi()
   const canvasRef = useRef<HTMLDivElement | null>(null)
 
   const [record, setRecord] = useState<FlowDefinitionRecord | null>(null)
@@ -487,6 +488,7 @@ export function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; 
     'controls.zoomIn.ariaLabel': t('zoomIn'), 'controls.zoomOut.ariaLabel': t('zoomOut'),
     'controls.fitView.ariaLabel': t('fitView'), 'controls.interactive.ariaLabel': t('toggleInteractive'),
   }
+  const ARROW_DIRECTIONS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as const
   function canvasKey(event: React.KeyboardEvent) {
     const element = (event.target as HTMLElement).closest<HTMLElement>('.react-flow__node')
     if (!element?.dataset.id) return
@@ -498,6 +500,22 @@ export function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; 
       event.preventDefault(); event.stopPropagation()
       setNodes((current) => current.map((node) => ({ ...node, selected: false })))
       element.focus()
+    } else if (Object.prototype.hasOwnProperty.call(ARROW_DIRECTIONS, event.key)) {
+      // Match React Flow 12.11.0 keyboard movement after Escape deselects a node.
+      // Selected nodes keep React Flow's own handler.
+      const id = element.dataset.id
+      const state = flowStore.getState()
+      const node = nodes.find((candidate) => candidate.id === id)
+      if (!node || node.selected || !(node.draggable ?? state.nodesDraggable)) return
+      event.preventDefault(); event.stopPropagation()
+      const [dx, dy] = ARROW_DIRECTIONS[event.key as keyof typeof ARROW_DIRECTIONS]
+      const factor = event.shiftKey ? 4 : 1
+      const [vx, vy] = state.snapToGrid ? state.snapGrid : [5, 5]
+      const position = { x: node.position.x + dx * vx * factor, y: node.position.y + dy * vy * factor }
+      if (state.snapToGrid) { position.x = Math.round(position.x / vx) * vx; position.y = Math.round(position.y / vy) * vy }
+      flowStore.setState({ ariaLiveMessage: state.ariaLabelConfig['node.a11yDescription.ariaLiveMessage']({ direction: event.key.replace('Arrow', '').toLowerCase(), x: Math.trunc(node.position.x), y: Math.trunc(node.position.y) }) })
+      setNodes((current) => current.map((candidate) => candidate.id === id ? { ...candidate, selected: true, position } : { ...candidate, selected: false }))
+      setDirty(true)
     }
   }
   const renderCanvasSurface = <section ref={canvasRef} className="designer-canvas relative min-w-0 flex-1" aria-label={t('canvas')} onDragOver={onDragOver} onDrop={onDrop} onKeyDownCapture={canvasKey}>

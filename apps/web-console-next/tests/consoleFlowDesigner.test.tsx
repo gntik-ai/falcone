@@ -7,6 +7,7 @@ import { getFlow, listTaskTypes, updateFlowDraft, publishFlow, triggerFlowSchedu
 import { flowRecord, flowPath, taskTypesPath, taskTypes, versionPath, triggerPath, serverErrors } from './parity/pages/console-flow-designer-page.manifest'
 import { FLOW_PALETTE_DRAG_MIME } from '../src/pages/consoleFlowDesigner/chrome'
 import { nodesToDefinition, definitionToNodes, definitionToEdges } from '../src/pages/consoleFlowDesigner/flowGraphModel'
+import * as graphModel from '../src/pages/consoleFlowDesigner/flowGraphModel'
 import { serializeFlowToYaml, parseYamlToFlow } from '../src/pages/consoleFlowDesigner/yaml-serialiser'
 import { evaluateConnection } from '../src/pages/consoleFlowDesigner/connectionRules'
 import { describeFlowValidationError } from '../src/pages/consoleFlowDesigner/validation-errors'
@@ -16,7 +17,7 @@ import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-flow-designer-page.json'
 import en from '../src/locales/en/pages.console-flow-designer-page.json'
 const context = vi.hoisted(() => ({ value: {} as Record<string, unknown> }))
-const canvas = vi.hoisted(() => ({ ariaLabelConfig: {} as Partial<import('@xyflow/react').AriaLabelConfig> }))
+const canvas = vi.hoisted(() => ({ ariaLabelConfig: {} as Partial<import('@xyflow/react').AriaLabelConfig>, nodes: [] as import('@xyflow/react').Node[], nodeKeyDown: vi.fn() }))
 vi.mock('../src/shell/context', () => ({ useConsoleContext: () => context.value }))
 vi.mock('../src/shell/permissions', () => ({ usePermissions: () => ({ can: () => false }) }))
 vi.mock('../src/pages/consoleFlowDesigner/MonacoYamlSurface', () => ({ default: ({ value, onChange }: { value: string; onChange: (text: string) => void }) => {
@@ -33,14 +34,16 @@ vi.mock('../src/pages/consoleFlowDesigner/MonacoYamlSurface', () => ({ default: 
     onChange(event.target.value)
   }} />
 } }))
+const flowStoreState = { nodesDraggable: true, snapToGrid: false, snapGrid: [15, 15] as [number, number], ariaLabelConfig: {} as import('@xyflow/react').AriaLabelConfig }
+const flowStore = { getState: () => flowStoreState, setState: vi.fn() }
 vi.mock('@xyflow/react', async (original) => {
   const real = await original<typeof import('@xyflow/react')>()
   return { ...real, ReactFlowProvider: ({ children }: { children: ReactNode }) => children, Handle: () => null,
     ReactFlow: ({ children, nodes, edges, nodeTypes, ariaLabelConfig }: { children: ReactNode; nodes: import('@xyflow/react').Node[]; edges: import('@xyflow/react').Edge[]; nodeTypes: Record<string, React.ComponentType<any>>; ariaLabelConfig: import('@xyflow/react').AriaLabelConfig }) => {
-      canvas.ariaLabelConfig = ariaLabelConfig
-      return <div data-testid="react-flow-stub">{nodes.map((node) => { const Component = nodeTypes[node.type!]; return <div key={node.id} role="button" tabIndex={0} className="react-flow__node" data-id={node.id} aria-label={node.ariaLabel} {...node.domAttributes}><Component data={node.data} selected={node.selected} /></div> })}<output data-testid="edges">{edges.length}</output>{children}</div>
+      canvas.ariaLabelConfig = ariaLabelConfig; canvas.nodes = nodes; flowStoreState.ariaLabelConfig = ariaLabelConfig
+      return <div data-testid="react-flow-stub">{nodes.map((node) => { const Component = nodeTypes[node.type!]; return <div key={node.id} role="button" tabIndex={0} className="react-flow__node" data-id={node.id} aria-label={node.ariaLabel} onKeyDown={canvas.nodeKeyDown} {...node.domAttributes}><Component data={node.data} selected={node.selected} /></div> })}<output data-testid="edges">{edges.length}</output>{children}</div>
     },
-    Background: () => null, Controls: () => null, useReactFlow: () => ({ screenToFlowPosition: (point: { x: number; y: number }) => point }) }
+    Background: () => null, Controls: () => null, useReactFlow: () => ({ screenToFlowPosition: (point: { x: number; y: number }) => point }), useStoreApi: () => flowStore }
 })
 let requests: ReturnType<typeof strictFetch>
 const calls = () => requests.mock.mock.calls.map(([url, init]) => ({ path: String(url), method: init?.method, body: init?.body ? JSON.parse(String(init.body)) : undefined }))
@@ -50,7 +53,7 @@ function setup(routes: Record<string, unknown> = {}) {
 function Probe() { const location = useLocation(); return <output data-testid="location">{location.pathname}{JSON.stringify(location.state)}</output> }
 function open(path = '/console/flows/f1') { return render(<StrictMode><MemoryRouter initialEntries={[path]}><Routes><Route path="/console/flows/:flowId" element={<ConsoleFlowDesignerPage />} /><Route path="/missing" element={<ConsoleFlowDesignerPage />} /><Route path="/console/flows/:flowId/runs" element={<Probe />} /></Routes></MemoryRouter></StrictMode>) }
 async function ready() { await screen.findByRole('heading', { name: flowRecord.name }); await screen.findByTestId('flow-palette-item-synthetic-task') }
-beforeEach(() => { Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => [] }); login(); context.value = { activeWorkspaceId: 'synthetic-workspace', loading: false, workspaces: [], selectWorkspace: vi.fn() } })
+beforeEach(() => { Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => [] }); login(); context.value = { activeWorkspaceId: 'synthetic-workspace', loading: false, workspaces: [], selectWorkspace: vi.fn() }; Object.assign(flowStoreState, { nodesDraggable: true, snapToGrid: false, snapGrid: [15, 15] }); flowStore.setState.mockClear(); canvas.nodeKeyDown.mockClear() })
 afterEach(() => requests?.verify())
 
 test.each(['es', 'en'] as const)('ports the legacy header, all node kinds and history navigation in %s', async (locale) => {
@@ -142,6 +145,108 @@ test('node Enter focuses the inspector, editing marks dirty, Escape returns focu
   await waitFor(() => expect(screen.queryByTestId('unsaved-changes-indicator')).toBeNull())
 })
 
+function overrideTaskNode(overrides: Partial<Pick<import('@xyflow/react').Node, 'draggable' | 'position'>>) {
+  const project = graphModel.definitionToNodes
+  vi.spyOn(graphModel, 'definitionToNodes').mockImplementation((definition) => project(definition).map((node) => node.id === 'task' ? { ...node, ...overrides } : node))
+}
+
+test.each((['es', 'en'] as const).flatMap((locale) => [
+  { key: 'ArrowRight', dx: 5, dy: 0 }, { key: 'ArrowLeft', dx: -5, dy: 0 },
+  { key: 'ArrowUp', dx: 0, dy: -5 }, { key: 'ArrowDown', dx: 0, dy: 5 }
+].map((direction) => ({ locale, ...direction }))))('$key moves a focused unselected node and announces it in $locale', async ({ locale, key, dx, dy }) => {
+  await i18n.changeLanguage(locale); setup(); open(); await ready()
+  const copy = locale === 'es' ? es : en
+  const node = screen.getByRole('button', { name: `${copy.nodeTypes.task}: synthetic-task` })
+  const other = document.querySelector<HTMLElement>('.react-flow__node[data-id="sequence"]')!
+  fireEvent.keyDown(other, { key: 'Enter' }); await waitFor(() => expect(document.getElementById('flow-inspector-heading')).toHaveFocus())
+  const before = canvas.nodes.map((candidate) => ({ id: candidate.id, position: { ...candidate.position } }))
+  const position = before.find(({ id }) => id === 'task')!.position
+  node.focus(); expect(fireEvent.keyDown(node, { key })).toBe(false)
+  expect(canvas.nodes.find(({ id }) => id === 'task')!.position).toEqual({ x: position.x + dx, y: position.y + dy })
+  expect(canvas.nodes.filter(({ selected }) => selected).map(({ id }) => id)).toEqual(['task'])
+  expect(canvas.nodes.filter(({ id }) => id !== 'task').map(({ id, position }) => ({ id, position }))).toEqual(before.filter(({ id }) => id !== 'task'))
+  expect(screen.getByTestId('unsaved-changes-indicator')).toBeVisible()
+  expect(flowStore.setState).toHaveBeenCalledExactlyOnceWith({ ariaLiveMessage: i18n.t('nodeMoved', { ns: 'pages.console-flow-designer-page', direction: copy.directions[key.replace('Arrow', '').toLowerCase() as keyof typeof copy.directions], x: Math.trunc(position.x), y: Math.trunc(position.y) }) })
+  expect(canvas.nodeKeyDown).not.toHaveBeenCalled()
+})
+
+test.each([
+  { key: 'ArrowLeft', shiftKey: true, snapToGrid: false, start: { x: 10, y: 20 }, expected: { x: -10, y: 20 } },
+  { key: 'ArrowDown', shiftKey: false, snapToGrid: true, start: { x: 24, y: 48 }, expected: { x: 24, y: 72 } },
+  { key: 'ArrowUp', shiftKey: true, snapToGrid: true, start: { x: 24, y: 48 }, expected: { x: 24, y: -48 } },
+  { key: 'ArrowRight', shiftKey: false, snapToGrid: true, start: { x: 11.75, y: -19.25 }, expected: { x: 24, y: -24 } }
+])('$key uses React Flow step, grid snapping and Shift rules ($shiftKey, $snapToGrid)', async ({ key, shiftKey, snapToGrid, start, expected }) => {
+  overrideTaskNode({ position: start }); Object.assign(flowStoreState, { snapToGrid, snapGrid: [12, 24] })
+  setup(); open(); await ready()
+  const node = screen.getByRole('button', { name: 'Tarea: synthetic-task' }); node.focus()
+  expect(fireEvent.keyDown(node, { key, shiftKey })).toBe(false)
+  expect(canvas.nodes.find(({ id }) => id === 'task')!.position).toEqual(expected)
+  expect(canvas.nodes.filter(({ selected }) => selected).map(({ id }) => id)).toEqual(['task'])
+  expect(screen.getByTestId('unsaved-changes-indicator')).toBeVisible()
+  expect(flowStore.setState).toHaveBeenCalledExactlyOnceWith({ ariaLiveMessage: i18n.t('nodeMoved', { ns: 'pages.console-flow-designer-page', direction: es.directions[key.replace('Arrow', '').toLowerCase() as keyof typeof es.directions], x: Math.trunc(start.x), y: Math.trunc(start.y) }) })
+  expect(canvas.nodeKeyDown).not.toHaveBeenCalled()
+})
+
+test.each([
+  { draggable: false, nodesDraggable: true }, { draggable: undefined, nodesDraggable: false }, { draggable: false, nodesDraggable: false }
+])('a locked node leaves arrow keys, selection and dirty state untouched ($draggable, $nodesDraggable)', async ({ draggable, nodesDraggable }) => {
+  overrideTaskNode({ draggable }); flowStoreState.nodesDraggable = nodesDraggable
+  setup(); open(); await ready()
+  const other = document.querySelector<HTMLElement>('.react-flow__node[data-id="sequence"]')!
+  fireEvent.keyDown(other, { key: 'Enter' }); await waitFor(() => expect(document.getElementById('flow-inspector-heading')).toHaveFocus())
+  const before = canvas.nodes
+  const node = screen.getByRole('button', { name: 'Tarea: synthetic-task' }); node.focus()
+  expect(fireEvent.keyDown(node, { key: 'ArrowRight' })).toBe(true)
+  expect(canvas.nodes).toEqual(before); expect(canvas.nodes.filter(({ selected }) => selected).map(({ id }) => id)).toEqual(['sequence'])
+  expect(screen.queryByTestId('unsaved-changes-indicator')).toBeNull(); expect(flowStore.setState).not.toHaveBeenCalled()
+  expect(canvas.nodeKeyDown).toHaveBeenCalledOnce()
+})
+
+test('a draggable node override permits movement when the global lock is off', async () => {
+  overrideTaskNode({ draggable: true }); flowStoreState.nodesDraggable = false
+  setup(); open(); await ready()
+  const position = { ...canvas.nodes.find(({ id }) => id === 'task')!.position }
+  const node = screen.getByRole('button', { name: 'Tarea: synthetic-task' }); node.focus()
+  expect(fireEvent.keyDown(node, { key: 'ArrowRight' })).toBe(false)
+  expect(canvas.nodes.find(({ id }) => id === 'task')!).toMatchObject({ selected: true, position: { x: position.x + 5, y: position.y } })
+  expect(screen.getByTestId('unsaved-changes-indicator')).toBeVisible(); expect(flowStore.setState).toHaveBeenCalledOnce()
+})
+
+test('an already selected node leaves movement and the event to React Flow without a second move', async () => {
+  setup(); open(); await ready()
+  const node = screen.getByRole('button', { name: 'Tarea: synthetic-task' })
+  fireEvent.keyDown(node, { key: 'Enter' }); await waitFor(() => expect(document.getElementById('flow-inspector-heading')).toHaveFocus())
+  const before = canvas.nodes; node.focus()
+  expect(fireEvent.keyDown(node, { key: 'ArrowRight' })).toBe(true)
+  expect(canvas.nodes).toEqual(before); expect(flowStore.setState).not.toHaveBeenCalled()
+  expect(screen.queryByTestId('unsaved-changes-indicator')).toBeNull(); expect(canvas.nodeKeyDown).toHaveBeenCalledOnce()
+})
+
+test('arrow keys outside a node are ignored', async () => {
+  setup(); open(); await ready()
+  const before = canvas.nodes
+  expect(fireEvent.keyDown(screen.getByRole('region', { name: es.canvas }), { key: 'ArrowRight' })).toBe(true)
+  expect(canvas.nodes).toEqual(before); expect(flowStore.setState).not.toHaveBeenCalled()
+  expect(screen.queryByTestId('unsaved-changes-indicator')).toBeNull()
+})
+
+test.each(['Enter', ' '])('%s and Escape keep node selection and focus behavior before an arrow move', async (key) => {
+  setup(); open(); await ready()
+  const node = screen.getByRole('button', { name: 'Tarea: synthetic-task' }); node.focus(); fireEvent.keyDown(node, { key })
+  await waitFor(() => expect(document.getElementById('flow-inspector-heading')).toHaveFocus())
+  expect(canvas.nodes.find(({ id }) => id === 'task')!.selected).toBe(true)
+  fireEvent.keyDown(screen.getByLabelText(es.name), { key: 'Escape' }); await waitFor(() => expect(node).toHaveFocus())
+  expect(canvas.nodes.every(({ selected }) => !selected)).toBe(true)
+  expect(screen.queryByTestId('unsaved-changes-indicator')).toBeNull()
+  fireEvent.keyDown(node, { key }); await waitFor(() => expect(document.getElementById('flow-inspector-heading')).toHaveFocus())
+  node.focus(); fireEvent.keyDown(node, { key: 'Escape' })
+  expect(node).toHaveFocus(); expect(canvas.nodes.every(({ selected }) => !selected)).toBe(true)
+  const position = { ...canvas.nodes.find(({ id }) => id === 'task')!.position }
+  fireEvent.keyDown(node, { key: 'ArrowRight' })
+  expect(canvas.nodes.find(({ id }) => id === 'task')!).toMatchObject({ selected: true, position: { x: position.x + 5, y: position.y } })
+  expect(screen.getByTestId('unsaved-changes-indicator')).toBeVisible()
+})
+
 test.each(['yaml', 'side-by-side'] as const)('revert clears local edits in %s despite the Monaco value echo and subsequent typing marks dirty', async (mode) => {
   setup(); open(); await ready()
   fireEvent.click(screen.getByRole('tab', { name: es[mode] }))
@@ -200,7 +305,7 @@ test('publish 422 merges structured node errors and safe flow-level Problems wit
 
 test('invalid YAML prevents PATCH and canvas switching and shows the degradation banner', async () => {
   setup(); open(); await ready(); fireEvent.click(screen.getByRole('tab', { name: es.yaml }))
-  const editor = await screen.findByRole('textbox', { name: es.yamlLabel }); fireEvent.change(editor, { target: { value: 'nodes: [broken' } })
+  const editor = await screen.findByRole('textbox', { name: es.yamlLabel }); fireEvent.change(editor, { target: { value: 'nodes:\n  - id: broken\n    type: task\n  bad indentation' } })
   await screen.findByTestId('designer-yaml-degraded-banner'); fireEvent.click(screen.getByTestId('save-draft-button'))
   expect(await screen.findByTestId('designer-error-banner')).toHaveTextContent(es.invalidYaml)
   fireEvent.click(screen.getByRole('tab', { name: es.canvas })); expect(screen.getByRole('tab', { name: es.yaml })).toHaveAttribute('aria-selected', 'true')

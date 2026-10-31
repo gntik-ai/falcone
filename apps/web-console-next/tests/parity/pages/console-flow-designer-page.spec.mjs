@@ -74,7 +74,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await tab(parity, 'yaml'); await expect(parity.page.locator('.monaco-editor')).toBeVisible();
       const editor = parity.page.getByRole('textbox', { name: copy(parity).yamlLabel });
       await editor.focus(); await expect(editor).toBeFocused();
-      await editor.press('ControlOrMeta+A'); await parity.page.keyboard.insertText('nodes: [broken');
+      await editor.press('ControlOrMeta+A'); await parity.page.keyboard.insertText('nodes:\n  - id: broken\n    type: task\n  bad indentation');
       await expect(parity.page.getByTestId('designer-yaml-degraded-banner')).toBeVisible();
       const before = calls(parity).filter(({ method }) => method === 'PATCH').length;
       await parity.page.getByTestId('save-draft-button').click(); expect(calls(parity).filter(({ method }) => method === 'PATCH')).toHaveLength(before);
