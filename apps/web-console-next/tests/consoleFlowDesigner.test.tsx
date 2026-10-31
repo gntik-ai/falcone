@@ -58,6 +58,7 @@ test.each(['es', 'en'] as const)('ports the legacy header, all node kinds and hi
   const copy = locale === 'es' ? es : en
   expect(screen.getByRole('tablist', { name: copy.view })).toBeVisible()
   expect(screen.getByRole('tab', { name: copy.canvas })).toBeVisible()
+  expect(screen.getByRole('region', { name: copy.notifications })).toBeInTheDocument()
   expect(screen.getAllByTestId('flow-node-shell')).toHaveLength(7)
   expect(screen.getByTestId('edges')).toHaveTextContent('9')
   expect(screen.getByRole('link', { name: i18n.t('historyNamed', { ns: 'pages.console-flow-designer-page', name: flowRecord.name }) })).toHaveAttribute('href', '/console/flows/f1/runs')
@@ -282,6 +283,8 @@ test('locale changes preserve unsaved graph edits without issuing another load',
   await act(async () => { await i18n.changeLanguage('en') })
   expect(screen.getAllByTestId('flow-node-shell')).toHaveLength(8)
   expect(screen.getByTestId('unsaved-changes-indicator')).toHaveTextContent(en.unsaved)
+  expect(screen.getByRole('region', { name: en.notifications })).toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: es.notifications })).toBeNull()
   expect(calls().filter(({ method, path }) => method === 'GET' && path === flowPath)).toHaveLength(1)
 })
 

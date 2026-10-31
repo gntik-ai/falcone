@@ -87,6 +87,7 @@
   "createWorkspace": "Create workspace",
   "workspaceDenied": "This organization does not have any workspaces yet. Ask an organization or workspace owner or administrator to create the first one.",
   "closeToast": "Close notification",
+  "notifications": "Notifications",
   "errors": {
     "401": "Your session expired or is invalid. Sign in again.",
     "403": "You do not have permission to view this resource.",

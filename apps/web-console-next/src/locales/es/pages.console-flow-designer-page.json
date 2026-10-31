@@ -87,6 +87,7 @@
   "createWorkspace": "Crear área de trabajo",
   "workspaceDenied": "Esta organización todavía no tiene áreas de trabajo. Pide a un propietario o administrador de la organización (o del área de trabajo) que cree la primera.",
   "closeToast": "Cerrar notificación",
+  "notifications": "Notificaciones",
   "errors": {
     "401": "Tu sesión expiró o no es válida. Vuelve a iniciar sesión.",
     "403": "No tienes permiso para ver este recurso.",

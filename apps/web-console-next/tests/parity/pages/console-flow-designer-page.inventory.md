@@ -4,6 +4,35 @@ Page: `console-flow-designer-page`, issue #1288, risk R2. Blueprint SHA256:
 `d52c1d932d0f68f904568c8caf9694f0ae2046daf5220d2b6465df6a0355f15d`.
 Delivery base: `33b4c9ef6a32caee57c1b711733896ad1dd416dc`.
 
+## CI parity repair after 6e8e9b99
+
+The toast viewport now receives its accessible name from the designer namespace
+in both languages, using the same container-local adapter as the flows list.
+Kit 0.11.0 exposes the close label but does not expose the viewport label.
+Regression assertions cover the initial es/en region and a live locale change.
+
+The newly added designer parity locale assertion incorrectly classified the DSL
+value `v1.0` as an untranslated key. Its page-local scanner retains the shared
+whole-document text, accessible-name, attribute and catalog checks, exempting
+only the exact schema version inside Monaco's rendered YAML lines. It still
+rejects untranslated keys within those lines and checks every attribute there.
+Three unit tests verify this boundary, including version-like copy outside the
+editor and the English toast region name. The shared checker is unchanged.
+
+The action journey now explicitly focuses Monaco's accessible textbox before
+selecting and replacing the document, instead of clicking the editor container.
+The invalid-YAML banner and zero-PATCH assertions remain unchanged.
+
+This repair changes no pre-existing tests. Across the complete ChangeSet, the
+only changed pre-existing test remains `flows has no role gate for %s under
+/next` (superadmin, tenant_viewer, workspace_viewer) in
+`tests/consoleFlows-routing.test.tsx`. The designer-anchor test remains
+byte-identical because neither flows-list link reads the migration flag.
+Browser parity, axe, viewport and CSP execution remains SKIPPED: Chromium
+unavailable; PR CI runs them. Screenshot review needs the independent checker
+and operator approval. The Hermes kit snapshot remains the reference;
+validate_page is NOT_RUN because no gntik_ui MCP server is available.
+
 ## YAML revert follow-up to aa7b6942
 
 The latest checker finding F1 is fixed by ignoring YAML change callbacks whose

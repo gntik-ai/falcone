@@ -4,7 +4,7 @@ import manifest, { flowPath, taskTypesPath, versionPath, triggerPath, flowRecord
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
-import { seedDesignerPrincipal } from './console-flow-designer-page.session.mjs';
+import { assertDesignerLocale } from './console-flow-designer-page.locale.mjs';
 
 const copies = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-flow-designer-page.json`, import.meta.url), 'utf8'))]));
 const state = new WeakMap();
@@ -56,7 +56,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       expect(calls(parity)).toEqual([{ method: 'GET', path: flowPath, body: undefined }, { method: 'GET', path: taskTypesPath, body: undefined }]);
       await tab(parity, 'yaml'); await expect(parity.page.locator('.monaco-editor')).toBeVisible();
       await expect(parity.page.getByTestId('flow-yaml-editor')).toHaveAttribute('data-yaml-valid', 'true');
-      await check.assertLocale(parity);
+      await assertDesignerLocale(parity);
     });
     test('action', async ({ parity }) => {
       // Mirror the legacy draft -> save -> publish -> revert journey against the same fixtures.
@@ -72,7 +72,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await surface(parity).getByRole('button', { name: copy(parity).revert, exact: true }).click();
       await expect(parity.page.locator('.react-flow__node')).toHaveCount(7);
       await tab(parity, 'yaml'); await expect(parity.page.locator('.monaco-editor')).toBeVisible();
-      const editor = parity.page.locator('.monaco-editor').first(); await editor.click(); await parity.page.keyboard.press('ControlOrMeta+A'); await parity.page.keyboard.insertText('nodes: [broken');
+      const editor = parity.page.getByRole('textbox', { name: copy(parity).yamlLabel });
+      await editor.focus(); await expect(editor).toBeFocused();
+      await editor.press('ControlOrMeta+A'); await parity.page.keyboard.insertText('nodes: [broken');
       await expect(parity.page.getByTestId('designer-yaml-degraded-banner')).toBeVisible();
       const before = calls(parity).filter(({ method }) => method === 'PATCH').length;
       await parity.page.getByTestId('save-draft-button').click(); expect(calls(parity).filter(({ method }) => method === 'PATCH')).toHaveLength(before);
@@ -112,7 +114,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       for (const key of ['zoomIn', 'zoomOut', 'fitView', 'toggleInteractive']) {
         await expect(parity.page.getByTestId('rf__controls').getByRole('button', { name: copy(parity)[key], exact: true })).toHaveAttribute('title', copy(parity)[key]);
       }
-      for (const mode of ['canvas', 'yaml', 'side-by-side']) { await tab(parity, mode); if (mode !== 'canvas') await expect(parity.page.locator('.monaco-editor')).toBeVisible(); await check.assertAccessibility(parity); await check.assertLocale(parity); }
+      for (const mode of ['canvas', 'yaml', 'side-by-side']) { await tab(parity, mode); if (mode !== 'canvas') await expect(parity.page.locator('.monaco-editor')).toBeVisible(); await check.assertAccessibility(parity); await assertDesignerLocale(parity); }
       await tab(parity, 'canvas'); const item = await palette(parity); await item.focus(); await parity.page.keyboard.press('Space');
       const node = parity.page.locator('.react-flow__node[data-id="synthetic-task-1"]'); await expect(node).toBeFocused();
       await parity.page.keyboard.press('Enter'); await expect(parity.page.locator('#flow-inspector-heading')).toBeFocused();
