@@ -25,7 +25,7 @@ export const deliberateChanges = [
 ]
 const manifest: ParityManifest = {
   route: '/console/flows', roles: ['superadmin', 'tenant_owner', 'tenant_viewer', 'workspace_admin', 'workspace_viewer'], endpoints: flowsEndpoints,
-  fixtures: ['flows.list:success-draft-and-published', 'flows.list:403-empty', 'shell:no-workspace', 'shell:workspace-viewer', 'refresh:success', 'refresh:401', ...['flows.list', 'flows.post', 'flows.schedule.trigger'].flatMap((name) => variants.map((variant) => `${name}:${variant}`))],
+  fixtures: ['flows.list:success-draft-and-published', 'flows.list:403-empty', 'shell:platform-superadmin-without-tenant', 'shell:no-workspace', 'shell:workspace-viewer', 'refresh:success', 'refresh:401', ...['flows.list', 'flows.post', 'flows.schedule.trigger'].flatMap((name) => variants.map((variant) => `${name}:${variant}`))],
   sources: ['src/pages/consoleFlows.tsx', 'src/pages/consoleFlows'],
   data: [{ name: 'flows title', locator: { es: 'h1:text-is("Flujos")', en: 'h1:text-is("Flows")' } }], actions: [],
   states: [

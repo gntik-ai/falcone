@@ -35,7 +35,7 @@ function usePermissionCopy() {
 function FailurePanel({ failure, workspace = false, retry }: { failure: Failure; workspace?: boolean; retry: () => void }) {
   const { t } = useCopy()
   const title = t(workspace ? 'workspaceError' : 'errorTitle')
-  const description = t(workspace ? 'workspaceErrorDescription' : 'errorDescription')
+  const description = t(workspace ? 'workspaceErrorDescription' : failure.status === 401 ? 'errors.401' : 'errorDescription')
   return <ErrorPanel title={title} message={description} code={failure.status ?? null} requestId={failure.requestId ?? ''} details="" secondaryAction={null} titleAs="h2" announce={false} retryLabel={t('retry')} retrying={false} onRetry={retry} className="min-w-0"
     labels={{ title, message: description, support: t('support'), retry: t('retry'), retrying: t('retrying'), retryingStatus: t('retrying'), requestId: t('requestId'), copyRequestId: t('copyRequestId'), copied: t('copied'), requestIdCopied: t('copied'), details: t('details') }} />
 }
@@ -54,6 +54,8 @@ function useErrorMessage() {
   const { t } = useCopy()
   return (cause: unknown, fallback: string, server = false) => {
     const error = failureFrom(cause)
+    // A domain 401 uses the page's localized state after refresh, including for run-now.
+    if (error.status === 401) return t('errors.401')
     // List access and trigger failures may show server reasons, but never transport defaults.
     if (server && error.status && error.message && !/^HTTP_\d+$/.test(error.message) && !['Request failed', 'Unauthorized', 'Forbidden', 'Not Found', 'Conflict', 'Too Many Requests', 'Internal Server Error', 'Bad Gateway', 'Service Unavailable', 'Gateway Timeout'].includes(error.message)) return error.message
     const status = error.status
