@@ -4,7 +4,30 @@ Page: `console-flow-designer-page`, issue #1288, risk R2. Blueprint SHA256:
 `d52c1d932d0f68f904568c8caf9694f0ae2046daf5220d2b6465df6a0355f15d`.
 Delivery base: `33b4c9ef6a32caee57c1b711733896ad1dd416dc`.
 
-## Current checker fixes
+## YAML revert follow-up to aa7b6942
+
+The latest checker finding F1 is fixed by ignoring YAML change callbacks whose
+text already matches the current buffer. Monaco's programmatic `setValue` echo
+after reverting therefore preserves the clean state, while subsequent typing
+still marks the draft dirty. The persisted definition still reseeds both views.
+
+The designer unit-test editor now reproduces Monaco's external-value echo.
+Both new `revert clears local edits in %s despite the Monaco value echo and
+subsequent typing marks dirty` cases failed before the fix with the unwanted
+`unsaved-changes-indicator`, in YAML and side-by-side views. They verify restored
+text, a clean state, one reload, no PATCH, and dirty state on a subsequent edit.
+The browser journey adds the equivalent regression for each view, locale and
+viewport, including an assertion that the unsaved indicator is absent after
+revert. Browser discovery now covers 78 designer cases; browser execution remains
+SKIPPED: Chromium unavailable; PR CI runs them. Screenshot assessment still needs
+the independent checker and operator approval.
+
+This correction changes only the designer, its migration-specific unit/browser
+tests, and this inventory. It changes no tests that existed at the delivery base.
+The final structured report records post-commit test results; the evidence below
+describes earlier attempts and is retained as history.
+
+## Previous checker fixes
 
 This follow-up to `b362335a508967f05c8239b1569423f9ad56e64f` fixes F1 and F2.
 Failed PATCH and versions requests preserve the current dirty state, matching

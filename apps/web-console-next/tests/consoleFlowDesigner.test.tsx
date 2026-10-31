@@ -1,4 +1,4 @@
-import { StrictMode, type ReactNode } from 'react'
+import { StrictMode, useEffect, useRef, type ReactNode } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -19,7 +19,20 @@ const context = vi.hoisted(() => ({ value: {} as Record<string, unknown> }))
 const canvas = vi.hoisted(() => ({ ariaLabelConfig: {} as Partial<import('@xyflow/react').AriaLabelConfig> }))
 vi.mock('../src/shell/context', () => ({ useConsoleContext: () => context.value }))
 vi.mock('../src/shell/permissions', () => ({ usePermissions: () => ({ can: () => false }) }))
-vi.mock('../src/pages/consoleFlowDesigner/MonacoYamlSurface', () => ({ default: ({ value, onChange }: { value: string; onChange: (text: string) => void }) => <textarea aria-label={i18n.t('yamlLabel', { ns: 'pages.console-flow-designer-page' })} value={value} onChange={(event) => onChange(event.target.value)} /> }))
+vi.mock('../src/pages/consoleFlowDesigner/MonacoYamlSurface', () => ({ default: ({ value, onChange }: { value: string; onChange: (text: string) => void }) => {
+  const previousValue = useRef(value)
+  useEffect(() => {
+    if (previousValue.current !== value) {
+      previousValue.current = value
+      // Match Monaco setValue echoing a programmatic replacement through onChange.
+      onChange(value)
+    }
+  }, [value, onChange])
+  return <textarea aria-label={i18n.t('yamlLabel', { ns: 'pages.console-flow-designer-page' })} value={value} onChange={(event) => {
+    previousValue.current = event.target.value
+    onChange(event.target.value)
+  }} />
+} }))
 vi.mock('@xyflow/react', async (original) => {
   const real = await original<typeof import('@xyflow/react')>()
   return { ...real, ReactFlowProvider: ({ children }: { children: ReactNode }) => children, Handle: () => null,
@@ -126,6 +139,22 @@ test('node Enter focuses the inspector, editing marks dirty, Escape returns focu
   fireEvent.click(screen.getByRole('button', { name: es.revert }))
   await waitFor(() => expect(calls().filter(({ path, method }) => path === flowPath && method === 'GET')).toHaveLength(2))
   await waitFor(() => expect(screen.queryByTestId('unsaved-changes-indicator')).toBeNull())
+})
+
+test.each(['yaml', 'side-by-side'] as const)('revert clears local edits in %s despite the Monaco value echo and subsequent typing marks dirty', async (mode) => {
+  setup(); open(); await ready()
+  fireEvent.click(screen.getByRole('tab', { name: es[mode] }))
+  const editor = await screen.findByRole('textbox', { name: es.yamlLabel })
+  const persisted = serializeFlowToYaml(flowRecord.definition!)
+  fireEvent.change(editor, { target: { value: `${persisted}\n# local edit` } })
+  expect(screen.getByTestId('unsaved-changes-indicator')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: es.revert }))
+  await waitFor(() => expect(editor).toHaveValue(persisted))
+  expect(screen.queryByTestId('unsaved-changes-indicator')).toBeNull()
+  expect(calls().filter(({ path, method }) => path === flowPath && method === 'GET')).toHaveLength(2)
+  expect(calls().some(({ method }) => method === 'PATCH')).toBe(false)
+  fireEvent.change(editor, { target: { value: `${persisted}\n# another edit` } })
+  expect(screen.getByTestId('unsaved-changes-indicator')).toBeVisible()
 })
 
 test('publish saves first, then posts versions and announces the pinned version', async () => {

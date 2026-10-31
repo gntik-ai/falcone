@@ -511,7 +511,12 @@ export function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; 
   </section>
   const renderYamlSurface = <div className="designer-yaml flex min-w-0 flex-1 flex-col" data-testid="designer-yaml-pane">
     {!yamlValidity.parseable && <div data-testid="designer-yaml-degraded-banner"><Callout warning={true} message={t('degraded')} /></div>}
-    <FlowYamlEditor value={yamlText} onChange={(text) => { setYamlText(text); setDirty(true) }} taskTypeCatalog={taskTypeIds} onValidityChange={setYamlValidity} readOnly={false} />
+    <FlowYamlEditor value={yamlText} onChange={(text) => {
+      // Monaco echoes external value replacements, including a reverted draft.
+      if (text === yamlText) return
+      setYamlText(text)
+      setDirty(true)
+    }} taskTypeCatalog={taskTypeIds} onValidityChange={setYamlValidity} readOnly={false} />
   </div>
   if (loadFailure && record === null) return <section><h1 className="text-lg font-semibold">{t('title')}</h1><LoadFailure error={loadFailure} retry={() => void load()} /></section>
   if (loading && record === null) return <Loading />

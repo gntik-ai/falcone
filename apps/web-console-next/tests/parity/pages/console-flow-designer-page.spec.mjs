@@ -77,6 +77,23 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       const before = calls(parity).filter(({ method }) => method === 'PATCH').length;
       await parity.page.getByTestId('save-draft-button').click(); expect(calls(parity).filter(({ method }) => method === 'PATCH')).toHaveLength(before);
     });
+    for (const mode of ['yaml', 'side-by-side']) test(`revert clears unsaved YAML in ${mode}`, async ({ parity }) => {
+      await open(parity); await ready(parity); await tab(parity, mode);
+      const editor = parity.page.locator('.monaco-editor').first();
+      await expect(editor).toBeVisible(); await editor.click();
+      await parity.page.keyboard.press('ControlOrMeta+Home');
+      await parity.page.keyboard.insertText('# local edit\n');
+      await expect(parity.page.getByTestId('unsaved-changes-indicator')).toBeVisible();
+      await surface(parity).getByRole('button', { name: copy(parity).revert, exact: true }).click();
+      await expect(editor.locator('.view-lines')).not.toContainText('# local edit');
+      await expect(parity.page.getByTestId('flow-yaml-editor')).toHaveAttribute('data-yaml-valid', 'true');
+      await expect(parity.page.getByTestId('unsaved-changes-indicator')).toHaveCount(0);
+      expect(calls(parity).filter(({ method, path }) => method === 'GET' && path === flowPath)).toHaveLength(2);
+      expect(calls(parity).some(({ method }) => method === 'PATCH')).toBe(false);
+      await editor.click(); await parity.page.keyboard.press('ControlOrMeta+Home');
+      await parity.page.keyboard.insertText('# another edit\n');
+      await expect(parity.page.getByTestId('unsaved-changes-indicator')).toBeVisible();
+    });
     test('error-empty', async ({ parity }) => {
       for (const variant of ['403', '404', '500', 'network']) {
         await open(parity, variant);
