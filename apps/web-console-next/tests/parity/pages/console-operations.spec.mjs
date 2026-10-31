@@ -382,6 +382,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
           // update history before the list's unmount cleanup aborts the request.
           await activate(parity, parity.page.locator('tbody tr:first-child a'));
           await expect(parity.page).toHaveURL(/\/console\/operations\/op_1$/);
+          await parity.page.clock.runFor(300);
           await expect(parity.page.locator('.operation-detail')).toBeVisible();
           release();
           await parity.page.clock.runFor(2000);

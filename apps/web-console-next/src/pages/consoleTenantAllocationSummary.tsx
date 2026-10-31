@@ -50,7 +50,8 @@ export default function ConsoleTenantAllocationSummary() {
     return () => { active = false }
   }, [tenantless, attempt])
   useEffect(() => {
-    if (loading || !retryRequested.current) return
+    // A new retry can start before the preceding render's focus effect runs.
+    if (loading || inFlight.current || !retryRequested.current) return
     if (failure && ![401, 403, 404].includes(failure.status ?? 0)) retry.current?.focus()
     else heading.current?.focus()
     retryRequested.current = false

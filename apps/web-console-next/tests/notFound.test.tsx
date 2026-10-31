@@ -1,5 +1,5 @@
 import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { consoleAuthConfig } from '@in-falcone/console-api/config'
@@ -17,10 +17,10 @@ beforeEach(() => { window.history.replaceState(null, ''); vi.stubGlobal('fetch',
 
 test('the pending catch-all chunk shows skeletons on the status layout', async () => {
   render(<MemoryRouter initialEntries={['/missing']}><App /></MemoryRouter>)
-  const main = screen.getByRole('main')
-  expect(main).toHaveAttribute('id', 'not-found-loading')
-  expect(within(main).getByRole('status')).toHaveTextContent('Cargando')
-  expect(await screen.findByRole('heading', { name: es.title })).toHaveFocus()
+  const main = await screen.findByRole('main')
+  await waitFor(() => expect(main).toHaveAttribute('id', 'not-found-loading'))
+  expect(await within(main).findByRole('status')).toHaveTextContent('Cargando')
+  await waitFor(() => expect(screen.getByRole('heading', { name: es.title })).toHaveFocus())
 })
 
 for (const locale of ['es', 'en'] as const) {

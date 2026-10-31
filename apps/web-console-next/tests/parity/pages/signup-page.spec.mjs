@@ -204,6 +204,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       for (const state of ['empty', '403', '404', '500']) { await open(parity, { signupPolicy: state }); await expect(page.locator('form')).toHaveCount(0); await check.assertAccessibility(parity); }
       await send(parity, 'active');
       await expect(page.getByRole('group', { name: copy.successTitle })).toBeFocused();
+      await expect(page.getByRole('region', { name: copy.notifications }).getByRole('dialog', { name: copy.successTitle, exact: true })).toHaveCSS('opacity', '1');
       await check.assertAccessibility(parity);
     });
     test('runtime-health', async ({ parity }) => {
