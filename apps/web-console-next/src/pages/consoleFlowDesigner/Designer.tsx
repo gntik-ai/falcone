@@ -434,7 +434,7 @@ export function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; 
       return true
     } catch (error) {
       const message = applyServerRejection(error)
-      setLoadError(message); setDirty(true); notify(message, true)
+      setLoadError(message); notify(message, true)
       return false
     } finally {
       setSaving(false)
@@ -463,7 +463,7 @@ export function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; 
       setServerErrors([])
     } catch (error) {
       const message = applyServerRejection(error)
-      setLoadError(message); setDirty(true); notify(message, true)
+      setLoadError(message); notify(message, true)
     } finally {
       setPublishing(false); operation.current = false
     }
@@ -481,6 +481,9 @@ export function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; 
     'node.a11yDescription.keyboardDisabled': t('nodeDescription'),
     'node.a11yDescription.ariaLiveMessage': ({ direction, x, y }) => t('nodeMoved', { direction: t(`directions.${direction}`), x, y }),
     'edge.a11yDescription.default': t('edgeDescription'),
+    'controls.ariaLabel': t('controls.ariaLabel'),
+    'handle.ariaLabel': t('handle.ariaLabel'),
+    'minimap.ariaLabel': t('minimap.ariaLabel'),
     'controls.zoomIn.ariaLabel': t('zoomIn'), 'controls.zoomOut.ariaLabel': t('zoomOut'),
     'controls.fitView.ariaLabel': t('fitView'), 'controls.interactive.ariaLabel': t('toggleInteractive'),
   }

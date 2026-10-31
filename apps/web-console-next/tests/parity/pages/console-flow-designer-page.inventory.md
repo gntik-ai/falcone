@@ -4,6 +4,32 @@ Page: `console-flow-designer-page`, issue #1288, risk R2. Blueprint SHA256:
 `d52c1d932d0f68f904568c8caf9694f0ae2046daf5220d2b6465df6a0355f15d`.
 Delivery base: `33b4c9ef6a32caee57c1b711733896ad1dd416dc`.
 
+## Current checker fixes
+
+This follow-up to `b362335a508967f05c8239b1569423f9ad56e64f` fixes F1 and F2.
+Failed PATCH and versions requests preserve the current dirty state, matching
+legacy. A successful PATCH followed by failed publication retains the saved
+indicator. A failed save of an unedited draft does not invent unsaved changes;
+a failed save after editing retains them. Regression tests cover 403, 422, 500
+and network failures, including a failed save after a previous successful save.
+
+Every React Flow accessibility configuration entry now comes from the page
+namespace, including the controls panel, connection handle and minimap names.
+The two catalogs have 179 matching leaf keys. Unit tests assert every canvas
+label in es/en, and browser accessibility cases explicitly assert the rendered
+controls panel name and each controls button's title. Browser PATCH 422 coverage
+now edits the draft first, and verifies that a subsequent successful PATCH and
+failed versions POST retain the saved indicator.
+
+This follow-up changes the designer, its catalogs, its new unit/browser tests,
+and this inventory. It makes no additional changes to pre-existing tests.
+The final delivery report records the post-commit full-suite command, its real
+exit status and any environment exclusions. Browser parity, axe, responsive,
+CSP and visual execution remain SKIPPED: Chromium unavailable; PR CI runs them.
+Visual screenshot assessment still requires the checker and operator.
+
+## Previous attempt evidence (through b362335a)
+
 The existing migration remains in place. The follow-up preserves the legacy
 palette's `Error.message` details, including its fallback for non-Error failures,
 with application-owned copy in both catalogs. Browser coverage now includes

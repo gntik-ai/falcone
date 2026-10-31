@@ -91,6 +91,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     });
     test('accessibility', async ({ parity }) => {
       await open(parity, 'published'); await ready(parity);
+      await expect(parity.page.getByTestId('rf__controls')).toHaveAttribute('aria-label', copy(parity).controls.ariaLabel);
+      for (const key of ['zoomIn', 'zoomOut', 'fitView', 'toggleInteractive']) {
+        await expect(parity.page.getByTestId('rf__controls').getByRole('button', { name: copy(parity)[key], exact: true })).toHaveAttribute('title', copy(parity)[key]);
+      }
       for (const mode of ['canvas', 'yaml', 'side-by-side']) { await tab(parity, mode); if (mode !== 'canvas') await expect(parity.page.locator('.monaco-editor')).toBeVisible(); await check.assertAccessibility(parity); await check.assertLocale(parity); }
       await tab(parity, 'canvas'); const item = await palette(parity); await item.focus(); await parity.page.keyboard.press('Space');
       const node = parity.page.locator('.react-flow__node[data-id="synthetic-task-1"]'); await expect(node).toBeFocused();
@@ -131,11 +135,15 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     test('kit-conformance', async () => { await check.kitConformance(manifest); });
     test('PATCH 422 remains raw; versions 422 decorates nodes and lists flow errors', async ({ parity }) => {
       await open(parity); await ready(parity); parity.network.setVariants({ 'flows.patch': '422-node-errors' });
+      const item = await palette(parity); await item.focus(); await parity.page.keyboard.press('Enter');
+      await expect(parity.page.getByTestId('unsaved-changes-indicator')).toBeVisible();
       await parity.page.getByTestId('publish-button').click(); await expect(parity.page.getByTestId('designer-error-banner')).toBeVisible();
       await expect(parity.page.getByTestId('flow-node-error-badge')).toHaveCount(0); expect(calls(parity).some(({ path }) => path === versionPath)).toBe(false);
       await expect(parity.page.getByTestId('unsaved-changes-indicator')).toBeVisible();
       parity.network.setVariants({ 'flows.patch': 'success', 'flows.versions.post': '422-node-errors' });
       await parity.page.getByTestId('publish-button').click(); await expect(parity.page.getByTestId('flow-node-error-badge')).toBeVisible();
+      await expect(parity.page.getByTestId('saved-indicator')).toBeVisible();
+      await expect(parity.page.getByTestId('unsaved-changes-indicator')).toHaveCount(0);
       await expect(parity.page.getByTestId('flow-problems-panel')).toContainText('FLW-E007');
       const problem = parity.page.getByRole('button', { name: copy(parity).selectNode.replace('{id}', 'task'), exact: true });
       await problem.focus(); await parity.page.keyboard.press('Enter');

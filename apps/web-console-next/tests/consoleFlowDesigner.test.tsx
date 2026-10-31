@@ -16,13 +16,17 @@ import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-flow-designer-page.json'
 import en from '../src/locales/en/pages.console-flow-designer-page.json'
 const context = vi.hoisted(() => ({ value: {} as Record<string, unknown> }))
+const canvas = vi.hoisted(() => ({ ariaLabelConfig: {} as Partial<import('@xyflow/react').AriaLabelConfig> }))
 vi.mock('../src/shell/context', () => ({ useConsoleContext: () => context.value }))
 vi.mock('../src/shell/permissions', () => ({ usePermissions: () => ({ can: () => false }) }))
 vi.mock('../src/pages/consoleFlowDesigner/MonacoYamlSurface', () => ({ default: ({ value, onChange }: { value: string; onChange: (text: string) => void }) => <textarea aria-label={i18n.t('yamlLabel', { ns: 'pages.console-flow-designer-page' })} value={value} onChange={(event) => onChange(event.target.value)} /> }))
 vi.mock('@xyflow/react', async (original) => {
   const real = await original<typeof import('@xyflow/react')>()
   return { ...real, ReactFlowProvider: ({ children }: { children: ReactNode }) => children, Handle: () => null,
-    ReactFlow: ({ children, nodes, edges, nodeTypes }: { children: ReactNode; nodes: import('@xyflow/react').Node[]; edges: import('@xyflow/react').Edge[]; nodeTypes: Record<string, React.ComponentType<any>> }) => <div data-testid="react-flow-stub">{nodes.map((node) => { const Component = nodeTypes[node.type!]; return <div key={node.id} role="button" tabIndex={0} className="react-flow__node" data-id={node.id} aria-label={node.ariaLabel} {...node.domAttributes}><Component data={node.data} selected={node.selected} /></div> })}<output data-testid="edges">{edges.length}</output>{children}</div>,
+    ReactFlow: ({ children, nodes, edges, nodeTypes, ariaLabelConfig }: { children: ReactNode; nodes: import('@xyflow/react').Node[]; edges: import('@xyflow/react').Edge[]; nodeTypes: Record<string, React.ComponentType<any>>; ariaLabelConfig: import('@xyflow/react').AriaLabelConfig }) => {
+      canvas.ariaLabelConfig = ariaLabelConfig
+      return <div data-testid="react-flow-stub">{nodes.map((node) => { const Component = nodeTypes[node.type!]; return <div key={node.id} role="button" tabIndex={0} className="react-flow__node" data-id={node.id} aria-label={node.ariaLabel} {...node.domAttributes}><Component data={node.data} selected={node.selected} /></div> })}<output data-testid="edges">{edges.length}</output>{children}</div>
+    },
     Background: () => null, Controls: () => null, useReactFlow: () => ({ screenToFlowPosition: (point: { x: number; y: number }) => point }) }
 })
 let requests: ReturnType<typeof strictFetch>
@@ -46,6 +50,26 @@ test.each(['es', 'en'] as const)('ports the legacy header, all node kinds and hi
   expect(screen.getByRole('link', { name: i18n.t('historyNamed', { ns: 'pages.console-flow-designer-page', name: flowRecord.name }) })).toHaveAttribute('href', '/console/flows/f1/runs')
   expect(calls()).toEqual([{ path: flowPath, method: 'GET', body: undefined }, { path: taskTypesPath, method: 'GET', body: undefined }])
   expect(screen.getByTestId('flow-run-now-button')).toBeDisabled()
+})
+
+test.each(['es', 'en'] as const)('localizes every React Flow accessible label in %s', async (locale) => {
+  await i18n.changeLanguage(locale); setup(); open(); await ready()
+  const copy = locale === 'es' ? es : en
+  expect(canvas.ariaLabelConfig).toEqual({
+    'node.a11yDescription.default': copy.nodeDescription,
+    'node.a11yDescription.keyboardDisabled': copy.nodeDescription,
+    'node.a11yDescription.ariaLiveMessage': expect.any(Function),
+    'edge.a11yDescription.default': copy.edgeDescription,
+    'controls.ariaLabel': copy.controls.ariaLabel,
+    'controls.zoomIn.ariaLabel': copy.zoomIn,
+    'controls.zoomOut.ariaLabel': copy.zoomOut,
+    'controls.fitView.ariaLabel': copy.fitView,
+    'controls.interactive.ariaLabel': copy.toggleInteractive,
+    'handle.ariaLabel': copy.handle.ariaLabel,
+    'minimap.ariaLabel': copy.minimap.ariaLabel,
+  })
+  expect(canvas.ariaLabelConfig['node.a11yDescription.ariaLiveMessage']!({ direction: 'right', x: 10, y: 20 }))
+    .toBe(i18n.t('nodeMoved', { ns: 'pages.console-flow-designer-page', direction: copy.directions.right, x: 10, y: 20 }))
 })
 
 test('keeps graph projection, every edge kind and YAML round trips identical to legacy', () => {
@@ -111,6 +135,19 @@ test('publish saves first, then posts versions and announces the pinned version'
   expect(screen.getByTestId('flow-run-now-button')).toBeEnabled()
 })
 
+test.each([403, 422, 500, 0])('publish %s retains the saved draft indicator after the successful PATCH', async (status) => {
+  setup({ [`POST ${versionPath}`]: () => { if (!status) throw new TypeError('synthetic network'); return Response.json({ errors: serverErrors }, { status }) } }); open(); await ready()
+  fireEvent.click(screen.getByTestId('flow-palette-item-synthetic-task'))
+  expect(screen.getByTestId('unsaved-changes-indicator')).toBeVisible()
+  fireEvent.click(screen.getByTestId('publish-button'))
+  expect(await screen.findByTestId('designer-error-banner')).toBeVisible()
+  expect(screen.getByTestId('saved-indicator')).toBeVisible()
+  expect(screen.queryByTestId('unsaved-changes-indicator')).toBeNull()
+  expect(screen.queryByTestId('published-version-badge')).toBeNull()
+  expect(screen.getAllByTestId('flow-node-shell')).toHaveLength(8)
+  expect(calls().slice(-2).map(({ method, path }) => [method, path])).toEqual([['PATCH', flowPath], ['POST', versionPath]])
+})
+
 test('PATCH 422 keeps dirty state and the canvas undecorated and never publishes', async () => {
   setup({ [`PATCH ${flowPath}`]: () => Response.json({ errors: serverErrors }, { status: 422 }) }); open(); await ready()
   fireEvent.click(screen.getByTestId('flow-palette-item-synthetic-task')); fireEvent.click(screen.getByTestId('publish-button'))
@@ -155,13 +192,32 @@ test.each([403, 404, 500, 0])('load %s renders an appropriate state with retry a
   expect(screen.queryByText('raw server text')).toBeNull()
 })
 
-test.each([403, 500, 0])('save %s uses localized copy and retains dirty canvas state', async (status) => {
+test.each([403, 422, 500, 0])('save %s uses localized copy and retains dirty canvas state', async (status) => {
   setup({ [`PATCH ${flowPath}`]: () => { if (!status) throw new TypeError('synthetic network'); return Response.json({ message: 'requires superadmin' }, { status }) } }); open(); await ready()
+  const node = screen.getByRole('button', { name: 'Tarea: synthetic-task' }); fireEvent.keyDown(node, { key: 'Enter' })
+  fireEvent.change(screen.getByLabelText(es.name), { target: { value: 'Renamed' } })
   fireEvent.click(screen.getByTestId('save-draft-button'))
   const banner = await screen.findByTestId('designer-error-banner')
-  expect(banner).toHaveTextContent(status === 403 ? es.errors['403'] : status ? es.errors.server : es.requestFailed)
+  expect(banner).toHaveTextContent(status === 403 ? es.errors['403'] : status === 500 ? es.errors.server : es.requestFailed)
   expect(screen.getAllByTestId('flow-node-shell')).toHaveLength(7); expect(screen.getByTestId('unsaved-changes-indicator')).toBeVisible()
   expect(screen.queryByText('requires superadmin')).toBeNull()
+})
+
+test.each([403, 422, 500, 0])('save %s preserves clean state before and after a successful save', async (status) => {
+  let reject = true
+  setup({ [`PATCH ${flowPath}`]: () => { if (!reject) return Response.json(flowRecord); if (!status) throw new TypeError('synthetic network'); return Response.json({ errors: serverErrors }, { status }) } }); open(); await ready()
+  fireEvent.click(screen.getByTestId('save-draft-button'))
+  await screen.findByTestId('designer-error-banner')
+  expect(screen.queryByTestId('unsaved-changes-indicator')).toBeNull()
+  expect(screen.queryByTestId('saved-indicator')).toBeNull()
+  reject = false; fireEvent.click(screen.getByTestId('save-draft-button'))
+  await screen.findByTestId('saved-indicator')
+  reject = true; fireEvent.click(screen.getByTestId('save-draft-button'))
+  await screen.findByTestId('designer-error-banner')
+  expect(screen.queryByTestId('unsaved-changes-indicator')).toBeNull()
+  expect(screen.getByTestId('saved-indicator')).toBeVisible()
+  expect(screen.getAllByTestId('flow-node-shell')).toHaveLength(7)
+  expect(calls().filter(({ method }) => method === 'PATCH')).toHaveLength(3)
 })
 
 test.each(['/console/flows/f1', '/missing'])('no workspace or missing flowId makes zero page requests for %s', (route) => {
