@@ -110,15 +110,15 @@ test.each(['es', 'en'] as const)('retry retains focus while pending, focuses ret
   expect(document.body).not.toHaveTextContent('PRIVATE_CORRELATION')
   retry.focus(); fireEvent.click(retry)
   await screen.findByRole('button', { name: copy.retrying })
-  expect(retry).toHaveFocus()
+  await waitFor(() => expect(retry).toHaveFocus())
   fireEvent.click(retry)
   await waitFor(() => expect(release).toBeTypeOf('function'))
   expect(calls()).toHaveLength(2)
   await act(async () => release())
-  expect(await screen.findByRole('button', { name: copy.retry })).toHaveFocus()
+  await waitFor(() => expect(screen.getByRole('button', { name: copy.retry })).toHaveFocus())
   fireEvent.click(screen.getByRole('button', { name: copy.retry }))
   await screen.findByRole('table')
-  expect(screen.getByRole('heading', { level: 1 })).toHaveFocus()
+  await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus())
   expect(calls()).toHaveLength(3)
 })
 
@@ -129,6 +129,30 @@ test('network rejection shows retry without a request ID or stale data', async (
   expect(screen.queryByText(es.requestId)).not.toBeInTheDocument()
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
   expect(document.body).not.toHaveTextContent('PRIVATE_MARKER')
+})
+
+test('retry started as the initial error renders retains the pending control', async () => {
+  let release!: () => void
+  let count = 0
+  const clicked = new Promise<HTMLButtonElement>((resolve) => {
+    const observer = new MutationObserver(() => {
+      const button = screen.queryByRole<HTMLButtonElement>('button', { name: es.retry })
+      if (!button) return
+      observer.disconnect()
+      button.focus(); fireEvent.click(button); resolve(button)
+    })
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true })
+  })
+  open(async () => {
+    if (++count === 2) await new Promise<void>((resolve) => { release = resolve })
+    return fail(500)
+  })
+  const retry = await clicked
+  expect(await screen.findByRole('button', { name: es.retrying })).toBe(retry)
+  await waitFor(() => expect(retry).toHaveFocus())
+  await waitFor(() => expect(release).toBeTypeOf('function'))
+  await act(async () => release())
+  await screen.findByRole('button', { name: es.retry })
 })
 
 test('label precedence, UUID fallback, byte suffix fallback and unit rules match legacy', () => {

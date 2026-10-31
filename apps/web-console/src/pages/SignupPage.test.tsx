@@ -34,7 +34,8 @@ describe('SignupPage', () => {
   })
 
   it('[#731] montada dentro de AuthLayout: conserva el formulario y obtiene el marco de marca + título de la ruta', async () => {
-    fetchMock.mockResolvedValueOnce(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
+    let releasePolicy!: (response: Response) => void
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => { releasePolicy = resolve }))
     vi.stubGlobal('fetch', fetchMock)
 
     // AuthLayout reads route `handle` data via `useMatches()`, which requires a data router
@@ -54,7 +55,8 @@ describe('SignupPage', () => {
     expect(await screen.findByRole('heading', { name: /crea tu acceso a in falcone console/i })).toBeInTheDocument()
     expect(document.title).toBe('Solicitar acceso · Consola In Falcone')
     expect(screen.getByRole('img', { name: /in falcone/i })).toHaveAttribute('src', '/img/logo-wide.png')
-    expect(screen.getByLabelText(/usuario/i)).toBeInTheDocument()
+    releasePolicy(createJsonResponse(200, enabledSignupPolicy({ minLength: 8 })))
+    expect(await screen.findByLabelText(/usuario/i)).toBeInTheDocument()
   })
 
   it('[#730] no muestra artefactos internos de scaffolding (badge EP/US, Realm/Client ID, rutas /v1/, roadmap)', async () => {

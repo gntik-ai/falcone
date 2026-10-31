@@ -13,6 +13,7 @@ const puts = (parity) => parity.network.requests.filter((request) => request.met
 const button = (parity, name) => dialog(parity).getByRole('button', { name, exact: true });
 async function open(parity, variants = {}) {
   await parity.open(manifest.route, variants);
+  await expect(surface(parity)).toBeVisible();
   await expect(surface(parity).locator('section[aria-busy="true"]')).toHaveCount(0);
 }
 function allowlist(parity) {
@@ -174,7 +175,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         if (state.variant === '404') await expect(surface(parity).getByRole('link', { name: copy.consoleStart })).toHaveAttribute('href', /\/console$/);
       }
       await open(parity, { tenants: 'empty' }); await expect(surface(parity).getByText(copy.blocked, { exact: true })).toBeVisible();
-      await open(parity, { workspaces: 'empty' }); await expect(surface(parity).getByRole('table')).toHaveCount(1);
+      await open(parity, { workspaces: 'empty' }); await expect(surface(parity).getByRole('region', { name: copy.tenant }).getByRole('table')).toBeVisible(); await expect(surface(parity).getByRole('table')).toHaveCount(1);
       await open(parity, { 'quotas.workspace': 'empty' });
       const workspace = surface(parity).getByRole('region', { name: copy.workspace });
       await expect(workspace.getByText(locale === 'es' ? '0 dimensiones' : '0 dimensions', { exact: true })).toBeVisible();
@@ -189,6 +190,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(search).toBeFocused(); await expect(search).toHaveValue(''); await expect(workspace.getByRole('table')).toBeVisible();
       expect(parity.network.requests).toHaveLength(beforeSearch);
       await open(parity, { 'quotas.tenant': 'quotas-500-then-ok' });
+      await expect(surface(parity).getByText('req_synthetic_quotas_500', { exact: true })).toBeVisible();
       await surface(parity).getByRole('button', { name: copy.retry }).click(); await expect(surface(parity).getByRole('table')).toHaveCount(2);
       if (role === 'superadmin') {
         for (const variant of ['tenant-plan-none', 'tenant-plan-500-then-ready', 'tenant-plan-delayed', 'tenant-plan-delayed-then-500']) {
