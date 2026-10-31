@@ -78,10 +78,10 @@
   "runStarted": "Se solicitó la ejecución del flujo.",
   "runError": "No se pudo iniciar el flujo.",
   "cancel": "Cancelar",
-  "workspace": "Área de trabajo",
-  "workspacePlaceholder": "Selecciona un área de trabajo",
+  "workspace": "Seleccionar área de trabajo",
+  "workspacePlaceholder": "Selecciona un área de trabajo…",
   "createWorkspace": "Crear área de trabajo",
-  "workspaceDenied": "No tienes permiso para crear áreas de trabajo.",
+  "workspaceDenied": "Esta organización todavía no tiene áreas de trabajo. Pide a un propietario o administrador de la organización (o del área de trabajo) que cree la primera.",
   "closeToast": "Cerrar notificación",
   "errors": {
     "401": "Tu sesión expiró o no es válida. Vuelve a iniciar sesión.",
@@ -183,5 +183,9 @@
   },
   "armLabel": "{index}. {when}",
   "inspectorTitle": "Propiedades del nodo: {type}",
-  "defaultConnection": "predeterminada"
+  "defaultConnection": "predeterminada",
+  "workspaceLoading": "Cargando áreas de trabajo",
+  "workspaceLoadingDescription": "Consultando las áreas de trabajo accesibles de la organización activa.",
+  "workspaceError": "No se pudieron cargar las áreas de trabajo",
+  "workspaceErrorDescription": "No se pudieron cargar las áreas de trabajo."
 }

@@ -524,7 +524,7 @@ export function DesignerSurface({ workspaceId, flowId }: { workspaceId: string; 
     consoleOpen={consoleOpen} defaultConsoleOpen={true} onConsoleOpenChange={setConsoleOpen}
     header={<div className="min-w-0 w-full space-y-3">
       <PageHeader as="div" wrapTitle={true} title={record?.name ?? flowId} description="" breadcrumbs={[{ label: t('flows'), href: '/console/flows' }]} status="" statuses={{}} meta={[]} tabs={null} actions={[]} labels={{ title: record?.name ?? flowId, description: '', moreActions: t('actions'), sections: t('actions') }} />
-      <div className="flex min-w-0 flex-wrap items-center gap-2"><StatusTag status={status} label={statusLabel} statuses={{ [status]: { label: statusLabel, tone: status === 'published' ? 'success' : 'neutral' } }} uppercase={false} />
+      <div className="flex min-w-0 flex-wrap items-center gap-2"><StatusTag status={status} label={statusLabel} statuses={{ [status]: { label: statusLabel, tone: status === 'published' ? 'success' : status === 'draft' ? 'warning' : status === 'failed' ? 'destructive' : 'neutral' } }} uppercase={false} />
         {publishedVersion !== null && <Badge variant="soft" tone="success" data-testid="published-version-badge">{t('published', { version: publishedVersion })}</Badge>}
         {dirty ? <Text variant="supporting" tone="warning" data-testid="unsaved-changes-indicator">{t('unsaved')}</Text> : savedAt ? <Text variant="supporting" tone="success" data-testid="saved-indicator">{t('saved')}</Text> : null}
       </div>

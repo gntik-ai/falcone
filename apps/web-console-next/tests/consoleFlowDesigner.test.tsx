@@ -219,3 +219,12 @@ test('semantic YAML markers block publish and reverting drops the edited YAML bu
   await waitFor(() => expect(editor).toHaveValue(serializeFlowToYaml(flowRecord.definition!)))
   expect(calls().filter(({ method }) => method === 'PATCH')).toHaveLength(0)
 })
+
+
+test('workspace loading and errors keep the legacy retry action without page traffic', async () => {
+  setup(); context.value.activeWorkspaceId = null; context.value.loading = true
+  const view = open(); expect(screen.getByRole('status', { name: es.workspaceLoading })).toBeVisible(); expect(calls()).toEqual([])
+  view.unmount(); context.value.loading = false; context.value.error = { status: 500 }; context.value.reloadWorkspaces = vi.fn()
+  open(); await screen.findByRole('heading', { name: es.workspaceError })
+  fireEvent.click(screen.getByRole('button', { name: es.retry })); expect(context.value.reloadWorkspaces).toHaveBeenCalledOnce(); expect(calls()).toEqual([])
+})

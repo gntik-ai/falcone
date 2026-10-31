@@ -78,10 +78,10 @@
   "runStarted": "Flow execution requested.",
   "runError": "Could not start the flow.",
   "cancel": "Cancel",
-  "workspace": "Workspace",
-  "workspacePlaceholder": "Select a workspace",
+  "workspace": "Select workspace",
+  "workspacePlaceholder": "Select a workspace…",
   "createWorkspace": "Create workspace",
-  "workspaceDenied": "You do not have permission to create workspaces.",
+  "workspaceDenied": "This organization does not have any workspaces yet. Ask an organization or workspace owner or administrator to create the first one.",
   "closeToast": "Close notification",
   "errors": {
     "401": "Your session expired or is invalid. Sign in again.",
@@ -183,5 +183,9 @@
   },
   "armLabel": "{index}. {when}",
   "inspectorTitle": "Node properties: {type}",
-  "defaultConnection": "default"
+  "defaultConnection": "default",
+  "workspaceLoading": "Loading workspaces",
+  "workspaceLoadingDescription": "Loading the active organization’s accessible workspaces.",
+  "workspaceError": "Could not load workspaces",
+  "workspaceErrorDescription": "Could not load workspaces."
 }
