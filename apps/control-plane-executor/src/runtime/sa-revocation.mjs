@@ -108,10 +108,14 @@ export function createSaRevocationCheck({
     return row;
   }
 
-  return async function revocationCheck(claims) {
+  return async function revocationCheck(claims, verifiedTrust) {
     const clientId = clientIdFromClaims(claims);
     if (!isServiceAccountClientId(clientId)) return false; // not a SA token → skip (no DB hit)
-    const realm = realmFromIssuer(claims?.iss, { realmsBase, platformRealm });
+    // The verifier supplies trust only after signature and policy validation. This keeps
+    // aliases on the same tenant-scoped lookup; standalone legacy callers retain topology checks.
+    const realm = verifiedTrust
+      ? (verifiedTrust.kind === 'tenant' ? verifiedTrust.realm : undefined)
+      : realmFromIssuer(claims?.iss, { realmsBase, platformRealm });
     if (!realm) {
       logger?.error?.('[sa-revocation] cannot derive realm for SA token (failing closed):', clientId);
       return true; // SA token whose realm is unknowable → fail closed (reject)
