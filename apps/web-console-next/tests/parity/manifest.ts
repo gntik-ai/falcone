@@ -27,3 +27,8 @@ export interface ParityManifest {
   }[]
   states: { fixture: string; variant: Exclude<Variant, 'success'>; locator: Locator }[]
 }
+
+// New console surfaces have no legacy page for screenshot comparison.
+export const newPages = {
+  'console-mcp-servers-page': { route: '/console/mcp/servers', legacyRoute: null },
+} as const

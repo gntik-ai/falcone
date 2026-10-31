@@ -7,8 +7,10 @@ import { App } from '../src/App'
 import { appRoutes, routerBasename } from '../src/router'
 import { fullPaths, legacyRoutes } from './legacy-routes'
 
-test('the scaffold retains the legacy normalized full route set, including index and wildcard paths', () => {
+test('the console retains legacy routes and adds the MCP servers list', () => {
   const expected = fullPaths(legacyRoutes())
+  // The MCP list is a new surface with no legacy counterpart.
+  expected.add('/console/mcp/servers')
   expect(expected).toContain('/console/')
   expect(expected).toContain('/console/*')
   expect(expected).toContain('/*')
