@@ -4,6 +4,39 @@ Page: `console-flow-designer-page`, issue #1288, risk R2. Blueprint SHA256:
 `d52c1d932d0f68f904568c8caf9694f0ae2046daf5220d2b6465df6a0355f15d`.
 Delivery base: `33b4c9ef6a32caee57c1b711733896ad1dd416dc`.
 
+## Amended-scope review at b42ccc2b
+
+The regenerated proposal retains the existing repairs in `5279392f` and
+`b42ccc2b`. The reported CI excerpt predates those repairs: the designer's toast
+region now uses the namespace in both locales, the locale scanner exempts only
+the canonical `apiVersion` scalar on its YAML line, and the action journey
+focuses Monaco's textbox before replacing the document. The shared locale
+checker and its assertions remain unchanged. No further runtime change is
+needed for those reported causes.
+
+Review against the delivery base confirms that the only changed pre-existing
+test is the three cases of `flows has no role gate for %s under /next` in
+`tests/consoleFlows-routing.test.tsx`. Its legacy designer-anchor case remains
+unchanged because `src/pages/consoleFlows.tsx:165` uses a hardcoded legacy
+anchor. `overview-shell.test.tsx` also remains unchanged. The sole pre-existing
+harness addition is the two permitted on-load GET fixtures in
+`tests/browser-session.mjs`. All designer tests, including the locale scanner
+tests, are new relative to the delivery base.
+
+Both catalogs contain 180 matching leaf keys. Type checking, colour lint,
+`check:i18n`, `lint:i18n`, parity structure validation and fixture scanning pass.
+Isolated Playwright discovery registers 78 designer cases and three CSP asset
+cases; discovery does not execute a browser. The final delivery report records
+the fresh full-suite result and any isolated reruns without relying on the
+historical counts below.
+
+Browser parity, axe, viewport and CSP execution remain SKIPPED: Chromium
+unavailable; PR CI runs them. Visual screenshot assessment still needs the
+independent checker and operator approval. `validate_page` remains NOT_RUN
+because no gntik_ui MCP server is available; the supplied Hermes snapshot is
+the kit reference. This review does not change dependencies, workflows, legacy
+code, backend code or the deployment worktree.
+
 ## CI repair verification after 5279392f
 
 The supplied CI failure is the red evidence for the untranslated toast viewport
