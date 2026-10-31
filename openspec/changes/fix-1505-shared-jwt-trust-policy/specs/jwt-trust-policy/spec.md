@@ -32,3 +32,16 @@ Foreign issuer hosts, incorrect realm paths, trailing segments, unallowlisted al
 ### Requirement: Safe and distinct JWT failures
 
 A JWT verification failure SHALL produce `401 INVALID_TOKEN` in the executor. Non-JWT missing/invalid credentials SHALL retain the existing missing-identity error. API-key, SSE query API-key and gateway-header identity behavior SHALL remain unchanged. Each shared verifier failure SHALL log only a bounded category, issuer host and audience list, never token segments, signatures or full claims.
+
+#### Scenario: Revoked service-account JWT
+
+- GIVEN a correctly signed service-account JWT whose credential has been revoked
+- WHEN the executor authenticates a request using that token
+- THEN the response is HTTP 401 with code `INVALID_TOKEN`
+- AND the verification log contains only category `revoked`, the issuer host and bounded audience values, without token segments, signatures or full claims.
+
+#### Scenario: Missing or invalid opaque credential
+
+- GIVEN a request with no credential or an invalid non-JWT credential
+- WHEN the executor authenticates the request
+- THEN the response retains HTTP 401 with code `UNAUTHENTICATED` and message `Missing tenant identity`.

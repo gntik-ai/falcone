@@ -16,7 +16,7 @@
 
 ## Bounded checks
 
-Run all verifier, identity, workspace-binding, tenant-audience, revocation and realtime API-key/SSE regression suites with Node's test isolation disabled. The recorded command is the same invocation used for the final source tree; the structured result reports its final outcome. No timeout wrapper is used. The initial broader run passed 776 tests; two added tenant-owner HTTP controls bring the final corpus to 778 tests.
+The previous implementation ran verifier, identity, workspace-binding, tenant-audience, revocation and realtime API-key/SSE regression suites with Node's test isolation disabled. No timeout wrapper was used. That bounded corpus passed 778 tests, but omitted `workspace-sa-rollback-auth.test.mjs`; it did not establish that the entire unit suite passed. The follow-up validation below supersedes that evidence for the current source tree.
 
 The bounded set is:
 
@@ -40,9 +40,28 @@ Also run syntax checks for changed JavaScript modules, Markdown lint and `git di
 
 ## Environment limits and handoff
 
-- Node's default test subprocess mode cannot execute in this sandbox. Use `--experimental-test-isolation=none` for the passing bounded run.
+- The previous maker reported that Node's default test subprocess mode could not execute. The follow-up maker successfully ran the bounded set in default mode; no isolation flag is required for that evidence.
 - `tests/unit/control-plane-jwt-identity.test.mjs` cannot initialize its TCP listener: `listen EPERM: operation not permitted 127.0.0.1`. Report SKIPPED, not an assertion failure. The generated-token in-memory HTTP tests cover both affected routes without binding a socket. PR CI must run socket-based identity suites.
 - Image builds and deployment chart render/provisioning tests are not run by this source maker. They require the separate deployment repository/CI and Docker infrastructure.
 - The deployment maker must consume the exact new env contract, reconcile the console mapper on existing realms, preserve ConfigMap/valueFrom/migration/checksum safeguards and add render parity tests. Tenant audience enforcement requires the corresponding mapper on tenant console/app clients.
 - The operator must confirm live superadmin and tenant-owner flows/MCP behavior after normal delivery and remove the explicit rollout audience by the documented deadline. Independent review must assess the issue's R3 concern and the account-audience compatibility decision against supplied R1 policy.
 - No dependencies, lockfiles, workflow pins, credentials, deployment state or unrelated source files change. Commit locally; do not push, merge or deploy.
+
+## Checker follow-up (2026-10-31)
+
+- [x] Confirm assigned branch, clean worktree and prior HEAD `5d803feafa87e1bb4aeefeedc3cbcdafa0636174`; preserve existing commits and workflow pins.
+- [x] Reproduce the stale assertion with `node --test --experimental-test-isolation=none tests/unit/workspace-sa-rollback-auth.test.mjs`: executor returned the required `INVALID_TOKEN`, but the test expected `UNAUTHENTICATED`. Update only that expectation; preserve the revoked-credential denial and both bound/unbound cases. The pre-fix red run is diagnostic evidence, not a final test result.
+- [x] Reproduce strict OpenSpec failure, then add revoked-JWT and missing/opaque-credential scenarios to the safe-failure requirement. Strict validation now passes.
+- [x] Document control-plane public `tokenEndpoint`/`callbackUrl` changes in design.md and linked upgrade notes, with pending R3 assessment.
+- [x] Document that tenant audience enforcement adds control-plane rejections, and require evidence of mapper coverage for all existing tenant app/console clients.
+- [x] Record the missing control-plane migration and effective prod-TLS trust-base fixes as companion deployment prerequisites, including required regression tests and release notes. No deployment files are changed by this source maker.
+- [x] Run the 15 files listed above plus `workspace-sa-rollback-auth.test.mjs`, `workspace-sa-rollback.test.mjs` and `tenant-social-provider.test.mjs` with `node --test` and no timeout wrapper: 18/18 files pass in default subprocess mode. Also run the repaired rollback-auth file alone, strict OpenSpec validation, Markdown lint and `git diff --check`.
+
+## Outstanding rollout tasks for #1505
+
+- [ ] Deployment maker: extend the paused atomic env migration/runbook to the control-plane Deployment/container, testing literal issuer/JWKS entries and duplicate prod-TLS JWKS entries as well as the executor. Publish operator release notes; preserve existing guards and checksums.
+- [ ] Deployment maker: derive the internal trusted realm base from the effective JWKS URL after TLS overrides. Add prod-TLS render assertions for the HTTPS base and absence of the stale HTTP alias, alongside shared-config parity tests.
+- [ ] Operator/R3 review: assess the new public service-account token endpoint and social-provider callback URL, and explicitly approve any temporary platform `account` audience. Approval is not supplied by this source change.
+- [ ] Operator: confirm audience mapper coverage on every existing tenant app and console client before enabling shared tenant-audience enforcement, and confirm platform console mapper reconciliation.
+- [ ] Operator, due 2026-11-14: remove `account` from the explicit platform audience list after existing sessions refresh/expire; verify strict `in-falcone` acceptance and `account`-only denial. This task tracks removal; the deadline is not enforced automatically.
+- [ ] PR/release CI and operator: run companion chart migration/render checks, image builds/scans and live superadmin/tenant-owner flows/MCP checks. No network, Docker/image infrastructure or live-session credentials are available to this source maker.
