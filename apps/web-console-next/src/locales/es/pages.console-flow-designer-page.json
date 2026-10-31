@@ -44,6 +44,7 @@
   "palette": "Tipos de tarea",
   "paletteLoading": "Cargando tipos de tarea",
   "paletteError": "No se pudo cargar el catálogo de tipos de tarea.",
+  "paletteErrorFallback": "No se pudieron cargar los tipos de tarea.",
   "paletteEmpty": "El catálogo de tipos de tarea está vacío.",
   "paletteHint": "Arrastra al lienzo o pulsa Intro o Espacio para insertar.",
   "other": "Otros",

@@ -65,12 +65,14 @@ export const FLOW_PALETTE_DRAG_MIME = 'application/x-falcone-flow-task-type'
 export function FlowPalette({ workspaceId, onCatalogLoaded, onInsert }: { workspaceId: string; onCatalogLoaded: (items: TaskTypeDescriptor[]) => void; onInsert: (descriptor: TaskTypeDescriptor) => void }) {
   const { t } = useCopy()
   const [attempt, setAttempt] = useState(0)
-  const [result, setResult] = useState<{ attempt: number; items: TaskTypeDescriptor[]; error: boolean }>({ attempt: -1, items: [], error: false })
+  const [result, setResult] = useState<{ attempt: number; items: TaskTypeDescriptor[]; error: string | null }>({ attempt: -1, items: [], error: null })
   const request = useRef<{ attempt: number; promise: Promise<TaskTypeDescriptor[]> } | null>(null)
   useEffect(() => {
     let active = true
     if (request.current?.attempt !== attempt) request.current = { attempt, promise: listTaskTypes(workspaceId) }
-    void request.current.promise.then((items) => { if (active) { setResult({ attempt, items, error: false }); onCatalogLoaded(items) } }).catch(() => { if (active) setResult({ attempt, items: [], error: true }) })
+    void request.current.promise.then((items) => { if (active) { setResult({ attempt, items, error: null }); onCatalogLoaded(items) } }).catch((error: unknown) => {
+      if (active) setResult({ attempt, items: [], error: error instanceof Error ? error.message : '' })
+    })
     return () => { active = false }
   }, [workspaceId, attempt, onCatalogLoaded])
   const drag = (event: DragEvent<HTMLButtonElement>, descriptor: TaskTypeDescriptor) => {
@@ -80,7 +82,7 @@ export function FlowPalette({ workspaceId, onCatalogLoaded, onInsert }: { worksp
   for (const descriptor of result.items) { const category = descriptor.category || t('other'); byCategory.set(category, [...(byCategory.get(category) ?? []), descriptor]) }
   return <ScrollArea orientation="vertical" bordered={false} aria-label={t('palette')} aria-labelledby={undefined} viewportClassName="max-h-80" contentClassName="space-y-3 p-3" viewportRef={undefined} className="min-w-0">
     {result.attempt !== attempt ? <TableSkeleton rows={3} columns={1} label={t('paletteLoading')} className="min-w-0" />
-      : result.error ? <div data-testid="flow-palette-error"><Text variant="body" tone="destructive">{t('paletteError')}</Text><Button variant="secondary" disabled={false} onClick={() => setAttempt((value) => value + 1)}>{t('retry')}</Button></div>
+      : result.error !== null ? <div data-testid="flow-palette-error"><Text variant="body" tone="destructive">{t('paletteError')}</Text><Text variant="supporting" tone="muted">{result.error || t('paletteErrorFallback')}</Text><Button variant="secondary" disabled={false} onClick={() => setAttempt((value) => value + 1)}>{t('retry')}</Button></div>
       : result.items.length === 0 ? <Text variant="body" tone="muted">{t('paletteEmpty')}</Text>
       : <div data-testid="flow-palette"><Text variant="supporting" tone="muted">{t('paletteHint')}</Text>{[...byCategory].map(([category, items]) => <section key={category} className="space-y-2"><h2 className="text-sm font-semibold">{category}</h2>{items.map((descriptor) =>
         <Button key={descriptor.id} variant="secondary" disabled={false} draggable={true} onDragStart={(event) => drag(event, descriptor)} onClick={() => onInsert(descriptor)} title={t('paletteHint')} data-testid={`flow-palette-item-${descriptor.id}`} className="w-full whitespace-normal">{descriptor.label}</Button>)}</section>)}</div>}

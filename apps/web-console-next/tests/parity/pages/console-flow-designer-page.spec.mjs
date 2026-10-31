@@ -120,6 +120,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     test('visual-review', async ({ parity }, info) => {
       await open(parity); await ready(parity);
       for (const mode of ['canvas', 'yaml', 'side-by-side']) { await tab(parity, mode); if (mode !== 'canvas') await expect(parity.page.locator('.monaco-editor')).toBeVisible(); await screenshot(parity, info, mode); }
+      await tab(parity, 'canvas');
+      await parity.page.locator('.react-flow__node[data-id="task"]').focus(); await parity.page.keyboard.press('Enter');
+      await expect(parity.page.locator('#flow-inspector-heading')).toBeFocused(); await screenshot(parity, info, 'selected-node-inspector');
+      parity.network.setVariants({ 'flows.versions.post': '422-node-errors' });
+      await parity.page.getByTestId('publish-button').click(); await expect(parity.page.getByTestId('flow-problems-panel')).toBeVisible();
+      await screenshot(parity, info, 'validation-problems');
       for (const variant of ['403', '500']) { await open(parity, variant); await screenshot(parity, info, variant); }
     });
     test('kit-conformance', async () => { await check.kitConformance(manifest); });
@@ -131,6 +137,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       parity.network.setVariants({ 'flows.patch': 'success', 'flows.versions.post': '422-node-errors' });
       await parity.page.getByTestId('publish-button').click(); await expect(parity.page.getByTestId('flow-node-error-badge')).toBeVisible();
       await expect(parity.page.getByTestId('flow-problems-panel')).toContainText('FLW-E007');
+      const problem = parity.page.getByRole('button', { name: copy(parity).selectNode.replace('{id}', 'task'), exact: true });
+      await problem.focus(); await parity.page.keyboard.press('Enter');
+      await expect(parity.page.locator('.react-flow__node[data-id="task"]')).toBeFocused();
       await check.assertAccessibility(parity);
     });
     for (const variant of ['401-refresh-ok', '401-refresh-rejected']) test(variant, async ({ parity, server }) => {

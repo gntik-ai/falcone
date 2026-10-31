@@ -200,14 +200,23 @@ test('locale changes preserve unsaved graph edits without issuing another load',
   expect(calls().filter(({ method, path }) => method === 'GET' && path === flowPath)).toHaveLength(1)
 })
 
-test('palette failures are localized and retry only the catalogue request', async () => {
+test('palette failures keep localized fallback copy and retry only the catalogue request', async () => {
   let attempt = 0
   setup({ [`GET ${taskTypesPath}`]: () => ++attempt === 1 ? Response.json({ message: 'raw palette backend message' }, { status: 500 }) : Response.json({ items: taskTypes }) }); open()
   const palette = await screen.findByTestId('flow-palette-error')
-  expect(palette).toHaveTextContent(es.paletteError); expect(screen.queryByText('raw palette backend message')).toBeNull()
+  expect(palette).toHaveTextContent(es.paletteError); expect(palette).toHaveTextContent(es.paletteErrorFallback); expect(screen.queryByText('raw palette backend message')).toBeNull()
   fireEvent.click(within(palette).getByRole('button', { name: es.retry })); await screen.findByTestId('flow-palette-item-synthetic-task')
   expect(calls().filter(({ path }) => path === taskTypesPath)).toHaveLength(2)
   expect(calls().filter(({ path }) => path === flowPath)).toHaveLength(1)
+})
+
+test.each(['es', 'en'] as const)('palette preserves legacy Error.message details in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  setup({ [`GET ${taskTypesPath}`]: () => { throw new Error('Synthetic catalogue connection failure') } }); open()
+  const palette = await screen.findByTestId('flow-palette-error')
+  expect(palette).toHaveTextContent(locale === 'es' ? es.paletteError : en.paletteError)
+  expect(palette).toHaveTextContent('Synthetic catalogue connection failure')
+  expect(calls().filter(({ path }) => path === taskTypesPath)).toHaveLength(1)
 })
 
 test('semantic YAML markers block publish and reverting drops the edited YAML buffer', async () => {

@@ -44,6 +44,7 @@
   "palette": "Task types",
   "paletteLoading": "Loading task types",
   "paletteError": "Could not load the task type catalogue.",
+  "paletteErrorFallback": "Could not load task types.",
   "paletteEmpty": "The task type catalogue is empty.",
   "paletteHint": "Drag onto the canvas or press Enter or Space to insert.",
   "other": "Other",
