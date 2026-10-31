@@ -25,7 +25,7 @@ import { createFlowMonitoringExecutor, createTemporalHistoryProvider } from './f
 import { wireFlowTriggers, createTriggerStore } from './flow-trigger-registry.mjs';
 import { createFlowQuotaGate } from './flow-quota-gate.mjs';
 import { createFlowQuotaEvaluator } from './flow-quota-evaluator.mjs';
-import { createJwtVerifier, deriveRealmTopology, tenantAudienceOptionsFromEnv } from './jwt-verify.mjs';
+import { createJwtVerifier, deriveRealmTopology, jwtVerifierOptionsFromEnv } from './jwt-verify.mjs';
 import { assertIdentityVerification } from './identity-guard.mjs';
 import { createSaRevocationCheck } from './sa-revocation.mjs';
 import { createMcpEngine } from './mcp-engine.mjs';
@@ -213,10 +213,7 @@ let jwtVerifier;
 let identityVerification;
 try {
   jwtVerifier = createJwtVerifier({
-    jwksUrl: process.env.KEYCLOAK_JWKS_URL,
-    issuer: process.env.KEYCLOAK_ISSUER,
-    audience: process.env.KEYCLOAK_AUDIENCE,
-    ...tenantAudienceOptionsFromEnv(),
+    ...jwtVerifierOptionsFromEnv(),
     revocationCheck: createSaRevocationCheck({
       pool: keyPool,
       realmsBase: saRealmsBase,

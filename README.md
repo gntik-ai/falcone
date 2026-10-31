@@ -198,6 +198,10 @@ remain Preview under the not-production-ready posture above:
 
 ## QuickStart with Docker Compose
 
+For existing installations upgrading the executor and control-plane JWT policy, review the
+[shared JWT policy upgrade notes](docs/installation/shared-jwt-policy-upgrade.md) for audience,
+public endpoint and companion chart migration prerequisites.
+
 The repository ships a Compose stack that brings up the **real backing services**
 Falcone talks to — PostgreSQL, Keycloak, Redpanda (Kafka), FerretDB + DocumentDB
 (MongoDB-wire document store), SeaweedFS (S3) and OpenBao — plus an APISIX gateway and an action runner.
