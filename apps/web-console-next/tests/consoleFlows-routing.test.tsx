@@ -34,7 +34,7 @@ async function ready() { await screen.findByTitle(flowRows.items[0].name, {}, ro
 
 test.each(['superadmin', 'tenant_viewer', 'workspace_viewer'])('flows has no role gate for %s under /next', async (role) => {
   setup([role]); open('/next'); await ready()
-  expect(isMigratedRoute('/console/flows')).toBe(true); expect(isMigratedRoute('/console/flows/f1')).toBe(false)
+  expect(isMigratedRoute('/console/flows')).toBe(true); expect(isMigratedRoute('/console/flows/f1')).toBe(true)
   expect(calls().filter(([url]) => url === flowsPath)).toHaveLength(1)
   if (role !== 'superadmin') expect(screen.queryByLabelText(es.newName)).toBeNull()
 })
