@@ -3,6 +3,7 @@
 .console-flow-designer > header > :first-child { min-width: 0; }
 .console-flow-designer .designer-canvas { min-height: 20rem; }
 .console-flow-designer .designer-yaml { min-height: 20rem; }
+#flow-designer-canvas > p { display: none; }
 .console-flow-designer .react-flow {
   --xy-background-color: hsl(var(--background));
   --xy-background-color-default: hsl(var(--background));
@@ -35,6 +36,8 @@
 @media (max-width: 1023px) {
   .console-flow-designer { height: auto; min-height: 44rem; }
   .console-flow-designer > header { flex-wrap: wrap; }
+  .console-flow-designer .designer-canvas,
+  .console-flow-designer .designer-yaml { height: 24rem; flex: none; }
   .console-flow-designer > header > :last-child { display: flex; }
   .console-flow-designer > header + div { flex-direction: column; }
   .console-flow-designer > header + div > aside:not([hidden]) { display: block; width: 100%; max-height: 20rem; overflow-y: auto; }
