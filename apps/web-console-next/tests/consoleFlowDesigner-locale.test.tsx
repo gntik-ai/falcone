@@ -8,16 +8,23 @@ beforeEach(() => {
 })
 
 test('only canonical version tokens in rendered YAML are exempt from the locale key check', () => {
-  render(<div data-testid="monaco-yaml-surface"><div className="view-lines"><span>apiVersion: </span><span>v1.0</span><span>pages.untranslated</span></div></div>)
+  render(<div data-testid="monaco-yaml-surface"><div className="view-lines"><div className="view-line"><span><span>apiVersion:</span><span>{'\u00a0'}</span><span>v1.0</span></span></div><div className="view-line"><span>pages.untranslated</span></div></div></div>)
   const values = collectDesignerLocaleValues('v1.0')
   expect(values).not.toContain('v1.0')
   expect(values).toContain('pages.untranslated')
 })
 
 test('version-like copy outside YAML and accessible labels inside YAML are still checked', () => {
-  render(<><span>v1.0</span><div data-testid="monaco-yaml-surface"><div className="view-lines"><span aria-label="v1.0" title="pages.untranslated">v1.0</span></div></div></>)
+  render(<><span>v1.0</span><div data-testid="monaco-yaml-surface"><div className="view-lines"><div className="view-line"><span>apiVersion: </span><span aria-label="v1.0" title="pages.untranslated">v1.0</span></div></div></div></>)
   expect(collectDesignerLocaleValues('v1.0').filter((value: string) => value === 'v1.0')).toHaveLength(2)
   expect(collectDesignerLocaleValues('v1.0')).toContain('pages.untranslated')
+})
+
+test('the schema exception does not hide version-like text on other YAML lines', () => {
+  render(<div data-testid="monaco-yaml-surface"><div className="view-lines"><div className="view-line"><span>name: </span><span>v1.0</span></div><div className="view-line"><span>apiVersion: </span><span>v2.0</span></div><div className="view-line"><span>v1.0</span></div></div></div>)
+  const values = collectDesignerLocaleValues('v1.0')
+  expect(values).toContain('v1.0')
+  expect(values).toContain('v2.0')
 })
 
 test('the whole-page locale scan keeps toast names and English chrome in YAML', () => {

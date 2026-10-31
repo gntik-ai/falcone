@@ -36,7 +36,9 @@ export function collectDesignerLocaleValues(apiVersion) {
     }
     for (const id of (element.getAttribute('aria-labelledby') ?? '').split(/\s+/)) if (id) values.push(document.getElementById(id)?.textContent ?? '');
     const addText = (text) => {
-      if (text.trim() === apiVersion && element.closest('[data-testid="monaco-yaml-surface"] .view-lines')) return;
+      const line = element.closest('[data-testid="monaco-yaml-surface"] .view-lines .view-line');
+      const isSchemaVersion = line?.textContent.replace(/\s+/g, ' ').trim() === `apiVersion: ${apiVersion}`;
+      if (text.trim() === apiVersion && isSchemaVersion) return;
       values.push(text);
     };
     for (const child of element.childNodes) if (child.nodeType === Node.TEXT_NODE) addText(child.textContent);

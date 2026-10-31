@@ -4,6 +4,26 @@ Page: `console-flow-designer-page`, issue #1288, risk R2. Blueprint SHA256:
 `d52c1d932d0f68f904568c8caf9694f0ae2046daf5220d2b6465df6a0355f15d`.
 Delivery base: `33b4c9ef6a32caee57c1b711733896ad1dd416dc`.
 
+## CI repair verification after 5279392f
+
+The supplied CI failure is the red evidence for the untranslated toast viewport
+and the schema-version false positive. The preceding commit already localizes
+the viewport and focuses Monaco's textbox before editing. This follow-up keeps
+those repairs and tightens the new page-local locale scanner: only the exact
+`v1.0` scalar on Monaco's rendered `apiVersion` line is exempt. Other YAML lines,
+untranslated keys, accessible labels and toast names remain scanned.
+
+The locale tests now reproduce Monaco's nested token spans and nonbreaking
+spaces, and prove that a different version or the same token on another line
+does not receive the schema exception. These are new ChangeSet tests, absent at
+the delivery base; no pre-existing assertion is changed by this follow-up.
+The shared parity checks, workflows and fixture harness are unchanged.
+
+Browser parity, axe, responsive and CSP execution remains SKIPPED: Chromium
+unavailable; PR CI runs them. Screenshot assessment still requires the checker
+and operator. `validate_page` remains NOT_RUN because no gntik_ui MCP server is
+available; the supplied Hermes snapshot is the kit reference.
+
 ## CI parity repair after 6e8e9b99
 
 The toast viewport now receives its accessible name from the designer namespace
