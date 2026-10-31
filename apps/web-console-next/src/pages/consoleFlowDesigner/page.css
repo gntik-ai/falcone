@@ -1,0 +1,45 @@
+.console-flow-designer { min-height: 44rem; height: calc(100dvh - 8rem); max-width: 100%; }
+.console-flow-designer > header { height: auto; align-items: flex-start; padding-block: 1rem; }
+.console-flow-designer > header > :first-child { min-width: 0; }
+.console-flow-designer .designer-canvas { min-height: 20rem; }
+.console-flow-designer .designer-yaml { min-height: 20rem; }
+#flow-designer-canvas > p { display: none; }
+.console-flow-designer .react-flow {
+  --xy-background-color: hsl(var(--background));
+  --xy-background-color-default: hsl(var(--background));
+  --xy-background-pattern-dots-color-default: hsl(var(--border));
+  --xy-edge-stroke-default: hsl(var(--muted-foreground));
+  --xy-edge-stroke-selected-default: hsl(var(--primary));
+  --xy-connectionline-stroke-default: hsl(var(--primary));
+  --xy-handle-background-color-default: hsl(var(--foreground));
+  --xy-handle-border-color-default: hsl(var(--background));
+  --xy-controls-button-background-color-default: hsl(var(--secondary));
+  --xy-controls-button-background-color-hover-default: hsl(var(--muted));
+  --xy-controls-button-color-default: hsl(var(--foreground));
+  --xy-controls-button-color-hover-default: hsl(var(--foreground));
+  --xy-controls-button-border-color-default: hsl(var(--border));
+  --xy-controls-box-shadow-default: none;
+  --xy-node-background-color-default: hsl(var(--card));
+  --xy-node-color-default: hsl(var(--foreground));
+  --xy-node-border-default: 1px solid hsl(var(--border));
+  --xy-node-boxshadow-hover-default: none;
+  --xy-node-boxshadow-selected-default: 0 0 0 2px hsl(var(--focus-ring));
+  --xy-edge-label-background-color-default: hsl(var(--background));
+  --xy-edge-label-color-default: hsl(var(--foreground));
+  --xy-selection-background-color-default: hsl(var(--muted));
+  --xy-selection-border-default: 1px solid hsl(var(--focus-ring));
+  --xy-resize-background-color-default: hsl(var(--primary));
+}
+.console-flow-designer .react-flow__node:focus-visible,
+.console-flow-designer .react-flow__edge:focus-visible,
+.console-flow-designer .react-flow__controls-button:focus-visible { outline: 2px solid hsl(var(--focus-ring)); outline-offset: 2px; }
+@media (max-width: 1023px) {
+  .console-flow-designer { height: auto; min-height: 44rem; }
+  .console-flow-designer > header { flex-wrap: wrap; }
+  .console-flow-designer .designer-canvas,
+  .console-flow-designer .designer-yaml { height: 24rem; flex: none; }
+  .console-flow-designer > header > :last-child { display: flex; }
+  .console-flow-designer > header + div { flex-direction: column; }
+  .console-flow-designer > header + div > aside:not([hidden]) { display: block; width: 100%; max-height: 20rem; overflow-y: auto; }
+  .console-flow-designer > header + div > div { min-height: 24rem; }
+}
