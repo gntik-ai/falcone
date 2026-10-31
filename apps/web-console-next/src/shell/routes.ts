@@ -36,7 +36,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'functions/data' },
   { path: 'realtime/changes' },
   { path: 'flows', migrated: true },
-  { path: 'flows/:flowId' },
+  { path: 'flows/:flowId', migrated: true },
   { path: 'flows/:flowId/runs', migrated: true },
   { path: 'flows/:flowId/runs/:executionId' },
   { path: 'storage' },

@@ -42,6 +42,10 @@ export async function installSession(page, roles = ['superadmin']) {
       } });
     } else if (route.request().method() === 'GET' && /^\/v1\/workspaces\/[^/]+\/functions$/.test(url.pathname) && !url.search) {
       await route.fulfill({ json: { items: [], total: 0 } });
+    } else if (route.request().method() === 'GET' && /^\/v1\/flows\/workspaces\/[^/]+\/flows\/[^/]+$/.test(url.pathname) && !url.search) {
+      await route.fulfill({ json: { flowId: decodeURIComponent(url.pathname.split('/')[6]), name: 'Synthetic flow', status: 'draft', definition: { apiVersion: 'v1.0', name: 'Synthetic flow', nodes: [] } } });
+    } else if (route.request().method() === 'GET' && /^\/v1\/flows\/workspaces\/[^/]+\/task-types$/.test(url.pathname) && !url.search) {
+      await route.fulfill({ json: { items: [] } });
     } else if (route.request().method() === 'GET' && /^\/v1\/flows\/workspaces\/[^/]+\/flows\/[^/]+\/executions$/.test(url.pathname) && !url.search) {
       await route.fulfill({ json: { items: [], nextPageToken: null } });
     } else {
