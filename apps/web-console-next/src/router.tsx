@@ -12,6 +12,7 @@ import { SignupFeedbackLayout } from './pages/signupFeedback'
 import { pendingConsoleRoutes } from './shell/routes'
 
 declare const __SHELL_TEST_FIXTURES__: boolean
+const AdminLayout = lazy(() => import('./shell/AdminLayout'))
 const FixtureRoutes = __SHELL_TEST_FIXTURES__ ? lazy(() => import('./shell/fixtures/FixtureRoutes')) : null
 
 export function routerBasename(base = import.meta.env.VITE_BASE_PATH || '/'): string {
@@ -65,6 +66,13 @@ export const appRoutes: RouteObject[] = [
         { path: '/signup/pending-activation', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<WelcomeLoading />}>{lazyPage('pages.pending-activation-page', () => import('./pages/pendingActivation'))}</Suspense></ShellErrorBoundary> },
       ] },
       { path: '*', handle: { ownLayout: true }, element: <ShellErrorBoundary><Suspense fallback={<NotFoundLoading />}>{lazyPage('pages.not-found-page', () => import('./pages/notFound'))}</Suspense></ShellErrorBoundary> }
+    ]
+  },
+  {
+    path: '/admin',
+    element: <ProtectedRoute><AdminLayout /></ProtectedRoute>,
+    children: [
+      { index: true, element: lazyPage('admin', () => import('./pages/admin')) }
     ]
   },
   {

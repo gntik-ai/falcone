@@ -11,6 +11,9 @@ test('the console retains legacy routes and adds the MCP servers list', () => {
   const expected = fullPaths(legacyRoutes())
   // The MCP list is a new surface with no legacy counterpart.
   expected.add('/console/mcp/servers')
+  // The administrator console entry point has no legacy counterpart.
+  expected.add('/admin')
+  expected.add('/admin/')
   expect(expected).toContain('/console/')
   expect(expected).toContain('/console/*')
   expect(expected).toContain('/*')

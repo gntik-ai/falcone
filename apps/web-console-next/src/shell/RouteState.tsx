@@ -4,12 +4,12 @@ import { ErrorPanel, type ErrorPanelLabels } from '@gntik-ai/blocks'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
-export function RouteState({ state, retry, title, description, message, errorLabels }: { message?: string; errorLabels?: ErrorPanelLabels; title?: string; description?: string; state: 'forbidden' | 'notFound' | 'unknown' | 'serverError'; retry?: () => void }) {
+export function RouteState({ state, retry, title, description, message, errorLabels, primaryAction }: { message?: string; primaryAction?: { label: string; to: string }; errorLabels?: ErrorPanelLabels; title?: string; description?: string; state: 'forbidden' | 'notFound' | 'unknown' | 'serverError'; retry?: () => void }) {
   const { t } = useTranslation('common')
   const navigate = useNavigate()
   return <StatusLayout mainId="route-status" code={state === 'forbidden' ? '403' : state === 'serverError' ? '500' : '404'}
     title={title ?? t(`states.${state}.title`)} description={description ?? message ?? t(`states.${state}.body`)}
-    primaryAction={<Button onClick={() => navigate('/console/overview')}>{t('navigation.overview')}</Button>}
+    primaryAction={<Button onClick={() => navigate(primaryAction?.to ?? '/console/overview')}>{primaryAction?.label ?? t('navigation.overview')}</Button>}
     secondaryAction={<Button variant="ghost" onClick={() => navigate(-1)}>{t('shell.back')}</Button>}>
     {state === 'serverError' && <ErrorPanel title={title ?? t('states.serverError.title')} message={message ?? t('states.serverError.body')}
       labels={errorLabels} requestId="" code={500} details="" secondaryAction={null}
