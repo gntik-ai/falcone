@@ -21,8 +21,8 @@ function open(path: string, basename?: string) {
   return render(<MemoryRouter basename={basename} initialEntries={[path]}><CurrentLocation /><App /></MemoryRouter>)
 }
 const copy = {
-  es: { header: 'Consola de administración', back: 'Volver a la consola', overview: 'Vista general', userMenu: 'Menú de usuario' },
-  en: { header: 'Administrator console', back: 'Back to console', overview: 'Overview', userMenu: 'User menu' }
+  es: { header: 'Consola de administración', back: 'Volver a la consola', overview: 'Vista general', userMenu: 'Menú de usuario', icon: 'Consola' },
+  en: { header: 'Administrator console', back: 'Back to console', overview: 'Overview', userMenu: 'User menu', icon: 'Console' }
 } as const
 
 describe.each(['es', 'en'] as const)('superadmin at /admin in %s', (locale) => {
@@ -37,6 +37,8 @@ describe.each(['es', 'en'] as const)('superadmin at /admin in %s', (locale) => {
     // One occurrence is the topbar title, the other is the landing heading.
     expect(screen.getAllByText(text.header)).toHaveLength(2)
     expect(screen.getByRole('button', { name: text.userMenu })).toBeVisible()
+    // The CSP/browser route sweep looks for the same console icon the /console shell renders.
+    expect(screen.getByRole('img', { name: text.icon })).toBeVisible()
     expect(document.querySelector('[aria-label="Active context"], [aria-label="Contexto activo"]')).toBeNull()
     expect(screen.queryByRole('button', { name: text.overview })).toBeNull()
     expect(screen.getByRole('link', { name: text.back })).toHaveAttribute('href', base === '/' ? '/console' : '/next/console')
