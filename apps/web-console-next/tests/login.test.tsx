@@ -42,6 +42,8 @@ function open(entry = '/login', basename = '/', app = false) {
     { path: '/login', element: app ? <App /> : <LoginPage /> },
     { path: '/password-recovery', element: <RecoveryPage /> },
     { path: '/console/*', element: <h1>Protected destination</h1> },
+    { path: '/admin/*', element: <h1>Admin destination</h1> },
+    { path: '/administrator', element: <h1>Administrator lookalike</h1> },
   ], { basename, initialEntries: [entry] })
   const page = render(<StrictMode><RouterProvider router={router} /></StrictMode>)
   return { ...page, router }
@@ -322,6 +324,25 @@ test.each(['/', '/next'])('restores basename-aware intent and rejects invalid in
     await screen.findByText('Protected destination')
     expect(page.router.state.location.pathname).toBe(`${prefix}/console/${intent?.endsWith('?x=1#h') ? 'settings' : 'overview'}`)
     if (intent?.endsWith('?x=1#h')) expect(page.router.state.location).toMatchObject({ search: '?x=1', hash: '#h' })
+    page.unmount(); sessionStorage.clear(); fetchMock.mockClear()
+  }
+})
+
+test.each(['/', '/next'])('post-login resolver honours only exact-boundary admin intents under %s', async (base) => {
+  vi.stubEnv('VITE_BASE_PATH', base)
+  const prefix = base === '/' ? '' : base
+  const cases: [string | null, string][] = [
+    [`${prefix}/admin`, '/admin'], [`${prefix}/admin/`, '/admin/'], [`${prefix}/admin?x=1`, '/admin'], [`${prefix}/admin#h`, '/admin'],
+    ['//evil', '/console/overview'], ['/login', '/console/overview'], [`${prefix}/administrator`, '/console/overview'],
+    [`${prefix}/adminx`, '/console/overview'], [null, '/console/overview']
+  ]
+  for (const [intent, pathname] of cases) {
+    if (intent) storeProtectedRouteIntent(intent)
+    install({ [loginPath]: () => response(200, session()) })
+    const page = open(`${prefix}/login`, base); await ready(); fill(); submit()
+    await waitFor(() => expect(page.router.state.location.pathname).toBe(`${prefix}${pathname}`))
+    expect(screen.queryByText('Administrator lookalike')).toBeNull()
+    if (intent?.includes('?x=1')) expect(page.router.state.location.search).toBe('?x=1')
     page.unmount(); sessionStorage.clear(); fetchMock.mockClear()
   }
 })

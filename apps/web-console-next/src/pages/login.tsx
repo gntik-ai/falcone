@@ -21,10 +21,15 @@ type Feedback = { kind: 'credential' | 'denied' | 'service'; error: Failure } | 
 const focusClass = 'rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
 const describedBy = (...ids: (string | false | undefined)[]) => ids.filter(Boolean).join(' ') || undefined
 
+// Exact path boundary: /admin matches, /administrator and /adminx do not.
+function isAdminIntent(intent: string, adminPath: string) {
+  return intent === adminPath || (intent.startsWith(adminPath) && ['/', '?', '#'].includes(intent.charAt(adminPath.length)))
+}
+
 function resolvePostLoginDestination() {
   const intent = consumeProtectedRouteIntent()
   const base = routerBasename() === '/' ? '' : routerBasename()
-  if (intent && !intent.startsWith('//') && intent.startsWith(`${base}/console/`)) return intent.slice(base.length)
+  if (intent && !intent.startsWith('//') && (intent.startsWith(`${base}/console/`) || isAdminIntent(intent, `${base}/admin`))) return intent.slice(base.length)
   return getConsolePermissions(readConsoleShellSession()?.principal?.platformRoles).isReadOnly ? '/console/observability' : '/console/overview'
 }
 

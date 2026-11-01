@@ -12,7 +12,7 @@ declare const __APP_COMMIT_SHA__: string
 export function App() {
   const { t, i18n } = useTranslation('common')
   const location = useLocation()
-  const consoleRoute = /^\/console(?:\/|$)/.test(location.pathname)
+  const consoleRoute = /^\/(?:console|admin)(?:\/|$)/.test(location.pathname)
   const ownLayout = matchRoutes(appRoutes, location)?.some((match) => match.route.handle?.ownLayout) ?? false
   const previousPath = useRef(location.pathname)
   useEffect(() => {
