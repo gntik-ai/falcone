@@ -22,7 +22,7 @@
   "listLegend": "Funciones disponibles",
   "selectedBadge": "Seleccionada: {name}",
   "columnName": "Función",
-  "columnRuntime": "Runtime",
+  "columnRuntime": "Entorno de ejecución",
   "columnResourceId": "ID de recurso",
   "selectionColumn": "Selección",
   "listLoading": "Cargando funciones…",

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
 import { useTranslation } from 'react-i18next'
 import { Link as RouterLink } from 'react-router-dom'
 import { Badge, Button, EmptyState, Field, FieldDescription, FieldLabel, I18nProvider, JsonViewer, Link, LiveAnnouncer, Page, SimpleSelect, StatusTag, Text, Textarea, Timestamp, ToastProvider, Toaster, useAnnounce, useToast, type BadgeTone } from '@gntik-ai/ui'
-import { DataTable, ErrorPanel, FirstRunEmpty, InlineCallout, NoAccessEmpty, NotFoundEmpty, PageHeader, PageToolbar, SectionHeader, TableSkeleton, type DataTableColumn } from '@gntik-ai/blocks'
+import { DataTable, ErrorPanel, InlineCallout, NoAccessEmpty, NotFoundEmpty, PageHeader, PageToolbar, SectionHeader, TableSkeleton, type DataTableColumn } from '@gntik-ai/blocks'
 import type { ApiError, JsonValue } from '@in-falcone/console-api/http'
 import { useConsoleContext } from '../shell/context'
 import { usePermissions } from '../shell/permissions'
@@ -252,7 +252,7 @@ function FunctionsConsole({ tenantId, workspaceId }: { tenantId: string; workspa
   const listBody = listLoading
     ? <section aria-busy={true} aria-label={t('listLoading')}><div aria-hidden={true}><TableSkeleton rows={3} columns={3} label={t('listLoading')} className="min-w-0" /></div><Text variant="body" tone="muted">{t('listLoadingDescription')}</Text></section>
     : listError ? <FailurePanel failure={listError} kind="list" retry={() => void reload()} />
-    : items.length === 0 ? <FirstRunEmpty icon={undefined} title={t('listEmpty')} description={t('listEmptyDescription')} actionLabel={undefined} onAction={undefined} secondary={null} steps={[]} titleAs="h3" bordered={false} className="min-w-0" labels={{ title: t('listEmpty'), description: t('listEmptyDescription'), action: '', guide: '' }} />
+    : items.length === 0 ? <EmptyState icon={undefined} title={t('listEmpty')} description={t('listEmptyDescription')} titleAs="h3" bordered={false} primaryAction={null} secondaryAction={null} className="min-w-0" />
     : <DataTable rows={items} columns={columns} getRowId={(fn) => fn.resourceId} getRowLabel={formatFunctionLabel} caption={t('listLegend')} showCaption={false} paginated={false} selectionMode="single" selectionName="function" aria-label={t('listLegend')} selectedId={selected || null} onSelectedIdChange={selectFunction} isRowDisabled={() => false} rowActions={undefined} toolbar={null} sort={null} defaultSort={null} manualSorting={true} loading={false} loadingRows={0} emptyState={null} showDensityToggle={false} showColumnMenu={false} showViewSwitcher={false} views={[]} defaultViews={[]} hiddenColumns={[]} resizable={false} virtualize={false} groupBy={undefined} showPinMenu={false} className="min-w-0" labels={{ scrollRegion: t('listLegend'), selection: t('selectionColumn'), selectRow: (label) => label, emptyTitle: t('listEmpty'), emptyDescription: t('listEmptyDescription'), loading: () => t('listLoading') }} />
 
   const listPanel = <section className="min-w-0 space-y-3" aria-label={t('listLegend')} aria-busy={listLoading}>
