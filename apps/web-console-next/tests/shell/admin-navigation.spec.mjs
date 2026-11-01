@@ -57,6 +57,23 @@ for (const locale of ['en', 'es']) {
     expect(unmatched).toEqual([]);
   });
 
+  test(`mobile shell entry leaves the flow-history breadcrumb clickable in ${locale}`, async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 900 });
+    const unmatched = await setup(page, locale);
+    await page.goto(server.url('console/flows/f1/runs/e1'));
+    const runs = page.getByRole('link', { name: locale === 'es' ? 'Ejecuciones' : 'Runs', exact: true });
+    await expect(runs).toBeVisible();
+    await runs.click({ trial: true });
+    const documents = [];
+    page.on('request', (request) => { if (request.resourceType() === 'document') documents.push(request.url()); });
+    const entry = page.getByRole('link', { name: text.admin, exact: true });
+    await expect(entry).toBeVisible();
+    await entry.click();
+    await expect(page).toHaveURL(server.url('admin'));
+    expect(documents).toEqual([]);
+    expect(unmatched).toEqual([]);
+  });
+
   for (const openKey of ['Enter', 'Space']) {
     test(`keyboard navigation opens both menus with ${openKey} in ${locale}`, async ({ page }) => {
       const unmatched = await setup(page, locale);
@@ -85,7 +102,7 @@ for (const locale of ['en', 'es']) {
     });
   }
 
-  test(`open menus meet the accessibility gate and add no all-impact violations in ${locale}`, async ({ page, context }) => {
+  test(`closed menus meet the accessibility gate and open menus add no all-impact violations in ${locale}`, async ({ page, context }) => {
     const baselinePage = await context.newPage();
     const baselineRequests = await setup(baselinePage, locale, ['tenant_owner']);
     await baselinePage.getByRole('button', { name: text.trigger }).click();
@@ -98,9 +115,10 @@ for (const locale of ['en', 'es']) {
     for (const [route, label] of [['console/overview', text.admin], ['admin', text.console]]) {
       await page.goto(server.url(route));
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page.getByRole('menu')).toHaveCount(0);
+      await assertAccessibility({ page });
       await page.getByRole('button', { name: text.trigger }).click();
       await expect(page.getByRole('menuitem', { name: label, exact: true })).toBeVisible();
-      await assertAccessibility({ page });
       const result = await new AxeBuilder({ page }).analyze();
       expect(result.violations.map((violation) => violation.id).filter((id) => !baselineIds.has(id))).toEqual([]);
       for (const violation of result.violations) {

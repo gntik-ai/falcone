@@ -80,7 +80,7 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
       topbar={<><MobileNav className="lg:hidden" groups={groups} currentHref={pathname} label={t('shell.navigation')}
         open={drawerOpen} onOpenChange={setDrawerOpen} footer={!platformGlobal && <ContextPanel />} /><LayoutDashboard role="img" aria-label={t('shell.console')} className="shrink-0" size={20} /><AppTopbar breadcrumb={<Breadcrumbs items={breadcrumbs} />} environment={null} search={null} notifications={null} theme={null} user={null} />
         {roles.includes('superadmin') && <Link to="/admin" className="inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring">
-          <Shield aria-hidden="true" size={18} />{t('shell.adminConsole')}
+          <Shield aria-hidden="true" size={18} /><span className="sr-only sm:not-sr-only">{t('shell.adminConsole')}</span>
         </Link>}<AccountMenu /></>}>
       {!platformGlobal && <ContextPanel />}
       <div className="p-4 sm:p-6">
