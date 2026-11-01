@@ -107,7 +107,8 @@ for (const locale of ['en', 'es']) {
         for (const node of violation.nodes) {
           const touchesEntry = await page.locator(node.target.join(' ')).evaluate((element, name) =>
             [...document.querySelectorAll('[role="menuitem"], a')].some((entry) =>
-              entry.textContent.trim() === name && (entry === element || entry.contains(element) || element.contains(entry))), label);
+              // An existing violation on the menu container is not a violation on each item.
+              entry.textContent.trim() === name && (entry === element || entry.contains(element))), label);
           expect(touchesEntry, `${violation.id} must not affect a new navigation entry`).toBe(false);
         }
       }
