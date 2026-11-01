@@ -86,7 +86,9 @@ describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) 
   test.each([
     { path: '/console/overview', label: text.admin, destination: '/next/admin' },
     { path: '/admin', label: text.console, destination: '/next/console/overview' }
-  ])('keyboard menu at $path focuses a named item and navigates on Enter', async ({ path, label, destination }) => {
+  ])('keyboard menu at $path focuses a named item and navigates in-router on Enter', async ({ path, label, destination }) => {
+    const assign = vi.fn()
+    vi.stubGlobal('window', Object.create(window, { location: { value: { ...window.location, assign } } }))
     open(path)
     const trigger = await screen.findByRole('button', { name: text.trigger })
     trigger.focus()
@@ -101,6 +103,8 @@ describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) 
     expect(document.activeElement).toHaveAccessibleName(label)
     fireEvent.keyDown(document.activeElement!, { key: 'Enter', code: 'Enter' })
     await waitFor(() => expect(visited.at(-1)).toBe(destination))
+    if (path === '/admin') expect(visited).toContain('/next/console')
+    expect(assign).not.toHaveBeenCalled()
   })
 
   test('both navigation keys resolve from this locale without fallback', () => {
