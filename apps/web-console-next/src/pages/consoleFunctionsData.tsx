@@ -87,6 +87,7 @@ function FunctionsConsole({ tenantId, workspaceId }: { tenantId: string; workspa
   const initial = useRef<ReturnType<typeof listFunctions> | null>(null)
   const announcedInitial = useRef<unknown>(null)
   const focusAfter = useRef<{ op: Operation; viaRetry: boolean } | null>(null)
+  const focusAfterList = useRef(false), listPanelRef = useRef<HTMLElement>(null)
   const deployButton = useRef<HTMLButtonElement>(null), invokeButton = useRef<HTMLButtonElement>(null), activationsButton = useRef<HTMLButtonElement>(null)
   const deployPanel = useRef<HTMLDivElement>(null), resultPanel = useRef<HTMLDivElement>(null), activationsPanel = useRef<HTMLDivElement>(null)
 
@@ -140,6 +141,15 @@ function FunctionsConsole({ tenantId, workspaceId }: { tenantId: string; workspa
     const target = viaRetry && failed ? findRetry(panel, feedback.current.t('retry')) : trigger.current
     target?.focus()
   }, [operation, deployError, invokeError, activationsError])
+
+  // The list skeleton replaces the error panel while a retry loads: restore focus to the new Reintentar, or to the list once it renders.
+  useLayoutEffect(() => {
+    if (listLoading || !focusAfterList.current) return
+    focusAfterList.current = false
+    const target = listError ? findRetry(listPanelRef, feedback.current.t('retry')) : listPanelRef.current?.querySelector<HTMLElement>('[role="radio"], input[type="radio"]')
+    target?.focus()
+  }, [listLoading, listError])
+  const retryList = () => { focusAfterList.current = true; void reload() }
 
   const selectedFunction = items.find((fn) => fn.resourceId === selected) ?? null
   const busy = operation !== null
@@ -251,11 +261,11 @@ function FunctionsConsole({ tenantId, workspaceId }: { tenantId: string; workspa
   const noAccess = listError?.status === 403
   const listBody = listLoading
     ? <section aria-busy={true} aria-label={t('listLoading')}><div aria-hidden={true}><TableSkeleton rows={3} columns={3} label={t('listLoading')} className="min-w-0" /></div><Text variant="body" tone="muted">{t('listLoadingDescription')}</Text></section>
-    : listError ? <FailurePanel failure={listError} kind="list" retry={() => void reload()} />
+    : listError ? <FailurePanel failure={listError} kind="list" retry={retryList} />
     : items.length === 0 ? <EmptyState icon={undefined} title={t('listEmpty')} description={t('listEmptyDescription')} titleAs="h3" bordered={false} primaryAction={null} secondaryAction={null} className="min-w-0" />
     : <DataTable rows={items} columns={columns} getRowId={(fn) => fn.resourceId} getRowLabel={formatFunctionLabel} caption={t('listLegend')} showCaption={false} paginated={false} selectionMode="single" selectionName="function" aria-label={t('listLegend')} selectedId={selected || null} onSelectedIdChange={selectFunction} isRowDisabled={() => false} rowActions={undefined} toolbar={null} sort={null} defaultSort={null} manualSorting={true} loading={false} loadingRows={0} emptyState={null} showDensityToggle={false} showColumnMenu={false} showViewSwitcher={false} views={[]} defaultViews={[]} hiddenColumns={[]} resizable={false} virtualize={false} groupBy={undefined} showPinMenu={false} className="min-w-0" labels={{ scrollRegion: t('listLegend'), selection: t('selectionColumn'), selectRow: (label) => label, emptyTitle: t('listEmpty'), emptyDescription: t('listEmptyDescription'), loading: () => t('listLoading') }} />
 
-  const listPanel = <section className="min-w-0 space-y-3" aria-label={t('listLegend')} aria-busy={listLoading}>
+  const listPanel = <section ref={listPanelRef} className="min-w-0 space-y-3" aria-label={t('listLegend')} aria-busy={listLoading}>
     <PageToolbar search="" defaultSearch="" onSearchChange={undefined} searchLabel={t('listLegend')} searchPlaceholder={t('listLegend')} views={[]} view="" defaultView="" onViewChange={undefined} primaryAction={null} aria-label={t('listLegend')} className="functions-data-toolbar min-w-0"
       filters={<div className="flex min-w-0 flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{t('listTitle', { count: listLoading || listError ? 0 : items.length })}</h2>{selectedFunction ? <Badge tone="neutral" variant="soft" size="sm" shape="rounded" dot={false} onRemove={undefined} removeLabel="" className="max-w-full truncate">{t('selectedBadge', { name: selectedFunction.actionName })}</Badge> : null}</div>} />
     {listBody}

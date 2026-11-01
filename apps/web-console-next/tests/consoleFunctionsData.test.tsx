@@ -280,6 +280,17 @@ test.each([['500', () => failure(500, 'req_list_500')()], ['network', () => { th
   fireEvent.click(button(es.retry)); await ready(); expect(calls().filter((call) => call.path === list)).toHaveLength(2)
 })
 
+test('a failed list retry keeps keyboard focus on the replacement Reintentar and a successful one lands on the list', async () => {
+  let attempt = 0
+  setup({ [`GET ${list}`]: () => ++attempt < 3 ? failure(500, `req_list_${attempt}`)() : Response.json(actions2) }); open()
+  await screen.findByRole('heading', { name: es.listError })
+  button(es.retry).focus(); fireEvent.click(button(es.retry))
+  await screen.findByText('req_list_2')
+  expect(button(es.retry)).toHaveFocus()
+  fireEvent.click(button(es.retry)); await ready()
+  expect(radios()[0]).toHaveFocus(); expect(calls().filter((call) => call.path === list)).toHaveLength(3)
+})
+
 test('without a tenant the page is blocked and sends nothing', () => {
   context.value = { ...context.value, activeTenantId: null, activeWorkspaceId: null }; setup(); open()
   expect(screen.getByRole('heading', { name: es.blockedTitle })).toBeVisible(); expect(screen.getByText(es.blockedDescription)).toBeVisible()
