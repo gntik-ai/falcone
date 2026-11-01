@@ -77,7 +77,9 @@ for (const [name, options] of [
 ]) test(`${name} remains unauthenticated without a tenant identity`, async () => {
   const result = await request(options);
   assert.equal(result.status, 401);
-  assert.deepEqual(result.body, { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
+  assert.deepEqual(result.body, ['expired token', 'wrong audience', 'untrusted issuer', 'invalid token'].includes(name)
+    ? { code: 'INVALID_TOKEN', message: 'Invalid token' }
+    : { code: 'UNAUTHENTICATED', message: 'Missing tenant identity' });
   assert.deepEqual(result.executions, []);
 });
 

@@ -237,7 +237,7 @@ async function resolveIdentity(headers, pathWorkspaceId, apiKeyStore, jwtVerifie
   const jwt = bearerJwtFromHeaders(headers);
   if (jwt && jwtVerifier) {
     const verified = await jwtVerifier.verify(jwt, pathWorkspaceId).catch(() => undefined);
-    return verified ?? { tenantId: undefined }; // invalid JWT → 401, fail closed
+    return verified ?? { tenantId: undefined, invalidToken: jwt.split('.').length === 3 }; // Fail closed; keep opaque credentials on the legacy error path.
   }
   // No authoritative credential. Fall through to header-based identity ONLY when the
   // gateway trust signal is valid. When gatewaySharedSecret is set (production), the
@@ -1530,6 +1530,9 @@ export function createControlPlaneServer({ registry, apiKeyStore, mongoExecutor,
       // SSE routes accept the anon key via ?apikey= (EventSource can't set headers).
       const queryApiKey = opts?.sse ? url.searchParams.get('apikey') : undefined;
       const identity = await resolveIdentity(req.headers, groups[0], apiKeyStore, jwtVerifier, queryApiKey, gatewaySharedSecret);
+      if (!opts?.noAuth && identity.invalidToken) {
+        return sendJson(res, 401, { code: 'INVALID_TOKEN', message: 'Invalid token' });
+      }
       const workspaceInPath = workspaceIdFromPath(url.pathname);
       let owningTenantId;
       let checkedWorkspaceTenant = false;

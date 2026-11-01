@@ -66,7 +66,7 @@ for (const [name, createCheck, createVerifier] of [
       for (const [bearer, workspace] of [[bound, W], [unbound, 'another-workspace']]) {
         const response = await executorRequest(server, `/v1/workspaces/${workspace}/api-keys`, bearer);
         assert.equal(response.status, 401);
-        assert.equal(response.body.code, 'UNAUTHENTICATED');
+        assert.equal(response.body.code, 'INVALID_TOKEN');
       }
     } else {
       // API-key listing is executor-only; use the control-plane's authenticated

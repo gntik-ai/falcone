@@ -21,7 +21,7 @@ import { normalizeWorkspaceBinding } from '../../packages/internal-contracts/src
 import { requestErrorForLog } from '../../packages/internal-contracts/src/request-log.mjs';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import { createMultiRealmVerifier, deriveRealmTopology } from './jwt-verify.mjs';
+import { createMultiRealmVerifier, deriveRealmTopology, jwtVerifierOptionsFromEnv } from './jwt-verify.mjs';
 import { loadRoutes as compileRoutes, matchRoute as matchCompiledRoute } from './route-table.mjs';
 import { invokeRoute } from './route-invoke.mjs';
 import { routes as seedRoutes } from './routes.mjs';
@@ -68,7 +68,6 @@ const WEBHOOK_KEY_LIFECYCLE_DATABASE_URL =
 const JWKS_URL = process.env.KEYCLOAK_JWKS_URL
   ?? 'http://falcone-keycloak:8080/realms/in-falcone-platform/protocol/openid-connect/certs';
 const ISSUER = process.env.KEYCLOAK_ISSUER || null;   // optional exact-match check
-const AUDIENCE = process.env.KEYCLOAK_AUDIENCE || null;
 const ROUTE_MAP_FILE = process.env.ROUTE_MAP_FILE || null; // optional JSON merged over seedRoutes
 const knativeRuntime = createKnativeRuntimeSource({ env: process.env });
 // Handle for the durable Function cleanup interval so shutdown can stop it gracefully (parity with
@@ -115,7 +114,6 @@ function listenForRequests() {
 // tokens from the platform realm AND from any per-tenant realm under the same Keycloak base (derived
 // from JWKS_URL/ISSUER), fetching each realm's JWKS on demand. For a tenant-realm token the tenant id
 // comes from the cryptographically-verified issuer (the realm name), not a forgeable claim.
-const ALLOW_TENANT_REALMS = process.env.KEYCLOAK_ALLOW_TENANT_REALMS !== '0';
 // Service-account revocation/rotation propagation (fix-sa-credential-revocation-invalidate-tokens,
 // #684). After offline JWT validation, reject any service-account access token whose credential has
 // been revoked (service_accounts.status='revoked') or rotated (its `iat` predates
@@ -142,10 +140,8 @@ const saRevocationCheck = createSaRevocationCheck({
   skewSec: SA_REVOCATION_SKEW_SEC,
 });
 const jwtVerifier = createMultiRealmVerifier({
+  ...jwtVerifierOptionsFromEnv(),
   jwksUrl: JWKS_URL,
-  issuer: ISSUER,
-  audience: AUDIENCE,
-  allowTenantRealms: ALLOW_TENANT_REALMS,
   revocationCheck: saRevocationCheck,
 });
 
