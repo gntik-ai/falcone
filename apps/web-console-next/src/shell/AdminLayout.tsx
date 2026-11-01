@@ -34,7 +34,7 @@ export default function AdminLayout() {
     <SidebarLayout fullScreen className="console-shell" drawerOpen={false} sidebarLabel={t('title')}
       sidebar={({ collapsed, closeDrawer }) => <AppSidebar collapsed={collapsed} workspaces={[]} user={null} usage={null} helpHref=""
         navLabel={t('title')} currentHref={pathname} navGroups={noGroups} onNavigate={closeDrawer} />}
-      topbar={<><LayoutDashboard role="img" aria-label={tc('shell.console')} className="shrink-0" size={20} /><span className="shrink-0 font-semibold">{t('title')}</span><AppTopbar breadcrumb={null} environment={null} search={null} notifications={null} theme={null} user={null} /><AccountMenu /></>}>
+      topbar={<><LayoutDashboard role="img" aria-label={tc('shell.console')} className="shrink-0" size={20} /><span className="shrink-0 font-semibold">{t('title')}</span><AppTopbar breadcrumb={null} environment={null} search={null} notifications={null} theme={null} user={null} /><AccountMenu mode="admin" /></>}>
       <div className="p-4 sm:p-6">
         <ShellErrorBoundary key={pathname}><Suspense fallback={<StatusPage state="loading" />}><Outlet /></Suspense></ShellErrorBoundary>
       </div>

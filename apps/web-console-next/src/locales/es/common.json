@@ -2,6 +2,8 @@
   "shell": {
     "console": "Consola",
     "about": "Acerca de",
+    "adminConsole": "Consola de administración",
+    "backToConsole": "Consola",
     "userMenu": "Menú de usuario",
     "navigation": "Navegación de consola",
     "back": "Volver",

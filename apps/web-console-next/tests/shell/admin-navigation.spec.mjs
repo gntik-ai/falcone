@@ -1,0 +1,121 @@
+import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import { startServer } from '../csp/server.mjs';
+import { installSession } from '../browser-session.mjs';
+import { assertAccessibility, assertResponsive } from '../parity/checks.mjs';
+
+let server;
+test.beforeAll(async () => { server = await startServer(); });
+test.afterAll(async () => { await server?.close(); });
+
+const copy = {
+  en: { admin: 'Admin console', console: 'Console', about: 'About', signOut: 'Sign out', trigger: 'User menu' },
+  es: { admin: 'Consola de administración', console: 'Consola', about: 'Acerca de', signOut: 'Cerrar sesión', trigger: 'Menú de usuario' },
+};
+const pathname = (page) => new URL(page.url()).pathname;
+async function setup(page, locale, roles = ['superadmin']) {
+  const unmatched = await installSession(page, roles);
+  await page.addInitScript((language) => localStorage.setItem('falcone-next-locale', language), locale);
+  await page.goto(server.url('console/overview'));
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('button', { name: copy[locale].trigger })).toBeVisible();
+  return unmatched;
+}
+async function tabTo(page, locator) {
+  // A finite traversal catches entries accidentally removed from the tab order.
+  for (let step = 0; step < 50; step++) {
+    await page.keyboard.press('Tab');
+    if (await locator.evaluate((element) => element === document.activeElement)) return;
+  }
+  await expect(locator).toBeFocused();
+}
+
+for (const locale of ['en', 'es']) {
+  const text = copy[locale];
+  test(`superadmin menu and topbar preserve /next without document navigation in ${locale}`, async ({ page }) => {
+    const unmatched = await setup(page, locale);
+    expect(pathname(page)).toBe('/next/console/overview');
+    const documents = [];
+    page.on('request', (request) => { if (request.resourceType() === 'document') documents.push(request.url()); });
+    const trigger = () => page.getByRole('button', { name: text.trigger });
+    await trigger().click();
+    await expect(page.getByRole('menuitem')).toHaveText([text.admin, text.about, text.signOut]);
+    await page.getByRole('menuitem', { name: text.admin, exact: true }).click();
+    await expect(page).toHaveURL(server.url('admin'));
+    await trigger().click();
+    await expect(page.getByRole('menuitem')).toHaveText([text.console, text.about, text.signOut]);
+    await expect(page.getByRole('menuitem', { name: text.admin, exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: text.admin, exact: true })).toHaveCount(0);
+    await page.getByRole('menuitem', { name: text.console, exact: true }).click();
+    await expect(page).toHaveURL(server.url('console/overview'));
+    const entry = page.getByRole('link', { name: text.admin, exact: true });
+    await expect(entry).toHaveAttribute('href', '/next/admin');
+    await expect(entry.locator('svg')).toHaveAttribute('aria-hidden', 'true');
+    await entry.click();
+    await expect(page).toHaveURL(server.url('admin'));
+    expect(documents).toEqual([]);
+    expect(unmatched).toEqual([]);
+  });
+
+  for (const openKey of ['Enter', 'Space']) {
+    test(`keyboard navigation opens both menus with ${openKey} in ${locale}`, async ({ page }) => {
+      const unmatched = await setup(page, locale);
+      const documents = [];
+      page.on('request', (request) => { if (request.resourceType() === 'document') documents.push(request.url()); });
+      await tabTo(page, page.getByRole('link', { name: text.admin, exact: true }));
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(server.url('admin'));
+      for (const [label, destination] of [[text.console, 'console/overview'], [text.admin, 'admin']]) {
+        await tabTo(page, page.getByRole('button', { name: text.trigger }));
+        await page.keyboard.press(openKey);
+        const item = page.getByRole('menuitem', { name: label, exact: true });
+        await expect(item).toBeVisible();
+        // ArrowDown/ArrowUp must use the kit's roving focus and return to the first item.
+        await expect(item).toBeFocused();
+        await page.keyboard.press('ArrowDown');
+        await expect(page.getByRole('menuitem', { name: text.about, exact: true })).toBeFocused();
+        await page.keyboard.press('ArrowUp');
+        await expect(item).toBeFocused();
+        await expect(item).toHaveAccessibleName(label);
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(server.url(destination));
+      }
+      expect(documents).toEqual([]);
+      expect(unmatched).toEqual([]);
+    });
+  }
+
+  test(`open menus meet the accessibility gate and add no all-impact violations in ${locale}`, async ({ page, context }) => {
+    const baselinePage = await context.newPage();
+    const baselineRequests = await setup(baselinePage, locale, ['tenant_owner']);
+    await baselinePage.getByRole('button', { name: text.trigger }).click();
+    const baseline = await new AxeBuilder({ page: baselinePage }).analyze();
+    const baselineIds = new Set(baseline.violations.map((violation) => violation.id));
+    expect(baselineRequests).toEqual([]);
+    await baselinePage.close();
+
+    const unmatched = await setup(page, locale);
+    for (const [route, label] of [['console/overview', text.admin], ['admin', text.console]]) {
+      await page.goto(server.url(route));
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await page.getByRole('button', { name: text.trigger }).click();
+      await expect(page.getByRole('menuitem', { name: label, exact: true })).toBeVisible();
+      await assertAccessibility({ page });
+      const result = await new AxeBuilder({ page }).analyze();
+      expect(result.violations.map((violation) => violation.id).filter((id) => !baselineIds.has(id))).toEqual([]);
+      for (const violation of result.violations) {
+        for (const node of violation.nodes) {
+          const touchesEntry = await page.locator(node.target.join(' ')).evaluate((element, name) =>
+            [...document.querySelectorAll('[role="menuitem"], a')].some((entry) =>
+              entry.textContent.trim() === name && (entry === element || entry.contains(element) || element.contains(entry))), label);
+          expect(touchesEntry, `${violation.id} must not affect a new navigation entry`).toBe(false);
+        }
+      }
+      for (const width of [375, 768, 1280]) {
+        await assertResponsive({ page }, width);
+        await test.info().attach(`${locale}-${route.replace('/', '-')}-${width}`, { body: await page.screenshot(), contentType: 'image/png' });
+      }
+    }
+    expect(unmatched).toEqual([]);
+  });
+}

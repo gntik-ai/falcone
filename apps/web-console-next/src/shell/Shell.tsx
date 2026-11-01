@@ -1,4 +1,4 @@
-import { LayoutDashboard } from 'lucide-react'
+import { LayoutDashboard, Shield } from 'lucide-react'
 import { Suspense, useState, useEffect, type ComponentPropsWithRef } from 'react'
 import { AppSidebar, AppTopbar } from '@gntik-ai/blocks'
 import { SidebarLayout, Breadcrumbs, WorkspaceSwitcher, LinkProvider, MobileNav, type NavGroup } from '@gntik-ai/ui'
@@ -78,7 +78,10 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
           currentHref={pathname} navGroups={groups} onNavigate={closeDrawer} />
       </>}
       topbar={<><MobileNav className="lg:hidden" groups={groups} currentHref={pathname} label={t('shell.navigation')}
-        open={drawerOpen} onOpenChange={setDrawerOpen} footer={!platformGlobal && <ContextPanel />} /><LayoutDashboard role="img" aria-label={t('shell.console')} className="shrink-0" size={20} /><AppTopbar breadcrumb={<Breadcrumbs items={breadcrumbs} />} environment={null} search={null} notifications={null} theme={null} user={null} /><AccountMenu /></>}>
+        open={drawerOpen} onOpenChange={setDrawerOpen} footer={!platformGlobal && <ContextPanel />} /><LayoutDashboard role="img" aria-label={t('shell.console')} className="shrink-0" size={20} /><AppTopbar breadcrumb={<Breadcrumbs items={breadcrumbs} />} environment={null} search={null} notifications={null} theme={null} user={null} />
+        {roles.includes('superadmin') && <Link to="/admin" className="inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring">
+          <Shield aria-hidden="true" size={18} />{t('shell.adminConsole')}
+        </Link>}<AccountMenu /></>}>
       {!platformGlobal && <ContextPanel />}
       <div className="p-4 sm:p-6">
         <ShellErrorBoundary key={pathname}><Suspense fallback={<StatusPage state="loading" />}><Outlet /></Suspense></ShellErrorBoundary>
