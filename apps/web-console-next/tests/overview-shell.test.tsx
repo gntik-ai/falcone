@@ -27,6 +27,7 @@ test.each(['superadmin', 'tenant_owner', 'tenant_viewer'])('allows authenticated
   expect(isMigratedRoute('/console/overview')).toBe(true)
   expect(isMigratedRoute('/console/functions-registry')).toBe(true)
   expect(isMigratedRoute('/console/flows')).toBe(true)
+  expect(isMigratedRoute('/console/functions/data')).toBe(true)
   for (const path of ['workspaces', 'members', 'my-plan']) expect(isMigratedRoute(`/console/${path}`)).toBe(false)
 })
 

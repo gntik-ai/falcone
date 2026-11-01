@@ -33,7 +33,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'kafka' },
   { path: 'events/data' },
   { path: 'functions' },
-  { path: 'functions/data' },
+  { path: 'functions/data', migrated: true },
   { path: 'realtime/changes' },
   { path: 'flows', migrated: true },
   { path: 'flows/:flowId', migrated: true },

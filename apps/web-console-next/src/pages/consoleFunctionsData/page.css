@@ -1,0 +1,5 @@
+/* The legacy list has no search. Supply a heading and keep the toolbar to one row. */
+.functions-data-toolbar div:has(> input[type="search"]) { display: none; }
+.functions-data-toolbar > div:first-child { display: block; min-width: 0; flex-basis: 100%; }
+.functions-data-toolbar > div:last-child { display: none; }
+.functions-data table { white-space: nowrap; }
