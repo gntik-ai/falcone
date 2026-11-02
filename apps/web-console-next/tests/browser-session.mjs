@@ -63,7 +63,11 @@ export async function installSession(page, roles = ['superadmin']) {
         await route.fulfill({ status: response.status, json: response.body });
         return;
       }
-      if (name && name !== 'plans.list' && (!url.search || (typeof isTenantPlanQuery !== 'undefined' && isTenantPlanQuery(request.method(), url)) || (typeof isMyPlanQuery !== 'undefined' && isMyPlanQuery(request.method(), url)))) {
+      // The Mi plan entitlements GET is accepted with its one exact query only, never queryless.
+      const queryAllowed = name === 'myPlanEntitlements'
+        ? isMyPlanQuery(request.method(), url)
+        : !url.search || (typeof isTenantPlanQuery !== 'undefined' && isTenantPlanQuery(request.method(), url));
+      if (name && name !== 'plans.list' && queryAllowed) {
         const response = endpoints.responseFor(name, 'superadmin', body);
         await route.fulfill({ status: response.status, json: response.body });
         return;

@@ -1,10 +1,12 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { buildConsoleRefreshSessionFixture } from '@in-falcone/console-api/fixtures'
 import { readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import Page from '../src/pages/consoleTenantPlanOverview'
 import { entitlementsMixed, entitlementsNoCapabilities, entitlementsNoLimits } from './parity/pages/console-tenant-plan-overview-page.manifest'
+// @ts-expect-error Browser helpers intentionally use native JavaScript modules.
+import { installSession } from './browser-session.mjs'
 import { login, renderWithSession, strictFetch } from './shell-support'
 import { ProtectedRoute } from '../src/shell/session'
 import i18n from '../src/i18n'
@@ -246,4 +248,18 @@ test.each([false, true])('401 refresh rejected=%s uses the shared transport and 
 test('both catalogs define the same keys', () => {
   const keys = (value: object, prefix = ''): string[] => Object.entries(value).flatMap(([key, child]) => typeof child === 'string' ? [prefix + key] : keys(child, `${prefix}${key}.`))
   expect(keys(es).sort()).toEqual(keys(en).sort())
+})
+
+test('the CSP session fulfils the entitlements GET with its exact query only and records every other form as unmatched', async () => {
+  let handle!: (route: unknown) => Promise<void>
+  const unmatched = await installSession({ addInitScript: vi.fn(), route: vi.fn((_pattern: string, callback: (route: unknown) => Promise<void>) => { handle = callback }) })
+  const base = '/v1/tenant/plan/effective-entitlements'
+  const attempts = [['GET', `${base}?include=consumption`, true], ['GET', base, false], ['GET', `${base}?include=other`, false],
+    ['GET', `${base}?include=consumption&x=1`, false], ['POST', `${base}?include=consumption`, false]] as const
+  for (const [method, target, accepted] of attempts) {
+    const route = { request: () => ({ method: () => method, url: () => `http://localhost${target}`, postDataJSON: () => undefined }), fulfill: vi.fn(), abort: vi.fn() }
+    await handle(route)
+    expect(route.fulfill, `${method} ${target}`).toHaveBeenCalledTimes(accepted ? 1 : 0)
+  }
+  expect(unmatched).toEqual(attempts.filter(([, , accepted]) => !accepted).map(([method, target]) => `${method} ${target}`))
 })
