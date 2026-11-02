@@ -3,6 +3,7 @@ import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
 import manifest, { tenantBody, tenantRows } from './consoleTenants.manifest.ts';
+import { entitlementsMixed, historyResponse, plansResponse, proPlan } from './console-tenant-plan-page.manifest.ts';
 import es from '../../../src/locales/es/pages.console-tenants-page.json' with { type: 'json' };
 import en from '../../../src/locales/en/pages.console-tenants-page.json' with { type: 'json' };
 import { tenantLocaleValues, forbiddenTenantCopy } from './consoleTenants.locale.ts';
@@ -201,6 +202,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       });
       await p.page.route((url) => url.pathname === '/console/tenants/t2/plan', async (route) => {
         await route.fulfill({ contentType: 'text/html', body: `<html lang="${locale}"><body><main><h1>Beta</h1></main></body></html>` });
+      });
+      // The link reaches the migrated tenant plan page in the same session. Its four reads are served here,
+      // outside the harness registry, so this journey's own request allowlist stays limited to the inventory.
+      await p.page.route((url) => url.pathname.startsWith('/v1/tenants/t2/plan') || (url.pathname === '/v1/plans' && url.search === '?status=active&page=1&pageSize=20'), async (route) => {
+        const url = new URL(route.request().url());
+        const body = url.pathname === '/v1/tenants/t2/plan' ? proPlan : url.pathname.endsWith('/effective-entitlements') ? entitlementsMixed
+          : url.pathname.endsWith('/history-impact') ? historyResponse('success', url).body : plansResponse('active').body;
+        await route.fulfill({ json: body });
       });
       await p.page.getByRole('link', { name: copy(p).openPlanName.replace('{name}', 'Beta'), exact: true }).click();
       await expect(p.page).toHaveURL(/\/console\/tenants\/t2\/plan$/);

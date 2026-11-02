@@ -60,14 +60,20 @@ test('a rejected session check denies access and preserves the protected intent'
 
 let requests: ReturnType<typeof strictFetch>
 afterEach(() => requests?.verify())
+const tenantPlanRoutes = {
+  'GET /v1/tenants/t1/plan': { assignment: null, plan: null },
+  'GET /v1/tenants/t1/plan/effective-entitlements?include=consumption': { tenantId: 't1', quantitativeLimits: [] },
+  'GET /v1/tenants/t1/plan/history-impact?page=1&pageSize=20': { items: [], total: 0, page: 1, pageSize: 20 },
+  'GET /v1/plans?status=active&page=1&pageSize=20': { items: [], total: 0, page: 1, pageSize: 20 },
+}
 
 test.each(['iam-access', 'plans', 'auth', 'tenants/t1/plan'].flatMap((path) =>
   [['superadmin'], ['platform_auditor'], ['tenant_owner'], []].map((roles) => ({ path, roles }))
 ))('$path keeps navigation visible and gates $roles by superadmin', async ({ path, roles }) => {
   login(roles)
-  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] }, 'GET /v1/plans?page=1&pageSize=20': { items: [], total: 0, page: 1, pageSize: 20 } })
+  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] }, 'GET /v1/plans?page=1&pageSize=20': { items: [], total: 0, page: 1, pageSize: 20 }, ...tenantPlanRoutes })
   open(`/console/${path}`)
-  expect(await screen.findByRole('heading', { name: roles.includes('superadmin') ? path === 'plans' ? 'Catálogo de planes' : 'Página pendiente' : 'Acceso denegado' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: roles.includes('superadmin') ? path === 'plans' ? 'Catálogo de planes' : path === 'tenants/t1/plan' ? 'Plan de la organización' : 'Página pendiente' : 'Acceso denegado' })).toBeVisible()
   expect(screen.getByRole('navigation', { name: 'Navegación de consola' })).toBeVisible()
 })
 
@@ -234,10 +240,11 @@ test('a tenant route parameter does not replace stored context', async () => {
   localStorage.setItem('in-falcone.console-active-context', JSON.stringify({ userId: 'synthetic-user', tenantId: 't2', workspaceId: null, updatedAt: '2026-01-01' }))
   requests = strictFetch({
     [`GET ${tenantUrl}`]: { items: [{ tenantId: 't1', displayName: 'Tenant One' }, { tenantId: 't2', displayName: 'Tenant Two' }] },
-    [`GET ${workspaceUrl('t2')}`]: { items: [] }
+    [`GET ${workspaceUrl('t2')}`]: { items: [] },
+    ...tenantPlanRoutes
   })
   open('/console/tenants/t1/plan')
-  await screen.findByRole('heading', { name: 'Página pendiente' })
+  await screen.findByRole('heading', { name: 'Plan de la organización' })
   await waitFor(() => expect(screen.getByLabelText('Organización activa')).toHaveValue('t2'))
 })
 
