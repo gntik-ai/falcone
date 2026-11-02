@@ -311,11 +311,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await openAssignment(parity, { assign: '401' }, { refresh: '401' });
       await expect(parity.page).toHaveURL(server.url('login'));
       expect(posts(parity)).toHaveLength(1);
-      // Read 401: one refresh, then /login with the return path preserved.
-      await visit(parity, server, { plan: '401' });
-      await expect(parity.page).toHaveURL(server.url('login'));
-      expect(parity.network.requests.filter((request) => request.path.endsWith('/refresh'))).toHaveLength(1);
-      expect(await parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(`/console/tenants/${tenantId}/plan`);
+      // Read 401 on each of the four reads: one refresh, /login with the return path preserved, and no assignment POST.
+      for (const read of ['plan', 'entitlements', 'history', 'plans']) {
+        await visit(parity, server, { [read]: '401' });
+        await expect(parity.page).toHaveURL(server.url('login'));
+        expect(parity.network.requests.filter((request) => request.path.endsWith('/refresh'))).toHaveLength(1);
+        expect(await parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(`/console/tenants/${tenantId}/plan`);
+        expect(posts(parity)).toHaveLength(0);
+      }
     });
     test('accessibility', async ({ parity }) => {
       test.setTimeout(120_000);

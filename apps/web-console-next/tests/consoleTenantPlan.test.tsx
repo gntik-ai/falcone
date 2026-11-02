@@ -1,8 +1,8 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { render } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
-import { buildConsoleRefreshSessionFixture } from '@in-falcone/console-api/fixtures'
+import { buildConsoleRefreshSessionFixture, buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures'
 import { readConsoleShellSession } from '@in-falcone/console-api/session'
 import ConsoleTenantPlanPage from '../src/pages/consoleTenantPlan'
 import { App } from '../src/App'
@@ -414,6 +414,28 @@ test.each(['ok', 'rejected'])('an assignment 401 never replays the POST (refresh
 
 test.each([['401', () => fail(401)], ['403', () => fail(403)], ['404', () => fail(404)], ['500', () => fail(500)], ['network', network]])('assignment read %s never reaches the POST path', async (_name, handler) => {
   setup({ [`GET ${planUrl}`]: handler, [`POST ${refreshUrl}`]: () => fail(401) }); open(); await wait(); await wait()
+  expect(posts()).toHaveLength(0)
+})
+
+function CurrentLocation() {
+  const { pathname } = useLocation()
+  return <output aria-label="Current location">{pathname}</output>
+}
+// The four reads all fire on load, so each 401 is observable without opening a tab or the dialog.
+const reads401 = [['entitlements', `GET ${entitlementsUrl}`], ['history', `GET ${historyUrl(1)}`], ['catalogue', `GET ${plansUrl}`]] as const
+// A read 401 goes through the shell: one refresh, the replay, then /login with the return path kept. No assignment is ever sent.
+test.each(reads401)('a %s read 401 refreshes once, returns to /login with the plan path kept and sends no assignment', async (_name, key) => {
+  const session = buildConsoleRefreshSessionFixture()
+  login(['superadmin'])
+  setup({
+    'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture(),
+    [key]: () => fail(401),
+    [`POST ${refreshUrl}`]: () => json(session),
+  })
+  render(<MemoryRouter initialEntries={['/console/tenants/ten_alpha/plan']}><CurrentLocation /><App /></MemoryRouter>)
+  await waitFor(() => expect(screen.getByLabelText('Current location')).toHaveTextContent('/login'))
+  expect(JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')!)).toBe('/console/tenants/ten_alpha/plan')
+  expect(count(`POST ${refreshUrl}`)).toBe(1)
   expect(posts()).toHaveLength(0)
 })
 
