@@ -1,0 +1,9 @@
+/* Long dimension names wrap inside their cells instead of widening the page. */
+.my-plan table th, .my-plan table td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+/* Compose the kit table as stacked label/value cards below its tablet breakpoint. */
+@media (max-width: 767px) {
+  .my-plan-limits table, .my-plan-limits tbody { display: block; width: 100%; }
+  .my-plan-limits thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .my-plan-limits tbody tr { display: block; margin-bottom: 1rem; }
+  .my-plan-limits tbody th, .my-plan-limits tbody td { display: block; width: 100%; }
+}

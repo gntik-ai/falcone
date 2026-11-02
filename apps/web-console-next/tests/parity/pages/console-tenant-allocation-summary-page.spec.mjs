@@ -1,12 +1,20 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import manifest, { allocationMixed } from './console-tenant-allocation-summary-page.manifest.ts';
+import { myPlanEndpoints } from './console-tenant-plan-overview-page.manifest.ts';
+import { pendingConsoleRoutes } from '../../../src/shell/routes.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale,
   JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-tenant-allocation-summary-page.json`, import.meta.url), 'utf8')),
 ]));
+const planTitles = Object.fromEntries(['es', 'en'].map((locale) => [locale,
+  JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-tenant-plan-overview-page.json`, import.meta.url), 'utf8')).title,
+]));
+// With my-plan migrated the back links are client navigation under the router basename.
+const migrated = pendingConsoleRoutes.find((route) => route.path === 'my-plan')?.migrated === true;
+const myPlanHref = (server) => migrated ? new URL(server.url('console/my-plan')).pathname : '/console/my-plan';
 const build = JSON.parse(readFileSync(new URL('../../../dist/.vite/manifest.json', import.meta.url), 'utf8'));
 const entry = Object.values(build).find((chunk) => chunk.isEntry && chunk.name === 'app').file;
 const surface = (parity) => parity.page.locator('.allocation-summary');
@@ -49,7 +57,7 @@ async function tenantless(parity, server) {
 
 for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`console-tenant-allocation-summary-page | ${role} | ${locale} | ${width}`, () => {
-    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: { ...manifest.endpoints, ...myPlanEndpoints } });
     const copy = bundles[locale];
     test('data', async ({ parity }) => {
       await open(parity, 'allocation-summary-mixed');
@@ -67,7 +75,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await assertRequests(parity, 1);
       await check.assertLocale(parity);
     });
-    test('action', async ({ parity }) => {
+    test('action', async ({ parity, server }) => {
       await open(parity, ['500', 'success']);
       await surface(parity).getByRole('button', { name: copy.retry, exact: true }).click();
       await expect(surface(parity).getByRole('table')).toBeVisible();
@@ -86,7 +94,18 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       expect(tokens).toEqual(['Bearer synthetic-access-token', 'Bearer synthetic-refreshed-access-token']);
       parity.page.off('request', observe);
       const back = surface(parity).getByRole('link', { name: copy.myPlan, exact: true });
-      await expect(back).toHaveAttribute('href', '/console/my-plan');
+      await expect(back).toHaveAttribute('href', myPlanHref(server));
+      if (migrated) {
+        // Client navigation: the document survives and the destination heading takes focus.
+        await parity.page.evaluate(() => { window.__allocationDocument = true; });
+        await keyboardActivate(parity.page, back);
+        await expect(parity.page).toHaveURL(server.url('console/my-plan'));
+        const heading = parity.page.getByRole('heading', { level: 1, name: planTitles[locale], exact: true });
+        await expect(heading).toBeVisible();
+        await expect(heading).toBeFocused();
+        expect(await parity.page.evaluate(() => window.__allocationDocument)).toBe(true);
+        return;
+      }
       // Capture Enter's default navigation before deliberately containing the legacy exit.
       await parity.page.evaluate(() => document.body.addEventListener('click', (event) => {
         if (event.target.closest('a')?.getAttribute('href') === '/console/my-plan') {
@@ -104,7 +123,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         if (state.variant === '404') {
           const links = surface(parity).getByRole('link', { name: copy.myPlan, exact: true });
           await expect(links).toHaveCount(2);
-          for (const link of await links.all()) await expect(link).toHaveAttribute('href', '/console/my-plan');
+          for (const link of await links.all()) await expect(link).toHaveAttribute('href', myPlanHref(server));
         }
         if (state.variant === '500') await expect(surface(parity).getByText('req_synthetic_alloc_500', { exact: true })).toBeVisible();
         if (state.variant === 'network') {
