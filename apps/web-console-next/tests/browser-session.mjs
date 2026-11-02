@@ -2,6 +2,7 @@ import { workspaceConsumptionEndpoints } from './parity/pages/console-workspace-
 import { tenantMetricsEndpoints } from './parity/pages/consoleTenants.manifest.ts';
 import { catalogEndpoints, catalogResponse, isPlansQuery } from './parity/pages/console-plan-catalog-page.manifest.ts';
 import { allocationEndpoints } from './parity/pages/console-tenant-allocation-summary-page.manifest.ts';
+import { buildTenantPlanEndpoints, cspTenantId, isTenantPlanQuery } from './parity/pages/console-tenant-plan-page.manifest.ts';
 import { createEndpointRegistry } from './parity/endpoint-registry.ts';
 import { operationEndpoints } from './parity/pages/operationDetail.manifest.ts';
 import { runtimeEndpoints } from './parity/pages/consoleRuntime.manifest.ts';
@@ -12,7 +13,7 @@ import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixture
 export async function installSession(page, roles = ['superadmin']) {
   const unmatched = [];
   const endpoints = createEndpointRegistry({}, () => ({}), {
-    ...(typeof tenantMetricsEndpoints === 'undefined' ? {} : tenantMetricsEndpoints), ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints),
+    ...(typeof tenantMetricsEndpoints === 'undefined' ? {} : tenantMetricsEndpoints), ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints), ...(typeof buildTenantPlanEndpoints === 'undefined' ? {} : buildTenantPlanEndpoints(cspTenantId)),
     ...(typeof workspaceConsumptionEndpoints === 'undefined' ? {} : workspaceConsumptionEndpoints),
     signupPolicy: { method: 'GET', path: '/v1/auth/signups/policy', fixtures: {
       success: { status: 200, body: buildConsoleSignupPolicyFixture() },
@@ -60,7 +61,7 @@ export async function installSession(page, roles = ['superadmin']) {
         await route.fulfill({ status: response.status, json: response.body });
         return;
       }
-      if (name && name !== 'plans.list' && !url.search) {
+      if (name && name !== 'plans.list' && (!url.search || (typeof isTenantPlanQuery !== 'undefined' && isTenantPlanQuery(request.method(), url)))) {
         const response = endpoints.responseFor(name, 'superadmin', body);
         await route.fulfill({ status: response.status, json: response.body });
         return;

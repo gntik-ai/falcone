@@ -1,0 +1,2 @@
+/* Long plan names, ids and correlation ids wrap inside their cells instead of widening the page. */
+.console-tenant-plan table th, .console-tenant-plan table td { overflow-wrap: anywhere; vertical-align: top; }
