@@ -38,6 +38,7 @@ async function openTenantless(parity, server, fixture) {
   finally { await parity.page.unroute(`**/${entry}`, seed); }
 }
 async function attach(parity, info, name, locale, width) {
+  await check.assertLocale(parity);
   const body = await parity.page.screenshot({ fullPage: true, animations: 'disabled' });
   const hash = createHash('sha256').update(body).digest('hex');
   await info.attach(`${name}-${locale}-${width}-sha256-${hash}`, { body, contentType: 'image/png' });
@@ -181,15 +182,28 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
     });
     test('visual-review', async ({ parity, server }, info) => {
       await open(parity, 'my-plan-entitlements-mixed');
+      await expect(surface(parity).getByRole('table', { name: copy.tableTitle })).toBeVisible();
+      await expect(surface(parity).getByText(myPlanMixed.planSlug, { exact: true })).toBeVisible();
+      await expect(surface(parity).getByRole('alert')).toContainText(locale === 'es' ? '1 dimensión' : '1 dimension');
       await attach(parity, info, 'my-plan-entitlements-mixed-summary', locale, width);
       await surface(parity).getByRole('tab', { name: copy.tabHistory }).click();
       await expect(surface(parity).getByRole('heading', { name: copy.historyTitle })).toBeVisible();
+      await expect(surface(parity).getByText(copy.historyDescription, { exact: true })).toBeVisible();
+      await expect(surface(parity).getByRole('table')).toHaveCount(0);
+      assertReads(parity, 1);
       await attach(parity, info, 'my-plan-entitlements-mixed-history', locale, width);
       await open(parity, 'my-plan-entitlements-500');
+      await expect(surface(parity).getByRole('heading', { name: copy.errorTitle })).toBeVisible();
+      await expect(surface(parity).getByText(copy.errorDescription, { exact: true })).toBeVisible();
       await expect(surface(parity).getByText('req_synthetic_my_plan_500')).toBeVisible();
+      await expect(surface(parity).getByRole('button', { name: copy.retry, exact: true })).toBeVisible();
+      await expect(surface(parity).getByRole('table')).toHaveCount(0);
       await attach(parity, info, 'my-plan-entitlements-500', locale, width);
       await openTenantless(parity, server, 'shell-superadmin-tenantless');
       await expect(surface(parity).getByRole('heading', { name: copy.tenantlessTitle })).toBeVisible();
+      await expect(surface(parity).getByText(copy.tenantlessAdminDescription, { exact: true })).toBeVisible();
+      await expect(surface(parity).getByRole('link', { name: copy.catalogue, exact: true })).toBeVisible();
+      assertReads(parity, 2);
       await attach(parity, info, 'shell-superadmin-tenantless', locale, width);
     });
     test('kit-conformance', async () => { await check.kitConformance(manifest); });
