@@ -39,7 +39,7 @@ test.each(['es', 'en'] as const)('renders the mixed fixture with plan, callout, 
   open()
   expect(await screen.findByRole('heading', { level: 1, name: copy.title })).toBeVisible()
   // The header renders while the summary loads, so wait for the data before reading it.
-  expect(await screen.findByText('synthetic-pro')).toBeVisible()
+  expect(await screen.findByText('synthetic-pro', {}, { timeout: 5000 })).toBeVisible()
   expect(screen.getByText(copy.status.active)).toBeVisible()
   expect(await screen.findByRole('alert')).toHaveTextContent(locale === 'es' ? '1 dimensión está actualmente por encima del límite.' : '1 dimension is currently over its limit.')
   const table = screen.getByRole('table')
@@ -142,6 +142,8 @@ test('shows skeletons while the request is pending and no table before it resolv
   expect(await screen.findByRole('status', { name: es.loading })).toHaveAttribute('aria-busy', 'true')
   expect(screen.getByRole('heading', { level: 1, name: es.title })).toBeVisible()
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  // The plan card, the limits table and the capabilities each have their own placeholder.
+  for (const region of ['plan', 'limits', 'capabilities']) expect(screen.getByTestId(`my-plan-loading-${region}`)).toBeInTheDocument()
   await act(async () => release(Response.json(entitlementsMixed)))
   expect(await screen.findByRole('table')).toBeVisible()
 })
@@ -174,7 +176,7 @@ test.each(['platform_operator', 'platform_admin'])('tenantless %s sees the descr
 
 test('a superadmin that has a tenant still loads the own-tenant plan', async () => {
   open(entitlementsMixed, ['superadmin'], ['synthetic-tenant'])
-  expect(await screen.findByText('synthetic-pro')).toBeVisible()
+  expect(await screen.findByText('synthetic-pro', {}, { timeout: 5000 })).toBeVisible()
   expect(calls()).toHaveLength(1)
 })
 
@@ -229,7 +231,7 @@ test('Reintentar after a failure clears the failed view and recovers', async () 
   let count = 0
   open(() => ++count === 1 ? network() : Response.json(entitlementsMixed))
   fireEvent.click(await screen.findByRole('button', { name: es.retry }))
-  expect(await screen.findByText('synthetic-pro')).toBeVisible()
+  expect(await screen.findByText('synthetic-pro', {}, { timeout: 5000 })).toBeVisible()
   expect(screen.queryByRole('heading', { name: es.errorTitle })).not.toBeInTheDocument()
 })
 

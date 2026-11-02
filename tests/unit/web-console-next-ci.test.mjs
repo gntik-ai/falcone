@@ -58,6 +58,19 @@ test('the next-console CSP step builds both bases and enforces the dist and Chro
   assert.match(step.run, /VITE_BASE_PATH="\$base".*web-console-next test:csp/);
 });
 
+test('the next-console job runs the overview, allocation and plan parity journeys under /next/', () => {
+  const job = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs['web-console-next'];
+  const names = job.steps.map((step) => step.name);
+  const step = job.steps.find((step) => step.name === 'Test overview, allocation and plan parity journeys under /next/');
+  assert.ok(step, 'The /next/ parity journeys must be an enforced step');
+  assert.equal(step.if, undefined);
+  assert.equal(step['continue-on-error'], undefined);
+  assert.ok(names.indexOf(step.name) > names.indexOf('Test authenticated next-console shell'));
+  assert.ok(names.indexOf(step.name) < names.indexOf('Build the next release SPA'));
+  assert.match(step.run, /VITE_BASE_PATH=\/next\/ .*playwright test --config tests\/parity\/playwright.config.mjs/);
+  for (const spec of ['overview', 'console-tenant-allocation-summary-page', 'console-tenant-plan-overview-page']) assert.ok(step.run.includes(`pages/${spec}.spec.mjs`), spec);
+});
+
 test('the shell step enforces release exclusion, fixture build and browser tests without changing legacy CI', () => {
   const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
   const job = ci.jobs['web-console-next'];

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button, EmptyState, I18nProvider, Link, Page, Tabs, TabsList, TabsPanel, TabsTab, Text } from '@gntik-ai/ui'
-import { ErrorPanel, NoAccessEmpty, NotFoundEmpty, PageHeader, TableSkeleton } from '@gntik-ai/blocks'
+import { ErrorPanel, NoAccessEmpty, ListSkeleton, NotFoundEmpty, PageHeader, TableSkeleton } from '@gntik-ai/blocks'
 import type { ApiError } from '@in-falcone/console-api/http'
 import i18n from '../i18n'
 import { useSession } from '../shell/session'
@@ -95,7 +95,11 @@ function TenantPlanOverview() {
           onClick={() => { if (inFlight.current) return; retryRequested.current = true; inFlight.current = true; setAttempt((value) => value + 1) }}>{t(loading ? 'retrying' : 'retry')}</Button>
       </div>
       : loading || failure?.status === 401 || !data ? <section role="status" aria-label={t('loading')} aria-busy={true}>
-        <Text>{t('loadingDescription')}</Text><div aria-hidden={true}><TableSkeleton rows={4} columns={5} label={t('loading')} className="min-w-0" /></div>
+        <Text>{t('loadingDescription')}</Text><div aria-hidden={true} className="min-w-0 space-y-6">
+          <div data-testid="my-plan-loading-plan"><ListSkeleton rows={1} label={t('loading')} className="min-w-0" /></div>
+          <div data-testid="my-plan-loading-limits"><TableSkeleton rows={4} columns={5} label={t('loading')} className="min-w-0" /></div>
+          <div data-testid="my-plan-loading-capabilities"><ListSkeleton rows={3} label={t('loading')} className="min-w-0" /></div>
+        </div>
       </section>
       : <Tabs value={tab} defaultValue={undefined} variant="underline" orientation="horizontal" onValueChange={(value) => setTab(String(value))} className="min-w-0">
         <TabsList activateOnFocus={true} indicator={false} fullWidth={false} aria-label={t('tabs')} className="flex max-w-full flex-wrap">
