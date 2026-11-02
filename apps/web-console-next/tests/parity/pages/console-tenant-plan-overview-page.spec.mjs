@@ -86,6 +86,17 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.page.keyboard.press('ArrowLeft');
       await expect(surface(parity).getByRole('table')).toBeVisible();
       assertReads(parity, 2);
+      await open(parity, ['my-plan-entitlements-network', { variant: 'success', delayMs: 1000 }]);
+      await expect(surface(parity).getByText(copy.networkDescription, { exact: true })).toBeVisible();
+      await expect(surface(parity).getByRole('table')).toHaveCount(0);
+      assertReads(parity, 3);
+      await check.assertLocale(parity);
+      await keyboardActivate(parity.page, surface(parity).getByRole('button', { name: copy.retry, exact: true }));
+      await expect(surface(parity).getByRole('button', { name: copy.retrying, exact: true })).toBeFocused();
+      await expect(surface(parity).getByRole('table')).toBeVisible();
+      await expect(surface(parity).getByRole('heading', { name: copy.title, level: 1 })).toBeFocused();
+      await expect(surface(parity).getByText(copy.networkDescription, { exact: true })).toHaveCount(0);
+      assertReads(parity, 4);
       const before = calls(parity).length;
       await openTenantless(parity, server, 'shell-superadmin-tenantless');
       await keyboardActivate(parity.page, surface(parity).getByRole('link', { name: copy.catalogue }));

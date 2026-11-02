@@ -211,14 +211,39 @@ test.each(['es', 'en'] as const)('500 retry is identical, retains pending focus 
   expect(calls()).toHaveLength(3)
 })
 
-test('network failure shows translated retry without stale data or private exception copy', async () => {
-  open(() => { throw new TypeError('PRIVATE_MARKER') })
-  await screen.findByRole('button', { name: es.retry })
-  expect(screen.getByText(es.networkDescription)).toBeVisible()
+test.each(['es', 'en'] as const)('network retry sends the identical read, retains pending focus and recovers in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
+  let release!: () => void
+  let count = 0
+  open(async () => {
+    if (++count === 1) throw new TypeError('PRIVATE_MARKER')
+    await new Promise<void>((resolve) => { release = resolve })
+    return Response.json(myPlanMixed)
+  })
+  const retry = await screen.findByRole('button', { name: copy.retry })
+  expect(screen.getByText(copy.networkDescription)).toBeVisible()
   expect(screen.queryByText('synthetic-growth')).not.toBeInTheDocument()
-  expect(screen.queryByText(es.requestId)).not.toBeInTheDocument()
+  expect(screen.queryByText(copy.requestId)).not.toBeInTheDocument()
   expect(document.body).not.toHaveTextContent('PRIVATE_MARKER')
   expect(calls()).toHaveLength(1)
+  const initial = calls()[0]
+  retry.focus(); fireEvent.click(retry)
+  expect(await screen.findByRole('button', { name: copy.retrying })).toBe(retry)
+  expect(retry).toHaveFocus()
+  expect(retry).toHaveAttribute('aria-disabled', 'true')
+  expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  await waitFor(() => expect(release).toBeTypeOf('function'))
+  expect(calls()).toHaveLength(2)
+  const repeated = calls()[1]
+  expect({ url: repeated[0], method: repeated[1]?.method, body: repeated[1]?.body })
+    .toEqual({ url: initial[0], method: initial[1]?.method, body: initial[1]?.body })
+  await act(async () => release())
+  expect(await screen.findByRole('table', { name: copy.tableTitle })).toBeVisible()
+  await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: copy.title })).toHaveFocus())
+  expect(screen.queryByRole('button', { name: copy.retry })).not.toBeInTheDocument()
+  expect(screen.queryByText(copy.networkDescription)).not.toBeInTheDocument()
+  expect(calls()).toHaveLength(2)
 })
 
 function Location() { return <output aria-label="Location">{useLocation().pathname}</output> }
