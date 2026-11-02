@@ -50,3 +50,16 @@ test.fails('an error thrown with fake timers left enabled is still reported as a
   vi.useFakeTimers()
   throw new Error('synthetic failure')
 })
+
+
+test.fails('a throwing pending fake timer is reported and leaves a real timer pending', () => {
+  setTimeout(() => { fired.push('real-after-throw') }, 40)
+  vi.useFakeTimers()
+  setTimeout(() => { throw new Error('synthetic timer failure') }, 10)
+})
+
+test('real timer left pending behind a throwing fake timer does not run after teardown', async () => {
+  await wait(120)
+  expect(fired).not.toContain('real-after-throw')
+  expect(vi.isFakeTimers()).toBe(false)
+})

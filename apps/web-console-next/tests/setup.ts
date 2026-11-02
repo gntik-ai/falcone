@@ -31,15 +31,19 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
-  cleanup()
-  if (vi.isFakeTimers()) {
-    // Run what the test left pending while the environment is alive, then hand back the real timers.
-    act(() => { vi.runOnlyPendingTimers() })
-    vi.useRealTimers()
+  try {
+    cleanup()
+    if (vi.isFakeTimers()) {
+      // Run what the test left pending while the environment is alive, then hand back the real timers.
+      act(() => { vi.runOnlyPendingTimers() })
+    }
+  } finally {
+    // Restoration must survive a throwing callback; the original error still propagates.
+    if (vi.isFakeTimers()) vi.useRealTimers()
+    // Real timers still pending after unmount are cancelled; nothing is awaited, so the suite pays no extra time.
+    for (const timer of pendingTimers) realClearTimeout(timer)
+    pendingTimers.clear()
+    globalThis.setTimeout = realSetTimeout
+    setConsoleSessionRetryUnauthorizedHandler(null)
   }
-  // Real timers still pending after unmount are cancelled; nothing is awaited, so the suite pays no extra time.
-  for (const timer of pendingTimers) realClearTimeout(timer)
-  pendingTimers.clear()
-  globalThis.setTimeout = realSetTimeout
-  setConsoleSessionRetryUnauthorizedHandler(null)
 })
