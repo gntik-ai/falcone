@@ -105,3 +105,16 @@ test('negative control: an inline script in a dist copy triggers CSP enforcement
     expect(await page.evaluate(() => window.inlineControlExecuted)).toBeUndefined();
   } finally { await negative.close(); }
 });
+
+test('the Mi plan read is matched exactly; any other query on its path is reported unmatched', async ({ page }) => {
+  const unmatched = await installSession(page);
+  await page.goto(server.url('tests/csp/index.html'));
+  const results = await page.evaluate(async () => {
+    const read = async (search) => {
+      try { return (await fetch(`/v1/tenant/plan/effective-entitlements${search}`)).status; } catch { return 'aborted'; }
+    };
+    return [await read('?include=consumption'), await read('?include=consumption&x=1'), await read('')];
+  });
+  expect(results).toEqual([200, 'aborted', 'aborted']);
+  expect(unmatched).toEqual(['GET /v1/tenant/plan/effective-entitlements?include=consumption&x=1', 'GET /v1/tenant/plan/effective-entitlements']);
+});

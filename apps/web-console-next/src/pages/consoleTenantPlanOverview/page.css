@@ -1,0 +1,11 @@
+/* Long dimension names and capability labels wrap inside their cells instead of widening the page. */
+.console-tenant-plan-overview table th, .console-tenant-plan-overview table td { overflow-wrap: anywhere; vertical-align: top; }
+/* Compose the kit table as stacked label/value cards below its tablet breakpoint. */
+.plan-overview-limits table { width: 100%; table-layout: fixed; }
+.plan-overview-limits td { white-space: normal; }
+@media (max-width: 767px) {
+  .plan-overview-limits table, .plan-overview-limits tbody { display: block; }
+  .plan-overview-limits thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .plan-overview-limits tbody tr { display: block; margin-bottom: 1rem; }
+  .plan-overview-limits tbody td { display: block; width: 100%; }
+}

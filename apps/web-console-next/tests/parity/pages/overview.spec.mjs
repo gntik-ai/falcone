@@ -1,11 +1,15 @@
 import { createHash } from 'node:crypto';
 import manifest from './overview.manifest.ts';
+import { overviewEndpoints } from './console-tenant-plan-overview-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import es from '../../../src/locales/es/pages.console-overview-page.json' with { type: 'json' };
 import en from '../../../src/locales/en/pages.console-overview-page.json' with { type: 'json' };
+import myPlanEs from '../../../src/locales/es/pages.console-tenant-plan-overview-page.json' with { type: 'json' };
+import myPlanEn from '../../../src/locales/en/pages.console-tenant-plan-overview-page.json' with { type: 'json' };
 
 const copy = (parity) => parity.locale === 'es' ? es : en;
+const myPlanCopy = (parity) => parity.locale === 'es' ? myPlanEs : myPlanEn;
 const overview = (parity) => parity.page.locator('.console-overview');
 const variants = (variant) => ({ tenants: variant, tenant: variant });
 const summaries = { tenants: 'overview-summaries', tenant: 'overview-summaries' };
@@ -68,7 +72,7 @@ async function assertNoPageRequests(parity) {
 
 for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`overview | ${role} | ${locale} | ${width}`, () => {
-    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: { 'flows.list': { method: 'GET', path: '/v1/flows/workspaces/synthetic-workspace/flows', fixtures: { success: { status: 200, body: { items: [] } } } } } });
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: { 'flows.list': { method: 'GET', path: '/v1/flows/workspaces/synthetic-workspace/flows', fixtures: { success: { status: 200, body: { items: [] } } } }, ...overviewEndpoints } });
     test.beforeEach(async ({ parity }) => {
       const open = parity.open.bind(parity);
       parity.open = async (route, selected = {}) => {
@@ -130,11 +134,13 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       for (const key of quickLinks) {
         await parity.open(manifest.route);
         const link = overview(parity).getByRole('link', { name: copy(parity).quick[key].label, exact: true });
-        if (key === 'flows') {
-          await expect(link).toHaveAttribute('href', new URL(server.url('console/flows')).pathname);
+        if (key === 'flows' || key === 'my-plan') {
+          // Migrated destinations navigate client-side under the router basename.
+          await expect(link).toHaveAttribute('href', new URL(server.url(`console/${key}`)).pathname);
           await link.focus(); await parity.page.keyboard.press('Enter');
-          await expect(parity.page.getByTestId('console-flows-page')).toBeVisible();
-          await expect(parity.page).toHaveURL(server.url('console/flows'));
+          if (key === 'flows') await expect(parity.page.getByTestId('console-flows-page')).toBeVisible();
+          else await expect(parity.page.getByRole('heading', { level: 1, name: myPlanCopy(parity).title, exact: true })).toBeVisible();
+          await expect(parity.page).toHaveURL(server.url(`console/${key}`));
           await check.assertRuntimeHealth(parity);
           continue;
         }

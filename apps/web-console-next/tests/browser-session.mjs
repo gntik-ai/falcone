@@ -33,6 +33,9 @@ export async function installSession(page, roles = ['superadmin']) {
     const url = new URL(route.request().url());
     if (route.request().method() === 'GET' && url.pathname === '/v1/tenants' && url.search === '?page%5Bsize%5D=100&sort=displayName') {
       await route.fulfill({ json: { items: [], page: { after: null } } });
+    } else if (route.request().method() === 'GET' && url.pathname === '/v1/tenant/plan/effective-entitlements' && url.search === '?include=consumption') {
+      // Exact own-tenant read of Mi plan; any other query on this path stays unmatched.
+      await route.fulfill({ json: { tenantId: 'synthetic-tenant', planSlug: 'synthetic-plan', planStatus: 'active', quantitativeLimits: [], capabilities: [] } });
     } else if (route.request().method() === 'GET' && /^\/v1\/workspaces\/[^/]+\/docs$/.test(url.pathname) && !url.search) {
       await route.fulfill({ json: {
         workspaceId: decodeURIComponent(url.pathname.split('/')[3]), tenantId: 'synthetic-tenant',
