@@ -38,7 +38,8 @@ test.each(['es', 'en'] as const)('renders the mixed fixture with plan, callout, 
   const copy = locale === 'es' ? es : en
   open()
   expect(await screen.findByRole('heading', { level: 1, name: copy.title })).toBeVisible()
-  expect(screen.getByText('synthetic-pro')).toBeVisible()
+  // The header renders while the summary loads, so wait for the data before reading it.
+  expect(await screen.findByText('synthetic-pro')).toBeVisible()
   expect(screen.getByText(copy.status.active)).toBeVisible()
   expect(await screen.findByRole('alert')).toHaveTextContent(locale === 'es' ? '1 dimensión está actualmente por encima del límite.' : '1 dimension is currently over its limit.')
   const table = screen.getByRole('table')
