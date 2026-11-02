@@ -378,7 +378,10 @@ test('an assignment 404 names the plan and Volver a elegir plan re-requests only
   setup({ [`POST ${planUrl}`]: () => fail(404), [`GET ${plansUrl}`]: sequence(ok(plansBody()), ok(plansBody(activePlansWithoutTeam))) })
   open(); const dialog = await dialogReady()
   await choose(es.dialog.activePlan, 'Synthetic Team'); confirm()
-  expect(await within(dialog).findByRole('heading', { name: 'No se encontró la organización o el plan Synthetic Team' })).toBeVisible()
+  const notFound = await within(dialog).findByRole('heading', { name: 'No se encontró la organización o el plan Synthetic Team' })
+  expect(notFound).toBeVisible()
+  // The heading sits in a live region so assistive technology announces the failure.
+  expect(notFound.closest('[role="alert"]')).not.toBeNull()
   expect(within(dialog).queryByRole('button', { name: es.retry })).not.toBeInTheDocument()
   const before = all().length
   fireEvent.click(within(dialog).getByRole('button', { name: es.assign.chooseAgain }))

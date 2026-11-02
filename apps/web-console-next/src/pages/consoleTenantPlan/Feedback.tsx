@@ -20,12 +20,13 @@ export function FailureSurface({ scope, failure, retrying, onRetry, notFoundActi
   hideRetry?: boolean
 }) {
   const { t } = useTranslation('pages.console-tenant-plan-page')
+  // The empty states carry no live region of their own, so the wrapper announces their heading when the failure appears.
   if (failure.status === 403) {
-    return <NoAccessEmpty resource={t('title')} owner="" showRequestAccess={false} onRequestAccess={undefined} action={undefined} defaultRequested={false} titleAs={titleAs} bordered={false} className="min-w-0"
-      labels={{ title: () => t(`${scope}.noAccessTitle`, values), description: () => t(`${scope}.noAccessDescription`, values), request: '', requested: '', sent: '' }} />
+    return <div role="alert" className="min-w-0"><NoAccessEmpty resource={t('title')} owner="" showRequestAccess={false} onRequestAccess={undefined} action={undefined} defaultRequested={false} titleAs={titleAs} bordered={false} className="min-w-0"
+      labels={{ title: () => t(`${scope}.noAccessTitle`, values), description: () => t(`${scope}.noAccessDescription`, values), request: '', requested: '', sent: '' }} /></div>
   }
   if (failure.status === 404) {
-    return <NotFoundEmpty icon={undefined} title={t(`${scope}.notFoundTitle`, values)} description={t(`${scope}.notFoundDescription`, values)} action={notFoundAction} titleAs={titleAs} bordered={false} className="min-w-0" />
+    return <div role="alert" className="min-w-0"><NotFoundEmpty icon={undefined} title={t(`${scope}.notFoundTitle`, values)} description={t(`${scope}.notFoundDescription`, values)} action={notFoundAction} titleAs={titleAs} bordered={false} className="min-w-0" /></div>
   }
   const title = t(`${scope}.errorTitle`)
   const message = t(failure.status ? `${scope}.errorMessage` : `${scope}.networkMessage`)

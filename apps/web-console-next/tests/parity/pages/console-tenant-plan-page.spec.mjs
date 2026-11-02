@@ -71,6 +71,8 @@ function configure(parity, overrides = {}) {
   state.attempts = {};
   parity.network.requests.length = 0;
 }
+// Restarts the response sequence of one request kind, e.g. so a fixture list begins at its first entry.
+const restartSequence = (parity, kind) => { delete states.get(parity).attempts[kind]; };
 async function open(parity, overrides = {}, shell = {}) {
   configure(parity, overrides);
   await parity.open(manifest.route, { tenants: 'empty', ...shell });
@@ -149,6 +151,15 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       const c = copy(parity);
       await open(parity, { history: 'page2-delayed', plans: 'loading', plan: 'tenant-plan-reassigned', assign: 'tenant-plan-assign-delayed' });
       await summaryReady(parity);
+      // The catalogue answers late: the field shows its loading state with the select and Confirmar disabled.
+      // This runs before the delayed history page so the catalogue is still pending.
+      await openDialog(parity);
+      await expect(dialog(parity).getByText(c.dialog.loadingPlans, { exact: true })).toBeVisible();
+      await expect(planSelect(parity)).toBeDisabled();
+      await expect(button(parity, c.dialog.confirm)).toBeDisabled();
+      await expect(planSelect(parity)).toBeEnabled();
+      await button(parity, c.dialog.cancel).click();
+      await expect(dialog(parity)).toHaveCount(0);
       // Page 2 of the history: skeleton while it loads, then its entries, with the exact query.
       await tab(parity, 'tabHistory').click();
       await expect(entries(parity)).toHaveCount(20);
@@ -156,11 +167,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(parity.page.getByRole('status', { name: c.loadingHistory, exact: true })).toBeVisible();
       await expect(parity.page.getByText('synthetic-admin-21', { exact: false }).first()).toBeVisible();
       expect(planRequests(parity, 'GET', historyPath()).at(-1)).toEqual({ method: 'GET', path: `${historyPath()}${historySearch(2)}`, body: undefined });
-      // The catalogue answers late: the field shows its loading state with the select and Confirmar disabled.
+      await tab(parity, 'tabSummary').click();
       await openDialog(parity);
-      await expect(dialog(parity).getByText(c.dialog.loadingPlans, { exact: true })).toBeVisible();
-      await expect(planSelect(parity)).toBeDisabled();
-      await expect(button(parity, c.dialog.confirm)).toBeDisabled();
       await expect(planSelect(parity)).toBeEnabled();
       await expect(planSelect(parity)).toContainText('Synthetic Pro');
       await chooseOption(parity, 'Synthetic Team');
@@ -344,6 +352,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await openAssignment(parity, { assign: '404' });
       await expect(heading(parity, c.assign.notFoundTitle.replace('{plan}', 'Synthetic Team'))).toBeVisible();
       await check.assertAccessibility(parity);
+      // The not-found heading sits in a live region, so the failure is announced while focus moves to the recovery action.
+      await expect(dialog(parity).locator('[role="alert"]').getByRole('heading', { name: c.assign.notFoundTitle.replace('{plan}', 'Synthetic Team'), exact: true })).toBeVisible();
       await expect(button(parity, c.assign.chooseAgain)).toBeFocused();
       await button(parity, c.assign.chooseAgain).click();
       await expect(planSelect(parity)).toBeFocused();
@@ -387,7 +397,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(heading(parity, c.history.errorTitle)).toBeVisible();
       variants(parity, { history: 'success' });
       await button(parity, c.retry).click();
-      await expect(entries(parity)).toHaveCount(20);
+      // The last page of the 45-entry fixture holds 5 entries.
+      await expect(entries(parity)).toHaveCount(5);
+      await expect(parity.page.getByText(locale === 'es' ? '41-45 de 45' : '41-45 of 45', { exact: true })).toBeVisible();
       await open(parity, { plans: '500' });
       await openDialog(parity);
       await expect(heading(parity, c.plans.errorTitle)).toBeVisible();
@@ -401,7 +413,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       variants(parity, { plans: 'without-selected-plan' });
       await button(parity, c.assign.chooseAgain).click();
       await expect(planSelect(parity)).toBeEnabled();
+      // The 404 consumed the first POST response; restart the sequence so this POST fails and the retry recovers.
       variants(parity, { assign: 'tenant-plan-assign-retry-200' });
+      restartSequence(parity, 'assign');
       await button(parity, c.dialog.confirm).click();
       await expect(heading(parity, c.assign.errorTitle)).toBeVisible();
       await button(parity, c.retry).click();
