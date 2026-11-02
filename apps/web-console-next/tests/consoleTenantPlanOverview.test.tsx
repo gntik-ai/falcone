@@ -83,6 +83,7 @@ test('missing effectiveValue renders Sin límite and unknown usage Datos no disp
   expect(within(table).getByText('x')).toBeVisible()
   expect(within(table).getByText(es.unlimited)).toBeVisible()
   expect(within(table).getByText(es.unlimitedUsage.replace('{used}', es.dash))).toBeVisible()
+  expect(within(table).getByText(es.noData)).toBeVisible()
   expect(within(table).queryByRole('meter')).not.toBeInTheDocument()
 })
 

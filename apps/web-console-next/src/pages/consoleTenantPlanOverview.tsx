@@ -26,7 +26,12 @@ function Consumption({ row }: { row: QuantitativeLimit }) {
   const used = row.currentUsage ?? null
   const name = row.displayLabel ?? row.dimensionKey
   // Legacy ConsumptionBar: unlimited shows the raw usage, unknown usage shows no data.
-  if (limit === -1) return <Text as="span">{t('unlimitedUsage', { used: used ?? t('dash') })}</Text>
+  if (limit === -1) {
+    return <div className="min-w-0 space-y-1">
+      <Text as="span">{t('unlimitedUsage', { used: used ?? t('dash') })}</Text>
+      {row.usageStatus === 'unknown' && <Text as="span" tone="muted" className="block">{t('noData')}</Text>}
+    </div>
+  }
   if (used === null) return <Text as="span" tone="muted">{t('noData')}</Text>
   const over = limit > 0 && used >= limit
   const label = limit > 0 ? t('usageOf', { used, limit }) : t('usageZeroLimit', { used })

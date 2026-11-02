@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import manifest, { entitlementsMixed, overviewUrl } from './console-tenant-plan-overview-page.manifest.ts';
+import { allocationEndpoints } from './console-tenant-allocation-summary-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 
@@ -51,7 +52,7 @@ async function tenantless(parity, server, platformRole) {
 
 for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`console-tenant-plan-overview-page | ${role} | ${locale} | ${width}`, () => {
-    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: { ...manifest.endpoints, ...allocationEndpoints } });
     const copy = bundles[locale];
     test('data', async ({ parity }) => {
       await open(parity, 'my-plan-entitlements-mixed');
