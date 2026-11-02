@@ -71,6 +71,8 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       // No billing chrome, toggle or kit sample value.
       await expect(page).not.toContainText(/[$€]|renew|renov|monthly|mensual|annual|anual|Acme|Recent activity/i);
       await expect(page.getByRole('switch')).toHaveCount(0);
+      // The locale scan covers the populated Summary before the tab changes.
+      await check.assertLocale(parity);
       await page.getByRole('tab', { name: copy.tabHistory, exact: true }).click();
       await expect(page.getByRole('heading', { name: copy.historyEmptyTitle, exact: true })).toBeVisible();
       await assertRequests(parity, 1);
@@ -119,6 +121,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         }
         if (state.variant === '500') await expect(surface(parity).getByText('req_synthetic_my_plan_500', { exact: true })).toBeVisible();
         if (['500', 'network'].includes(state.variant)) await expect(surface(parity).getByRole('button', { name: copy.retry, exact: true })).toBeVisible();
+        if (['500', 'network'].includes(state.variant)) await expect(surface(parity).getByRole('alert')).toHaveText(`${copy.errorTitle}. ${state.variant === 'network' ? copy.networkMessage : copy.errorMessage}`);
         if (state.variant === 'network') await expect(surface(parity).getByText(copy.requestId, { exact: true })).toHaveCount(0);
       }
       await open(parity, 'my-plan-entitlements-no-limits');
@@ -173,6 +176,9 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await expect(meter).toHaveAttribute('aria-label', /.+/);
         await expect(meter).toHaveAttribute('aria-valuetext', /.+/);
       }
+      // The mixed Summary, with its populated limits and capabilities, is scanned before the tab changes.
+      await check.assertAccessibility(parity);
+      await check.assertLocale(parity);
       const summary = surface(parity).getByRole('tab', { name: copy.tabSummary, exact: true });
       const history = surface(parity).getByRole('tab', { name: copy.tabHistory, exact: true });
       await summary.focus(); await parity.page.keyboard.press('ArrowRight');

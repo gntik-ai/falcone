@@ -84,8 +84,11 @@ function TenantPlanOverview() {
         labels={{ title: () => t('noAccessTitle'), description: () => t('noAccessDescription'), request: '', requested: '', sent: '' }} /></div>
       : failure?.status === 404 ? <div role="alert" className="min-w-0"><NotFoundEmpty icon={undefined} title={t('notFoundTitle')} description={t('notFoundDescription')} action={overview} titleAs="h2" bordered={false} /></div>
       : retryable ? <div className="min-w-0 space-y-3" data-testid="my-plan-error">
+        {/* The pinned ErrorPanel announces neither its message nor retry progress, so the page owns both live regions. */}
+        <p role="alert" className="sr-only">{`${t('errorTitle')}. ${message}`}</p>
+        <p role="status" className="sr-only">{loading ? t('retrying') : ''}</p>
         <ErrorPanel title={t('errorTitle')} message={message} code={failure.status ?? null} requestId={failure.requestId ?? ''} details=""
-          onRetry={undefined} retrying={false} retryLabel={t('retry')} secondaryAction={null} titleAs="h2" announce={true}
+          onRetry={undefined} retrying={false} retryLabel={t('retry')} secondaryAction={null} titleAs="h2" announce={false}
           labels={{ title: t('errorTitle'), message, support: '', retry: t('retry'), retrying: t('retrying'), retryingStatus: t('retrying'),
             requestId: t('requestId'), copyRequestId: t('copyRequestId'), copied: t('copied'), requestIdCopied: t('copied'), details: t('details') }} />
         <Button ref={retry} type="button" variant="secondary" aria-disabled={loading} aria-busy={loading}
