@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { myPlanEndpoints } from './console-tenant-plan-overview-page.manifest.ts';
 import manifest, { allocationMixed } from './console-tenant-allocation-summary-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
@@ -49,7 +50,7 @@ async function tenantless(parity, server) {
 
 for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`console-tenant-allocation-summary-page | ${role} | ${locale} | ${width}`, () => {
-    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: { ...manifest.endpoints, ...myPlanEndpoints } });
     const copy = bundles[locale];
     test('data', async ({ parity }) => {
       await open(parity, 'allocation-summary-mixed');
@@ -67,7 +68,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await assertRequests(parity, 1);
       await check.assertLocale(parity);
     });
-    test('action', async ({ parity }) => {
+    test('action', async ({ parity, server }) => {
       await open(parity, ['500', 'success']);
       await surface(parity).getByRole('button', { name: copy.retry, exact: true }).click();
       await expect(surface(parity).getByRole('table')).toBeVisible();
@@ -86,15 +87,11 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       expect(tokens).toEqual(['Bearer synthetic-access-token', 'Bearer synthetic-refreshed-access-token']);
       parity.page.off('request', observe);
       const back = surface(parity).getByRole('link', { name: copy.myPlan, exact: true });
-      await expect(back).toHaveAttribute('href', '/console/my-plan');
-      // Capture Enter's default navigation before deliberately containing the legacy exit.
-      await parity.page.evaluate(() => document.body.addEventListener('click', (event) => {
-        if (event.target.closest('a')?.getAttribute('href') === '/console/my-plan') {
-          window.__allocationBackPrevented = event.defaultPrevented; event.preventDefault();
-        }
-      }));
+      await expect(back).toHaveAttribute('href', new URL(server.url('console/my-plan')).pathname);
+      await parity.page.evaluate(() => { window.__allocationBackDocument = true; });
       await keyboardActivate(parity.page, back);
-      expect(await parity.page.evaluate(() => window.__allocationBackPrevented)).toBe(false);
+      await expect(parity.page.locator('.plan-overview table')).toBeVisible();
+      expect(await parity.page.evaluate(() => window.__allocationBackDocument)).toBe(true);
     });
     test('error-empty', async ({ parity, server }) => {
       for (const state of manifest.states) {
@@ -104,7 +101,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         if (state.variant === '404') {
           const links = surface(parity).getByRole('link', { name: copy.myPlan, exact: true });
           await expect(links).toHaveCount(2);
-          for (const link of await links.all()) await expect(link).toHaveAttribute('href', '/console/my-plan');
+          for (const link of await links.all()) await expect(link).toHaveAttribute('href', new URL(server.url('console/my-plan')).pathname);
         }
         if (state.variant === '500') await expect(surface(parity).getByText('req_synthetic_alloc_500', { exact: true })).toBeVisible();
         if (state.variant === 'network') {

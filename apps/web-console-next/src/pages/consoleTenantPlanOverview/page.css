@@ -1,0 +1,9 @@
+/* Keep all five quota values readable as labelled rows below the tablet breakpoint. */
+.my-plan-limits table { width: 100%; table-layout: fixed; }
+.my-plan-limits th, .my-plan-limits td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+@media (max-width: 767px) {
+  .my-plan-limits table, .my-plan-limits tbody { display: block; }
+  .my-plan-limits thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .my-plan-limits tbody tr { display: block; margin-bottom: 1rem; }
+  .my-plan-limits tbody td { display: block; width: 100%; }
+}

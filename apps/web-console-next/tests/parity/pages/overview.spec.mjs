@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import manifest from './overview.manifest.ts';
+import { myPlanEndpoints } from './console-tenant-plan-overview-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import es from '../../../src/locales/es/pages.console-overview-page.json' with { type: 'json' };
@@ -68,7 +69,7 @@ async function assertNoPageRequests(parity) {
 
 for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`overview | ${role} | ${locale} | ${width}`, () => {
-    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: { 'flows.list': { method: 'GET', path: '/v1/flows/workspaces/synthetic-workspace/flows', fixtures: { success: { status: 200, body: { items: [] } } } } } });
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: { ...myPlanEndpoints, 'flows.list': { method: 'GET', path: '/v1/flows/workspaces/synthetic-workspace/flows', fixtures: { success: { status: 200, body: { items: [] } } } } } });
     test.beforeEach(async ({ parity }) => {
       const open = parity.open.bind(parity);
       parity.open = async (route, selected = {}) => {
@@ -135,6 +136,15 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
           await link.focus(); await parity.page.keyboard.press('Enter');
           await expect(parity.page.getByTestId('console-flows-page')).toBeVisible();
           await expect(parity.page).toHaveURL(server.url('console/flows'));
+          await check.assertRuntimeHealth(parity);
+          continue;
+        }
+        if (key === 'my-plan') {
+          await expect(link).toHaveAttribute('href', new URL(server.url('console/my-plan')).pathname);
+          await link.focus(); await parity.page.keyboard.press('Enter');
+          await expect(parity.page).toHaveURL(server.url('console/my-plan'));
+          await expect(parity.page.locator('.plan-overview h1')).toHaveText(locale === 'es' ? 'Mi plan' : 'My plan');
+          await expect(parity.page.locator('.plan-overview table')).toBeVisible();
           await check.assertRuntimeHealth(parity);
           continue;
         }
