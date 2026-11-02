@@ -496,6 +496,17 @@ jobs:
           SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/next/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
           VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
 
+      - name: Upload shell Playwright report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: shell-playwright-report
+          path: |
+            apps/web-console-next/test-results/shell-report
+            apps/web-console-next/test-results/shell-report.json
+            apps/web-console-next/test-results/shell
+          if-no-files-found: warn
+
       - name: Build the legacy release SPA
         run: pnpm --filter @in-falcone/web-console exec vite build
 
