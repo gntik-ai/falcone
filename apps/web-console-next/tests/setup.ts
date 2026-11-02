@@ -6,12 +6,12 @@ import { invalidateConsoleShellSession, setConsoleSessionRetryUnauthorizedHandle
 
 const realSetTimeout = globalThis.setTimeout
 const realClearTimeout = globalThis.clearTimeout
-const pendingTimers = new Set<ReturnType<typeof setTimeout>>()
+const pendingTimers = new Set<Parameters<typeof clearTimeout>[0]>()
 
 // Kit components may leave a timer running after unmount; it must not fire once jsdom is torn down.
 function trackRealTimers() {
-  globalThis.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
-    const timer = realSetTimeout(handler, timeout, ...args)
+  globalThis.setTimeout = ((...args: Parameters<typeof setTimeout>) => {
+    const timer = realSetTimeout(...args)
     pendingTimers.add(timer)
     return timer
   }) as typeof setTimeout
