@@ -47,8 +47,17 @@ export function AssignmentDialog({ tenantId, currentPlanId, plans, trigger, onBu
   }, [failure])
   useEffect(() => {
     if (!refocusSelect.current || plans.retrying || plans.phase === 'loading') return
-    refocusSelect.current = false
-    ;(plans.phase === 'ready' ? select.current : plansRetry.current)?.focus()
+    if (plans.phase !== 'ready') { refocusSelect.current = false; plansRetry.current?.focus(); return }
+    // The kit select drops its disabled attribute a render after the catalogue answers, and a disabled control cannot take focus.
+    let frame = 0
+    let tries = 0
+    const focusWhenEnabled = () => {
+      const target = select.current
+      if (target && !target.disabled) { refocusSelect.current = false; target.focus(); return }
+      if (++tries < 30) frame = requestAnimationFrame(focusWhenEnabled)
+    }
+    focusWhenEnabled()
+    return () => cancelAnimationFrame(frame)
   }, [plans.phase, plans.retrying, plans.data])
 
   const setBusyState = (value: boolean) => { setBusy(value); onBusyChange(value) }

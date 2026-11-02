@@ -6,6 +6,7 @@ import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
 import { installSession } from '../../browser-session.mjs';
+import { contextPanelLabel, forbiddenPlanCopy, planLocaleValues } from './console-tenant-plan-page.locale.ts';
 import es from '../../../src/locales/es/pages.console-tenant-plan-page.json' with { type: 'json' };
 import en from '../../../src/locales/en/pages.console-tenant-plan-page.json' with { type: 'json' };
 
@@ -112,8 +113,17 @@ async function openHistory(parity, overrides = {}) {
   await open(parity, overrides);
   await tab(parity, 'tabHistory').click();
 }
+// The shared locale check also scans the shell's context panel, whose kit copy is outside this page.
+async function assertPlanLocale(parity) {
+  await expect(parity.page.locator('html'), 'locale: document language').toHaveAttribute('lang', parity.locale);
+  const values = await parity.page.evaluate(planLocaleValues, await contextPanelLabel(parity.locale));
+  expect(values.length, 'locale: the tenant plan page must contain copy').toBeGreaterThan(0);
+  const forbidden = await forbiddenPlanCopy(parity.locale);
+  const bad = values.filter((text) => /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/.test(text) || (parity.locale === 'es' && forbidden.has(text)));
+  expect(bad, `locale: unexpected copy ${bad.join(', ')}`).toEqual([]);
+}
 async function snapshot(parity, info, name) {
-  await check.assertLocale(parity);
+  await assertPlanLocale(parity);
   const screenshot = await parity.page.screenshot({ fullPage: true, animations: 'disabled' });
   const digest = createHash('sha256').update(screenshot).digest('hex');
   await info.attach(`${name}-${parity.locale}-sha256-${digest}`, { body: screenshot, contentType: 'image/png' });
@@ -145,7 +155,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(entries(parity).first().getByRole('heading', { name: c.history.impactSummary })).toBeVisible();
       await expect(entries(parity).first().getByRole('table')).toHaveCount(2);
       await expect(entries(parity).first().getByText('Synthetic SSO', { exact: true })).toBeVisible();
-      await check.assertLocale(parity);
+      await assertPlanLocale(parity);
     });
     test('action', async ({ parity }) => {
       const c = copy(parity);
@@ -346,8 +356,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await openDialog(parity);
       await expect(planSelect(parity)).toBeEnabled();
       await check.assertAccessibility(parity);
-      for (let index = 0; index < 8; index++) await parity.page.keyboard.press('Tab');
-      expect(await parity.page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true);
+      // Focus cycles through the dialog controls and the dialog's own focus guards, and never settles on the page behind it.
+      // The guard hands focus back asynchronously, so each press is polled until focus has settled.
+      for (let index = 0; index < 8; index++) {
+        await parity.page.keyboard.press('Tab');
+        await expect.poll(() => parity.page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]') || document.activeElement?.hasAttribute('data-base-ui-focus-guard') === true), { message: `Tab ${index + 1} stays in the dialog` }).toBe(true);
+      }
       await button(parity, c.dialog.cancel).click();
       await expect(dialog(parity)).toHaveCount(0);
       await expect(trigger(parity)).toBeFocused();
@@ -376,7 +390,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       variants(parity, { history: '500-then-success' });
       await button(parity, c.retry).focus();
       await parity.page.keyboard.press('Enter');
-      await check.assertLocale(parity);
+      await assertPlanLocale(parity);
     });
     test('kit-conformance', async ({ parity }) => {
       await check.kitConformance(manifest);
@@ -386,7 +400,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(parity.page.locator('[data-slot="plan-card"], [class*="plan-card"]')).toHaveCount(0);
       await expect(parity.page.getByRole('switch')).toHaveCount(0);
       await expect(parity.page.locator('main')).not.toContainText(/[$€]/);
-      await check.assertLocale(parity);
+      await assertPlanLocale(parity);
     });
     test('runtime-health', async ({ parity }) => {
       const c = copy(parity);
