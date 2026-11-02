@@ -12,7 +12,7 @@ function ColumnLabel({ children }: { children: string }) {
   return <Text as="span" className="mb-1 block text-sm text-muted-foreground md:hidden">{children}</Text>
 }
 
-function Consumption({ row }: { row: EntitlementLimit }) {
+function ConsumptionBar({ row }: { row: EntitlementLimit }) {
   const { t, i18n } = useTranslation(ns)
   const number = (value: number) => new Intl.NumberFormat(i18n.language).format(value)
   const limit = row.effectiveValue ?? -1
@@ -27,7 +27,17 @@ function Consumption({ row }: { row: EntitlementLimit }) {
   return <div className="min-w-0 space-y-1">
     <Meter value={limit > 0 ? Math.min(used, limit) : over ? 1 : 0} min={0} max={limit > 0 ? limit : 1} size="sm" label={null} aria-label={t('usageName', { dimension: name })}
       aria-valuetext={valueText} valueLabel={label} hideValue={false} thresholds={{ warning: 80, destructive: 100 }} higherIsBetter={false} note={over ? t('usage.over_limit') : null} />
-    {row.usageStatus === 'unknown' && <Text as="span" tone="muted">{t('noData')}</Text>}
+  </div>
+}
+
+function Consumption({ row }: { row: EntitlementLimit }) {
+  const { t } = useTranslation(ns)
+  // Legacy shows the unavailable-data note for every unknown usageStatus, unlimited limits included;
+  // a bounded limit without usage already shows it in place of the meter.
+  const showNote = row.usageStatus === 'unknown' && !((row.effectiveValue ?? -1) !== -1 && (row.currentUsage ?? null) === null)
+  return <div className="min-w-0 space-y-1">
+    <ConsumptionBar row={row} />
+    {showNote && <Text as="span" tone="muted" className="block">{t('noData')}</Text>}
   </div>
 }
 

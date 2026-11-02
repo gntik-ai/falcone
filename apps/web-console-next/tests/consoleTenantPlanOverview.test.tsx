@@ -98,6 +98,16 @@ test('missing effectiveValue renders Sin límite and an unknown usage enum falls
   expect(within(table).getByRole('group', { name: 'max_x: estado Desconocido' })).toBeVisible()
 })
 
+test('unknown usage shows the unavailable-data note for unlimited, missing and bounded limits alike', async () => {
+  open({ ...entitlementsMixed, quantitativeLimits: [
+    { dimensionKey: 'max_a', displayLabel: 'Unlimited A', effectiveValue: -1, currentUsage: null, usageStatus: 'unknown' },
+    { dimensionKey: 'max_b', displayLabel: 'Missing B', currentUsage: null, usageStatus: 'unknown' },
+    { dimensionKey: 'max_c', displayLabel: 'Bounded C', effectiveValue: 5, currentUsage: null, usageStatus: 'unknown' }
+  ] as never, capabilities: [] })
+  await screen.findByRole('table')
+  for (const name of ['Unlimited A', 'Missing B', 'Bounded C']) expect(within(row(name)).getAllByText(es.noData)).toHaveLength(1)
+})
+
 test('empty capabilities show the translated copy while the plan, callout and limits stay rendered', async () => {
   open(entitlementsNoCapabilities)
   expect(await screen.findByRole('heading', { name: es.noCapabilities })).toBeVisible()
