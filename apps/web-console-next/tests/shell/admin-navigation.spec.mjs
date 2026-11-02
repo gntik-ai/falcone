@@ -130,11 +130,68 @@ for (const locale of ['en', 'es']) {
           expect(touchesEntry, `${violation.id} must not affect a new navigation entry`).toBe(false);
         }
       }
-      for (const width of [375, 768, 1280]) {
-        await assertResponsive({ page }, width);
-        await test.info().attach(`${locale}-${route.replace('/', '-')}-${width}`, { body: await page.screenshot(), contentType: 'image/png' });
-      }
     }
     expect(unmatched).toEqual([]);
   });
+
+  // Each width is measured with the menu opened at that width: a menu left open across a resize keeps its old
+  // popover position and would report a desktop-sized scrollWidth, so it is closed before every resize.
+  for (const [role, route, entry] of [
+    ['superadmin', 'console/overview', 'admin'], ['superadmin', 'admin', 'console'],
+    ['tenant_owner', 'console/overview', 'about'], ['tenant_owner', 'admin', null],
+  ]) {
+    test(`${role} has no horizontal overflow on ${route} at 375, 768 and 1280 px with the menu closed and opened at each width in ${locale}`, async ({ page }) => {
+      const widths = [375, 768, 1280];
+      const height = 900;
+      await page.setViewportSize({ width: widths[0], height });
+      const unmatched = await setup(page, locale, [role]);
+      await page.goto(server.url(route));
+      const label = entry && text[entry];
+      const trigger = page.getByRole('button', { name: text.trigger });
+      const adminLink = page.getByRole('link', { name: text.admin, exact: true });
+      const adminItem = page.getByRole('menuitem', { name: text.admin, exact: true });
+      const measure = () => page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+      for (const width of widths) {
+        await expect(page.getByRole('menu')).toHaveCount(0);
+        await page.setViewportSize({ width, height });
+        await expect(page.getByRole('main')).toBeVisible();
+        // Only a viewport that was set while the menu was closed counts as evidence for the opened state below.
+        expect(page.viewportSize()).toEqual({ width, height });
+        const tag = `${locale}-${role}-${route.replace('/', '-')}-${width}`;
+        const measured = { closed: await measure() };
+        await assertResponsive({ page }, width);
+        if (role === 'superadmin' && route === 'console/overview') {
+          await expect(adminLink).toBeVisible();
+          await expect(adminLink).toHaveAttribute('href', '/next/admin');
+        } else await expect(adminLink).toHaveCount(0);
+        await test.info().attach(`${tag}-closed`, { body: await page.screenshot(), contentType: 'image/png' });
+        if (entry) {
+          await trigger.click();
+          if (entry === 'about') {
+            await expect(page.getByRole('menuitem')).toHaveText([text.about, text.signOut]);
+            await expect(adminItem).toHaveCount(0);
+            await expect(page.getByRole('menuitem', { name: text.console, exact: true })).toHaveCount(0);
+          } else await expect(page.getByRole('menuitem', { name: label, exact: true })).toHaveAccessibleName(label);
+          const item = page.getByRole('menuitem', { name: label, exact: true });
+          await expect(item).toBeVisible();
+          // The popover position is not asserted, only that the item lies inside the viewport.
+          await expect(async () => {
+            const box = await item.boundingBox();
+            expect(box).not.toBeNull();
+            expect(box.x).toBeGreaterThanOrEqual(0);
+            expect(box.y).toBeGreaterThanOrEqual(0);
+            expect(box.x + box.width).toBeLessThanOrEqual(width);
+            expect(box.y + box.height).toBeLessThanOrEqual(height);
+          }).toPass();
+          measured.open = await measure();
+          await assertResponsive({ page }, width);
+          await test.info().attach(`${tag}-open`, { body: await page.screenshot(), contentType: 'image/png' });
+          await page.keyboard.press('Escape');
+          await expect(page.getByRole('menu')).toHaveCount(0);
+        } else await expect(trigger).toHaveCount(0);
+        await test.info().attach(`${tag}-sizes`, { body: JSON.stringify({ locale, role, route, width, ...measured }), contentType: 'application/json' });
+      }
+      expect(unmatched).toEqual([]);
+    });
+  }
 }
