@@ -64,6 +64,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     test('action', async ({ parity: p }) => {
       await open(p);
       expect(calls(p)).toEqual([{ method: 'GET', path: realtimePath, body: undefined }]);
+      expect(p.network.capabilityRequests).toEqual([{ method: 'GET', path: capabilitiesPath, body: undefined }]);
+      expect(p.network.allRequests).toHaveLength(p.network.requests.length + p.network.capabilityRequests.length);
       await p.page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => { window.__syntheticCopied = value; } } }));
       await surface(p).getByRole('button', { name: copy.copyEndpoint }).click();
       expect(await p.page.evaluate(() => window.__syntheticCopied)).toBe(ready.realtimeEndpointUrl);
@@ -115,7 +117,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await open(p); await check.assertRuntimeHealth(p);
       await open(p, { realtime: 'workspace-realtime-no-sources' });
       await surface(p).getByRole('link', { name: copy.provisioning }).click();
-      await expect(p.page).toHaveURL(/\/next\/console\/workspaces\/ws-1\/provisioning$/);
+      await expect(p.page).toHaveURL(server.url('console/workspaces/ws-1/provisioning'));
       await expect(p.page.locator('main h1')).toBeVisible();
       await p.page.goBack(); await expect(surface(p).getByRole('heading', { level: 1 })).toBeVisible();
       await check.assertRuntimeHealth(p);

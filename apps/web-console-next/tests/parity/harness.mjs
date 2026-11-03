@@ -15,7 +15,7 @@ export const test = base.extend({
     try { await use(server); } finally { await server.close(); }
   }, { scope: 'worker' }],
   parity: [async ({ page, server, role, locale, pageEndpoints, preserveLocale }, use) => {
-    const requests = [], unmatched = [], faults = [], injectedFailures = [];
+    const requests = [], capabilityRequests = [], allRequests = [], unmatched = [], faults = [], injectedFailures = [];
     const registry = createEndpointRegistry(endpoints, responseFor, pageEndpoints);
     await page.clock.setFixedTime(new Date('2026-06-01T12:00:00Z'));
     await page.exposeBinding('__parityFault', (_, message) => { faults.push(message); });
@@ -45,15 +45,20 @@ export const test = base.extend({
       const method = request.method(), path = url.pathname;
       let body;
       try { body = request.postDataJSON() ?? undefined; } catch { body = request.postData(); }
-      requests.push({ method, path: path + url.search, body });
+      const record = { method, path: path + url.search, body };
+      allRequests.push(record);
       const name = registry.find(method, path, body);
+      // Keep the new shell bootstrap separate from existing page request contracts.
+      // Every request still passes the registry and unmatched-request gate below.
+      if (name === 'capabilities' && url.origin === server.origin && !url.search && body === undefined) capabilityRequests.push(record);
+      else requests.push(record);
       // Other page journeys can now navigate back to the migrated catalog.
       if (url.origin === server.origin && !name && isPlansQuery(method, url)) {
         const response = catalogResponse('45-mixed', url);
         await route.fulfill({ status: response.status, json: response.body });
         return;
       }
-      if (url.origin !== server.origin || !name) {
+      if (url.origin !== server.origin || !name || (name === 'capabilities' && (url.search || body !== undefined))) {
         unmatched.push(`${method} ${path}${url.search}`);
         await route.fulfill({ status: 404, json: { error_msg: '404 Route Not Found' } });
         return;
@@ -68,7 +73,7 @@ export const test = base.extend({
       if (response.network) await route.abort('failed');
       else await route.fulfill({ status: response.status ?? 200, json: response.body });
     });
-    const network = { requests, setVariants: (value) => registry.setVariants(value) };
+    const network = { requests, capabilityRequests, allRequests, setVariants: (value) => registry.setVariants(value) };
     const parity = {
       page, locale, role, network, faults,
       async open(route, variants = {}) {
