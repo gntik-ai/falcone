@@ -91,7 +91,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(surface(p).getByText(c.statusLive, { exact: true })).toBeVisible();
       let calls = await streamCalls(p);
       expect(calls).toHaveLength(1);
-      expect(calls[0]).toMatchObject({ url: mongoPath, method: 'GET', headers: [] });
+      // The stream carries only the Accept header: the anon key in the URL is the sole credential.
+      expect(calls[0]).toMatchObject({ url: mongoPath, method: 'GET', headers: ['Accept'] });
+      expect(calls[0].headers.map((name) => name.toLowerCase())).not.toContain('authorization');
       await stop(p);
       await expect(surface(p).getByRole('button', { name: c.subscribe, exact: true })).toBeVisible();
       expect((await streamCalls(p))[0].aborted).toBe(true);
@@ -187,8 +189,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await open(p);
       const toggle = surface(p).getByRole('button', { name: c.showKey, exact: true });
       await toggle.focus(); await p.page.keyboard.press('Enter');
-      await expect(toggle).toBeFocused();
-      await expect(surface(p).getByRole('button', { name: c.hideKey, exact: true })).toHaveAttribute('aria-pressed', 'true');
+      // The accessible name changes on reveal, so focus is asserted through the new name.
+      const hide = surface(p).getByRole('button', { name: c.hideKey, exact: true });
+      await expect(hide).toBeFocused();
+      await expect(hide).toHaveAttribute('aria-pressed', 'true');
     });
     test('runtime-health', async ({ parity: p, server }) => {
       const c = copy(p);
@@ -257,11 +261,17 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) for (co
       await fill(p); await subscribe(p);
       await expect(rows(p)).toHaveCount(3);
       await p.page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active organization' }).selectOption('t2');
+      const retained = async () => {
+        await expect(surface(p).getByLabel(copy(p).database, { exact: true })).toHaveValue(' app_db ');
+        await expect(surface(p).getByLabel(copy(p).collection, { exact: true })).toHaveValue('orders');
+        await expect(surface(p).getByLabel(copy(p).anonKey, { exact: true })).toHaveValue(apiKey);
+      };
       if (variant === 'session-401-refresh-ok') {
         await expect.poll(() => t2.length).toBe(2);
         expect(t2.map((call) => ({ method: call.method, url: call.url, body: call.body }))).toEqual([{ method: 'GET', url: t2Path, body: null }, { method: 'GET', url: t2Path, body: null }]);
         expect(t2[1].authorization).toBe('Bearer synthetic-refreshed-access-token');
         await expect(p.page).not.toHaveURL(/\/login$/);
+        await retained();
         expect(p.network.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/refresh'))).toHaveLength(1);
       } else {
         await expect(p.page).toHaveURL(/\/login$/);

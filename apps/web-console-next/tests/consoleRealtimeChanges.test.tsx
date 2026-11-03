@@ -232,6 +232,37 @@ test('a dropped connection keeps stale-marked lines, reconnects to the same URL 
   expect(screen.getByText(es.statusLive)).toBeVisible()
 })
 
+test('a failed reconnect keeps earlier lines marked as received before the disconnection', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  const server = serve((call) => call === 0 ? sseResponse() : errorResponse(500, { status: 500, requestId: 'synthetic-request-id' })); open(); fillMongo(); subscribe(); await stage()
+  await feed(server.streams[0], frame('insert', change('insert', 'a')))
+  await act(async () => { server.streams[0].end(); await flush() })
+  await act(async () => { await vi.advanceTimersByTimeAsync(DEFAULT_RETRY_MS); await flush() })
+  expect(server.calls).toHaveLength(2)
+  expect(screen.getByRole('heading', { name: es.errorTitle })).toBeVisible()
+  expect(lineTexts()).toHaveLength(1)
+  expect(lineTexts()[0]).toContain(es.stale)
+})
+
+test('a workspace transition closes the stream and keeps the form as typed', async () => {
+  const signals: AbortSignal[] = []
+  const server: Server = { calls: [], streams: [] }
+  stubFetch((url, init) => { signals.push(init.signal as AbortSignal); const next = sseResponse(); server.streams.push(next); server.calls.push([url, init]); return next.response })
+  const view = open(); fillMongo(); subscribe(); await stage()
+  await feed(server.streams[0], frame('insert', change('insert', 'a')))
+  const rerender = () => view.rerender(<StrictMode><MemoryRouter><ConsoleRealtimeChangesPage /></MemoryRouter></StrictMode>)
+  context.value = { ...context.value, activeWorkspaceId: null }; rerender(); await stage()
+  expect(signals[0].aborted).toBe(true)
+  expect(screen.getByText(es.workspaceRequired)).toBeVisible()
+  context.value = { ...context.value, activeWorkspaceId: 'ws-2' }; rerender(); await stage()
+  expect(textbox(es.database)).toHaveValue(' app_db ')
+  expect(textbox(es.collection)).toHaveValue(' orders ')
+  expect(keyField()).toHaveValue(` ${key} `)
+  expect(lineTexts()).toHaveLength(0)
+  expect(screen.getByRole('button', { name: es.subscribe })).toBeVisible()
+  expect(server.calls).toHaveLength(1)
+})
+
 test('Reintentar before the held reconnect cancels it and opens exactly one stream with only its frames', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   const server = serve(); open(); fillMongo(); subscribe(); await stage()

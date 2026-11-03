@@ -29,8 +29,8 @@ function WorkspaceGate() {
 export default function ConsoleRealtimeChangesPage() {
   const { t, i18n: language } = useCopy()
   const context = useConsoleContext()
-  // Keyed by workspace so a switch closes the open stream.
-  const body = context.activeWorkspaceId ? <RealtimeConsole key={context.activeWorkspaceId} workspaceId={context.activeWorkspaceId} /> : <WorkspaceGate />
+  // One console instance serves every workspace: a switch closes the open stream and keeps the form.
+  const body = <RealtimeConsole workspaceId={context.activeWorkspaceId || null} gate={<WorkspaceGate />} />
   return <I18nProvider locale={language.language}><LiveAnnouncer>
     <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('title')} className="console-realtime-changes min-w-0 space-y-6 wrap-anywhere" data-testid="console-realtime-changes-page"
       header={<PageHeader as="div" wrapTitle={true} title={t('title')} description={t('description')} breadcrumbs={[]} status="" statuses={{}} meta={[]} tabs={null} actions={[]} labels={{ title: t('title'), description: t('description'), moreActions: t('title'), sections: t('title') }} />}>

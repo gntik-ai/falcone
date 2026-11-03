@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, EmptyState, Field, FieldLabel, Input, JsonViewer, Link, PasswordInput, SimpleSelect, StatusDot, Text, useAnnounce } from '@gntik-ai/ui'
 import { ErrorPanel, FirstRunEmpty, FormSection, InlineCallout, ListSkeleton, LogViewer, NoResultsEmpty, NotFoundEmpty, type LogLine } from '@gntik-ai/blocks'
@@ -13,7 +13,8 @@ const focus = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
 type Phase = 'idle' | 'connecting' | 'live' | 'disconnected' | 'failed'
 type Attention = { seq: number; target: 'retry' | 'database' }
 
-export function RealtimeConsole({ workspaceId }: { workspaceId: string }) {
+// Stays mounted across workspace changes so the form survives them; without a workspace it renders `gate`.
+export function RealtimeConsole({ workspaceId, gate }: { workspaceId: string | null; gate: ReactNode }) {
   const { t, i18n: language } = useTranslation(NAMESPACE)
   const announce = useAnnounce()
   const ids = { source: useId(), database: useId(), collection: useId(), schema: useId(), table: useId(), key: useId() }
@@ -65,8 +66,14 @@ export function RealtimeConsole({ workspaceId }: { workspaceId: string }) {
   }, [])
   // The stream never outlives the page.
   useEffect(() => stop, [stop])
+  // A workspace change closes the open stream and drops its results; the form stays as typed.
+  useEffect(() => {
+    stop()
+    setChanges([]); setSelectedId(null); setDropped(false); setFailure(null); setPhase('idle')
+  }, [workspaceId, stop])
 
   function subscribe() {
+    if (!workspaceId) return
     setValidation(null)
     const built = buildTarget({ source, database, collection, schema, table, apiKey })
     if (!built) { setValidation(source); return }
@@ -94,7 +101,7 @@ export function RealtimeConsole({ workspaceId }: { workspaceId: string }) {
         onFailure: (next) => {
           if (!active()) return
           stream.current = null
-          setPhase('failed'); setFailure(next); setDropped(false)
+          setPhase('failed'); setFailure(next)
           // A rejected key is fixed in the form; a missing stream sends focus back to the target.
           if (next.status === 404) ask('database')
           else if (next.status !== 401 && next.status !== 403) ask('retry')
@@ -104,7 +111,7 @@ export function RealtimeConsole({ workspaceId }: { workspaceId: string }) {
     })
   }
 
-  function detener() {
+  function stopStream() {
     stop()
     setPhase('idle'); setDropped(false); setFailure(null)
   }
@@ -126,6 +133,8 @@ export function RealtimeConsole({ workspaceId }: { workspaceId: string }) {
     message: `${stale ? `[${t('stale')}] ` : ''}${change.known ? '' : `${change.type} `}${change.json}`,
   })), [changes, stale, t])
   const total = changes.length
+  // Every hook above runs for every render, so the gate can replace the console here.
+  if (!workspaceId) return <>{gate}</>
 
   const statusLabel = phase === 'connecting' ? t('statusConnecting') : phase === 'live' ? t('statusLive') : t('statusDisconnected')
   const statusTone = phase === 'live' ? 'success' : phase === 'connecting' ? 'warning' : phase === 'idle' ? 'neutral' : 'destructive'
@@ -200,7 +209,7 @@ export function RealtimeConsole({ workspaceId }: { workspaceId: string }) {
     <FormSection labels={{ title: t('formTitle'), description: t('formDescription') }} title={t('formTitle')} description={t('formDescription')} headingLevel="h2" divided={false} className="min-w-0"
       actions={<div className="flex min-w-0 flex-wrap items-center gap-3">
         {streaming
-          ? <Button type="button" variant="secondary" size="md" disabled={false} loading={false} onClick={detener}>{t('stop')}</Button>
+          ? <Button type="button" variant="secondary" size="md" disabled={false} loading={false} onClick={stopStream}>{t('stop')}</Button>
           : <Button type="button" variant="primary" size="md" disabled={false} loading={false} onClick={subscribe}>{t('subscribe')}</Button>}
         <Text as="span" variant="supporting" tone="muted">{t('statusLabel')}</Text>
         <StatusDot tone={statusTone} size="md" label={statusLabel} pulse={phase === 'connecting' || phase === 'live'} />
