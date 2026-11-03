@@ -59,7 +59,7 @@
     "realtime-nodejs-backend-basic": {
       "label": "Node.js (server) — WebSocket subscription",
       "code": "// npm install ws\nimport WebSocket from 'ws'\n\nconst ENDPOINT = '{REALTIME_ENDPOINT}'\nconst WORKSPACE_ID = '{WORKSPACE_ID}'\nconst SERVICE_ACCOUNT_TOKEN = '<YOUR_SERVICE_ACCOUNT_TOKEN>'  // obtain via client_credentials grant\n\nconst ws = new WebSocket(\n  `${ENDPOINT}/workspaces/{WORKSPACE_ID}/realtime/connect`,\n  { headers: { Authorization: `Bearer ${SERVICE_ACCOUNT_TOKEN}` } }\n)\n\nws.on('open', () => {\n  ws.send(JSON.stringify({\n    type: 'subscribe',\n    channelType: '{CHANNEL_TYPE}',\n    filter: {}\n  }))\n})\n\nws.on('message', (data) => {\n  const msg = JSON.parse(data.toString())\n  if (msg.type === 'event') {\n    console.log('Event received:', msg.payload)\n  }\n})\n\nws.on('error', (err) => console.error('WS error', err))\nws.on('close', (code, reason) => console.log('Closed', code, reason.toString()))",
-      "secret": "Obtain a service-account token using the Keycloak client_credentials grant."
+      "secret": "Obtain a service-account token using the Keycloak client_credentials grant and your client_id/client_secret."
     },
     "realtime-python-backend-basic": {
       "label": "Python (server) — WebSocket subscription",
@@ -69,12 +69,12 @@
     "realtime-js-browser-filter": {
       "label": "JavaScript (browser) — subscription with operation/entity filter",
       "code": "// Requires: a valid Keycloak access token for this workspace\nconst ENDPOINT = '{REALTIME_ENDPOINT}'\nconst WORKSPACE_ID = '{WORKSPACE_ID}'\nconst TOKEN = '<YOUR_ACCESS_TOKEN>'\n\nconst ws = new WebSocket(\n  `${ENDPOINT}/workspaces/{WORKSPACE_ID}/realtime/connect`,\n  ['v1.falcone.realtime']\n)\n\nws.addEventListener('open', () => {\n  void TOKEN\n  ws.send(JSON.stringify({\n    type: 'subscribe',\n    channelType: '{CHANNEL_TYPE}',\n    // Supported filter fields: operation (INSERT|UPDATE|DELETE), entity (table/collection name)\n    filter: { operation: 'INSERT', entity: 'orders' }\n  }))\n})\n\nws.addEventListener('message', (event) => {\n  const msg = JSON.parse(event.data)\n  if (msg.type === 'event') {\n    console.log('Filtered event:', msg.payload)\n  }\n})",
-      "secret": "Obtain a service-account token using the Keycloak client_credentials grant."
+      "secret": "Obtain the access token from Keycloak: POST /realms/<realm>/protocol/openid-connect/token"
     },
     "realtime-nodejs-backend-filter": {
       "label": "Node.js (server) — subscription with operation/entity filter",
       "code": "// npm install ws\nimport WebSocket from 'ws'\n\nconst ENDPOINT = '{REALTIME_ENDPOINT}'\nconst WORKSPACE_ID = '{WORKSPACE_ID}'\nconst SERVICE_ACCOUNT_TOKEN = '<YOUR_SERVICE_ACCOUNT_TOKEN>'\n\nconst ws = new WebSocket(\n  `${ENDPOINT}/workspaces/{WORKSPACE_ID}/realtime/connect`,\n  { headers: { Authorization: `Bearer ${SERVICE_ACCOUNT_TOKEN}` } }\n)\n\nws.on('open', () => {\n  ws.send(JSON.stringify({\n    type: 'subscribe',\n    channelType: '{CHANNEL_TYPE}',\n    filter: { operation: 'INSERT', entity: 'orders' }\n  }))\n})\n\nws.on('message', (data) => {\n  const msg = JSON.parse(data.toString())\n  if (msg.type === 'event') {\n    console.log('Filtered event:', msg.payload)\n  }\n})",
-      "secret": "Obtain a service-account token using the Keycloak client_credentials grant."
+      "secret": "Obtain a service-account token using the Keycloak client_credentials grant and your client_id/client_secret."
     },
     "realtime-python-backend-filter": {
       "label": "Python (server) — subscription with operation/entity filter",
@@ -82,14 +82,14 @@
       "secret": "Obtain a service-account token using the Keycloak client_credentials grant."
     },
     "realtime-js-browser-reconnect": {
-      "label": "JavaScript (browser) — reconnect with exponential backoff",
+      "label": "JavaScript (browser) — reconnect with exponential backoff and token refresh",
       "code": "const ENDPOINT = '{REALTIME_ENDPOINT}'\nconst WORKSPACE_ID = '{WORKSPACE_ID}'\n\nlet token = '<YOUR_ACCESS_TOKEN>'\nlet attempt = 0\nconst MAX_BACKOFF_MS = 30_000\n\nasync function refreshToken() {\n  // Replace with your token-refresh logic (e.g., Keycloak refresh_token grant)\n  const resp = await fetch('/auth/refresh', { method: 'POST' })\n  const data = await resp.json()\n  return data.access_token\n}\n\nfunction connect() {\n  const ws = new WebSocket(\n    `${ENDPOINT}/workspaces/{WORKSPACE_ID}/realtime/connect?token=${encodeURIComponent(token)}`,\n    ['v1.falcone.realtime']\n  )\n\n  ws.addEventListener('open', () => {\n    attempt = 0\n    ws.send(JSON.stringify({ type: 'subscribe', channelType: '{CHANNEL_TYPE}', filter: {} }))\n  })\n\n  ws.addEventListener('message', (event) => {\n    const msg = JSON.parse(event.data)\n    if (msg.type === 'event') console.log('Event:', msg.payload)\n    if (msg.type === 'token_expired') {\n      ws.close(4001, 'token_expired')\n    }\n  })\n\n  ws.addEventListener('close', async (e) => {\n    const backoff = Math.min(1_000 * 2 ** attempt, MAX_BACKOFF_MS)\n    attempt++\n    if (e.code === 4001) {\n      token = await refreshToken()\n    }\n    setTimeout(connect, backoff)\n  })\n}\n\nconnect()",
       "secret": "Replace refreshToken() with your Keycloak token refresh implementation."
     },
     "realtime-nodejs-backend-reconnect": {
       "label": "Node.js (server) — reconnect with exponential backoff",
       "code": "// npm install ws\nimport WebSocket from 'ws'\n\nconst ENDPOINT = '{REALTIME_ENDPOINT}'\nconst WORKSPACE_ID = '{WORKSPACE_ID}'\nconst SERVICE_ACCOUNT_TOKEN = '<YOUR_SERVICE_ACCOUNT_TOKEN>'\nlet attempt = 0\n\nfunction connect() {\n  const ws = new WebSocket(\n    `${ENDPOINT}/workspaces/{WORKSPACE_ID}/realtime/connect`,\n    { headers: { Authorization: `Bearer ${SERVICE_ACCOUNT_TOKEN}` } }\n  )\n\n  ws.on('open', () => {\n    attempt = 0\n    ws.send(JSON.stringify({ type: 'subscribe', channelType: '{CHANNEL_TYPE}', filter: {} }))\n  })\n\n  ws.on('message', (data) => {\n    const msg = JSON.parse(data.toString())\n    if (msg.type === 'event') {\n      console.log('Event:', msg.payload)\n    }\n  })\n\n  ws.on('close', (code) => {\n    // Rotate your service-account token via Keycloak client_credentials if you receive close code 4001\n    const delay = Math.min(1000 * 2 ** attempt, 30000)\n    attempt++\n    setTimeout(connect, delay)\n    if (code === 4001) {\n      console.warn('Service-account token should be rotated before reconnecting.')\n    }\n  })\n}\n\nconnect()",
-      "secret": "Obtain a service-account token using the Keycloak client_credentials grant."
+      "secret": "Obtain a service-account token using the Keycloak client_credentials grant and your client_id/client_secret."
     },
     "realtime-python-backend-reconnect": {
       "label": "Python (server) — reconnect with exponential backoff",

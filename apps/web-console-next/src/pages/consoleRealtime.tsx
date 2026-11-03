@@ -38,7 +38,8 @@ function Realtime() {
   const [busy, setBusy] = useState(true)
   const [reload, setReload] = useState(0)
   const [language, setLanguage] = useState<Language>(initialLanguage)
-  const [feedback, setFeedback] = useState('')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [manualId, setManualId] = useState<string | null>(null)
   const request = useRef<{ workspace: string; reload: number; promise: ReturnType<typeof getWorkspaceRealtime> } | null>(null)
   const recovery = useRef(false)
   const container = useRef<HTMLDivElement>(null)
@@ -47,7 +48,7 @@ function Realtime() {
   const error = result?.workspace === workspaceId ? result.error : null
   useEffect(() => {
     let cancelled = false
-    setFeedback('')
+    setCopiedId(null); setManualId(null)
     if (!workspaceId) { setBusy(false); return }
     setBusy(true)
     if (request.current?.workspace !== workspaceId || request.current.reload !== reload) {
@@ -71,16 +72,21 @@ function Realtime() {
       else heading.current?.focus()
     }
   }, [busy, gate.loading, error, t])
+  useEffect(() => {
+    if (!copiedId) return
+    const timer = window.setTimeout(() => setCopiedId(null), 2500)
+    return () => window.clearTimeout(timer)
+  }, [copiedId])
   // Shared session transport and shell own refresh and redirect.
   if (error?.status === 401) return null
   const channels = mapChannelTypes(data?.dataSources)
   const retry = () => { recovery.current = true; setReload((value) => value + 1) }
-  const copy = async (value: string, endpoint = false) => {
+  const copy = async (id: string, value: string) => {
     try {
-      if (typeof navigator.clipboard?.writeText !== 'function') { setFeedback(t('manual')); return }
+      if (typeof navigator.clipboard?.writeText !== 'function') { setManualId(id); return }
       await navigator.clipboard.writeText(value)
-      setFeedback(t(endpoint ? 'copiedEndpoint' : 'copiedSnippet'))
-    } catch { setFeedback(t('manual')) }
+      setManualId(null); setCopiedId(id)
+    } catch { setManualId(id) }
   }
   const skeleton = <div role="status" aria-label={t('loading')} aria-busy="true"><PageSkeleton stats={0} rows={4} label={t('loading')} className="" /></div>
   const header = <PageHeader as="div" titleRef={heading} wrapTitle={true} title={t('title')} description={t('description')} breadcrumbs={null} status="" statuses={{}} meta={[]} actions={[]} tabs={null}
@@ -92,7 +98,7 @@ function Realtime() {
       items={[
         { id: 'workspace', label: t('fields.workspace'), value: data?.workspaceId ?? '', mono: true, render: undefined, status: undefined, copyable: false, copyValue: '' },
         { id: 'endpoint', label: t('fields.endpoint'), value: data?.realtimeEndpointUrl ?? t('unavailable'), mono: true, status: undefined, copyable: false, copyValue: '',
-          render: <div className="min-w-0 space-y-2"><Text as="span" className="block font-mono wrap-anywhere">{data?.realtimeEndpointUrl ?? t('unavailable')}</Text>{data?.realtimeEndpointUrl ? <Button type="button" variant="secondary" disabled={!gate.enabled} loading={false} onClick={() => void copy(data.realtimeEndpointUrl!, true)}>{t('copyEndpoint')}</Button> : null}</div> },
+          render: <div className="min-w-0 space-y-2"><Text as="span" className="block font-mono wrap-anywhere">{data?.realtimeEndpointUrl ?? t('unavailable')}</Text>{data?.realtimeEndpointUrl ? <Button type="button" variant="secondary" disabled={!gate.enabled} loading={false} onClick={() => void copy('endpoint', data.realtimeEndpointUrl!)}>{t(copiedId === 'endpoint' ? 'copied' : 'copyEndpoint')}</Button> : null}</div> },
         { id: 'enabled', label: t('fields.enabled'), value: t(data?.features?.realtime === true ? 'enabled' : 'disabled'), mono: false, render: undefined, status: undefined, copyable: false, copyValue: '' },
         { id: 'channels', label: t('fields.channels'), value: channels.join(', '), mono: false, render: undefined, status: undefined, copyable: false, copyValue: '' },
       ]} />
@@ -101,7 +107,7 @@ function Realtime() {
       labels={{ title: t('emptyTitle'), description: t('emptyDescription'), action: '', guide: t('provisioning') }} /></LinkProvider>
       : <section aria-labelledby="realtime-snippets-heading" className="min-w-0 space-y-4">
         <h2 id="realtime-snippets-heading" className="text-lg font-semibold">{t('snippets')}</h2>
-        <Tabs value={language} onValueChange={(value) => { setLanguage(value as Language); setFeedback(''); try { sessionStorage.setItem(storageKey, String(value)) } catch { /* Storage can be unavailable. */ } }}>
+        <Tabs value={language} onValueChange={(value) => { setLanguage(value as Language); setCopiedId(null); setManualId(null); try { sessionStorage.setItem(storageKey, String(value)) } catch { /* Storage can be unavailable. */ } }}>
           <TabsList aria-label={t('languages')} className="max-w-full overflow-x-auto">{languages.map((language) => <TabsTab key={language} value={language} disabled={!gate.enabled}>{t(language)}</TabsTab>)}</TabsList>
           {languages.map((language) => <TabsPanel key={language} value={language} tabIndex={-1} className="min-w-0 space-y-4">
             <h3 className="text-lg font-semibold">{t('connection')}</h3><Text>{t('connectionDescription')}</Text>
@@ -109,7 +115,7 @@ function Realtime() {
               const code = t(`entries.${id}.code`).replace(/\{REALTIME_ENDPOINT\}|\{WORKSPACE_ID\}|\{CHANNEL_TYPE\}/g, (token) => token === '{REALTIME_ENDPOINT}' ? data?.realtimeEndpointUrl ?? '<REALTIME_ENDPOINT>' : token === '{WORKSPACE_ID}' ? workspaceId : channels[0])
               return <section key={id} className="min-w-0 space-y-2" aria-label={t(`entries.${id}.label`)}>
                 <h4 className="font-medium">{t(`entries.${id}.label`)}</h4>
-                <Button type="button" variant="secondary" disabled={!gate.enabled} loading={false} onClick={() => void copy(code)}>{t('copy')}</Button>
+                <Button type="button" variant="secondary" disabled={!gate.enabled} loading={false} onClick={() => void copy(id, code)}>{t(copiedId === id ? 'copied' : 'copy')}</Button>
                 <CodeBlock code={code} language={language === 'python' ? 'python' : 'javascript'} filename="" label={t(`entries.${id}.label`)} showLineNumbers={false} highlightLines={[]} defaultWrap={true} wrapToggle={false} copyable={false} maxHeight={undefined} highlight={undefined} className="min-w-0 max-w-full" />
                 {!data?.realtimeEndpointUrl && <Text>{t('missingEndpoint')}</Text>}
                 <Text>{t('secrets')} {t(`entries.${id}.secret`)}</Text>
@@ -119,7 +125,7 @@ function Realtime() {
         </Tabs>
         {channels.length > 1 && <Text>{t('additional', { channels: channels.slice(1).join(', ') })}</Text>}
       </section>}
-    <Text role="status" aria-live="polite">{feedback}</Text>
+    <Text role="status" aria-live="polite">{manualId ? t('manual') : copiedId ? t(copiedId === 'endpoint' ? 'copiedEndpoint' : 'copiedSnippet') : ''}</Text>
   </>
   return <div ref={container} className="console-realtime min-w-0 wrap-anywhere">
     <Page width="default" header={header} actions={null} actionBar={null} className="min-w-0">
