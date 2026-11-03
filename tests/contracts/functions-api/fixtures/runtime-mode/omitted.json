@@ -1,0 +1,34 @@
+{
+  "description": "runtimeMode omitted: implies wasm.",
+  "instances": {
+    "FunctionExecutionConfiguration": {
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "parameters": {},
+      "environment": {},
+      "limits": {
+        "timeoutSeconds": 30,
+        "memoryMb": 256
+      },
+      "webAction": {
+        "enabled": false,
+        "requireAuthentication": true,
+        "rawHttpResponse": false
+      }
+    },
+    "FunctionActionExecutionConfiguration": {
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "parameters": {},
+      "limits": {
+        "timeoutMs": 30000,
+        "memoryMb": 256
+      }
+    },
+    "FunctionDefinitionPayload": {
+      "actionName": "legacy-fn",
+      "runtime": "nodejs:20",
+      "entrypoint": "main"
+    }
+  }
+}

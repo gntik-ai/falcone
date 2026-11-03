@@ -1,0 +1,35 @@
+{
+  "operationId": "importFunctionDefinition",
+  "method": "post",
+  "path": "/v1/functions/workspaces/{workspaceId}/definition-imports",
+  "request": {
+    "pathParameters": {
+      "workspaceId": "wrk_legacy_01"
+    },
+    "query": {},
+    "headers": {
+      "X-API-Version": "2026-03-26",
+      "X-Correlation-Id": "corr-legacy-0001",
+      "Idempotency-Key": "idem-legacy-0001"
+    },
+    "body": {
+      "bundleVersion": "1",
+      "tenantId": "ten_legacy_01",
+      "workspaceId": "wrk_legacy_01",
+      "resources": [
+        {
+          "resourceType": "function_action",
+          "actionName": "legacy-fn"
+        }
+      ],
+      "definitions": [
+        {
+          "actionName": "legacy-fn",
+          "runtime": "nodejs:20",
+          "entrypoint": "main",
+          "sourceCode": "function main() { return {}; }"
+        }
+      ]
+    }
+  }
+}

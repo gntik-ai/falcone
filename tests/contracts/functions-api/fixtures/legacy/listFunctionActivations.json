@@ -1,0 +1,18 @@
+{
+  "operationId": "listFunctionActivations",
+  "method": "get",
+  "path": "/v1/functions/actions/{resourceId}/activations",
+  "request": {
+    "pathParameters": {
+      "resourceId": "res_abc123"
+    },
+    "query": {
+      "page[size]": 50,
+      "sort": "-startedAt"
+    },
+    "headers": {
+      "X-API-Version": "2026-03-26",
+      "X-Correlation-Id": "corr-legacy-0001"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "operationId": "createFunctions",
+  "method": "post",
+  "path": "/v1/functions/actions",
+  "request": {
+    "pathParameters": {},
+    "query": {},
+    "headers": {
+      "X-API-Version": "2026-03-26",
+      "X-Correlation-Id": "corr-legacy-0001",
+      "Idempotency-Key": "idem-legacy-0001"
+    },
+    "body": {
+      "tenantId": "ten_legacy_01",
+      "workspaceId": "wrk_legacy_01",
+      "actionName": "legacy-fn",
+      "source": {
+        "kind": "inline_code",
+        "inlineCode": "function main() { return {}; }",
+        "language": "javascript"
+      },
+      "execution": {
+        "runtime": "nodejs:20",
+        "entrypoint": "main",
+        "parameters": {},
+        "environment": {},
+        "limits": {
+          "timeoutSeconds": 30,
+          "memoryMb": 256
+        },
+        "webAction": {
+          "enabled": false,
+          "requireAuthentication": true,
+          "rawHttpResponse": false
+        }
+      },
+      "activationPolicy": {
+        "logsAccess": "workspace_developers",
+        "resultAccess": "workspace_developers",
+        "rerunPolicy": "manual_only",
+        "retentionHours": 24
+      }
+    }
+  }
+}

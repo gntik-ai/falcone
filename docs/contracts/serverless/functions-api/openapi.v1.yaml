@@ -1,0 +1,4804 @@
+# Functions API contract v1. Derived from apps/control-plane-executor/openapi/families/functions.openapi.json;
+# see README.md in this directory for the versioning rule and the parity guarantee.
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  description: Workspace-scoped OpenWhisk-governed serverless package, trigger, rule, action, and inventory contracts routed by the gateway. Generated from the unified public API contract for v1.
+  summary: Workspace-scoped OpenWhisk-governed serverless package, trigger, rule, action, and inventory contracts routed by the gateway.
+  title: In Falcone Functions API
+  version: 1.0.0
+servers:
+  - url: https://{publicHost}
+    variables:
+      publicHost:
+        default: api.dev.in-falcone.example.com
+        enum:
+          - api.dev.in-falcone.example.com
+          - api.sandbox.in-falcone.example.com
+          - api.baas.musematic.ai
+          - api.in-falcone.example.com
+tags:
+  - name: Functions
+paths:
+  /v1/functions/actions:
+    post:
+      operationId: createFunctions
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionActionWriteRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayMutationAccepted"
+          description: Function action deployment request accepted.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested change conflicts with existing OpenWhisk state or an existing governed exposure.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected the request because the body exceeded the configured size budget for this route family.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is valid JSON but violates logical-context, tenant-isolation, runtime, or policy guardrails.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "501":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionsDisabledError"
+          description: The Functions capability is intentionally disabled.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnativeUnavailableError"
+          description: The selected Knative runtime cannot serve workloads; no Function or runtime mutation was attempted.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Submit one workspace-scoped function action provisioning request with governed source, runtime, execution, and policy inputs
+      tags:
+        - Functions
+      x-audiences:
+        - developer_external
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - knative
+        - local-control-plane
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: provisioning
+      x-resource-type: function_action
+      x-runtime-success-contract:
+        requiredBodyFields:
+          family: functions
+          resourceType: function_action
+        schema: GatewayMutationAccepted
+        status: 202
+      x-scope: workspace
+      x-visibility: public
+      x-workspace-mutation-authorization:
+        allowedWorkspaceRoles:
+          - workspace_owner
+          - workspace_admin
+          - workspace_developer
+        deniedWorkspaceRoles:
+          - workspace_viewer
+        dependencyDisclosure: after_authorization
+        workspaceClaim: workspace_id
+        workspaceClaimMatch: required
+  /v1/functions/actions/{resourceId}:
+    delete:
+      operationId: deleteFunctions
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionDeletionAccepted"
+          description: Function action deletion accepted.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested change conflicts with existing OpenWhisk state or an existing governed exposure.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected the request because the body exceeded the configured size budget for this route family.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is valid JSON but violates logical-context, tenant-isolation, runtime, or policy guardrails.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "501":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionsDisabledError"
+          description: The Functions capability is intentionally disabled.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Delete one governed function action and its managed exposure bindings from the workspace serverless context
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - knative
+        - local-control-plane
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: provisioning
+      x-resource-type: function_action
+      x-runtime-cleanup-ownership:
+        appliesTo:
+          - immediate
+          - deferred
+        onMismatch: retain
+        requiredIdentity:
+          - tenantId
+          - functionResourceId
+      x-scope: workspace
+      x-visibility: public
+      x-workspace-mutation-authorization:
+        allowedWorkspaceRoles:
+          - workspace_owner
+          - workspace_admin
+          - workspace_developer
+        deniedWorkspaceRoles:
+          - workspace_viewer
+        dependencyDisclosure: after_authorization
+        workspaceClaim: workspace_id
+        workspaceClaimMatch: required
+    get:
+      operationId: getFunctions
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionAction"
+          description: Function action returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Fetch one governed function action with normalized source, execution, policy, and trigger state
+      tags:
+        - Functions
+      x-audiences:
+        - developer_external
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_viewer
+        - workspace_service_account
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-read
+      x-resource-type: function_action
+      x-scope: workspace
+      x-visibility: public
+    patch:
+      operationId: updateFunctions
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionActionWriteRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayMutationAccepted"
+          description: Function action update accepted.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested change conflicts with existing OpenWhisk state or an existing governed exposure.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected the request because the body exceeded the configured size budget for this route family.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is valid JSON but violates logical-context, tenant-isolation, runtime, or policy guardrails.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "501":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionsDisabledError"
+          description: The Functions capability is intentionally disabled.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnativeUnavailableError"
+          description: The selected Knative runtime cannot serve workloads; no Function or runtime mutation was attempted.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Update one governed function action without exposing native namespace, subject, or unrestricted provider administration
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - knative
+        - local-control-plane
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: provisioning
+      x-resource-type: function_action
+      x-runtime-success-contract:
+        requiredBodyFields:
+          family: functions
+          resourceType: function_action
+        schema: GatewayMutationAccepted
+        status: 202
+      x-scope: workspace
+      x-visibility: public
+      x-workspace-mutation-authorization:
+        allowedWorkspaceRoles:
+          - workspace_owner
+          - workspace_admin
+          - workspace_developer
+        deniedWorkspaceRoles:
+          - workspace_viewer
+        dependencyDisclosure: after_authorization
+        workspaceClaim: workspace_id
+        workspaceClaimMatch: required
+  /v1/functions/actions/{resourceId}/activations:
+    get:
+      operationId: listFunctionActivations
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+        - $ref: "#/components/parameters/FunctionActivationPageSize"
+        - $ref: "#/components/parameters/PageAfter"
+        - $ref: "#/components/parameters/Sort"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionActivationCollection"
+          description: Function activations returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: List cursor-paginated activation summaries for one governed function action with a total count
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_service_account
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: observability
+      x-resource-type: function_activation
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/actions/{resourceId}/activations/{activationId}:
+    get:
+      operationId: getFunctionActivation
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+        - $ref: "#/components/parameters/FunctionActivationId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionActivation"
+          description: Function activation returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Fetch one activation summary for a governed function action
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_service_account
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: observability
+      x-resource-type: function_activation
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/actions/{resourceId}/activations/{activationId}/logs:
+    get:
+      operationId: getFunctionActivationLogs
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+        - $ref: "#/components/parameters/FunctionActivationId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionActivationLog"
+          description: Function activation logs returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Fetch redacted activation logs for one governed function action execution when policy allows it
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_service_account
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: observability
+      x-resource-type: function_activation_log
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/actions/{resourceId}/activations/{activationId}/rerun:
+    post:
+      operationId: rerunFunctionActivation
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+        - $ref: "#/components/parameters/FunctionActivationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionInvocationWriteRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionActivationRerunAccepted"
+          description: Function activation rerun accepted.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested change conflicts with existing OpenWhisk state or an existing governed exposure.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected the request because the body exceeded the configured size budget for this route family.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is valid JSON but violates logical-context, tenant-isolation, runtime, or policy guardrails.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "501":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionsDisabledError"
+          description: The Functions capability is intentionally disabled.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnativeUnavailableError"
+          description: The selected Knative runtime cannot serve workloads; no rerun was attempted.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Request one governed rerun for an existing function activation when the action policy permits it
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - knative
+        - local-control-plane
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-control
+      x-resource-type: function_invocation
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/actions/{resourceId}/activations/{activationId}/result:
+    get:
+      operationId: getFunctionActivationResult
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+        - $ref: "#/components/parameters/FunctionActivationId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionActivationResult"
+          description: Function activation result returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Fetch the result envelope for one governed function action activation when policy allows it
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_service_account
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: observability
+      x-resource-type: function_activation_result
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/actions/{resourceId}/definition-export:
+    get:
+      operationId: exportFunctionDefinition
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionDefinitionExportBundle"
+          description: Function definition export returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Export one governed function action definition for bounded workspace-safe import/export workflows
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_viewer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-read
+      x-resource-type: function_definition_export
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/actions/{resourceId}/invocations:
+    post:
+      operationId: invokeFunctionAction
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionInvocationWriteRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionInvocationAccepted"
+          description: Function invocation accepted.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested change conflicts with existing OpenWhisk state or an existing governed exposure.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected the request because the body exceeded the configured size budget for this route family.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is valid JSON but violates logical-context, tenant-isolation, runtime, or policy guardrails.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "501":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionsDisabledError"
+          description: The Functions capability is intentionally disabled.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnativeUnavailableError"
+          description: The selected Knative runtime cannot serve workloads; no invocation or successful activation was attempted.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Invoke one governed function action directly through the control-plane abstraction
+      tags:
+        - Functions
+      x-audiences:
+        - developer_external
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_service_account
+        - platform_team
+      x-downstream-adapters:
+        - knative
+        - local-control-plane
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-control
+      x-resource-type: function_invocation
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/actions/{resourceId}/rollback:
+    post:
+      operationId: rollbackFunctionAction
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionRollbackWriteRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionRollbackAccepted"
+          description: Function rollback accepted.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested change conflicts with existing OpenWhisk state or an existing governed exposure.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected the request because the body exceeded the configured size budget for this route family.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is valid JSON but violates logical-context, tenant-isolation, runtime, or policy guardrails.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "501":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionsDisabledError"
+          description: The Functions capability is intentionally disabled.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnativeUnavailableError"
+          description: The selected Knative runtime cannot serve workloads; no rollback mutation was attempted.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Request rollback of one governed function action to a prior immutable version
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - knative
+        - local-control-plane
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: provisioning
+      x-resource-type: function_rollback
+      x-scope: workspace
+      x-visibility: public
+      x-workspace-mutation-authorization:
+        allowedWorkspaceRoles:
+          - workspace_owner
+          - workspace_admin
+          - workspace_developer
+        deniedWorkspaceRoles:
+          - workspace_viewer
+        dependencyDisclosure: after_authorization
+        workspaceClaim: workspace_id
+        workspaceClaimMatch: required
+  /v1/functions/actions/{resourceId}/versions:
+    get:
+      operationId: listFunctionVersions
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/FunctionActionId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionVersionCollection"
+          description: Function versions returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: List immutable versions for one governed function action within its tenant and workspace lifecycle scope
+      tags:
+        - Functions
+      x-audiences:
+        - developer_external
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_viewer
+        - workspace_service_account
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-read
+      x-resource-type: function_version
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/workspaces/{workspaceId}/actions:
+    get:
+      operationId: listFunctionActions
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageAfter"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/WorkspaceId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionActionCollection"
+          description: Workspace function action collection returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: List governed function actions for one workspace including runtime, source, policy, and exposure summaries
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_viewer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-read
+      x-resource-type: function_action
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/workspaces/{workspaceId}/definition-imports:
+    post:
+      operationId: importFunctionDefinition
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/WorkspaceId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionDefinitionImportRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayMutationAccepted"
+          description: Function definition import accepted.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested import conflicts with existing OpenWhisk logical names.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected an oversized request body.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request violates logical-context, collision, or web-action visibility policy guardrails.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Import one governed function action definition into the same workspace scope with collision and visibility policy enforcement
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: provisioning
+      x-resource-type: function_definition_import
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/workspaces/{workspaceId}/inventory:
+    get:
+      operationId: getFunctionInventory
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/WorkspaceId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionInventory"
+          description: Workspace function inventory returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Fetch one workspace OpenWhisk serverless inventory with logical namespace, subject, package, trigger, and rule visibility
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_viewer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-read
+      x-resource-type: function_inventory
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/workspaces/{workspaceId}/package-definition-imports:
+    post:
+      operationId: importFunctionPackageDefinition
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/WorkspaceId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionDefinitionImportRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayMutationAccepted"
+          description: Function package definition import accepted.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested import conflicts with existing OpenWhisk logical names.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected an oversized request body.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request violates logical-context, collision, or web-action visibility policy guardrails.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Import one governed function package definition into the same workspace scope with collision and visibility policy enforcement
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: provisioning
+      x-resource-type: function_definition_import
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/workspaces/{workspaceId}/packages/{packageName}/definition-export:
+    get:
+      operationId: exportFunctionPackageDefinition
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/FunctionPackageName"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionDefinitionExportBundle"
+          description: Function package definition export returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Export one governed function package definition for bounded workspace-safe import/export workflows
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - workspace_viewer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-read
+      x-resource-type: function_definition_export
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/workspaces/{workspaceId}/secrets:
+    get:
+      operationId: listFunctionWorkspaceSecrets
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageAfter"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/WorkspaceId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionWorkspaceSecretCollection"
+          description: Workspace function secrets returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: List workspace-scoped governed function secrets without exposing secret material
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-read
+      x-resource-type: function_workspace_secret
+      x-scope: workspace
+      x-visibility: public
+    post:
+      operationId: createFunctionWorkspaceSecret
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/WorkspaceId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionWorkspaceSecretWriteRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionWorkspaceSecret"
+          description: Workspace function secret created.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource conflicts with an existing record.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected the request because the payload exceeded allowed limits.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Create a workspace-scoped governed function secret with a write-only value payload
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-write
+      x-resource-type: function_workspace_secret
+      x-scope: workspace
+      x-visibility: public
+  /v1/functions/workspaces/{workspaceId}/secrets/{secretName}:
+    delete:
+      operationId: deleteFunctionWorkspaceSecret
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/WorkspaceId"
+        - in: path
+          name: secretName
+          required: true
+          schema:
+            pattern: ^[a-z][a-z0-9_-]{0,62}$
+            type: string
+      responses:
+        "204":
+          description: Workspace function secret deleted.
+          headers:
+            x-falcone-affected-functions:
+              description: JSON array of consuming Function resource IDs; the response has no body.
+              schema:
+                example: '["fn-a"]'
+                type: string
+            x-falcone-resolved-ref-count:
+              description: Number of Functions declaring this secret, including retained declarations after revocation.
+              schema:
+                minimum: 0
+                type: integer
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected the request because the payload exceeded allowed limits.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Delete a workspace-scoped governed function secret without disclosing secret material
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-write
+      x-resource-type: function_workspace_secret
+      x-scope: workspace
+      x-visibility: public
+    get:
+      operationId: getFunctionWorkspaceSecret
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/WorkspaceId"
+        - in: path
+          name: secretName
+          required: true
+          schema:
+            pattern: ^[a-z][a-z0-9_-]{0,62}$
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionWorkspaceSecret"
+          description: Workspace function secret returned.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Get metadata for one workspace-scoped governed function secret without exposing its value
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-read
+      x-resource-type: function_workspace_secret
+      x-scope: workspace
+      x-visibility: public
+    put:
+      operationId: updateFunctionWorkspaceSecret
+      parameters:
+        - $ref: "#/components/parameters/XApiVersion"
+        - $ref: "#/components/parameters/XCorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/WorkspaceId"
+        - in: path
+          name: secretName
+          required: true
+          schema:
+            pattern: ^[a-z][a-z0-9_-]{0,62}$
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionWorkspaceSecretWriteRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionWorkspaceSecret"
+          description: Workspace function secret updated.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The request is malformed or contextually inconsistent.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The caller is authenticated but not authorized for this scope.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource was not found.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: The requested resource conflicts with an existing record.
+        "413":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected the request because the payload exceeded allowed limits.
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway QoS policy rejected the request rate for this route family.
+        "431":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway rejected one or more invalid or oversized request headers.
+        "504":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Gateway timed out while waiting for the downstream control-plane or adapter response.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unexpected gateway error.
+      security:
+        - bearerAuth: []
+      summary: Replace a workspace-scoped governed function secret while keeping the secret value write-only
+      tags:
+        - Functions
+      x-audiences:
+        - workspace_owner
+        - workspace_admin
+        - workspace_developer
+        - platform_team
+      x-downstream-adapters:
+        - openwhisk
+      x-family: functions
+      x-owning-service: control_api
+      x-rate-limit-class: data-write
+      x-resource-type: function_workspace_secret
+      x-scope: workspace
+      x-visibility: public
+components:
+  parameters:
+    FunctionActionId:
+      in: path
+      name: resourceId
+      required: true
+      schema:
+        pattern: ^(?:fn_[0-9a-f]{8}-[0-9a-f]{3}|res_[0-9a-z]+)$
+        type: string
+    FunctionActivationId:
+      description: Stable activation identifier assigned to one governed function execution.
+      in: path
+      name: activationId
+      required: true
+      schema:
+        pattern: ^(?:act_[0-9a-f]{8}-[0-9a-f]{3}|act_[0-9a-z]{1,64})$
+        type: string
+    FunctionActivationPageSize:
+      description: Maximum number of activations to return, newest first.
+      in: query
+      name: page[size]
+      required: false
+      schema:
+        default: 50
+        maximum: 200
+        minimum: 1
+        type: integer
+    FunctionPackageName:
+      description: Logical function package name scoped to the workspace serverless context.
+      in: path
+      name: packageName
+      required: true
+      schema:
+        pattern: ^[a-z][a-z0-9-]{1,62}$
+        type: string
+    IdempotencyKey:
+      description: "Optional key for safe retries of authenticated, non-streaming POST, PUT, PATCH, and DELETE requests, scoped per tenant and verified principal (API-key credential ID or subject). Final 2xx and 4xx responses are retained for 24h. Identical retries replay the original status and body with X-Idempotency-Replayed: true; original responses omit that header. A different method, normalized request target or raw body returns 422 IDEMPOTENCY_KEY_MISMATCH; an in-flight duplicate returns 409 IDEMPOTENCY_KEY_IN_PROGRESS with Retry-After. Secret-returning routes and responses over the configured size cap (default 256 KiB) block duplicate execution with 409 IDEMPOTENCY_REPLAY_UNAVAILABLE. Failed 5xx attempts can be retried. Omitted keys and GET requests retain existing behavior. A keyed mutation without a verified principal or configured replay storage returns 503 IDEMPOTENCY_UNAVAILABLE before dispatch. If recording a final response fails, the reservation blocks retries until its 24h expiry. Retry-After is a polling suggestion, not a guarantee that the reservation will be released after that delay."
+      in: header
+      name: Idempotency-Key
+      required: false
+      schema:
+        maxLength: 128
+        minLength: 8
+        pattern: ^[A-Za-z0-9._:-]{8,128}$
+        type: string
+    PageAfter:
+      description: Opaque cursor for the next page window.
+      in: query
+      name: page[after]
+      required: false
+      schema:
+        maxLength: 256
+        minLength: 1
+        type: string
+    PageSize:
+      description: Maximum number of items to return for list and catalog routes.
+      in: query
+      name: page[size]
+      required: false
+      schema:
+        default: 25
+        maximum: 200
+        minimum: 1
+        type: integer
+    Search:
+      description: Free-text search across human-facing route metadata.
+      in: query
+      name: search
+      required: false
+      schema:
+        maxLength: 120
+        minLength: 1
+        type: string
+    Sort:
+      description: Stable sort field for catalog and collection routes.
+      in: query
+      name: sort
+      required: false
+      schema:
+        maxLength: 120
+        minLength: 1
+        type: string
+    WorkspaceId:
+      description: Stable workspace identifier.
+      in: path
+      name: workspaceId
+      required: true
+      schema:
+        minLength: 3
+        type: string
+    XApiVersion:
+      description: Pinned additive contract version for the v1 public API release published with gateway QoS and hardening support.
+      in: header
+      name: X-API-Version
+      required: true
+      schema:
+        const: 2026-03-26
+        pattern: ^2026-03-26$
+        type: string
+    XCorrelationId:
+      description: Stable request correlation identifier reused by downstream authorization, orchestration, audit flows, and backfilled by the gateway when recovery requires it.
+      in: header
+      name: X-Correlation-Id
+      required: true
+      schema:
+        maxLength: 128
+        minLength: 8
+        pattern: ^[A-Za-z0-9._:-]{8,128}$
+        type: string
+  schemas:
+    ErrorDetail:
+      additionalProperties: true
+      properties:
+        reason:
+          type: string
+        violations:
+          items:
+            type: string
+          type: array
+      type: object
+    ErrorResource:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        path:
+          type: string
+        type:
+          type: string
+      required:
+        - path
+      type: object
+    ErrorResponse:
+      additionalProperties: false
+      properties:
+        code:
+          pattern: ^GW_[A-Z0-9_]+$
+          type: string
+        correlationId:
+          maxLength: 128
+          minLength: 8
+          pattern: ^[A-Za-z0-9._:-]{8,128}$
+          type: string
+        detail:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        requestId:
+          maxLength: 128
+          minLength: 8
+          type: string
+        resource:
+          $ref: "#/components/schemas/ErrorResource"
+        retryable:
+          type: boolean
+        status:
+          maximum: 599
+          minimum: 400
+          type: integer
+        timestamp:
+          format: date-time
+          type: string
+      required:
+        - status
+        - code
+        - message
+        - detail
+        - requestId
+        - correlationId
+        - timestamp
+        - resource
+      type: object
+    FunctionAction:
+      additionalProperties: false
+      properties:
+        actionName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        activationPolicy:
+          $ref: "#/components/schemas/FunctionActivationPolicy"
+        activeVersionId:
+          pattern: ^fnv_[0-9a-z]+$
+          type: string
+        cronTriggers:
+          items:
+            $ref: "#/components/schemas/FunctionCronTrigger"
+          type: array
+        deploymentDigest:
+          maxLength: 255
+          minLength: 12
+          type: string
+        execution:
+          $ref: "#/components/schemas/FunctionActionExecutionConfiguration"
+        httpExposure:
+          $ref: "#/components/schemas/FunctionHttpExposure"
+        kafkaTriggers:
+          items:
+            $ref: "#/components/schemas/FunctionKafkaTriggerSummary"
+          type: array
+        latestActivation:
+          $ref: "#/components/schemas/FunctionActivation"
+        latestRollbackAt:
+          format: date-time
+          type: string
+        namespaceName:
+          maxLength: 80
+          minLength: 3
+          type: string
+        packageName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        providerCompatibility:
+          $ref: "#/components/schemas/OpenWhiskProviderCompatibility"
+        provisioning:
+          $ref: "#/components/schemas/FunctionProvisioningState"
+        resourceId:
+          pattern: ^(?:fn_[0-9a-f]{8}-[0-9a-f]{3}|res_[0-9a-z]+)$
+          type: string
+        rollbackAvailable:
+          type: boolean
+        runtimeDependency:
+          $ref: "#/components/schemas/FunctionRuntimeDependency"
+        secretReferences:
+          items:
+            $ref: "#/components/schemas/FunctionSecretReference"
+          type: array
+        source:
+          $ref: "#/components/schemas/FunctionDeploymentSource"
+        status:
+          enum:
+            - active
+            - unavailable
+            - deletion_pending
+          type: string
+        storageTriggers:
+          items:
+            $ref: "#/components/schemas/FunctionStorageTrigger"
+          type: array
+        subjectRef:
+          maxLength: 120
+          minLength: 3
+          type: string
+        tenantId:
+          type: string
+        timestamps:
+          $ref: "#/components/schemas/LifecycleTimestamps"
+        unresolvedSecretRefs:
+          default: 0
+          maximum: 10000
+          minimum: 0
+          type: integer
+        versionCount:
+          maximum: 10000
+          minimum: 0
+          type: integer
+        workspaceId:
+          type: string
+      required:
+        - resourceId
+        - tenantId
+        - workspaceId
+        - actionName
+        - source
+        - execution
+        - activationPolicy
+        - status
+        - runtimeDependency
+        - provisioning
+        - timestamps
+        - versionCount
+        - rollbackAvailable
+        - secretReferences
+        - unresolvedSecretRefs
+      type: object
+    FunctionActionCollection:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/FunctionAction"
+          type: array
+        page:
+          $ref: "#/components/schemas/FunctionActionPage"
+      required:
+        - items
+        - page
+      type: object
+    FunctionActionExecutionConfiguration:
+      additionalProperties: false
+      properties:
+        base:
+          description: Optional execution base. Omitted means the per-mode, per-language default alias, resolved and pinned at deploy. A catalog base names a catalog entry as name@version with its digest; a byo base names a customer image by digest with the signer identity and attestation reference that vouch for it.
+          discriminator:
+            propertyName: kind
+          oneOf:
+            - additionalProperties: false
+              properties:
+                digest:
+                  pattern: ^sha256:[0-9a-f]{64}$
+                  type: string
+                id:
+                  pattern: ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?@(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$
+                  type: string
+                kind:
+                  const: catalog
+                  type: string
+              required:
+                - kind
+                - id
+                - digest
+              type: object
+            - additionalProperties: false
+              properties:
+                attestation_ref:
+                  maxLength: 1024
+                  minLength: 1
+                  type: string
+                image_digest:
+                  pattern: ^sha256:[0-9a-f]{64}$
+                  type: string
+                kind:
+                  const: byo
+                  type: string
+                signer_identity:
+                  maxLength: 512
+                  minLength: 1
+                  type: string
+              required:
+                - kind
+                - image_digest
+                - signer_identity
+                - attestation_ref
+              type: object
+        entrypoint:
+          maxLength: 120
+          minLength: 1
+          type: string
+        limits:
+          $ref: "#/components/schemas/FunctionActionExecutionLimits"
+        parameters:
+          additionalProperties:
+            type:
+              - string
+              - number
+              - integer
+              - boolean
+              - object
+              - array
+              - "null"
+          type: object
+        runtime:
+          maxLength: 40
+          minLength: 3
+          type: string
+        runtimeMode:
+          default: wasm
+          description: Execution mode of the action. Omitted means wasm. oci is refused with GW_OCI_NOT_AUTHORIZED (detail.reason oci_not_authorized) until OCI authorization, base validation and isolation evidence exist.
+          enum:
+            - wasm
+            - oci
+          type: string
+      required:
+        - runtime
+        - entrypoint
+        - parameters
+        - limits
+      type: object
+    FunctionActionExecutionLimits:
+      additionalProperties: false
+      properties:
+        memoryMb:
+          maximum: 2048
+          minimum: 128
+          type: integer
+        timeoutMs:
+          maximum: 900000
+          minimum: 1
+          type: integer
+      required:
+        - timeoutMs
+        - memoryMb
+      type: object
+    FunctionActionPage:
+      additionalProperties: false
+      properties:
+        total:
+          minimum: 0
+          type: integer
+      required:
+        - total
+      type: object
+    FunctionActionWriteRequest:
+      additionalProperties: false
+      properties:
+        actionName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        activationPolicy:
+          $ref: "#/components/schemas/FunctionActivationPolicy"
+        defaultCronTriggerPolicy:
+          $ref: "#/components/schemas/FunctionCronTriggerWriteRequest"
+        defaultHttpExposure:
+          $ref: "#/components/schemas/FunctionHttpExposureWriteRequest"
+        defaultKafkaTriggerPolicy:
+          $ref: "#/components/schemas/FunctionKafkaTriggerWriteRequest"
+        defaultStorageTriggerPolicy:
+          $ref: "#/components/schemas/FunctionStorageTriggerWriteRequest"
+        deploymentDigest:
+          maxLength: 255
+          minLength: 12
+          type: string
+        execution:
+          $ref: "#/components/schemas/FunctionExecutionConfiguration"
+        packageName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        secretReferences:
+          description: Declared workspace-secret names and env mappings only; resolved values are never persisted.
+          items:
+            $ref: "#/components/schemas/FunctionSecretDeclaration"
+          type: array
+        secrets:
+          deprecated: true
+          description: Declared workspace-secret names and env mappings only; resolved values are never persisted.
+          items:
+            $ref: "#/components/schemas/FunctionSecretDeclaration"
+          type: array
+        source:
+          $ref: "#/components/schemas/FunctionDeploymentSource"
+        tenantId:
+          type: string
+        workspaceId:
+          type: string
+      required:
+        - tenantId
+        - workspaceId
+        - actionName
+        - source
+        - execution
+        - activationPolicy
+      type: object
+    FunctionActivation:
+      additionalProperties: false
+      properties:
+        activationId:
+          pattern: ^(?:act_[0-9a-f]{8}-[0-9a-f]{3}|act_[0-9a-z]{1,64})$
+          type: string
+        durationMs:
+          maximum: 900000
+          minimum: 0
+          type: integer
+        finishedAt:
+          format: date-time
+          type: string
+        invocationId:
+          pattern: ^inv_[0-9a-z]+$
+          type: string
+        memoryMb:
+          maximum: 2048
+          minimum: 128
+          type: integer
+        resourceId:
+          pattern: ^(?:fn_[0-9a-f]{8}-[0-9a-f]{3}|res_[0-9a-z]+)$
+          type: string
+        startedAt:
+          format: date-time
+          type: string
+        status:
+          enum:
+            - running
+            - succeeded
+            - failed
+            - timed_out
+            - cancelled
+          type: string
+        statusCode:
+          maximum: 599
+          minimum: 100
+          type: integer
+        triggerKind:
+          enum:
+            - manual
+            - direct
+            - http
+            - kafka
+            - storage
+            - cron
+          type: string
+      required:
+        - activationId
+        - resourceId
+        - status
+        - startedAt
+        - durationMs
+        - triggerKind
+      type: object
+    FunctionActivationCollection:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/FunctionActivation"
+          type: array
+        page:
+          $ref: "#/components/schemas/FunctionActivationPage"
+      required:
+        - items
+        - page
+      type: object
+    FunctionActivationLog:
+      additionalProperties: false
+      properties:
+        activationId:
+          pattern: ^(?:act_[0-9a-f]{8}-[0-9a-f]{3}|act_[0-9a-z]{1,64})$
+          type: string
+        lines:
+          items:
+            maxLength: 4096
+            type: string
+          type: array
+        policy:
+          $ref: "#/components/schemas/FunctionActivationPolicy"
+        truncated:
+          type: boolean
+      required:
+        - activationId
+        - lines
+        - truncated
+        - policy
+      type: object
+    FunctionActivationPage:
+      additionalProperties: false
+      properties:
+        nextCursor:
+          maxLength: 256
+          minLength: 1
+          type: string
+        size:
+          maximum: 200
+          minimum: 1
+          type: integer
+        total:
+          minimum: 0
+          type: integer
+      required:
+        - size
+        - total
+      type: object
+    FunctionActivationPolicy:
+      additionalProperties: false
+      properties:
+        logsAccess:
+          enum:
+            - workspace_developers
+            - workspace_admins
+            - service_accounts
+            - disabled
+          type: string
+        redactionMode:
+          enum:
+            - metadata_only
+            - logs_only
+            - logs_and_results
+          type: string
+        rerunPolicy:
+          enum:
+            - manual_only
+            - blocked
+            - idempotent_only
+          type: string
+        resultAccess:
+          enum:
+            - workspace_developers
+            - workspace_admins
+            - service_accounts
+            - disabled
+          type: string
+        retentionHours:
+          maximum: 720
+          minimum: 1
+          type: integer
+      required:
+        - logsAccess
+        - resultAccess
+        - rerunPolicy
+        - retentionHours
+      type: object
+    FunctionActivationRerunAccepted:
+      additionalProperties: false
+      properties:
+        acceptedAt:
+          format: date-time
+          type: string
+        activationId:
+          pattern: ^(?:act_[0-9a-f]{8}-[0-9a-f]{3}|act_[0-9a-z]{1,64})$
+          type: string
+        rerunInvocationId:
+          pattern: ^(?:act_[0-9a-f]{8}-[0-9a-f]{3}|inv_[0-9a-z]{1,64})$
+          type: string
+        status:
+          enum:
+            - accepted
+            - blocked_policy
+            - queued
+          type: string
+      required:
+        - activationId
+        - rerunInvocationId
+        - status
+        - acceptedAt
+      type: object
+    FunctionActivationResult:
+      additionalProperties: false
+      properties:
+        activationId:
+          pattern: ^(?:act_[0-9a-f]{8}-[0-9a-f]{3}|act_[0-9a-z]{1,64})$
+          type: string
+        contentType:
+          maxLength: 120
+          minLength: 3
+          type: string
+        policy:
+          $ref: "#/components/schemas/FunctionActivationPolicy"
+        result:
+          type:
+            - object
+            - array
+            - string
+            - number
+            - integer
+            - boolean
+            - "null"
+        status:
+          enum:
+            - available
+            - redacted
+            - pending
+          type: string
+        truncated:
+          type: boolean
+      required:
+        - activationId
+        - status
+        - policy
+      type: object
+    FunctionAdminPage:
+      additionalProperties: false
+      properties:
+        nextCursor:
+          maxLength: 256
+          minLength: 1
+          type: string
+        size:
+          maximum: 200
+          minimum: 1
+          type: integer
+      required:
+        - size
+      type: object
+    FunctionCronTrigger:
+      additionalProperties: false
+      properties:
+        catchUpMode:
+          enum:
+            - none
+            - single
+            - replay_window
+          type: string
+        overlapPolicy:
+          enum:
+            - allow
+            - skip
+            - queue_one
+          type: string
+        schedule:
+          maxLength: 120
+          minLength: 5
+          type: string
+        status:
+          enum:
+            - provisioning
+            - active
+            - paused
+            - failed
+          type: string
+        timezone:
+          maxLength: 64
+          minLength: 3
+          type: string
+        triggerId:
+          pattern: ^trg_[0-9a-z]+$
+          type: string
+      required:
+        - triggerId
+        - schedule
+        - timezone
+        - status
+        - overlapPolicy
+      type: object
+    FunctionCronTriggerWriteRequest:
+      additionalProperties: false
+      properties:
+        catchUpMode:
+          enum:
+            - none
+            - single
+            - replay_window
+          type: string
+        overlapPolicy:
+          enum:
+            - allow
+            - skip
+            - queue_one
+          type: string
+        schedule:
+          maxLength: 120
+          minLength: 5
+          type: string
+        timezone:
+          maxLength: 64
+          minLength: 3
+          type: string
+      required:
+        - schedule
+        - timezone
+      type: object
+    FunctionDefinitionExportBundle:
+      additionalProperties: false
+      properties:
+        bundleVersion:
+          type: string
+        definitions:
+          description: Self-contained deployable definitions for the exported actions (source, runtime, entrypoint, parameters, metadata). Carried so an export -> import round-trips the actual function code with fidelity, not only the resource reference. Optional and additive (consumers that only read 'resources' are unaffected).
+          items:
+            $ref: "#/components/schemas/FunctionDefinitionPayload"
+          type: array
+        resources:
+          items:
+            $ref: "#/components/schemas/FunctionDefinitionResource"
+          type: array
+        scope:
+          additionalProperties: false
+          properties:
+            tenantId:
+              type: string
+            workspaceId:
+              type: string
+          required:
+            - tenantId
+            - workspaceId
+          type: object
+        tenantId:
+          type: string
+        workspaceId:
+          type: string
+      required:
+        - bundleVersion
+        - tenantId
+        - workspaceId
+        - scope
+        - resources
+      type: object
+    FunctionDefinitionImportRequest:
+      additionalProperties: false
+      properties:
+        bundleVersion:
+          type: string
+        definitions:
+          description: Self-contained deployable definitions to import (source, runtime, entrypoint, parameters, metadata). When present, the registry rows are created/updated from these; the scope is always re-stamped to the caller's verified tenant/workspace. Optional and additive.
+          items:
+            $ref: "#/components/schemas/FunctionDefinitionPayload"
+          type: array
+        importOperation:
+          enum:
+            - apply
+          type: string
+        resources:
+          items:
+            $ref: "#/components/schemas/FunctionDefinitionResource"
+          type: array
+        tenantId:
+          type: string
+        workspaceId:
+          type: string
+      required:
+        - bundleVersion
+        - tenantId
+        - workspaceId
+        - resources
+      type: object
+    FunctionDefinitionPayload:
+      additionalProperties: false
+      description: A single deployable function-definition payload inside an export/import bundle.
+      properties:
+        actionName:
+          type: string
+        base:
+          description: Optional execution base. Omitted means the per-mode, per-language default alias, resolved and pinned at deploy. A catalog base names a catalog entry as name@version with its digest; a byo base names a customer image by digest with the signer identity and attestation reference that vouch for it.
+          discriminator:
+            propertyName: kind
+          oneOf:
+            - additionalProperties: false
+              properties:
+                digest:
+                  pattern: ^sha256:[0-9a-f]{64}$
+                  type: string
+                id:
+                  pattern: ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?@(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$
+                  type: string
+                kind:
+                  const: catalog
+                  type: string
+              required:
+                - kind
+                - id
+                - digest
+              type: object
+            - additionalProperties: false
+              properties:
+                attestation_ref:
+                  maxLength: 1024
+                  minLength: 1
+                  type: string
+                image_digest:
+                  pattern: ^sha256:[0-9a-f]{64}$
+                  type: string
+                kind:
+                  const: byo
+                  type: string
+                signer_identity:
+                  maxLength: 512
+                  minLength: 1
+                  type: string
+              required:
+                - kind
+                - image_digest
+                - signer_identity
+                - attestation_ref
+              type: object
+        entrypoint:
+          type: string
+        metadata:
+          type: object
+        packageName:
+          type: string
+        parameters:
+          type: object
+        runtime:
+          type: string
+        runtimeMode:
+          default: wasm
+          description: Execution mode of the action. Omitted means wasm. oci is refused with GW_OCI_NOT_AUTHORIZED (detail.reason oci_not_authorized) until OCI authorization, base validation and isolation evidence exist.
+          enum:
+            - wasm
+            - oci
+          type: string
+        sourceCode:
+          type: string
+      required:
+        - actionName
+      type: object
+    FunctionDefinitionResource:
+      additionalProperties: false
+      properties:
+        actionName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        name:
+          type: string
+        packageName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        resourceType:
+          enum:
+            - function_action
+            - function_package
+          type: string
+        tenantId:
+          type: string
+        visibility:
+          enum:
+            - public
+            - private
+          type: string
+        workspaceId:
+          type: string
+      required:
+        - resourceType
+      type: object
+    FunctionDeletionAccepted:
+      additionalProperties: false
+      properties:
+        acceptedAt:
+          format: date-time
+          type: string
+        correlationId:
+          maxLength: 128
+          minLength: 1
+          type: string
+        requestId:
+          maxLength: 128
+          minLength: 1
+          type: string
+        resourceId:
+          maxLength: 255
+          minLength: 1
+          type: string
+        status:
+          enum:
+            - accepted
+            - deletion_pending
+          type: string
+      required:
+        - requestId
+        - correlationId
+        - resourceId
+        - status
+        - acceptedAt
+      type: object
+    FunctionDeploymentSource:
+      additionalProperties: false
+      properties:
+        artifactRef:
+          description: Opaque package or artifact reference managed by the control plane.
+          maxLength: 255
+          minLength: 8
+          type: string
+        digest:
+          maxLength: 255
+          minLength: 12
+          type: string
+        entryFile:
+          maxLength: 255
+          minLength: 1
+          type: string
+        imageEntrypoint:
+          maxLength: 255
+          minLength: 1
+          type: string
+        imageRef:
+          description: Container image reference used when runtime supports image-backed actions.
+          maxLength: 255
+          minLength: 8
+          type: string
+        inlineCode:
+          description: Inline source payload used when kind=inline_code.
+          maxLength: 262144
+          minLength: 1
+          type: string
+        kind:
+          enum:
+            - inline_code
+            - packaged_artifact
+            - stored_reference
+            - runtime_image
+          type: string
+        language:
+          maxLength: 32
+          minLength: 2
+          type: string
+        storedObjectRef:
+          description: Stored source reference such as a bucket object URI or managed asset key.
+          maxLength: 255
+          minLength: 8
+          type: string
+      required:
+        - kind
+      type: object
+    FunctionExecutionConfiguration:
+      additionalProperties: false
+      properties:
+        base:
+          description: Optional execution base. Omitted means the per-mode, per-language default alias, resolved and pinned at deploy. A catalog base names a catalog entry as name@version with its digest; a byo base names a customer image by digest with the signer identity and attestation reference that vouch for it.
+          discriminator:
+            propertyName: kind
+          oneOf:
+            - additionalProperties: false
+              properties:
+                digest:
+                  pattern: ^sha256:[0-9a-f]{64}$
+                  type: string
+                id:
+                  pattern: ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?@(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$
+                  type: string
+                kind:
+                  const: catalog
+                  type: string
+              required:
+                - kind
+                - id
+                - digest
+              type: object
+            - additionalProperties: false
+              properties:
+                attestation_ref:
+                  maxLength: 1024
+                  minLength: 1
+                  type: string
+                image_digest:
+                  pattern: ^sha256:[0-9a-f]{64}$
+                  type: string
+                kind:
+                  const: byo
+                  type: string
+                signer_identity:
+                  maxLength: 512
+                  minLength: 1
+                  type: string
+              required:
+                - kind
+                - image_digest
+                - signer_identity
+                - attestation_ref
+              type: object
+        entrypoint:
+          maxLength: 120
+          minLength: 1
+          type: string
+        environment:
+          additionalProperties:
+            maxLength: 4096
+            type: string
+          type: object
+        limits:
+          $ref: "#/components/schemas/FunctionExecutionLimits"
+        parameters:
+          additionalProperties:
+            type:
+              - string
+              - number
+              - integer
+              - boolean
+              - object
+              - array
+              - "null"
+          type: object
+        runtime:
+          enum:
+            - nodejs:20
+            - python:3.11
+            - php:8.2
+            - go:1.22
+            - java:21
+            - container:image
+          maxLength: 40
+          minLength: 3
+          type: string
+        runtimeMode:
+          default: wasm
+          description: Execution mode of the action. Omitted means wasm. oci is refused with GW_OCI_NOT_AUTHORIZED (detail.reason oci_not_authorized) until OCI authorization, base validation and isolation evidence exist.
+          enum:
+            - wasm
+            - oci
+          type: string
+        secrets:
+          description: Declared workspace-secret names and env mappings only; resolved values are never persisted.
+          items:
+            $ref: "#/components/schemas/FunctionSecretDeclaration"
+          type: array
+        webAction:
+          $ref: "#/components/schemas/FunctionWebActionConfiguration"
+      required:
+        - runtime
+        - entrypoint
+        - parameters
+        - environment
+        - limits
+        - webAction
+      type: object
+    FunctionExecutionLimits:
+      additionalProperties: false
+      properties:
+        concurrency:
+          maximum: 100
+          minimum: 1
+          type: integer
+        logLineLimit:
+          maximum: 5000
+          minimum: 1
+          type: integer
+        memoryMb:
+          maximum: 2048
+          minimum: 128
+          type: integer
+        resultByteLimit:
+          maximum: 1048576
+          minimum: 1024
+          type: integer
+        timeoutSeconds:
+          maximum: 900
+          minimum: 1
+          type: integer
+      required:
+        - timeoutSeconds
+        - memoryMb
+      type: object
+    FunctionHttpExposure:
+      additionalProperties: false
+      properties:
+        apisixRouteRef:
+          maxLength: 255
+          minLength: 8
+          type: string
+        authMode:
+          enum:
+            - workspace_token
+            - signed_url
+            - public_readonly
+          type: string
+        cors:
+          additionalProperties: false
+          properties:
+            allowOrigins:
+              items:
+                maxLength: 255
+                type: string
+              type: array
+            enabled:
+              type: boolean
+          required:
+            - enabled
+          type: object
+        exposureId:
+          pattern: ^exp_[0-9a-z]+$
+          type: string
+        methods:
+          items:
+            enum:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+            type: string
+          minItems: 1
+          type: array
+        path:
+          maxLength: 255
+          minLength: 2
+          type: string
+        publicUrl:
+          format: uri
+          type: string
+        rateLimitProfile:
+          maxLength: 64
+          minLength: 3
+          type: string
+        status:
+          enum:
+            - provisioning
+            - active
+            - disabled
+            - failed
+          type: string
+      required:
+        - exposureId
+        - status
+        - authMode
+        - methods
+        - path
+        - publicUrl
+        - apisixRouteRef
+      type: object
+    FunctionHttpExposureWriteRequest:
+      additionalProperties: false
+      properties:
+        authMode:
+          enum:
+            - workspace_token
+            - signed_url
+            - public_readonly
+          type: string
+        cors:
+          additionalProperties: false
+          properties:
+            allowOrigins:
+              items:
+                maxLength: 255
+                type: string
+              type: array
+            enabled:
+              type: boolean
+          type: object
+        methods:
+          items:
+            enum:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+            type: string
+          minItems: 1
+          type: array
+        path:
+          maxLength: 255
+          minLength: 2
+          type: string
+        rateLimitProfile:
+          maxLength: 64
+          minLength: 3
+          type: string
+      required:
+        - authMode
+        - methods
+        - path
+      type: object
+    FunctionInventory:
+      additionalProperties: false
+      properties:
+        actions:
+          items:
+            $ref: "#/components/schemas/FunctionAction"
+          type: array
+        counts:
+          additionalProperties: false
+          properties:
+            actions:
+              maximum: 5000
+              minimum: 0
+              type: integer
+            httpExposures:
+              maximum: 5000
+              minimum: 0
+              type: integer
+            packages:
+              maximum: 5000
+              minimum: 0
+              type: integer
+            rules:
+              maximum: 10000
+              minimum: 0
+              type: integer
+            triggers:
+              maximum: 5000
+              minimum: 0
+              type: integer
+          required:
+            - actions
+            - packages
+            - triggers
+            - rules
+            - httpExposures
+          type: object
+        packages:
+          items:
+            $ref: "#/components/schemas/FunctionPackage"
+          type: array
+        providerCompatibility:
+          $ref: "#/components/schemas/OpenWhiskProviderCompatibility"
+        quotaStatus:
+          $ref: "#/components/schemas/FunctionQuotaStatus"
+        rules:
+          items:
+            $ref: "#/components/schemas/FunctionRule"
+          type: array
+        serverlessContext:
+          $ref: "#/components/schemas/FunctionServerlessContext"
+        tenantIsolation:
+          $ref: "#/components/schemas/FunctionTenantIsolation"
+        triggers:
+          items:
+            $ref: "#/components/schemas/FunctionTrigger"
+          type: array
+        workspaceId:
+          type: string
+      required:
+        - workspaceId
+        - serverlessContext
+        - counts
+        - quotaStatus
+        - actions
+        - packages
+        - triggers
+        - rules
+        - providerCompatibility
+        - tenantIsolation
+      type: object
+    FunctionInvocationAccepted:
+      additionalProperties: false
+      properties:
+        acceptedAt:
+          format: date-time
+          type: string
+        invocationId:
+          pattern: ^(?:act_[0-9a-f]{8}-[0-9a-f]{3}|act_[0-9a-z]{1,64})$
+          type: string
+        resourceId:
+          pattern: ^(?:fn_[0-9a-f]{8}-[0-9a-f]{3}|res_[0-9a-z]+)$
+          type: string
+        status:
+          enum:
+            - completed
+            - failed
+          type: string
+      required:
+        - invocationId
+        - resourceId
+        - status
+        - acceptedAt
+      type: object
+    FunctionInvocationWriteRequest:
+      additionalProperties: false
+      properties:
+        idempotencyScope:
+          enum:
+            - request
+            - payload_digest
+          type: string
+        parameters:
+          additionalProperties:
+            type:
+              - string
+              - number
+              - integer
+              - boolean
+              - object
+              - array
+              - "null"
+          type: object
+        responseMode:
+          enum:
+            - accepted
+            - wait_for_result
+          type: string
+        triggerContext:
+          additionalProperties: false
+          properties:
+            correlationKey:
+              maxLength: 255
+              minLength: 1
+              type: string
+            kind:
+              enum:
+                - direct
+                - http
+                - kafka
+                - storage
+                - cron
+              type: string
+          type: object
+      type: object
+    FunctionKafkaTriggerSummary:
+      additionalProperties: false
+      properties:
+        deliveryMode:
+          enum:
+            - per_event
+            - micro_batch
+          type: string
+        status:
+          enum:
+            - planned
+            - active
+            - degraded
+            - paused
+          type: string
+        topicRef:
+          pattern: ^res_[0-9a-z]+$
+          type: string
+        triggerId:
+          pattern: ^ktr_[0-9a-z-]+$
+          type: string
+      required:
+        - triggerId
+        - topicRef
+        - deliveryMode
+        - status
+      type: object
+    FunctionKafkaTriggerWriteRequest:
+      additionalProperties: false
+      properties:
+        auditMode:
+          enum:
+            - metadata_only
+            - headers_and_denials
+          type: string
+        batchSize:
+          maximum: 500
+          minimum: 1
+          type: integer
+        deadLetterTopicRef:
+          pattern: ^res_[0-9a-z]+$
+          type: string
+        deliveryMode:
+          enum:
+            - per_event
+            - micro_batch
+          type: string
+        failurePolicy:
+          enum:
+            - retry_then_dead_letter
+            - dead_letter_only
+          type: string
+        filterExpression:
+          maxLength: 255
+          type: string
+        maxParallelInvocations:
+          maximum: 50
+          minimum: 1
+          type: integer
+        topicRef:
+          pattern: ^res_[0-9a-z]+$
+          type: string
+      required:
+        - topicRef
+      type: object
+    FunctionLifecycleState:
+      enum:
+        - active
+        - unavailable
+        - deletion_pending
+      type: string
+    FunctionPackage:
+      additionalProperties: false
+      properties:
+        actionCount:
+          maximum: 1000
+          minimum: 0
+          type: integer
+        annotations:
+          additionalProperties: true
+          type: object
+        defaultParameters:
+          additionalProperties: true
+          type: object
+        namespaceName:
+          maxLength: 80
+          minLength: 3
+          type: string
+        packageBindingRef:
+          maxLength: 120
+          minLength: 3
+          type: string
+        packageName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        physicalPackageName:
+          maxLength: 80
+          minLength: 3
+          type: string
+        providerCompatibility:
+          $ref: "#/components/schemas/OpenWhiskProviderCompatibility"
+        provisioning:
+          $ref: "#/components/schemas/ProvisioningResourceState"
+        quotaStatus:
+          $ref: "#/components/schemas/FunctionQuotaStatus"
+        resourceId:
+          pattern: ^res_[0-9a-z]+$
+          type: string
+        status:
+          enum:
+            - provisioning
+            - active
+            - suspended
+          type: string
+        subjectRef:
+          maxLength: 120
+          minLength: 3
+          type: string
+        tenantId:
+          type: string
+        tenantIsolation:
+          $ref: "#/components/schemas/FunctionTenantIsolation"
+        timestamps:
+          $ref: "#/components/schemas/LifecycleTimestamps"
+        visibility:
+          enum:
+            - private
+            - workspace_shared
+          type: string
+        workspaceId:
+          type: string
+      required:
+        - resourceId
+        - tenantId
+        - workspaceId
+        - packageName
+        - physicalPackageName
+        - namespaceName
+        - subjectRef
+        - packageBindingRef
+        - visibility
+        - defaultParameters
+        - annotations
+        - actionCount
+        - quotaStatus
+        - tenantIsolation
+        - providerCompatibility
+        - status
+      type: object
+    FunctionProvisioningState:
+      additionalProperties: false
+      properties:
+        failureReason:
+          description: "Why the action is not serving. Extensible: clients treat values they do not know as a generic non-retryable failure."
+          enum:
+            - oci_not_authorized
+            - base_disabled
+            - base_mismatch
+          type: string
+          x-extensible-enum: true
+        runtimeMode:
+          enum:
+            - wasm
+            - oci
+          type: string
+        state:
+          $ref: "#/components/schemas/FunctionLifecycleState"
+      required:
+        - state
+      type: object
+    FunctionQuotaDimensionStatus:
+      additionalProperties: false
+      properties:
+        blocked:
+          type: boolean
+        limit:
+          minimum: 0
+          type: integer
+        metricKey:
+          type: string
+        name:
+          enum:
+            - function_count
+            - invocation_count
+            - compute_time_ms
+            - memory_mb
+          type: string
+        remaining:
+          minimum: 0
+          type: integer
+        used:
+          minimum: 0
+          type: integer
+      required:
+        - name
+        - used
+        - limit
+        - remaining
+        - blocked
+      type: object
+    FunctionQuotaEvaluation:
+      additionalProperties: false
+      properties:
+        allowed:
+          type: boolean
+        effectiveDimension:
+          enum:
+            - function_count
+            - invocation_count
+            - compute_time_ms
+            - memory_mb
+          type: string
+        effectiveScope:
+          enum:
+            - tenant
+            - workspace
+          type: string
+        violations:
+          items:
+            $ref: "#/components/schemas/FunctionQuotaViolation"
+          type: array
+      required:
+        - allowed
+        - violations
+      type: object
+    FunctionQuotaScopeStatus:
+      additionalProperties: false
+      properties:
+        computeTimeMs:
+          $ref: "#/components/schemas/FunctionQuotaDimensionStatus"
+        functionCount:
+          $ref: "#/components/schemas/FunctionQuotaDimensionStatus"
+        invocationCount:
+          $ref: "#/components/schemas/FunctionQuotaDimensionStatus"
+        memoryMb:
+          $ref: "#/components/schemas/FunctionQuotaDimensionStatus"
+        scope:
+          enum:
+            - tenant
+            - workspace
+          type: string
+        scopeId:
+          type: string
+      required:
+        - scope
+        - scopeId
+        - functionCount
+        - invocationCount
+        - computeTimeMs
+        - memoryMb
+      type: object
+    FunctionQuotaStatus:
+      additionalProperties: false
+      properties:
+        effectiveViolation:
+          $ref: "#/components/schemas/FunctionQuotaViolation"
+        lastEvaluation:
+          $ref: "#/components/schemas/FunctionQuotaEvaluation"
+        maxActionsPerWorkspace:
+          maximum: 5000
+          minimum: 0
+          type: integer
+        maxHttpExposuresPerWorkspace:
+          maximum: 5000
+          minimum: 0
+          type: integer
+        maxPackagesPerWorkspace:
+          maximum: 5000
+          minimum: 0
+          type: integer
+        maxRulesPerWorkspace:
+          maximum: 10000
+          minimum: 0
+          type: integer
+        maxTriggersPerWorkspace:
+          maximum: 5000
+          minimum: 0
+          type: integer
+        scopes:
+          items:
+            $ref: "#/components/schemas/FunctionQuotaScopeStatus"
+          type: array
+        tenantScope:
+          $ref: "#/components/schemas/FunctionQuotaScopeStatus"
+        usedActions:
+          maximum: 5000
+          minimum: 0
+          type: integer
+        usedHttpExposures:
+          maximum: 5000
+          minimum: 0
+          type: integer
+        usedPackages:
+          maximum: 5000
+          minimum: 0
+          type: integer
+        usedRules:
+          maximum: 10000
+          minimum: 0
+          type: integer
+        usedTriggers:
+          maximum: 5000
+          minimum: 0
+          type: integer
+        visibleInConsole:
+          type: boolean
+        workspaceScope:
+          $ref: "#/components/schemas/FunctionQuotaScopeStatus"
+      required:
+        - maxActionsPerWorkspace
+        - maxPackagesPerWorkspace
+        - maxTriggersPerWorkspace
+        - maxRulesPerWorkspace
+        - maxHttpExposuresPerWorkspace
+        - usedActions
+        - usedPackages
+        - usedTriggers
+        - usedRules
+        - usedHttpExposures
+        - visibleInConsole
+        - tenantScope
+        - workspaceScope
+        - scopes
+      type: object
+    FunctionQuotaViolation:
+      additionalProperties: false
+      properties:
+        dimension:
+          enum:
+            - function_count
+            - invocation_count
+            - compute_time_ms
+            - memory_mb
+          type: string
+        limit:
+          minimum: 0
+          type: integer
+        message:
+          type: string
+        metricKey:
+          type: string
+        remaining:
+          minimum: 0
+          type: integer
+        scope:
+          enum:
+            - tenant
+            - workspace
+          type: string
+        scopeId:
+          type: string
+        used:
+          minimum: 0
+          type: integer
+      required:
+        - scope
+        - dimension
+        - used
+        - limit
+        - remaining
+        - message
+      type: object
+    FunctionRollbackAccepted:
+      additionalProperties: false
+      properties:
+        acceptedAt:
+          format: date-time
+          type: string
+        correlationId:
+          maxLength: 128
+          minLength: 8
+          type: string
+        requestId:
+          maxLength: 128
+          minLength: 8
+          type: string
+        requestedVersionId:
+          pattern: ^fnv_[0-9a-z]+$
+          type: string
+        resourceId:
+          pattern: ^(?:fn_[0-9a-f]{8}-[0-9a-f]{3}|res_[0-9a-z]+)$
+          type: string
+        status:
+          enum:
+            - accepted
+            - queued
+          type: string
+      required:
+        - requestId
+        - resourceId
+        - requestedVersionId
+        - status
+        - correlationId
+        - acceptedAt
+      type: object
+    FunctionRollbackWriteRequest:
+      additionalProperties: false
+      properties:
+        reason:
+          maxLength: 512
+          minLength: 3
+          type: string
+        versionId:
+          pattern: ^fnv_[0-9a-z]+$
+          type: string
+      required:
+        - versionId
+      type: object
+    FunctionRule:
+      additionalProperties: false
+      properties:
+        actionName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        activationState:
+          enum:
+            - active
+            - inactive
+          type: string
+        namespaceName:
+          maxLength: 80
+          minLength: 3
+          type: string
+        packageName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        physicalRuleName:
+          maxLength: 80
+          minLength: 3
+          type: string
+        physicalTriggerName:
+          maxLength: 80
+          minLength: 3
+          type: string
+        providerCompatibility:
+          $ref: "#/components/schemas/OpenWhiskProviderCompatibility"
+        provisioning:
+          $ref: "#/components/schemas/ProvisioningResourceState"
+        quotaStatus:
+          $ref: "#/components/schemas/FunctionQuotaStatus"
+        resourceId:
+          pattern: ^res_[0-9a-z]+$
+          type: string
+        ruleName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        status:
+          enum:
+            - provisioning
+            - active
+            - suspended
+          type: string
+        subjectRef:
+          maxLength: 120
+          minLength: 3
+          type: string
+        tenantId:
+          type: string
+        tenantIsolation:
+          $ref: "#/components/schemas/FunctionTenantIsolation"
+        timestamps:
+          $ref: "#/components/schemas/LifecycleTimestamps"
+        triggerName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        workspaceId:
+          type: string
+      required:
+        - resourceId
+        - tenantId
+        - workspaceId
+        - ruleName
+        - physicalRuleName
+        - triggerName
+        - physicalTriggerName
+        - actionName
+        - namespaceName
+        - subjectRef
+        - activationState
+        - quotaStatus
+        - tenantIsolation
+        - providerCompatibility
+        - status
+      type: object
+    FunctionRuntimeDependency:
+      additionalProperties: false
+      properties:
+        mode:
+          enum:
+            - managed
+            - external
+            - disabled
+          type: string
+        ready:
+          type: boolean
+        reason:
+          pattern: ^[A-Z][A-Z0-9_]{0,63}$
+          type: string
+        state:
+          enum:
+            - ready
+            - unverified
+            - degraded
+            - unavailable
+            - disabled
+          type: string
+      required:
+        - mode
+        - state
+        - reason
+        - ready
+      type: object
+    FunctionSecretDeclaration:
+      description: A workspace-secret name or value-free mapping. name/env and secretName/mountAlias are equivalent; workspaceId, if supplied, must match the Function workspace. All references fail closed when absent, regardless of the legacy required flag.
+      oneOf:
+        - pattern: ^[a-z][a-z0-9_-]{0,62}$
+          type: string
+        - additionalProperties: false
+          anyOf:
+            - required:
+                - name
+            - required:
+                - secretName
+          properties:
+            env:
+              pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+              type: string
+            mountAlias:
+              pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+              type: string
+            name:
+              pattern: ^[a-z][a-z0-9_-]{0,62}$
+              type: string
+            required:
+              type: boolean
+            secretName:
+              pattern: ^[a-z][a-z0-9_-]{0,62}$
+              type: string
+            workspaceId:
+              type: string
+          type: object
+    FunctionSecretReference:
+      additionalProperties: false
+      properties:
+        mountAlias:
+          pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+          type: string
+        required:
+          type: boolean
+        secretName:
+          pattern: ^[a-z][a-z0-9_-]{0,62}$
+          type: string
+        workspaceId:
+          type: string
+      required:
+        - secretName
+        - mountAlias
+        - required
+      type: object
+    FunctionServerlessContext:
+      additionalProperties: false
+      properties:
+        actionPrefix:
+          maxLength: 48
+          minLength: 3
+          type: string
+        namespaceName:
+          maxLength: 80
+          minLength: 3
+          type: string
+        namespaceProvisioning:
+          additionalProperties: false
+          properties:
+            mode:
+              enum:
+                - internal_only
+              type: string
+            state:
+              enum:
+                - ready
+                - provisioning
+                - reconciling
+              type: string
+          required:
+            - mode
+            - state
+          type: object
+        namingPolicy:
+          $ref: "#/components/schemas/FunctionServerlessNamingPolicy"
+        packageBindingRef:
+          maxLength: 120
+          minLength: 3
+          type: string
+        packagePrefix:
+          maxLength: 64
+          minLength: 3
+          type: string
+        provider:
+          const: openwhisk
+          type: string
+        rulePrefix:
+          maxLength: 64
+          minLength: 3
+          type: string
+        status:
+          enum:
+            - ready
+            - provisioning
+            - reconciling
+          type: string
+        subjectProvisioning:
+          additionalProperties: false
+          properties:
+            mode:
+              enum:
+                - internal_only
+              type: string
+            state:
+              enum:
+                - ready
+                - provisioning
+                - reconciling
+              type: string
+          required:
+            - mode
+            - state
+          type: object
+        subjectRef:
+          maxLength: 120
+          minLength: 3
+          type: string
+        tenantId:
+          type: string
+        tenantIsolation:
+          $ref: "#/components/schemas/FunctionTenantIsolation"
+        triggerPrefix:
+          maxLength: 64
+          minLength: 3
+          type: string
+        workspaceId:
+          type: string
+      required:
+        - tenantId
+        - workspaceId
+        - provider
+        - namespaceName
+        - subjectRef
+        - packageBindingRef
+        - packagePrefix
+        - triggerPrefix
+        - rulePrefix
+        - namespaceProvisioning
+        - subjectProvisioning
+        - namingPolicy
+        - tenantIsolation
+        - status
+      type: object
+    FunctionServerlessNamingPolicy:
+      additionalProperties: false
+      properties:
+        actionPrefix:
+          maxLength: 48
+          minLength: 3
+          type: string
+        namespacePattern:
+          maxLength: 120
+          minLength: 3
+          type: string
+        packagePrefix:
+          maxLength: 64
+          minLength: 3
+          type: string
+        physicalNamePolicy:
+          enum:
+            - provider_generated
+          type: string
+        rulePrefix:
+          maxLength: 64
+          minLength: 3
+          type: string
+        subjectPattern:
+          maxLength: 120
+          minLength: 3
+          type: string
+        triggerPrefix:
+          maxLength: 64
+          minLength: 3
+          type: string
+        userManagedNamespacesAllowed:
+          const: false
+          type: boolean
+        userManagedSubjectsAllowed:
+          const: false
+          type: boolean
+        userProvidedPhysicalNamesAllowed:
+          const: false
+          type: boolean
+      required:
+        - namespacePattern
+        - subjectPattern
+        - packagePrefix
+        - triggerPrefix
+        - rulePrefix
+        - physicalNamePolicy
+        - userManagedNamespacesAllowed
+        - userManagedSubjectsAllowed
+        - userProvidedPhysicalNamesAllowed
+        - actionPrefix
+      type: object
+    FunctionStorageTrigger:
+      additionalProperties: false
+      properties:
+        bucketRef:
+          maxLength: 255
+          minLength: 8
+          type: string
+        deliveryMode:
+          enum:
+            - direct
+            - managed_bridge
+          type: string
+        eventTypes:
+          items:
+            enum:
+              - object_created
+              - object_deleted
+              - object_archived
+              - object_restored
+            type: string
+          minItems: 1
+          type: array
+        prefix:
+          maxLength: 255
+          type: string
+        status:
+          enum:
+            - provisioning
+            - active
+            - paused
+            - failed
+          type: string
+        suffix:
+          maxLength: 120
+          type: string
+        triggerId:
+          pattern: ^trg_[0-9a-z]+$
+          type: string
+      required:
+        - triggerId
+        - bucketRef
+        - eventTypes
+        - status
+        - deliveryMode
+      type: object
+    FunctionStorageTriggerWriteRequest:
+      additionalProperties: false
+      properties:
+        bucketRef:
+          maxLength: 255
+          minLength: 8
+          type: string
+        deliveryMode:
+          enum:
+            - direct
+            - managed_bridge
+          type: string
+        eventTypes:
+          items:
+            enum:
+              - object_created
+              - object_deleted
+              - object_archived
+              - object_restored
+            type: string
+          minItems: 1
+          type: array
+        prefix:
+          maxLength: 255
+          type: string
+        suffix:
+          maxLength: 120
+          type: string
+      required:
+        - bucketRef
+        - eventTypes
+      type: object
+    FunctionTenantIsolation:
+      additionalProperties: false
+      properties:
+        actionPrefixIsolation:
+          maxLength: 48
+          minLength: 3
+          type: string
+        crossTenantAccessPrevented:
+          const: true
+          type: boolean
+        isolationBoundary:
+          enum:
+            - namespace_subject
+          type: string
+        namespaceName:
+          maxLength: 80
+          minLength: 3
+          type: string
+        packagePrefixIsolation:
+          maxLength: 64
+          minLength: 3
+          type: string
+        rulePrefixIsolation:
+          maxLength: 64
+          minLength: 3
+          type: string
+        subjectRef:
+          maxLength: 120
+          minLength: 3
+          type: string
+        triggerPrefixIsolation:
+          maxLength: 64
+          minLength: 3
+          type: string
+        userManagedNativeAdminSupported:
+          const: false
+          type: boolean
+      required:
+        - isolationBoundary
+        - namespaceName
+        - subjectRef
+        - crossTenantAccessPrevented
+        - userManagedNativeAdminSupported
+        - packagePrefixIsolation
+        - triggerPrefixIsolation
+        - rulePrefixIsolation
+      type: object
+    FunctionTrigger:
+      additionalProperties: false
+      properties:
+        namespaceName:
+          maxLength: 80
+          minLength: 3
+          type: string
+        packageName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        parameters:
+          additionalProperties: true
+          type: object
+        physicalTriggerName:
+          maxLength: 80
+          minLength: 3
+          type: string
+        providerCompatibility:
+          $ref: "#/components/schemas/OpenWhiskProviderCompatibility"
+        provisioning:
+          $ref: "#/components/schemas/ProvisioningResourceState"
+        quotaStatus:
+          $ref: "#/components/schemas/FunctionQuotaStatus"
+        resourceId:
+          pattern: ^res_[0-9a-z]+$
+          type: string
+        scheduleExpression:
+          maxLength: 120
+          minLength: 5
+          type: string
+        sourceRef:
+          maxLength: 255
+          minLength: 3
+          type: string
+        sourceType:
+          enum:
+            - manual
+            - event_topic
+            - cron
+            - http
+          type: string
+        status:
+          enum:
+            - provisioning
+            - active
+            - suspended
+          type: string
+        subjectRef:
+          maxLength: 120
+          minLength: 3
+          type: string
+        tenantId:
+          type: string
+        tenantIsolation:
+          $ref: "#/components/schemas/FunctionTenantIsolation"
+        timestamps:
+          $ref: "#/components/schemas/LifecycleTimestamps"
+        triggerName:
+          pattern: ^[a-z][a-z0-9-]{1,62}$
+          type: string
+        workspaceId:
+          type: string
+      required:
+        - resourceId
+        - tenantId
+        - workspaceId
+        - triggerName
+        - physicalTriggerName
+        - namespaceName
+        - subjectRef
+        - sourceType
+        - parameters
+        - quotaStatus
+        - tenantIsolation
+        - providerCompatibility
+        - status
+      type: object
+    FunctionVersion:
+      additionalProperties: false
+      properties:
+        activationPolicy:
+          $ref: "#/components/schemas/FunctionActivationPolicy"
+        deploymentDigest:
+          maxLength: 255
+          minLength: 12
+          type: string
+        execution:
+          $ref: "#/components/schemas/FunctionExecutionConfiguration"
+        originType:
+          enum:
+            - publish
+            - rollback_restore
+          type: string
+        originVersionId:
+          pattern: ^fnv_[0-9a-z]+$
+          type: string
+        resourceId:
+          pattern: ^(?:fn_[0-9a-f]{8}-[0-9a-f]{3}|res_[0-9a-z]+)$
+          type: string
+        rollbackEligible:
+          type: boolean
+        source:
+          $ref: "#/components/schemas/FunctionDeploymentSource"
+        status:
+          enum:
+            - active
+            - historical
+            - rollback_target
+            - retired
+            - invalid
+          type: string
+        tenantId:
+          type: string
+        timestamps:
+          $ref: "#/components/schemas/LifecycleTimestamps"
+        versionId:
+          pattern: ^fnv_[0-9a-z]+$
+          type: string
+        versionNumber:
+          minimum: 1
+          type: integer
+        workspaceId:
+          type: string
+      required:
+        - versionId
+        - resourceId
+        - tenantId
+        - workspaceId
+        - versionNumber
+        - status
+        - rollbackEligible
+        - originType
+        - source
+        - execution
+        - activationPolicy
+        - timestamps
+      type: object
+    FunctionVersionCollection:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/FunctionVersion"
+          type: array
+        page:
+          $ref: "#/components/schemas/FunctionAdminPage"
+      required:
+        - items
+        - page
+      type: object
+    FunctionWebActionConfiguration:
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+        rawHttpResponse:
+          type: boolean
+        requireAuthentication:
+          type: boolean
+        responseMode:
+          enum:
+            - json
+            - raw
+            - http_envelope
+          type: string
+      required:
+        - enabled
+        - requireAuthentication
+        - rawHttpResponse
+      type: object
+    FunctionWorkspaceSecret:
+      additionalProperties: false
+      properties:
+        affectedFunctions:
+          description: Function resource IDs whose derived Secret projections were updated by this operation.
+          items:
+            type: string
+          type: array
+        description:
+          maxLength: 500
+          type: string
+        resolvedRefCount:
+          maximum: 10000
+          minimum: 0
+          type: integer
+        secretName:
+          pattern: ^[a-z][a-z0-9_-]{0,62}$
+          type: string
+        tenantId:
+          type: string
+        timestamps:
+          $ref: "#/components/schemas/LifecycleTimestamps"
+        workspaceId:
+          type: string
+      required:
+        - secretName
+        - workspaceId
+        - tenantId
+        - resolvedRefCount
+        - timestamps
+      type: object
+    FunctionWorkspaceSecretCollection:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/FunctionWorkspaceSecret"
+          type: array
+        page:
+          $ref: "#/components/schemas/FunctionAdminPage"
+      required:
+        - items
+        - page
+      type: object
+    FunctionWorkspaceSecretWriteRequest:
+      additionalProperties: false
+      properties:
+        description:
+          maxLength: 500
+          type: string
+        secretName:
+          pattern: ^[a-z][a-z0-9_-]{0,62}$
+          type: string
+        secretValue:
+          maxLength: 65535
+          minLength: 1
+          type: string
+          writeOnly: true
+        tenantId:
+          type: string
+        workspaceId:
+          type: string
+      required:
+        - secretName
+        - secretValue
+      type: object
+    FunctionsDisabledError:
+      additionalProperties: false
+      properties:
+        code:
+          const: FUNCTIONS_DISABLED
+          type: string
+        correlationId:
+          maxLength: 128
+          minLength: 1
+          type: string
+        message:
+          const: Functions capability is disabled.
+          type: string
+      required:
+        - code
+        - message
+        - correlationId
+      type: object
+    GatewayMutationAccepted:
+      additionalProperties: false
+      properties:
+        acceptedAt:
+          format: date-time
+          type: string
+        correlationId:
+          maxLength: 128
+          minLength: 8
+          type: string
+        family:
+          type: string
+        requestId:
+          maxLength: 128
+          minLength: 8
+          type: string
+        resourceId:
+          type: string
+        resourceType:
+          type: string
+        status:
+          enum:
+            - accepted
+            - queued
+          type: string
+      required:
+        - requestId
+        - status
+        - family
+        - resourceType
+        - resourceId
+        - correlationId
+        - acceptedAt
+      type: object
+    KnativeUnavailableError:
+      additionalProperties: false
+      properties:
+        code:
+          const: KNATIVE_UNAVAILABLE
+          type: string
+        correlationId:
+          maxLength: 128
+          minLength: 1
+          type: string
+        message:
+          const: Knative runtime is unavailable.
+          type: string
+        mode:
+          enum:
+            - managed
+            - external
+            - disabled
+          type: string
+        reason:
+          pattern: ^[A-Z][A-Z0-9_]{0,63}$
+          type: string
+        state:
+          enum:
+            - unverified
+            - degraded
+            - unavailable
+            - disabled
+          type: string
+      required:
+        - code
+        - message
+        - mode
+        - state
+        - reason
+        - correlationId
+      type: object
+    LifecycleTimestamps:
+      additionalProperties: false
+      properties:
+        activatedAt:
+          format: date-time
+          type: string
+        createdAt:
+          format: date-time
+          type: string
+        deletedAt:
+          format: date-time
+          type: string
+        suspendedAt:
+          format: date-time
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+      required:
+        - createdAt
+        - updatedAt
+      type: object
+    OpenWhiskProviderCompatibility:
+      additionalProperties: false
+      properties:
+        apisixHttpExposure:
+          additionalProperties: false
+          properties:
+            managedByGateway:
+              type: boolean
+            productRouteFamily:
+              const: functions
+              type: string
+          required:
+            - managedByGateway
+            - productRouteFamily
+          type: object
+        namespaceStrategy:
+          enum:
+            - logical_namespace_per_workspace
+          type: string
+        nativeAdminCrudExposed:
+          const: false
+          type: boolean
+        provider:
+          const: openwhisk
+          type: string
+        subjectProvisioning:
+          enum:
+            - internal_only
+          type: string
+        supportedRuntimes:
+          items:
+            additionalProperties: false
+            properties:
+              runtime:
+                maxLength: 40
+                minLength: 3
+                type: string
+              sourceKinds:
+                items:
+                  enum:
+                    - inline_code
+                    - packaged_artifact
+                    - stored_reference
+                    - runtime_image
+                  type: string
+                minItems: 1
+                type: array
+              webActionSupported:
+                type: boolean
+            required:
+              - runtime
+              - sourceKinds
+              - webActionSupported
+            type: object
+          minItems: 1
+          type: array
+        supportedSourceKinds:
+          items:
+            enum:
+              - inline_code
+              - packaged_artifact
+              - stored_reference
+              - runtime_image
+            type: string
+          minItems: 1
+          type: array
+        supportedTriggerKinds:
+          items:
+            enum:
+              - http
+              - kafka
+              - storage
+              - cron
+            type: string
+          minItems: 1
+          type: array
+        supportedVersions:
+          items:
+            additionalProperties: false
+            properties:
+              label:
+                maxLength: 120
+                minLength: 3
+                type: string
+              range:
+                maxLength: 16
+                minLength: 3
+                type: string
+            required:
+              - range
+              - label
+            type: object
+          minItems: 1
+          type: array
+      required:
+        - provider
+        - namespaceStrategy
+        - subjectProvisioning
+        - nativeAdminCrudExposed
+        - supportedVersions
+        - supportedRuntimes
+        - supportedSourceKinds
+        - supportedTriggerKinds
+        - apisixHttpExposure
+      type: object
+    ProvisioningFailureClass:
+      enum:
+        - retryable_dependency_failure
+        - terminal_dependency_failure
+        - validation_error
+        - authorization_error
+      type: string
+    ProvisioningGatingMode:
+      enum:
+        - always
+        - capability_gated
+      type: string
+    ProvisioningResourceState:
+      additionalProperties: false
+      properties:
+        attemptCount:
+          minimum: 0
+          type: integer
+        displayName:
+          maxLength: 120
+          minLength: 3
+          type: string
+        failureClass:
+          $ref: "#/components/schemas/ProvisioningFailureClass"
+        gatingMode:
+          $ref: "#/components/schemas/ProvisioningGatingMode"
+        lastAttemptAt:
+          format: date-time
+          type: string
+        provider:
+          maxLength: 120
+          minLength: 2
+          type: string
+        providerReference:
+          maxLength: 255
+          minLength: 3
+          type: string
+        requiredCapabilityKey:
+          maxLength: 120
+          minLength: 3
+          type: string
+        resourceKey:
+          pattern: ^[a-z0-9](?:[a-z0-9_-]{1,62}[a-z0-9])?$
+          type: string
+        resourceType:
+          enum:
+            - tenant
+            - tenant_membership
+            - workspace
+            - workspace_membership
+            - identity_context
+            - postgres_instance
+            - storage_bucket
+            - mongo_database
+            - event_topic
+            - function_action
+          type: string
+        scope:
+          enum:
+            - tenant
+            - workspace
+          type: string
+        status:
+          $ref: "#/components/schemas/ProvisioningResourceStatus"
+        visibleInConsole:
+          type: boolean
+      required:
+        - resourceKey
+        - resourceType
+        - scope
+        - gatingMode
+        - status
+        - attemptCount
+        - visibleInConsole
+      type: object
+    ProvisioningResourceStatus:
+      enum:
+        - pending
+        - in_progress
+        - provisioned
+        - skipped
+        - failed
+        - retry_scheduled
+      type: string

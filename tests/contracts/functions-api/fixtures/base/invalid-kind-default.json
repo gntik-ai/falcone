@@ -1,0 +1,44 @@
+{
+  "description": "default is not a base kind; omit base instead.",
+  "expectedRejection": "/base",
+  "instances": {
+    "FunctionExecutionConfiguration": {
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "parameters": {},
+      "environment": {},
+      "limits": {
+        "timeoutSeconds": 30,
+        "memoryMb": 256
+      },
+      "webAction": {
+        "enabled": false,
+        "requireAuthentication": true,
+        "rawHttpResponse": false
+      },
+      "base": {
+        "kind": "default"
+      }
+    },
+    "FunctionActionExecutionConfiguration": {
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "parameters": {},
+      "limits": {
+        "timeoutMs": 30000,
+        "memoryMb": 256
+      },
+      "base": {
+        "kind": "default"
+      }
+    },
+    "FunctionDefinitionPayload": {
+      "actionName": "legacy-fn",
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "base": {
+        "kind": "default"
+      }
+    }
+  }
+}
