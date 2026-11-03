@@ -168,6 +168,26 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(rows(p).first()).toContainText(c.stale);
       expect(p.network.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/refresh'))).toHaveLength(0);
     });
+    test('burst', async ({ parity: p }) => {
+      // Record every distinct text of the polite live regions, so the announcement count is observable.
+      await p.page.addInitScript(() => {
+        window.__announcements = [];
+        const read = () => Array.from(document.querySelectorAll('[aria-live="polite"]')).map((node) => node.textContent ?? '').join('|');
+        let last = '';
+        new MutationObserver(() => { const text = read(); if (text !== last) { last = text; if (text) window.__announcements.push(text); } })
+          .observe(document, { subtree: true, childList: true, characterData: true });
+      });
+      await start(p, 'realtime-sse-burst');
+      await expect(rows(p)).toHaveCount(50);
+      await expect(surface(p).getByText('(50)', { exact: true })).toBeVisible();
+      await expect.poll(() => p.page.evaluate(() => window.__announcements.filter((text) => /\b50\b/.test(text)).length)).toBe(1);
+      // The burst is never announced line by line: wait past the announcement window and recount.
+      await p.page.waitForTimeout(1000);
+      const announcements = await p.page.evaluate(() => window.__announcements);
+      expect(announcements.filter((text) => /\b50\b/.test(text))).toHaveLength(1);
+      expect(announcements.filter((text) => /\b(?:[1-9]|[1-4]\d)\b (?:cambios?|new change)/.test(text))).toHaveLength(0);
+      await check.assertRuntimeHealth(p);
+    });
     test('accessibility', async ({ parity: p }) => {
       const c = copy(p);
       await open(p); await check.assertAccessibility(p); await check.assertLocale(p);
@@ -252,9 +272,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) for (co
         await p.page.route('**/v1/auth/login-sessions/synthetic-session/refresh', async (route) => {
           if (route.request().method() !== 'POST') return route.fallback();
           p.network.requests.push({ method: 'POST', path: '/v1/auth/login-sessions/synthetic-session/refresh', body: route.request().postDataJSON() });
-          await route.fulfill({ json: (await import('../fixtures/shell.ts')).sessionFor('superadmin', true) });
+          await route.fulfill({ json: unrestricted(sessionFor('superadmin', true)) });
         });
       } else p.network.setVariants({ refresh: '401' });
+      // The harness principal is limited to the synthetic tenant and workspace; the shell filters tenants and
+      // workspaces by those memberships, so this journey seeds a principal without limits to reach t2.
+      const { sessionFor } = await import('../fixtures/shell.ts');
+      const unrestricted = (session) => { session.principal.tenantIds = []; session.principal.workspaceIds = []; return session; };
+      await p.page.addInitScript((session) => { sessionStorage.setItem('in-falcone.console-shell-session', JSON.stringify(session)); }, unrestricted(sessionFor('superadmin')));
       await p.page.addInitScript(streamMock, streamFixtures['realtime-sse-mongo']);
       await p.page.goto(server.url('console/realtime/changes'));
       await p.page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active organization' }).selectOption('synthetic-tenant');
