@@ -1,0 +1,4 @@
+/* The legacy provider list has no search: keep the toolbar to its primary action. */
+.auth-config-toolbar div:has(> input[type="search"]) { display: none; }
+.auth-config-toolbar > div:first-child { display: none; }
+.auth-config-toolbar > div:last-child { margin-inline-start: auto; }
