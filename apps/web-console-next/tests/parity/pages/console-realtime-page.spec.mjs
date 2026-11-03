@@ -64,8 +64,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     test('action', async ({ parity: p }) => {
       await open(p);
       expect(calls(p)).toEqual([{ method: 'GET', path: realtimePath, body: undefined }]);
-      expect(p.network.capabilityRequests).toEqual([{ method: 'GET', path: capabilitiesPath, body: undefined }]);
-      expect(p.network.allRequests).toHaveLength(p.network.requests.length + p.network.capabilityRequests.length);
+      expect(p.network.requests.filter((r) => [capabilitiesPath, realtimePath].includes(r.path)).sort((a, b) => a.path.localeCompare(b.path))).toEqual([
+        { method: 'GET', path: capabilitiesPath, body: undefined },
+        { method: 'GET', path: realtimePath, body: undefined },
+      ]);
       await p.page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => { window.__syntheticCopied = value; } } }));
       await surface(p).getByRole('button', { name: copy.copyEndpoint }).click();
       expect(await p.page.evaluate(() => window.__syntheticCopied)).toBe(ready.realtimeEndpointUrl);

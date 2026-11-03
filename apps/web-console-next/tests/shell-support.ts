@@ -22,15 +22,7 @@ export function strictFetch(routes: Record<string, unknown | ((init: RequestInit
     const response = routes[key]
     return typeof response === 'function' ? response(init) : Response.json(response)
   })
-  // Default shell bootstrap stays separate from existing page request assertions.
-  // Realtime/provider tests register this path explicitly to assert its count and failures.
-  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init: RequestInit = {}) => {
-    const key = `${init.method ?? 'GET'} ${String(input)}`
-    if (key === 'GET /v1/tenant/effective-capabilities' && !(key in routes) && init.body === undefined) {
-      return Promise.resolve(Response.json({ capabilities: { realtime: true } }))
-    }
-    return mock(input, init)
-  }))
+  vi.stubGlobal('fetch', mock)
   return { mock, verify: () => expect(unmatched).toEqual([]) }
 }
 

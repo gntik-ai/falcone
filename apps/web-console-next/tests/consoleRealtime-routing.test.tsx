@@ -8,6 +8,7 @@ import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
 import { ready, realtimePath, capabilitiesPath } from './parity/pages/console-realtime-page.manifest'
 import { consumption } from './parity/pages/console-workspace-dashboard-page.manifest'
 import es from '../src/locales/es/pages.console-realtime-page.json'
+import common from '../src/locales/es/common.json'
 
 let requests: ReturnType<typeof strictFetch>
 afterEach(() => { requests?.verify(); document.documentElement.removeAttribute('data-same-document') })
@@ -26,6 +27,7 @@ test('NavLink and navigate load the lazy route once each in the same document wi
   requests = strictFetch({ ...bootstrap, [`GET ${realtimePath}`]: ready })
   render(<MemoryRouter initialEntries={['/console/workspaces/ws-1']}><Controls /><App /></MemoryRouter>)
   await screen.findByRole('table', {}, { timeout: 10000 })
+  expect(requests.mock.mock.calls.filter(([path]) => path === capabilitiesPath)).toHaveLength(0)
   document.documentElement.dataset.sameDocument = 'synthetic-marker'
   fireEvent.click(screen.getByRole('link', { name: 'Realtime link fixture' }))
   await screen.findByRole('tab', { name: 'JavaScript' }, { timeout: 10000 })
@@ -38,6 +40,17 @@ test('NavLink and navigate load the lazy route once each in the same document wi
   expect(requests.mock.mock.calls.filter(([path]) => path === realtimePath)).toHaveLength(2)
   expect(requests.mock.mock.calls.filter(([path]) => path === capabilitiesPath)).toHaveLength(1)
 }, 20000)
+test('the provisioning link reaches the unknown route and the back control restores realtime', async () => {
+  login(['superadmin'])
+  requests = strictFetch({ ...bootstrap, [`GET ${realtimePath}`]: { ...ready, dataSources: [] } })
+  render(<MemoryRouter basename="/next" initialEntries={['/next/console/workspaces/ws-1/realtime']}><App /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('link', { name: es.provisioning }))
+  expect(await screen.findByRole('heading', { name: common.states.unknown.title })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: common.shell.back }))
+  expect(await screen.findByRole('heading', { name: es.emptyTitle })).toBeVisible()
+  expect(requests.mock.mock.calls.filter(([path]) => path === realtimePath)).toHaveLength(2)
+  expect(requests.mock.mock.calls.filter(([path]) => path === capabilitiesPath)).toHaveLength(1)
+})
 test.each(['refresh-ok', 'refresh-rejected', 'replay-401'])('401 shared session lifecycle: %s', async (variant) => {
   login(['superadmin']); let count = 0
   const refreshed = buildConsoleRefreshSessionFixture()

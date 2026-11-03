@@ -11,7 +11,7 @@ import { capabilitiesPath, realtimeEndpoints, realtimePath } from './parity/page
 
 interface RequestRecord { method: string; path: string; body: unknown }
 interface Parity {
-  network: { requests: RequestRecord[]; capabilityRequests: RequestRecord[]; allRequests: RequestRecord[] }
+  network: { requests: RequestRecord[] }
 }
 const origin = 'http://synthetic.test'
 async function withHarness(use: (parity: Parity, send: (method: string, path: string, body?: unknown) => Promise<ReturnType<typeof vi.fn>>) => Promise<void>) {
@@ -29,24 +29,18 @@ async function withHarness(use: (parity: Parity, send: (method: string, path: st
   })
 }
 
-test('shell capabilities stay observable without changing existing page request contracts', async () => {
+test('capabilities and realtime use the ordinary request registry without a hidden bucket', async () => {
   await withHarness(async (parity, send) => {
     const workspace = '/v1/workspaces?page%5Bsize%5D=100&sort=displayName'
     await send('GET', workspace)
-    await send('GET', capabilitiesPath)
     const before = parity.network.requests.length
+    await send('GET', capabilitiesPath)
     await send('GET', realtimePath)
-    expect(parity.network.requests.slice(before)).toEqual([{ method: 'GET', path: realtimePath, body: undefined }])
-    expect(parity.network.capabilityRequests).toEqual([{ method: 'GET', path: capabilitiesPath, body: undefined }])
-    expect(parity.network.allRequests).toEqual([
-      { method: 'GET', path: workspace, body: undefined },
+    expect(parity.network.requests.slice(before)).toEqual([
       { method: 'GET', path: capabilitiesPath, body: undefined },
       { method: 'GET', path: realtimePath, body: undefined },
     ])
-    // Another document or tenant bootstrap remains visible to dedicated assertions.
-    await send('GET', capabilitiesPath)
-    expect(parity.network.capabilityRequests).toHaveLength(2)
-    expect(parity.network.allRequests).toHaveLength(4)
+    expect(parity.network.requests).toHaveLength(3)
   })
 })
 
@@ -62,7 +56,5 @@ test.each([
     observed = { network: parity.network, fulfill: await send(method, path, body) }
   })).rejects.toThrow('Unmatched requests:')
   expect(observed.fulfill).toHaveBeenCalledWith({ status: 404, json: { error_msg: '404 Route Not Found' } })
-  expect(observed.network.capabilityRequests).toEqual([])
-  expect(observed.network.requests).toEqual(observed.network.allRequests)
-  expect(observed.network.allRequests).toHaveLength(1)
+  expect(observed.network.requests).toEqual([{ method, path: new URL(path, origin).pathname + new URL(path, origin).search, body }])
 })

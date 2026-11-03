@@ -29,13 +29,14 @@ export const realtimeFixtures = {
   'workspace-realtime-network': { network: true },
 }
 export const realtimeEndpoints: Record<string, PageEndpoint> = {
+  capabilities: { method: 'GET', path: capabilitiesPath, fixtures: capabilityFixtures },
   realtime: { method: 'GET', path: realtimePath, fixtures: { success: ok(ready), empty: realtimeFixtures['workspace-realtime-no-sources'], ...realtimeFixtures } },
 }
 // Allowed presentation differences from legacy; the snippets and transport remain identical.
 export const allowedDifferences = ['inert disabled content', 'description list', 'endpoint copy', '403/404 states', 'back links', 'request id', 'focus moves']
 const manifest: ParityManifest = {
   route: '/console/workspaces/ws-1/realtime', roles: ['superadmin', 'tenant_viewer'], endpoints: realtimeEndpoints,
-  fixtures: ['realtime'], sources: ['src/pages/consoleRealtime.tsx', 'src/pages/consoleRealtime'],
+  fixtures: ['realtime', 'capabilities'], sources: ['src/pages/consoleRealtime.tsx', 'src/pages/consoleRealtime'],
   data: [{ name: 'title', locator: { es: 'h1:text-is("Tiempo real del área de trabajo")', en: 'h1:text-is("Workspace realtime")' } }],
   actions: [], states: [],
 }
