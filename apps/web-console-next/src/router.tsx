@@ -100,6 +100,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'mcp/servers/:mcpServerId' && route.migrated) return { ...route, element: lazyPage('pages.console-mcp-server-detail-page', () => import('./pages/consoleMcpServerDetail')) }
         if (route.path === 'functions-registry' && route.migrated) return { ...route, element: lazyPage('pages.console-function-registry-page', () => import('./pages/consoleFunctionRegistry')) }
         if (route.path === 'functions/data' && route.migrated) return { ...route, element: lazyPage('pages.console-functions-data-page', () => import('./pages/consoleFunctionsData')) }
+        if (route.path === 'realtime/changes' && route.migrated) return { ...route, element: lazyPage('pages.console-realtime-changes-page', () => import('./pages/consoleRealtimeChanges')) }
         if (route.path === 'flows' && route.migrated) return { ...route, element: lazyPage('pages.console-flows-page', () => import('./pages/consoleFlows')) }
         if (route.path === 'flows/:flowId' && route.migrated) return { ...route, element: lazyPage('pages.console-flow-designer-page', () => import('./pages/consoleFlowDesigner')) }
         if (route.path === 'flows/:flowId/runs' && route.migrated) return { ...route, element: lazyPage('pages.console-flow-history-page', () => import('./pages/consoleFlowHistory')) }
