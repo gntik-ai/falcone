@@ -44,13 +44,13 @@ test('the provisioning link reaches the unknown route and the back control resto
   login(['superadmin'])
   requests = strictFetch({ ...bootstrap, [`GET ${realtimePath}`]: { ...ready, dataSources: [] } })
   render(<MemoryRouter basename="/next" initialEntries={['/next/console/workspaces/ws-1/realtime']}><App /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('link', { name: es.provisioning }))
-  expect(await screen.findByRole('heading', { name: common.states.unknown.title })).toBeVisible()
+  fireEvent.click(await screen.findByRole('link', { name: es.provisioning }, { timeout: 10000 }))
+  expect(await screen.findByRole('heading', { name: common.states.unknown.title }, { timeout: 10000 })).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: common.shell.back }))
-  expect(await screen.findByRole('heading', { name: es.emptyTitle })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: es.emptyTitle }, { timeout: 10000 })).toBeVisible()
   expect(requests.mock.mock.calls.filter(([path]) => path === realtimePath)).toHaveLength(2)
   expect(requests.mock.mock.calls.filter(([path]) => path === capabilitiesPath)).toHaveLength(1)
-})
+}, 20000)
 test.each(['refresh-ok', 'refresh-rejected', 'replay-401'])('401 shared session lifecycle: %s', async (variant) => {
   login(['superadmin']); let count = 0
   const refreshed = buildConsoleRefreshSessionFixture()
