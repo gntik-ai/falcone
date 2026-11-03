@@ -24,8 +24,8 @@ export function mapChannelTypes(sources: WorkspaceRealtimeResponse['dataSources'
   return Array.from(new Set((sources ?? []).flatMap((source) => source?.type === 'postgresql' ? ['postgresql-changes'] : source?.type === 'mongodb' ? ['mongodb-changes'] : [])))
 }
 
-function ProvisioningLink({ href, ...props }: ComponentPropsWithRef<'a'>) {
-  return <RouterLink to={href ?? ''} {...props} />
+function ProvisioningLink({ href, children, ...props }: ComponentPropsWithRef<'a'>) {
+  return <RouterLink to={href ?? ''} {...props}><>{children}</></RouterLink>
 }
 
 function Realtime() {
