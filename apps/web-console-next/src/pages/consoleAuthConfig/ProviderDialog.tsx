@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useId, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Checkbox, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Field, FieldDescription, FieldLabel, Input, PasswordInput, SimpleSelect, Text, useAnnounce } from '@gntik-ai/ui'
 import { InlineCallout, ValidationSummary, type ValidationIssue } from '@gntik-ai/blocks'
@@ -20,7 +20,7 @@ interface Props {
 export function ProviderDialog({ tenantId, provider, aliases, returnFocus, onClose, onSaved }: Props) {
   const { t } = useTranslation(NAMESPACE)
   const announce = useAnnounce()
-  const base = useRef(`auth-config-provider-${Math.random().toString(36).slice(2, 8)}`).current
+  const base = `auth-config-provider${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const ids = { template: `${base}-template`, alias: `${base}-alias`, name: `${base}-name`, clientId: `${base}-client-id`, secret: `${base}-secret`, scope: `${base}-scope` }
   const [open, setOpen] = useState(true)
   const [providerId, setProviderId] = useState(provider?.providerId ?? 'google')

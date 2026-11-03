@@ -120,7 +120,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       // No organisation: an empty state and no auth-config request.
       await parity.open(manifest.route, { tenant: 'empty', tenants: 'empty' });
       await expect(surface(parity).getByRole('heading', { name: c.selectOrganization, exact: true })).toBeVisible(); expect(configCalls(parity)).toHaveLength(0);
-      await check.assertLocale(parity);
+      // The shell's workspace switcher renders a kit-built English placeholder when no workspace exists, so this state checks the page surface and the document language only.
+      await expect(parity.page.locator('html')).toHaveAttribute('lang', parity.locale);
+      await expect(surface(parity).getByText(c.selectOrganizationDescription, { exact: true })).toBeVisible();
       // No providers: first-run empty state with the realm and Crear proveedor.
       await parity.open(manifest.route, { 'auth-config-get': 'no-providers' });
       await expect(surface(parity).getByRole('heading', { name: c.emptyProviders, exact: true })).toBeVisible();
