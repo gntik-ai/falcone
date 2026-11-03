@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ComponentPropsWithRef } from 'react'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Badge, Button, CodeBlock, EmptyState, I18nProvider, Link, LinkProvider, Page, Tabs, TabsList, TabsPanel, TabsTab, Text } from '@gntik-ai/ui'
-import { DescriptionListCard, ErrorPanel, FirstRunEmpty, NoAccessEmpty, PageHeader, PageSkeleton } from '@gntik-ai/blocks'
+import { DescriptionListCard, ErrorPanel, NoAccessEmpty, PageHeader, PageSkeleton } from '@gntik-ai/blocks'
 import type { ApiError } from '@in-falcone/console-api/http'
 import { useConsoleContext } from '../shell/context'
 import { useCapabilityGate } from '../shell/capabilities'
@@ -102,9 +102,8 @@ function Realtime() {
         { id: 'enabled', label: t('fields.enabled'), value: t(data?.features?.realtime === true ? 'enabled' : 'disabled'), mono: false, render: undefined, status: undefined, copyable: false, copyValue: '' },
         { id: 'channels', label: t('fields.channels'), value: channels.join(', '), mono: false, render: undefined, status: undefined, copyable: false, copyValue: '' },
       ]} />
-    {!data?.features?.realtime || !channels.length ? <LinkProvider component={ProvisioningLink}><FirstRunEmpty title={t('emptyTitle')} description={t('emptyDescription')} titleAs="h2" bordered={false} icon={undefined}
-      actionLabel="" onAction={undefined} secondary={{ label: t('provisioning'), href: `/console/workspaces/${workspaceId}/provisioning` }} steps={[]}
-      labels={{ title: t('emptyTitle'), description: t('emptyDescription'), action: '', guide: t('provisioning') }} /></LinkProvider>
+    {!data?.features?.realtime || !channels.length ? <LinkProvider component={ProvisioningLink}><EmptyState title={t('emptyTitle')} description={t('emptyDescription')} titleAs="h2" bordered={false} icon={undefined}
+      primaryAction={null} secondaryAction={<Link href={`/console/workspaces/${workspaceId}/provisioning`} underline="always">{t('provisioning')}</Link>} /></LinkProvider>
       : <section aria-labelledby="realtime-snippets-heading" className="min-w-0 space-y-4">
         <h2 id="realtime-snippets-heading" className="text-lg font-semibold">{t('snippets')}</h2>
         <Tabs value={language} onValueChange={(value) => { setLanguage(value as Language); setCopiedId(null); setManualId(null); try { sessionStorage.setItem(storageKey, String(value)) } catch { /* Storage can be unavailable. */ } }}>

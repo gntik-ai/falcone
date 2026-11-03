@@ -100,7 +100,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(surface(p).getByRole('tablist')).toBeVisible();
     });
     test('accessibility', async ({ parity: p }) => {
-      for (const variants of [{}, { capabilities: 'capability-disabled' }, { realtime: 'workspace-realtime-500' }]) {
+      for (const variants of [{}, { capabilities: 'capability-disabled' }, { realtime: 'workspace-realtime-disabled' }, { realtime: 'workspace-realtime-no-sources' }, { realtime: 'workspace-realtime-only-unsupported' }, { realtime: 'workspace-realtime-500' }]) {
         await open(p, variants); await check.assertAccessibility(p); await check.assertLocale(p);
       }
       await open(p);

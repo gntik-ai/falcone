@@ -52,11 +52,16 @@ test.each(['workspace-realtime-dup-unsupported', 'workspace-realtime-null-endpoi
     expect(document.querySelector('pre')).toHaveTextContent('<REALTIME_ENDPOINT>')
   } else expect(document.querySelectorAll('dd')[3]).toHaveTextContent('postgresql-changes, mongodb-changes')
 })
-test.each(['workspace-realtime-no-sources', 'workspace-realtime-only-unsupported', 'workspace-realtime-disabled'] as const)('unavailable state keeps configuration and provisioning: %s', async (fixture) => {
+test.each((['es', 'en'] as const).flatMap((locale) => (['workspace-realtime-no-sources', 'workspace-realtime-only-unsupported', 'workspace-realtime-disabled'] as const).map((fixture) => [locale, fixture] as const)))('unavailable state keeps configuration and named controls in %s: %s', async (locale, fixture) => {
+  await i18n.changeLanguage(locale)
+  const copy = locale === 'es' ? es : en
   mock(realtimeFixtures[fixture].body); open()
-  expect(await screen.findByRole('heading', { name: es.emptyTitle })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: copy.emptyTitle })).toBeVisible()
   expect(document.querySelectorAll('dt')).toHaveLength(4)
-  expect(screen.getByRole('link', { name: es.provisioning })).toHaveAttribute('href', '/console/workspaces/ws-1/provisioning')
+  expect(screen.getByRole('link', { name: copy.provisioning })).toHaveAttribute('href', '/console/workspaces/ws-1/provisioning')
+  expect(screen.queryByRole('button', { name: '' })).not.toBeInTheDocument()
+  expect(screen.getAllByRole('button')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: copy.copyEndpoint })).toBeVisible()
   expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
 })
 test('route workspace wins over selection, with selection fallback and no-workspace no-request', async () => {
