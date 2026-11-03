@@ -168,26 +168,6 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(rows(p).first()).toContainText(c.stale);
       expect(p.network.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/refresh'))).toHaveLength(0);
     });
-    test('burst', async ({ parity: p }) => {
-      // Record every distinct text of the polite live regions, so the announcement count is observable.
-      await p.page.addInitScript(() => {
-        window.__announcements = [];
-        const read = () => Array.from(document.querySelectorAll('[aria-live="polite"]')).map((node) => node.textContent ?? '').join('|');
-        let last = '';
-        new MutationObserver(() => { const text = read(); if (text !== last) { last = text; if (text) window.__announcements.push(text); } })
-          .observe(document, { subtree: true, childList: true, characterData: true });
-      });
-      await start(p, 'realtime-sse-burst');
-      await expect(rows(p)).toHaveCount(50);
-      await expect(surface(p).getByText('(50)', { exact: true })).toBeVisible();
-      await expect.poll(() => p.page.evaluate(() => window.__announcements.filter((text) => /\b50\b/.test(text)).length)).toBe(1);
-      // The burst is never announced line by line: wait past the announcement window and recount.
-      await p.page.waitForTimeout(1000);
-      const announcements = await p.page.evaluate(() => window.__announcements);
-      expect(announcements.filter((text) => /\b50\b/.test(text))).toHaveLength(1);
-      expect(announcements.filter((text) => /\b(?:[1-9]|[1-4]\d)\b (?:cambios?|new change)/.test(text))).toHaveLength(0);
-      await check.assertRuntimeHealth(p);
-    });
     test('accessibility', async ({ parity: p }) => {
       const c = copy(p);
       await open(p); await check.assertAccessibility(p); await check.assertLocale(p);
@@ -248,13 +228,42 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   });
 }
 
+// Burst announcement journey, kept outside the eight-check parity groups (the reporter requires exactly those checks).
+for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
+  test.describe(`console-realtime-changes-page burst - ${locale} - ${width}`, () => {
+    test.use({ locale, role: 'superadmin', viewport: { width, height: 900 } });
+    test('burst announcement is bounded', async ({ parity: p }) => {
+      // Record every distinct text of the polite live regions, so the announcement count is observable.
+      await p.page.addInitScript(() => {
+        window.__announcements = [];
+        const read = () => Array.from(document.querySelectorAll('[aria-live="polite"]')).map((node) => node.textContent ?? '').join('|');
+        let last = '';
+        new MutationObserver(() => { const text = read(); if (text !== last) { last = text; if (text) window.__announcements.push(text); } })
+          .observe(document, { subtree: true, childList: true, characterData: true });
+      });
+      await start(p, 'realtime-sse-burst');
+      // The log viewer virtualizes its rows: assert the logical total and the newest, windowed line.
+      await expect(rows(p).first()).toContainText('"_id":"b50"');
+      await expect(surface(p).getByText('(50)', { exact: true })).toBeVisible();
+      await expect.poll(() => p.page.evaluate(() => window.__announcements.filter((text) => /\b50\b/.test(text)).length)).toBe(1);
+      // The burst is never announced line by line: wait past the announcement window and recount.
+      await p.page.waitForTimeout(1000);
+      const announcements = await p.page.evaluate(() => window.__announcements);
+      expect(announcements.filter((text) => /\b50\b/.test(text))).toHaveLength(1);
+      expect(announcements.filter((text) => /\b(?:[1-9]|[1-4]\d)\b (?:cambios?|new change)/.test(text))).toHaveLength(0);
+      await check.assertRuntimeHealth(p);
+    });
+  });
+}
+
 // Session expiry while the page is active follows the shell: one refresh and one replay, or the login redirect.
+// Not a parity group (no ' | ' in the title): the reporter would count its single check as an incomplete group.
 const tenants = { items: [
   { tenantId: 'synthetic-tenant', displayName: 'Synthetic Tenant', slug: 'synthetic-tenant', state: 'active' },
   { tenantId: 't2', displayName: 'Second Tenant', slug: 't2', state: 'active' },
 ], page: { after: null } };
 for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) for (const variant of ['session-401-refresh-ok', 'session-401-refresh-rejected']) {
-  test.describe(`console-realtime-changes-page session | ${locale} | ${width} | ${variant}`, () => {
+  test.describe(`console-realtime-changes-page session - ${locale} - ${width} - ${variant}`, () => {
     test.use({ locale, role: 'superadmin', viewport: { width, height: 900 } });
     test('shared session refresh and replay are bounded', async ({ parity: p, server }) => {
       const t2Path = '/v1/workspaces?page%5Bsize%5D=100&sort=displayName&filter%5BtenantId%5D=t2';
