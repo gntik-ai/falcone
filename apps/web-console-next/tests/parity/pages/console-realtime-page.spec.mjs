@@ -4,6 +4,23 @@ import manifest, { ready, realtimePath, capabilitiesPath, allowedDifferences, re
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-realtime-page.json`, import.meta.url), 'utf8'))]));
+const build = JSON.parse(readFileSync(new URL('../../../dist/.vite/manifest.json', import.meta.url), 'utf8'));
+const entry = Object.values(build).find((chunk) => chunk.isEntry && chunk.name === 'app').file;
+// Keep the named workspace fixture consistent with the synthetic session's membership.
+test.beforeEach(async ({ parity: p }) => {
+  await p.page.route(`**/${entry}`, async (route) => {
+    await p.page.evaluate(() => {
+      const key = 'in-falcone.console-shell-session';
+      const session = JSON.parse(sessionStorage.getItem(key));
+      session.principal.workspaceIds = ['ws-1'];
+      sessionStorage.setItem(key, JSON.stringify(session));
+    });
+    await route.fallback();
+  });
+  await p.page.route((url) => url.pathname === '/v1/workspaces', async (route) => route.fulfill({ json: {
+    items: [{ workspaceId: 'ws-1', tenantId: 'synthetic-tenant', displayName: 'Synthetic workspace', slug: 'synthetic' }], page: { after: null },
+  } }));
+});
 const calls = (p) => p.network.requests.filter((r) => r.path === realtimePath);
 const surface = (p) => p.page.locator('.console-realtime');
 async function open(p, variants = {}) {
@@ -26,12 +43,6 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`console-realtime-page | ${locale} | ${width}`, () => {
     test.use({ locale, role: 'superadmin', viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
     const copy = bundles[locale];
-    test.beforeEach(async ({ parity: p }) => {
-      // Use the named ws-1 fixture without changing any other page's shell fixtures.
-      await p.page.route((url) => url.pathname === '/v1/workspaces', async (route) => route.fulfill({ json: {
-        items: [{ workspaceId: 'ws-1', tenantId: 'synthetic-tenant', displayName: 'Synthetic workspace', slug: 'synthetic' }], page: { after: null },
-      } }));
-    });
     test('data', async ({ parity: p }) => {
       await open(p);
       await expect(surface(p).locator('dt')).toHaveText(Object.values(copy.fields));
@@ -146,7 +157,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) for (co
     test('shared session refresh and replay are bounded', async ({ parity: p, server }) => {
       p.network.setVariants({ realtime: variant, refresh: variant === 'workspace-realtime-401-refresh-rejected' ? '401' : 'success' });
       await p.page.goto(server.url('console/workspaces/ws-1/realtime'));
-      if (variant === 'workspace-realtime-401-refresh-ok') await expect(surface(p).getByRole('heading', { level: 1 })).toBeVisible();
+      if (variant === 'workspace-realtime-401-refresh-ok') await expect(surface(p).locator('dl')).toBeVisible();
       else {
         await expect(p.page).toHaveURL(/\/login$/);
         expect(await p.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(server.url('console/workspaces/ws-1/realtime')).pathname);
