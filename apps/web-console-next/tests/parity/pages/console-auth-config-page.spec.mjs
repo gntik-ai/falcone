@@ -173,13 +173,15 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       expect(writes(parity)).toHaveLength(start);
       // Delete: cancel sends nothing, a 500 keeps the confirmation open with its error.
       await parity.open(manifest.route, { 'auth-config-idp-delete': '500' }); await ready(parity);
+      // The harness keeps every request of the test, so compare against a checkpoint taken before this scenario.
+      const checkpoint = writes(parity).length;
       const trigger = button(parity, 'deleteNamed', 'Google');
       await trigger.click(); await parity.page.getByRole('alertdialog').getByRole('button', { name: c.cancel, exact: true }).click();
       await expect(parity.page.getByRole('alertdialog')).toHaveCount(0); await expect(trigger).toBeFocused();
-      expect(writes(parity)).toHaveLength(0);
+      expect(writes(parity).slice(checkpoint)).toHaveLength(0);
       await trigger.click(); await parity.page.getByRole('alertdialog').getByRole('button', { name: c.deleteConfirm, exact: true }).click();
       await expect(parity.page.getByRole('alertdialog').getByText(c.errors['5xx'], { exact: true })).toBeVisible();
-      expect(writes(parity)).toEqual([{ method: 'DELETE', path: providerPath('google'), body: undefined }]);
+      expect(writes(parity).slice(checkpoint)).toEqual([{ method: 'DELETE', path: providerPath('google'), body: undefined }]);
     });
     test('accessibility', async ({ parity }) => {
       const c = copy(parity);
@@ -246,7 +248,13 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await url.scrollIntoViewIfNeeded(); await check.assertResponsive(parity, width);
       expect(await url.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
       await button(parity, 'createProvider').click();
-      const dialog = providerDialog(parity); await expect(dialog).toBeVisible(); await check.assertResponsive(parity, width);
+      // An open modal hides the main landmark from the accessibility tree, so measure the document and the dialog directly.
+      const dialog = providerDialog(parity); await expect(dialog).toBeVisible();
+      const sizes = await parity.page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+      expect(sizes.scrollWidth, `responsive: horizontal overflow with the dialog open at ${width}px`).toBeLessThanOrEqual(sizes.clientWidth);
+      const bounds = await dialog.boundingBox();
+      expect(bounds.x, `responsive: dialog left edge at ${width}px`).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width, `responsive: dialog right edge at ${width}px`).toBeLessThanOrEqual(width);
       await expect(dialog.getByRole('button', { name: c.dialogSave, exact: true })).toBeVisible();
     });
     test('visual-review', async ({ parity }, info) => {
