@@ -44,7 +44,7 @@ async function snapshot(p, info, name) {
 }
 
 for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
-  test.describe(`console-realtime-changes-page | ${locale} | ${width}`, () => {
+  test.describe(`console-realtime-changes-page | superadmin | ${locale} | ${width}`, () => {
     test.use({ locale, role: 'superadmin', viewport: { width, height: 900 } });
     test('data', async ({ parity: p }) => {
       const c = copy(p);
