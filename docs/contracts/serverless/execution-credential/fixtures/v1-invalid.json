@@ -1,0 +1,3175 @@
+[
+  {
+    "name": "missing-max-lifetime",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "invalid-lifetime-config"
+    }
+  },
+  {
+    "name": "missing-exp",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-claims"
+    }
+  },
+  {
+    "name": "guest-holder",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "guest",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "untrusted-holder"
+    }
+  },
+  {
+    "name": "wrong-issuer",
+    "claims": {
+      "iss": "foreign:issuer",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "wrong-issuer"
+    }
+  },
+  {
+    "name": "foreign-audience",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "foreign:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "wrong-audience"
+    }
+  },
+  {
+    "name": "now-equals-exp",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1060,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "expired-or-overlong"
+    }
+  },
+  {
+    "name": "tenant-only-mismatch",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-b",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "tenant-mismatch"
+    }
+  },
+  {
+    "name": "workspace-only-mismatch",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-b",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "workspace-mismatch"
+    }
+  },
+  {
+    "name": "attempt-mismatch",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-b",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "scope-mismatch"
+    }
+  },
+  {
+    "name": "completed-attempt",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "completed",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "attempt-not-active"
+    }
+  },
+  {
+    "name": "capabilities-outside-pinned-grants",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "private/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "capabilities-outside-grants"
+    }
+  },
+  {
+    "name": "requested-capability-absent",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "private/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "requested-capability-not-allowed"
+    }
+  },
+  {
+    "name": "guest-tenant-mismatch",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a",
+      "guest_scope": {
+        "tenant": "tenant-b"
+      }
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "guest-scope-mismatch"
+    }
+  },
+  {
+    "name": "dotted-jwt-like-handle",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "test.claims.signature"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-handle"
+    }
+  },
+  {
+    "name": "unknown-handle",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "guessed_test_handle"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "unknown-handle"
+    }
+  },
+  {
+    "name": "handle-of-another-attempt",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-b",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "handle-not-bound-to-attempt"
+    }
+  },
+  {
+    "name": "tenant-container-holder",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "tenant-container",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "untrusted-holder"
+    }
+  },
+  {
+    "name": "zero-max-lifetime",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 0,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "invalid-lifetime-config"
+    }
+  },
+  {
+    "name": "negative-max-lifetime",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": -1,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "invalid-lifetime-config"
+    }
+  },
+  {
+    "name": "string-infinity-max-lifetime",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": "Infinity",
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "invalid-lifetime-config"
+    }
+  },
+  {
+    "name": "now-after-exp",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1061,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "expired-or-overlong"
+    }
+  },
+  {
+    "name": "iat-after-now",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1031,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "expired-or-overlong"
+    }
+  },
+  {
+    "name": "exp-equals-deadline-plus-one",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1059,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "expired-or-overlong"
+    }
+  },
+  {
+    "name": "lifetime-equals-max-plus-one",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 999,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "expired-or-overlong"
+    }
+  },
+  {
+    "name": "activation-mismatch",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-b",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "scope-mismatch"
+    }
+  },
+  {
+    "name": "revision-mismatch",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-b",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "scope-mismatch"
+    }
+  },
+  {
+    "name": "pool_profile-mismatch",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool_profile-b",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "scope-mismatch"
+    }
+  },
+  {
+    "name": "cancelled-attempt",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "cancelled",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "attempt-not-active"
+    }
+  },
+  {
+    "name": "guest-workspace-mismatch",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a",
+      "guest_scope": {
+        "workspace": "workspace-b"
+      }
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "guest-scope-mismatch"
+    }
+  },
+  {
+    "name": "extra-claims-property",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "extra": "unexpected"
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-claims"
+    }
+  },
+  {
+    "name": "extra-nested-claims-property",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ],
+            "extra": "unexpected"
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-claims"
+    }
+  },
+  {
+    "name": "handle-after-completed",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "completed"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "handle-not-bound-to-attempt"
+    }
+  },
+  {
+    "name": "handle-after-cancelled",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "cancelled"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "handle-not-bound-to-attempt"
+    }
+  },
+  {
+    "name": "handle-after-expired",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "expired"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "handle-not-bound-to-attempt"
+    }
+  },
+  {
+    "name": "pem-marker-handle",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "-----BEGIN TEST-----"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-handle"
+    }
+  },
+  {
+    "name": "whitespace-handle",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle test a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-handle"
+    }
+  },
+  {
+    "name": "embedded-claims-handle",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "{\"tenant\":\"tenant-a\"}"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-handle"
+    }
+  },
+  {
+    "name": "empty-handle",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": ""
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-handle"
+    }
+  },
+  {
+    "name": "unknown-context-property",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a",
+      "extra": "unexpected"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-claims"
+    }
+  },
+  {
+    "name": "unknown-guest-property",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a",
+      "guest_scope": {
+        "attempt": "attempt-a"
+      }
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "guest-scope-mismatch"
+    }
+  },
+  {
+    "name": "non-number-now",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": "1030",
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "expired-or-overlong"
+    }
+  },
+  {
+    "name": "empty-allowed-capabilities",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": []
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "requested-capability-not-allowed"
+    }
+  },
+  {
+    "name": "duplicate-registry-handle",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        },
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-handle"
+    }
+  },
+  {
+    "name": "trailing-newline-handle",
+    "claims": {
+      "iss": "falcone:admission-dispatch",
+      "aud": "falcone:host",
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "iat": 1000,
+      "exp": 1060,
+      "allowed_capabilities": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ]
+    },
+    "context": {
+      "now": 1030,
+      "max_lifetime_seconds": 60,
+      "attempt_deadline": 1060,
+      "tenant": "tenant-a",
+      "workspace": "workspace-a",
+      "pool_profile": "pool-a/profile-a",
+      "revision": "revision-a",
+      "activation": "activation-a",
+      "attempt": "attempt-a",
+      "audience": "falcone:host",
+      "attempt_state": "active",
+      "pinned_grants": [
+        {
+          "family": "storage",
+          "interface": "falcone:host/storage@0.1.0",
+          "scope": {
+            "prefixes": [
+              "reports/"
+            ]
+          }
+        }
+      ],
+      "requested_capability": {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "reports/"
+          ]
+        }
+      },
+      "holder": "wasm-host-binding",
+      "handle_registry": [
+        {
+          "handle": "handle_test_a",
+          "attempt": "attempt-a",
+          "state": "active"
+        }
+      ],
+      "presented_handle": "handle_test_a\n"
+    },
+    "expected": {
+      "verdict": "reject",
+      "reason": "malformed-handle"
+    }
+  }
+]
