@@ -123,14 +123,19 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(p.page.locator('main h1')).toBeVisible();
       await p.page.goBack(); await expect(surface(p).getByRole('heading', { level: 1 })).toBeVisible();
       await check.assertRuntimeHealth(p);
-      // Back links retain the legacy document boundary until the workspace list migrates.
+      // Back links retain the legacy document boundary; the harness reseeds each new document.
       for (const fixture of ['workspace-realtime-403', 'workspace-realtime-404']) {
         await open(p, { realtime: fixture });
         await p.page.route((url) => url.pathname === '/console/workspaces', (route) => route.fulfill({ contentType: 'text/html', body: `<html lang="${locale}"><body><main><h1>${copy.back}</h1></main></body></html>` }));
-        const session = await p.page.evaluate(() => sessionStorage.getItem('in-falcone.console-shell-session'));
+        const session = await p.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-shell-session')));
         await surface(p).getByRole('link', { name: copy.back }).click();
         await expect(p.page).toHaveURL(new URL('/console/workspaces', server.origin).href);
-        expect(await p.page.evaluate(() => sessionStorage.getItem('in-falcone.console-shell-session'))).toBe(session);
+        // Only the entry-script fixture above changes workspace membership to ws-1.
+        // The stub document has no entry script, so it retains the harness's original membership.
+        expect(await p.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-shell-session')))).toEqual({
+          ...session,
+          principal: { ...session.principal, workspaceIds: sessionFor('superadmin').principal.workspaceIds },
+        });
         await check.assertRuntimeHealth(p);
       }
     });
