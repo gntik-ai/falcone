@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { myPlanEndpoints } from './console-tenant-plan-overview-page.manifest.ts';
 import manifest, { consumption } from './console-workspace-dashboard-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
@@ -11,7 +12,7 @@ const path = `/v1/workspaces/${consumption.workspaceId}/consumption`;
 const surface = (parity) => parity.page.locator('.workspace-dashboard');
 const calls = (parity) => parity.network.requests.filter((request) => request.path.endsWith('/consumption'));
 const endpoints = {
-  ...manifest.endpoints,
+  ...manifest.endpoints, ...myPlanEndpoints,
   consumptionA: { method: 'GET', path: '/v1/workspaces/a/consumption', fixtures: { success: { status: 200, body: { ...consumption, workspaceId: 'a' }, delayMs: 2000 } } },
   consumptionB: { method: 'GET', path: '/v1/workspaces/b/consumption', fixtures: { success: { status: 200, body: { ...consumption, workspaceId: 'b' } } } },
   consumptionEncoded: { method: 'GET', path: '/v1/workspaces/synthetic%2Fwith%20space/consumption', fixtures: { success: { status: 200, body: { ...consumption, workspaceId: 'synthetic/with space' } } } },
@@ -47,7 +48,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       assertReads(parity, 1);
       await check.assertLocale(parity);
     });
-    test('action', async ({ parity }) => {
+    test('action', async ({ parity, server }) => {
       await open(parity, ['500', 'success']);
       const retry = surface(parity).getByRole('button', { name: copy.retry, exact: true });
       await keyboardFocus(parity.page, retry);
@@ -58,7 +59,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       for (const status of ['403', '404']) {
         await open(parity, status);
         const back = surface(parity).getByRole('link', { name: copy.myPlan, exact: true });
-        await expect(back).toHaveAttribute('href', '/console/my-plan');
+        await expect(back).toHaveAttribute('href', new URL(server.url('console/my-plan')).pathname);
         await keyboardFocus(parity.page, back);
         await parity.page.keyboard.press('Enter');
         await expect(parity.page).toHaveURL(/\/console\/my-plan$/);
