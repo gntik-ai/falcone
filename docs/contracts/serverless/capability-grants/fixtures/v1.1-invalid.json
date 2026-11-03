@@ -1,0 +1,270 @@
+[
+  {
+    "name": "no-exposure",
+    "data": [
+      {
+        "secret_grant": {
+          "secret_ref": "orders-api-token",
+          "purpose": "Authenticate order lookups",
+          "host_operation": "http.fetch"
+        }
+      }
+    ]
+  },
+  {
+    "name": "no-review",
+    "data": [
+      {
+        "secret_grant": {
+          "secret_ref": "orders-api-token",
+          "purpose": "Authenticate order lookups",
+          "exposure": "guest-exposed"
+        }
+      }
+    ]
+  },
+  {
+    "name": "review-no-reviewer",
+    "data": [
+      {
+        "secret_grant": {
+          "secret_ref": "orders-api-token",
+          "purpose": "Authenticate order lookups",
+          "exposure": "guest-exposed",
+          "review": {
+            "reviewed_at": "2026-11-03T10:00:00Z",
+            "scope": "orders-api token for order lookups"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "review-no-scope",
+    "data": [
+      {
+        "secret_grant": {
+          "secret_ref": "orders-api-token",
+          "purpose": "Authenticate order lookups",
+          "exposure": "guest-exposed",
+          "review": {
+            "reviewer": "security-reviewer",
+            "reviewed_at": "2026-11-03T10:00:00Z"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "no-operation",
+    "data": [
+      {
+        "secret_grant": {
+          "secret_ref": "orders-api-token",
+          "purpose": "Authenticate order lookups",
+          "exposure": "host-use"
+        }
+      }
+    ]
+  },
+  {
+    "name": "empty-purpose",
+    "data": [
+      {
+        "secret_grant": {
+          "secret_ref": "orders-api-token",
+          "purpose": "",
+          "exposure": "host-use",
+          "host_operation": "http.fetch"
+        }
+      }
+    ]
+  },
+  {
+    "name": "bad-date",
+    "data": [
+      {
+        "secret_grant": {
+          "secret_ref": "orders-api-token",
+          "purpose": "Authenticate order lookups",
+          "exposure": "guest-exposed",
+          "review": {
+            "reviewer": "security-reviewer",
+            "reviewed_at": "2026-13-01T00:00:00Z",
+            "scope": "orders-api token for order lookups"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "inline-value",
+    "data": [
+      {
+        "secret_grant": {
+          "secret_ref": "orders-api-token",
+          "purpose": "Authenticate order lookups",
+          "exposure": "host-use",
+          "host_operation": "http.fetch",
+          "value": "not-a-real-value"
+        }
+      }
+    ]
+  },
+  {
+    "name": "dest-extra-prop",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "orders.t1.svc.cluster.local",
+          "port": 8443,
+          "scheme": "https",
+          "path": "/v1"
+        }
+      }
+    ]
+  },
+  {
+    "name": "dest-no-port",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "orders.t1.svc.cluster.local",
+          "scheme": "https"
+        }
+      }
+    ]
+  },
+  {
+    "name": "port-0",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "orders.t1.svc.cluster.local",
+          "port": 0,
+          "scheme": "https"
+        }
+      }
+    ]
+  },
+  {
+    "name": "port-65536",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "orders.t1.svc.cluster.local",
+          "port": 65536,
+          "scheme": "https"
+        }
+      }
+    ]
+  },
+  {
+    "name": "scheme-http",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "orders.t1.svc.cluster.local",
+          "port": 8443,
+          "scheme": "http"
+        }
+      }
+    ]
+  },
+  {
+    "name": "host-169.254.169.254",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "169.254.169.254",
+          "port": 8443,
+          "scheme": "https"
+        }
+      }
+    ]
+  },
+  {
+    "name": "host-10.0.0.1",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "10.0.0.1",
+          "port": 8443,
+          "scheme": "https"
+        }
+      }
+    ]
+  },
+  {
+    "name": "host-fe80::1",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "fe80::1",
+          "port": 8443,
+          "scheme": "https"
+        }
+      }
+    ]
+  },
+  {
+    "name": "host-fd00:ec2::254",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "fd00:ec2::254",
+          "port": 8443,
+          "scheme": "https"
+        }
+      }
+    ]
+  },
+  {
+    "name": "host-metadata.google.internal",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "metadata.google.internal",
+          "port": 8443,
+          "scheme": "https"
+        }
+      }
+    ]
+  },
+  {
+    "name": "host-*.internal",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "*.internal",
+          "port": 8443,
+          "scheme": "https"
+        }
+      }
+    ]
+  },
+  {
+    "name": "host-10.0.0.0/8",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "10.0.0.0/8",
+          "port": 8443,
+          "scheme": "https"
+        }
+      }
+    ]
+  }
+]

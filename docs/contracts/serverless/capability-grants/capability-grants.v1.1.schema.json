@@ -1,0 +1,416 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://falcone.dev/contracts/serverless/capability-grants/v1.1",
+  "title": "Capability grants v1.1",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "oneOf": [
+      {
+        "$ref": "#/$defs/grant"
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "secret_grant"
+        ],
+        "properties": {
+          "secret_grant": {
+            "$ref": "#/$defs/secret_grant"
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "internal_destination_binding"
+        ],
+        "properties": {
+          "internal_destination_binding": {
+            "$ref": "#/$defs/internal_destination_binding"
+          }
+        }
+      }
+    ]
+  },
+  "$defs": {
+    "eventScope": {
+      "additionalProperties": false,
+      "properties": {
+        "topics": {
+          "items": {
+            "minLength": 1,
+            "not": {
+              "const": "*"
+            },
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/safeName"
+      },
+      "required": [
+        "topics"
+      ],
+      "type": "object"
+    },
+    "grant": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "family": {
+                "const": "storage"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "interface": {
+                "enum": [
+                  "falcone:host/storage@0.1.0"
+                ]
+              },
+              "scope": {
+                "$ref": "#/$defs/storageScope"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "family": {
+                "const": "http"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "interface": {
+                "enum": [
+                  "falcone:host/http@0.1.0"
+                ]
+              },
+              "scope": {
+                "$ref": "#/$defs/httpScope"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "family": {
+                "const": "event"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "interface": {
+                "enum": [
+                  "falcone:host/events@0.1.0"
+                ]
+              },
+              "scope": {
+                "$ref": "#/$defs/eventScope"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "family": {
+                "const": "workflow"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "interface": {
+                "enum": [
+                  "falcone:host/workflows@0.1.0"
+                ]
+              },
+              "scope": {
+                "$ref": "#/$defs/workflowScope"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "family": {
+          "enum": [
+            "storage",
+            "http",
+            "event",
+            "workflow"
+          ]
+        },
+        "guestGrantId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "interface": {
+          "type": "string"
+        },
+        "scope": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/storageScope"
+            },
+            {
+              "$ref": "#/$defs/httpScope"
+            },
+            {
+              "$ref": "#/$defs/eventScope"
+            },
+            {
+              "$ref": "#/$defs/workflowScope"
+            }
+          ]
+        },
+        "secretRef": {
+          "$ref": "#/$defs/secretRef"
+        }
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/safeName"
+      },
+      "required": [
+        "family",
+        "interface",
+        "scope"
+      ],
+      "type": "object"
+    },
+    "httpScope": {
+      "additionalProperties": false,
+      "properties": {
+        "hosts": {
+          "items": {
+            "minLength": 1,
+            "not": {
+              "const": "*"
+            },
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/safeName"
+      },
+      "required": [
+        "hosts"
+      ],
+      "type": "object"
+    },
+    "safeName": {
+      "not": {
+        "pattern": "^([_.-]*[Vv][_.-]*[Aa][_.-]*[Ll][_.-]*[Uu][_.-]*[Ee][_.-]*|[_.-]*[Pp][_.-]*[Ll][_.-]*[Aa][_.-]*[Ii][_.-]*[Nn][_.-]*[Tt][_.-]*[Ee][_.-]*[Xx][_.-]*[Tt][_.-]*|[_.-]*[Ss][_.-]*[Ee][_.-]*[Cc][_.-]*[Rr][_.-]*[Ee][_.-]*[Tt][_.-]*|[_.-]*[Ss][_.-]*[Ee][_.-]*[Cc][_.-]*[Rr][_.-]*[Ee][_.-]*[Tt][_.-]*[Vv][_.-]*[Aa][_.-]*[Ll][_.-]*[Uu][_.-]*[Ee][_.-]*|[_.-]*[Pp][_.-]*[Aa][_.-]*[Ss][_.-]*[Ss][_.-]*[Ww][_.-]*[Oo][_.-]*[Rr][_.-]*[Dd][_.-]*|[_.-]*[Pp][_.-]*[Aa][_.-]*[Ss][_.-]*[Ss][_.-]*[Ww][_.-]*[Dd][_.-]*|[_.-]*[Tt][_.-]*[Oo][_.-]*[Kk][_.-]*[Ee][_.-]*[Nn][_.-]*|[_.-]*[Aa][_.-]*[Pp][_.-]*[Ii][_.-]*[Kk][_.-]*[Ee][_.-]*[Yy][_.-]*|[_.-]*[Pp][_.-]*[Rr][_.-]*[Ii][_.-]*[Vv][_.-]*[Aa][_.-]*[Tt][_.-]*[Ee][_.-]*[Kk][_.-]*[Ee][_.-]*[Yy][_.-]*|[_.-]*[Cc][_.-]*[Rr][_.-]*[Ee][_.-]*[Dd][_.-]*[Ee][_.-]*[Nn][_.-]*[Tt][_.-]*[Ii][_.-]*[Aa][_.-]*[Ll][_.-]*|[_.-]*[Cc][_.-]*[Rr][_.-]*[Ee][_.-]*[Dd][_.-]*[Ee][_.-]*[Nn][_.-]*[Tt][_.-]*[Ii][_.-]*[Aa][_.-]*[Ll][_.-]*[Ss][_.-]*|[_.-]*[Cc][_.-]*[Ll][_.-]*[Ii][_.-]*[Ee][_.-]*[Nn][_.-]*[Tt][_.-]*[Ss][_.-]*[Ee][_.-]*[Cc][_.-]*[Rr][_.-]*[Ee][_.-]*[Tt][_.-]*|[_.-]*[Aa][_.-]*[Cc][_.-]*[Cc][_.-]*[Ee][_.-]*[Ss][_.-]*[Ss][_.-]*[Kk][_.-]*[Ee][_.-]*[Yy][_.-]*)$"
+      }
+    },
+    "secretRef": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/safeName"
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "storageScope": {
+      "additionalProperties": false,
+      "properties": {
+        "prefixes": {
+          "items": {
+            "minLength": 1,
+            "not": {
+              "const": "*"
+            },
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/safeName"
+      },
+      "required": [
+        "prefixes"
+      ],
+      "type": "object"
+    },
+    "workflowScope": {
+      "additionalProperties": false,
+      "properties": {
+        "targets": {
+          "items": {
+            "minLength": 1,
+            "not": {
+              "const": "*"
+            },
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/safeName"
+      },
+      "required": [
+        "targets"
+      ],
+      "type": "object"
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer",
+        "reviewed_at",
+        "scope"
+      ],
+      "properties": {
+        "reviewer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewed_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "secret_grant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "secret_ref",
+        "purpose",
+        "exposure"
+      ],
+      "properties": {
+        "secret_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exposure": {
+          "enum": [
+            "host-use",
+            "guest-exposed"
+          ]
+        },
+        "host_operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review": {
+          "$ref": "#/$defs/review"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "exposure": {
+                "const": "host-use"
+              }
+            },
+            "required": [
+              "exposure"
+            ]
+          },
+          "then": {
+            "required": [
+              "host_operation"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "exposure": {
+                "const": "guest-exposed"
+              }
+            },
+            "required": [
+              "exposure"
+            ]
+          },
+          "then": {
+            "required": [
+              "review"
+            ]
+          }
+        }
+      ]
+    },
+    "internal_destination_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binding_id",
+        "host",
+        "port",
+        "scheme"
+      ],
+      "properties": {
+        "binding_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z]([a-z0-9-]{0,61}[a-z0-9])?$",
+          "not": {
+            "const": "metadata.google.internal"
+          }
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "scheme": {
+          "enum": [
+            "https"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+[
+  {
+    "name": "secret-host-use",
+    "data": [
+      {
+        "secret_grant": {
+          "secret_ref": "orders-api-token",
+          "purpose": "Authenticate order lookups",
+          "exposure": "host-use",
+          "host_operation": "http.fetch"
+        }
+      }
+    ]
+  },
+  {
+    "name": "secret-guest-exposed-reviewed",
+    "data": [
+      {
+        "secret_grant": {
+          "secret_ref": "orders-api-token",
+          "purpose": "Authenticate order lookups",
+          "exposure": "guest-exposed",
+          "review": {
+            "reviewer": "security-reviewer",
+            "reviewed_at": "2026-11-03T10:00:00Z",
+            "scope": "orders-api token for order lookups"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "internal-destination-binding",
+    "data": [
+      {
+        "internal_destination_binding": {
+          "binding_id": "orders-t1",
+          "host": "orders.t1.svc.cluster.local",
+          "port": 8443,
+          "scheme": "https"
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,57 @@
+[
+  {
+    "name": "bare-star-scope",
+    "data": [
+      {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "*"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "empty-list",
+    "data": [
+      {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "unknown-family",
+    "data": [
+      {
+        "family": "database",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "uploads/"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "unknown-property",
+    "data": [
+      {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "uploads/"
+          ]
+        },
+        "extra": true
+      }
+    ]
+  }
+]
