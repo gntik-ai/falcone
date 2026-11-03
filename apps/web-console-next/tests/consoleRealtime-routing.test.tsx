@@ -40,14 +40,17 @@ test('NavLink and navigate load the lazy route once each in the same document wi
 }, 20000)
 test.each(['refresh-ok', 'refresh-rejected', 'replay-401'])('401 shared session lifecycle: %s', async (variant) => {
   login(['superadmin']); let count = 0
+  const refreshed = buildConsoleRefreshSessionFixture()
+  Object.assign(refreshed.principal!, { tenantIds: ['t1'], workspaceIds: ['ws-1'] })
   requests = strictFetch({ ...bootstrap,
     'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture(),
     [`GET ${realtimePath}`]: () => ++count === 2 && variant === 'refresh-ok' ? Response.json(ready) : Response.json({ code: 'UNAUTHORIZED' }, { status: 401 }),
-    'POST /v1/auth/login-sessions/synthetic-session/refresh': () => variant === 'refresh-rejected' ? Response.json({}, { status: 401 }) : Response.json(buildConsoleRefreshSessionFixture()),
+    'POST /v1/auth/login-sessions/synthetic-session/refresh': () => variant === 'refresh-rejected' ? Response.json({}, { status: 401 }) : Response.json(refreshed),
   })
   render(<MemoryRouter basename="/next" initialEntries={['/next/console/workspaces/ws-1/realtime']}><App /></MemoryRouter>)
   if (variant === 'refresh-ok') {
     await screen.findByRole('tab', { name: 'JavaScript' }, { timeout: 10000 })
+    expect(screen.getByTestId('realtime-enabled')).not.toHaveAttribute('inert')
     const replay = requests.mock.mock.calls.filter(([path]) => path === realtimePath)[1][1]
     expect(new Headers(replay?.headers).get('Authorization')).toBe(`Bearer ${buildConsoleRefreshSessionFixture().tokenSet!.accessToken}`)
   } else {

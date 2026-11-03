@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import manifest, { ready, realtimePath, capabilitiesPath, allowedDifferences, realtimeFixtures } from './console-realtime-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
+import { sessionFor } from '../fixtures/shell.ts';
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-realtime-page.json`, import.meta.url), 'utf8'))]));
 const build = JSON.parse(readFileSync(new URL('../../../dist/.vite/manifest.json', import.meta.url), 'utf8'));
 const entry = Object.values(build).find((chunk) => chunk.isEntry && chunk.name === 'app').file;
@@ -155,6 +156,15 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) for (co
   test.describe(`realtime session | ${locale} | ${width} | ${variant}`, () => {
     test.use({ locale, role: 'superadmin', viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
     test('shared session refresh and replay are bounded', async ({ parity: p, server }) => {
+      if (variant !== 'workspace-realtime-401-refresh-rejected') {
+        await p.page.route('**/v1/auth/login-sessions/synthetic-session/refresh', async (route) => {
+          if (route.request().method() !== 'POST') return route.fallback();
+          const session = sessionFor('superadmin', true);
+          session.principal.workspaceIds = ['ws-1'];
+          p.network.requests.push({ method: 'POST', path: '/v1/auth/login-sessions/synthetic-session/refresh', body: route.request().postDataJSON() });
+          await route.fulfill({ json: session });
+        });
+      }
       p.network.setVariants({ realtime: variant, refresh: variant === 'workspace-realtime-401-refresh-rejected' ? '401' : 'success' });
       await p.page.goto(server.url('console/workspaces/ws-1/realtime'));
       if (variant === 'workspace-realtime-401-refresh-ok') await expect(surface(p).locator('dl')).toBeVisible();
