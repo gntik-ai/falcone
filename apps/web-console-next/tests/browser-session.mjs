@@ -1,3 +1,4 @@
+import { ready as realtimeReady, capabilityFixtures, capabilitiesPath } from './parity/pages/console-realtime-page.manifest.ts';
 import { workspaceConsumptionEndpoints } from './parity/pages/console-workspace-dashboard-page.manifest.ts';
 import { tenantMetricsEndpoints } from './parity/pages/consoleTenants.manifest.ts';
 import { catalogEndpoints, catalogResponse, isPlansQuery } from './parity/pages/console-plan-catalog-page.manifest.ts';
@@ -10,7 +11,7 @@ import { pendingEndpoints } from './parity/pages/pendingActivation.manifest.ts';
 import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures';
 
 // Synthetic identities only. The app still exercises real session parsing and loaders.
-export async function installSession(page, roles = ['superadmin']) {
+export async function installSession(page, roles = ['superadmin'], capabilityVariant = 'success') {
   const unmatched = [];
   const endpoints = createEndpointRegistry({}, () => ({}), {
     ...(typeof tenantMetricsEndpoints === 'undefined' ? {} : tenantMetricsEndpoints), ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints), ...(typeof buildTenantPlanEndpoints === 'undefined' ? {} : buildTenantPlanEndpoints(cspTenantId)),
@@ -33,6 +34,12 @@ export async function installSession(page, roles = ['superadmin']) {
     const url = new URL(route.request().url());
     if (route.request().method() === 'GET' && url.pathname === '/v1/tenants' && url.search === '?page%5Bsize%5D=100&sort=displayName') {
       await route.fulfill({ json: { items: [], page: { after: null } } });
+    } else if (route.request().method() === 'GET' && url.pathname === capabilitiesPath && !url.search) {
+      const response = capabilityFixtures[capabilityVariant];
+      if (response.delayMs) await new Promise((resolve) => setTimeout(resolve, response.delayMs));
+      await route.fulfill({ status: response.status, json: response.body });
+    } else if (route.request().method() === 'GET' && url.pathname === '/v1/workspaces/sample-workspaceId/realtime' && !url.search) {
+      await route.fulfill({ json: { ...realtimeReady, workspaceId: 'sample-workspaceId' } });
     } else if (route.request().method() === 'GET' && url.pathname === '/v1/tenant/plan/effective-entitlements' && url.search === '?include=consumption') {
       await route.fulfill({ json: { tenantId: 'synthetic-tenant', quantitativeLimits: [], capabilities: [] } });
     } else if (route.request().method() === 'GET' && /^\/v1\/workspaces\/[^/]+\/docs$/.test(url.pathname) && !url.search) {

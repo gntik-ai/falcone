@@ -47,7 +47,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'operations', migrated: true },
   { path: 'mcp/servers', migrated: true },
   { path: 'mcp/servers/:mcpServerId', migrated: true },
-  { path: 'workspaces/:workspaceId/realtime' },
+  { path: 'workspaces/:workspaceId/realtime', migrated: true },
   { path: 'workspaces/:workspaceId/docs', migrated: true },
   { path: 'secrets' },
   { path: 'secrets/:encodedSecretPath/rotate' },

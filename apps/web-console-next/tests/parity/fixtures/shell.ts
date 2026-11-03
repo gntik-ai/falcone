@@ -1,3 +1,4 @@
+import { capabilityFixtures } from '../pages/console-realtime-page.manifest'
 import {
   buildConsoleSignupPolicyFixture, buildConsoleLoginSessionFixture, buildConsoleRefreshSessionFixture, buildConsoleAccountStatusViewFixture,
   buildConsoleSessionTerminationFixture, buildTenantFixture, buildTenantCollectionFixture, buildWorkspaceCollectionFixture,
@@ -7,6 +8,7 @@ import { overviewResponse, overviewVariants, type OverviewVariant } from './over
 
 export const variants: Variant[] = ['success', 'empty', '401', '403', '404', '500', 'network']
 export const endpoints = {
+  capabilities: { method: 'GET', path: '/v1/tenant/effective-capabilities' },
   signupPolicy: { method: 'GET', path: '/v1/auth/signups/policy' },
   refresh: { method: 'POST', path: '/v1/auth/login-sessions/synthetic-session/refresh' },
   status: { method: 'GET', path: '/v1/auth/status-views/active' },
@@ -21,8 +23,10 @@ export function sessionFor(role: Role, refresh = false) {
   return session
 }
 export function responseFor(name: string, variant: Variant | OverviewVariant | '504', role: Role) {
+  if (name === 'capabilities' && Object.hasOwn(capabilityFixtures, variant)) return capabilityFixtures[variant as keyof typeof capabilityFixtures]
   if (overviewVariants.includes(variant as OverviewVariant) && ['tenant', 'tenants'].includes(name)) return overviewResponse(name, variant as OverviewVariant)
   const builders: Record<string, () => unknown> = {
+    capabilities: () => ({ capabilities: { realtime: true } }),
     signupPolicy: buildConsoleSignupPolicyFixture,
     refresh: () => sessionFor(role, true), status: buildConsoleAccountStatusViewFixture,
     tenants: () => { const value = buildTenantCollectionFixture(); if (variant === 'empty') value.items = []; return value }, tenant: buildTenantFixture,
