@@ -1,0 +1,16 @@
+{
+  "operationId": "getFunctionActivationLogs",
+  "method": "get",
+  "path": "/v1/functions/actions/{resourceId}/activations/{activationId}/logs",
+  "request": {
+    "pathParameters": {
+      "resourceId": "res_abc123",
+      "activationId": "act_0a1b2c3d-4e5"
+    },
+    "query": {},
+    "headers": {
+      "X-API-Version": "2026-03-26",
+      "X-Correlation-Id": "corr-legacy-0001"
+    }
+  }
+}

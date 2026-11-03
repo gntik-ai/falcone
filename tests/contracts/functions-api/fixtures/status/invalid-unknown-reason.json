@@ -1,0 +1,5 @@
+{
+  "state": "unavailable",
+  "runtimeMode": "oci",
+  "failureReason": "quota_exceeded"
+}

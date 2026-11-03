@@ -1,0 +1,17 @@
+{
+  "status": 409,
+  "code": "GW_BASE_DISABLED",
+  "message": "The selected base is disabled.",
+  "detail": {
+    "reason": "base_disabled"
+  },
+  "retryable": false,
+  "requestId": "req-fixture-0001",
+  "correlationId": "corr-fixture-0001",
+  "timestamp": "2026-11-03T00:00:00Z",
+  "resource": {
+    "path": "/v1/functions/actions",
+    "type": "function_action",
+    "id": "res_abc123"
+  }
+}

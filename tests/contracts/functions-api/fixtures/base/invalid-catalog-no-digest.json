@@ -1,0 +1,47 @@
+{
+  "description": "Catalog base without digest.",
+  "expectedRejection": "/base",
+  "instances": {
+    "FunctionExecutionConfiguration": {
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "parameters": {},
+      "environment": {},
+      "limits": {
+        "timeoutSeconds": 30,
+        "memoryMb": 256
+      },
+      "webAction": {
+        "enabled": false,
+        "requireAuthentication": true,
+        "rawHttpResponse": false
+      },
+      "base": {
+        "kind": "catalog",
+        "id": "node22@1.0.0"
+      }
+    },
+    "FunctionActionExecutionConfiguration": {
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "parameters": {},
+      "limits": {
+        "timeoutMs": 30000,
+        "memoryMb": 256
+      },
+      "base": {
+        "kind": "catalog",
+        "id": "node22@1.0.0"
+      }
+    },
+    "FunctionDefinitionPayload": {
+      "actionName": "legacy-fn",
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "base": {
+        "kind": "catalog",
+        "id": "node22@1.0.0"
+      }
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "description": "native is not a runtimeMode value.",
+  "expectedRejection": "/runtimeMode",
+  "instances": {
+    "FunctionExecutionConfiguration": {
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "parameters": {},
+      "environment": {},
+      "limits": {
+        "timeoutSeconds": 30,
+        "memoryMb": 256
+      },
+      "webAction": {
+        "enabled": false,
+        "requireAuthentication": true,
+        "rawHttpResponse": false
+      },
+      "runtimeMode": "native"
+    },
+    "FunctionActionExecutionConfiguration": {
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "parameters": {},
+      "limits": {
+        "timeoutMs": 30000,
+        "memoryMb": 256
+      },
+      "runtimeMode": "native"
+    },
+    "FunctionDefinitionPayload": {
+      "actionName": "legacy-fn",
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "runtimeMode": "native"
+    }
+  }
+}

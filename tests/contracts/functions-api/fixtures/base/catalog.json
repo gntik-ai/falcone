@@ -1,0 +1,49 @@
+{
+  "description": "Catalog base.",
+  "instances": {
+    "FunctionExecutionConfiguration": {
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "parameters": {},
+      "environment": {},
+      "limits": {
+        "timeoutSeconds": 30,
+        "memoryMb": 256
+      },
+      "webAction": {
+        "enabled": false,
+        "requireAuthentication": true,
+        "rawHttpResponse": false
+      },
+      "base": {
+        "kind": "catalog",
+        "id": "node22@1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "FunctionActionExecutionConfiguration": {
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "parameters": {},
+      "limits": {
+        "timeoutMs": 30000,
+        "memoryMb": 256
+      },
+      "base": {
+        "kind": "catalog",
+        "id": "node22@1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "FunctionDefinitionPayload": {
+      "actionName": "legacy-fn",
+      "runtime": "nodejs:20",
+      "entrypoint": "main",
+      "base": {
+        "kind": "catalog",
+        "id": "node22@1.0.0",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  }
+}
