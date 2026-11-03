@@ -170,6 +170,19 @@ test('with no providers the first-run state names the realm and offers creation 
   expect(screen.getAllByRole('button', { name: es.createProvider })).toHaveLength(1)
 })
 
+test('with no providers the create action is disabled while a login-method save is in flight', async () => {
+  let release!: () => void
+  const held = new Promise<void>((resolve) => { release = resolve })
+  setup({ [`GET ${configPath}`]: noProviders, [`PUT ${configPath}`]: async () => { await held; return Response.json({ ...noProviders, rememberMe: true }) } }); open()
+  await screen.findByRole('heading', { name: es.emptyProviders })
+  expect(button(es.createProvider)).toBeEnabled()
+  fireEvent.click(checkbox('rememberMe')); fireEvent.click(button(es.save))
+  await waitFor(() => expect(button(es.createProvider)).toBeDisabled())
+  fireEvent.click(button(es.createProvider))
+  expect(screen.queryByRole('dialog', { name: providerDialogName })).not.toBeInTheDocument()
+  release(); await waitFor(() => expect(button(es.createProvider)).toBeEnabled())
+})
+
 test('with no providers a read-only user gets no create action', async () => {
   context.roles = ['tenant_viewer']; setup({ [`GET ${configPath}`]: noProviders }); open()
   expect(await screen.findByRole('heading', { name: es.emptyProviders })).toBeVisible()
@@ -250,6 +263,21 @@ test('a failed dialog save keeps the other fields, clears the secret and shows t
   expect(screen.queryByText(/raw backend trace/)).not.toBeInTheDocument()
   expect(field(form, es.fieldClientId)).toHaveValue('synthetic-id'); expect(field(form, es.fieldSecret)).toHaveValue('')
   expect(document.body.innerHTML).not.toContain(syntheticSecret)
+})
+
+test('a failed dialog save remounts the secret input so the submitted value is not retained', async () => {
+  setup({ [`PUT ${providerPath('github')}`]: failure(500, 'req_synthetic_dialog', 'raw backend trace') }); open(); await ready()
+  fireEvent.click(button(es.createProvider)); const form = await dialog()
+  await chooseTemplate(form, 'GitHub')
+  fireEvent.change(field(form, es.fieldClientId), { target: { value: 'synthetic-id' } })
+  const before = field(form, es.fieldSecret)
+  fireEvent.change(before, { target: { value: syntheticSecret } })
+  fireEvent.click(within(form).getByRole('button', { name: es.dialogSave }))
+  await within(form).findByText(es.errors['5xx'])
+  const after = field(form, es.fieldSecret)
+  // The kit input keeps its own copy of the value, so the node must be replaced, not just emptied.
+  expect(after).not.toBe(before); expect(after).toHaveValue('')
+  expect(before.isConnected).toBe(false)
 })
 
 test('closing the dialog returns focus to its trigger', async () => {

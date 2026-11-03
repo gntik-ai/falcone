@@ -33,6 +33,9 @@ export function ProviderDialog({ tenantId, provider, aliases, returnFocus, onClo
   const [error, setError] = useState<string | null>(null)
   const [issues, setIssues] = useState<ValidationIssue[]>([])
   const [submits, setSubmits] = useState(0)
+  // Bumped on submit to remount the password input: the kit component mirrors its value in internal state,
+  // so clearing the DOM value alone would leave the submitted secret in memory after a failed save.
+  const [secretEpoch, setSecretEpoch] = useState(0)
   // The secret is write-only: it lives in the uncontrolled input only, never in state or storage,
   // and the input is emptied before the request leaves.
   const secret = useRef<HTMLInputElement>(null)
@@ -56,7 +59,7 @@ export function ProviderDialog({ tenantId, provider, aliases, returnFocus, onClo
     setIssues(found); setSubmits((count) => count + 1)
     if (found.length) return
     const clientSecret = secret.current?.value ?? ''
-    if (secret.current) secret.current.value = ''
+    setSecretEpoch((epoch) => epoch + 1)
     inFlight.current = true; setBusy(true); setError(null)
     try {
       const result = await upsertTenantIdentityProvider(tenantId, alias, {
@@ -105,7 +108,7 @@ export function ProviderDialog({ tenantId, provider, aliases, returnFocus, onClo
           {text(ids.clientId, t('fieldClientId'), clientId, setClientId, LIMITS.clientId, { required: true })}
           <Field invalid={invalid(ids.secret)} className="min-w-0">
             <FieldLabel htmlFor={ids.secret} required={!editing}>{t('fieldSecret')}</FieldLabel>
-            <PasswordInput id={ids.secret} ref={secret} autoComplete="new-password" maxLength={LIMITS.clientSecret} disabled={busy} invalid={invalid(ids.secret)} showStrength={false}
+            <PasswordInput key={secretEpoch} id={ids.secret} ref={secret} autoComplete="new-password" maxLength={LIMITS.clientSecret} disabled={busy} invalid={invalid(ids.secret)} showStrength={false}
               showLabel={t('showSecret')} hideLabel={t('hideSecret')} aria-describedby={`${ids.secret}-help`} spellCheck={false} className="w-full min-w-0" wrapperClassName="min-w-0" />
             <Text id={`${ids.secret}-help`} variant="supporting" tone="muted">{t(provider?.clientSecretSet ? 'fieldSecretSetHelp' : 'fieldSecretNewHelp')}</Text>
           </Field>

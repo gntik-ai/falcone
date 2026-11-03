@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Badge, Button, Checkbox, CopyButton, EmptyState, Link, Page, StatusTag, Text, useAnnounce, useToast } from '@gntik-ai/ui'
-import { DataTable, ErrorPanel, FirstRunEmpty, FormSection, InlineCallout, ListSkeleton, NoAccessEmpty, NotFoundEmpty, PageHeader, PageToolbar, SectionHeader, StickyActionBar, TableSkeleton, type DataTableColumn } from '@gntik-ai/blocks'
+import { DataTable, ErrorPanel, FormSection, InlineCallout, ListSkeleton, NoAccessEmpty, NotFoundEmpty, PageHeader, PageToolbar, SectionHeader, StickyActionBar, TableSkeleton, type DataTableColumn } from '@gntik-ai/blocks'
 import {
   deleteTenantIdentityProvider, getTenantAuthConfig, updateTenantAuthConfig, upsertTenantIdentityProvider,
   type TenantAuthConfig, type TenantAuthConfigBooleanKey, type TenantIdentityProvider,
@@ -179,8 +179,8 @@ export function AuthConfigConsole() {
 
   const providerBody = !config ? null : providers.length === 0
     ? (canManage
-      ? <FirstRunEmpty icon={undefined} title={t('emptyProviders')} description={t('emptyProvidersDescription', { realm: config.realm })} actionLabel={t('createProvider')} secondary={null} steps={[]} titleAs="h3" bordered={false} className="min-w-0"
-          onAction={() => { remember('create'); setDialog({ provider: null }) }} labels={{ title: t('emptyProviders'), description: t('emptyProvidersDescription', { realm: config.realm }), action: t('createProvider'), guide: '' }} />
+      ? <EmptyState icon={undefined} title={t('emptyProviders')} description={t('emptyProvidersDescription', { realm: config.realm })} titleAs="h3" bordered={false} secondaryAction={null} className="min-w-0"
+          primaryAction={<Button type="button" variant="primary" disabled={saving} className={focusRing} onClick={() => { remember('create'); setDialog({ provider: null }) }}>{t('createProvider')}</Button>} />
       : <EmptyState icon={undefined} title={t('emptyProviders')} description={t('emptyProvidersRead')} titleAs="h3" bordered={false} primaryAction={null} secondaryAction={null} className="min-w-0" />)
     : <div className="min-w-0 space-y-3">
         {canManage && <PageToolbar search="" defaultSearch="" onSearchChange={undefined} searchLabel={t('toolbarLabel')} searchPlaceholder={t('toolbarLabel')} filters={null} views={[]} view="" defaultView="" onViewChange={undefined}
