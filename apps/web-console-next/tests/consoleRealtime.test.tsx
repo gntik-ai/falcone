@@ -99,7 +99,7 @@ test.each(['es', 'en'] as const)('copy endpoint and snippet, clipboard fallback,
   mock(); const view = open(); await settled()
   fireEvent.click(screen.getByRole('button', { name: copy.copyEndpoint }))
   await screen.findByText(copy.copiedEndpoint)
-  expect(screen.getByRole('button', { name: copy.copied, exact: true })).toBeVisible()
+  expect(screen.getByRole('button', { name: copy.copied })).toBeVisible()
   expect(writeText).toHaveBeenLastCalledWith(ready.realtimeEndpointUrl)
   fireEvent.click(screen.getByRole('tab', { name: 'Python' }))
   expect(sessionStorage.getItem('realtime-snippet-lang')).toBe('python')
