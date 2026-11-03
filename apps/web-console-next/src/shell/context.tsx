@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useRef, useCallback, ty
 import { listAccessibleTenants, listAccessibleWorkspaces } from '@in-falcone/console-api/loaders'
 import type { Tenant, Workspace } from '@in-falcone/console-api/clients'
 import { useSession } from './session'
+import { CapabilitiesProvider } from './capabilities'
 
 // Shared with the legacy app: no migration, extra fields, or alternate key.
 const contextKey = 'in-falcone.console-active-context'
@@ -190,5 +191,5 @@ export function ConsoleContextProvider({ children, routeWorkspaceId }: { childre
     if (workspaceId && !workspaces.some((workspace) => workspace.workspaceId === workspaceId)) return
     setWorkspace(workspaceId); persist(userId, activeTenantId, workspaceId)
   }
-  return <Context.Provider value={{ tenants: tenants ?? [], workspaces, activeTenantId, activeWorkspaceId, loading: loading || tenantsReloading, error, selectTenant, selectWorkspace, reloadTenants, reloadWorkspaces, tenantsPageInfo, tenantsRequestId, tenantsError }}>{children}</Context.Provider>
+  return <Context.Provider value={{ tenants: tenants ?? [], workspaces, activeTenantId, activeWorkspaceId, loading: loading || tenantsReloading, error, selectTenant, selectWorkspace, reloadTenants, reloadWorkspaces, tenantsPageInfo, tenantsRequestId, tenantsError }}><CapabilitiesProvider>{children}</CapabilitiesProvider></Context.Provider>
 }

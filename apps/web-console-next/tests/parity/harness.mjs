@@ -53,7 +53,7 @@ export const test = base.extend({
         await route.fulfill({ status: response.status, json: response.body });
         return;
       }
-      if (url.origin !== server.origin || !name) {
+      if (url.origin !== server.origin || !name || (name === 'capabilities' && (url.search || body !== undefined))) {
         unmatched.push(`${method} ${path}${url.search}`);
         await route.fulfill({ status: 404, json: { error_msg: '404 Route Not Found' } });
         return;
@@ -62,7 +62,7 @@ export const test = base.extend({
       if (response.delayMs) await new Promise((done) => setTimeout(done, response.delayMs));
       if ((/^\/v1\/auth\/(?:login-sessions(?:\/[^/]+\/refresh)?|signups\/policy|status-views\/[^/]+)$/.test(path) && (response.network || response.status >= 400)) ||
           (path === '/v1/async-operation-query' && (response.network || response.status === 500)) ||
-          (path === '/v1/platform/runtime/knative' && (response.network || [401, 403, 404, 500].includes(response.status)))) {
+          ((path === '/v1/tenant/effective-capabilities' || /^\/v1\/workspaces\/[^/]+\/realtime$/.test(path) || path === '/v1/platform/runtime/knative') && (response.network || [401, 403, 404, 500].includes(response.status)))) {
         injectedFailures.push({ url: request.url(), kind: response.network ? 'network' : String(response.status) });
       }
       if (response.network) await route.abort('failed');
