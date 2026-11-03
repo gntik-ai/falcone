@@ -291,10 +291,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) for (co
       await p.page.addInitScript((session) => { sessionStorage.setItem('in-falcone.console-shell-session', JSON.stringify(session)); }, unrestricted(sessionFor('superadmin')));
       await p.page.addInitScript(streamMock, streamFixtures['realtime-sse-mongo']);
       await p.page.goto(server.url('console/realtime/changes'));
-      await p.page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active organization' }).selectOption('synthetic-tenant');
+      await p.page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active tenant' }).selectOption('synthetic-tenant');
       await fill(p); await subscribe(p);
       await expect(rows(p)).toHaveCount(3);
-      await p.page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active organization' }).selectOption('t2');
+      await p.page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active tenant' }).selectOption('t2');
       const retained = async () => {
         await expect(surface(p).getByLabel(copy(p).database, { exact: true })).toHaveValue(' app_db ');
         await expect(surface(p).getByLabel(copy(p).collection, { exact: true })).toHaveValue('orders');
