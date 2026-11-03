@@ -280,6 +280,30 @@ test('a failed dialog save remounts the secret input so the submitted value is n
   expect(before.isConnected).toBe(false)
 })
 
+test('the secret input is already empty when the provider request is sent', async () => {
+  let atRequest: string | null = null
+  setup({ [`PUT ${providerPath('github')}`]: () => {
+    atRequest = (document.querySelector('input[type="password"], input[autocomplete="new-password"]') as HTMLInputElement | null)?.value ?? null
+    return Response.json({ identityProviders: [providers.google, providers.gitlab, providers.github] })
+  } }); open(); await ready()
+  fireEvent.click(button(es.createProvider)); const form = await dialog()
+  await chooseTemplate(form, 'GitHub')
+  fireEvent.change(field(form, es.fieldClientId), { target: { value: 'synthetic-id' } })
+  fireEvent.change(field(form, es.fieldSecret), { target: { value: syntheticSecret } })
+  fireEvent.click(within(form).getByRole('button', { name: es.dialogSave }))
+  await waitFor(() => expect(writes()).toHaveLength(1))
+  expect(writes()[0].body.config.clientSecret).toBe(syntheticSecret)
+  expect(atRequest).toBe('')
+})
+
+test('Crear proveedor is the only Tab stop of the provider toolbar', async () => {
+  setup(); open(); await ready()
+  const toolbar = screen.getByRole('toolbar', { name: es.toolbarLabel })
+  expect(within(toolbar).queryByRole('searchbox')).not.toBeInTheDocument()
+  expect(within(toolbar).getAllByRole('button')).toEqual([button(es.createProvider)])
+  expect(button(es.createProvider)).toHaveAttribute('tabindex', '0')
+})
+
 test('closing the dialog returns focus to its trigger', async () => {
   setup(); open(); await ready()
   const trigger = button(es.editNamed.replace('{name}', 'Google')); trigger.focus(); fireEvent.click(trigger)

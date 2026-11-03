@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Badge, Button, Checkbox, CopyButton, EmptyState, Link, Page, StatusTag, Text, useAnnounce, useToast } from '@gntik-ai/ui'
-import { DataTable, ErrorPanel, FormSection, InlineCallout, ListSkeleton, NoAccessEmpty, NotFoundEmpty, PageHeader, PageToolbar, SectionHeader, StickyActionBar, TableSkeleton, type DataTableColumn } from '@gntik-ai/blocks'
+import { Badge, Button, Checkbox, CopyButton, EmptyState, Link, Page, StatusTag, Text, Toolbar, ToolbarButton, ToolbarEnd, useAnnounce, useToast } from '@gntik-ai/ui'
+import { DataTable, ErrorPanel, FormSection, InlineCallout, ListSkeleton, NoAccessEmpty, NotFoundEmpty, PageHeader, SectionHeader, StickyActionBar, TableSkeleton, type DataTableColumn } from '@gntik-ai/blocks'
 import {
   deleteTenantIdentityProvider, getTenantAuthConfig, updateTenantAuthConfig, upsertTenantIdentityProvider,
   type TenantAuthConfig, type TenantAuthConfigBooleanKey, type TenantIdentityProvider,
@@ -12,7 +12,6 @@ import { usePermissions } from '../../shell/permissions'
 import { BOOLEAN_KEYS, buildPatch, callbackPath, describeFailure, draftFromConfig, failureFrom, isDirty, type BooleanDraft, type Failure } from './model'
 import { ProviderDialog } from './ProviderDialog'
 import { DeleteDialog } from './DeleteDialog'
-import './page.css'
 
 const NAMESPACE = 'pages.console-auth-config-page'
 const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
@@ -183,8 +182,12 @@ export function AuthConfigConsole() {
           primaryAction={<Button type="button" variant="primary" disabled={saving} className={focusRing} onClick={() => { remember('create'); setDialog({ provider: null }) }}>{t('createProvider')}</Button>} />
       : <EmptyState icon={undefined} title={t('emptyProviders')} description={t('emptyProvidersRead')} titleAs="h3" bordered={false} primaryAction={null} secondaryAction={null} className="min-w-0" />)
     : <div className="min-w-0 space-y-3">
-        {canManage && <PageToolbar search="" defaultSearch="" onSearchChange={undefined} searchLabel={t('toolbarLabel')} searchPlaceholder={t('toolbarLabel')} filters={null} views={[]} view="" defaultView="" onViewChange={undefined}
-          primaryAction={{ id: 'create-provider', label: t('createProvider'), variant: 'primary', disabled: saving, onClick: () => { remember('create'); setDialog({ provider: null }) } }} aria-label={t('toolbarLabel')} className="auth-config-toolbar min-w-0" />}
+        {/* The legacy list has no search or filters, so the toolbar holds only its primary action: the kit's toolbar primitives keep the single Tab stop on Crear proveedor. */}
+        {canManage && <Toolbar aria-label={t('toolbarLabel')} className="min-w-0">
+          <ToolbarEnd className="ms-auto">
+            <ToolbarButton variant="primary" disabled={saving} className={focusRing} onClick={() => { remember('create'); setDialog({ provider: null }) }}>{t('createProvider')}</ToolbarButton>
+          </ToolbarEnd>
+        </Toolbar>}
         <DataTable rows={providers} columns={columns} getRowId={(provider) => provider.alias} getRowLabel={nameOf} caption={t('providersTable')} showCaption={false} paginated={false}
           selectable={false} selectionMode="none" selectedIds={[]} selectionSummary={false} rowActions={undefined} toolbar={null} sort={null} defaultSort={null} manualSorting={true} loading={false} loadingRows={0} emptyState={null}
           showDensityToggle={false} showColumnMenu={false} showViewSwitcher={false} views={[]} defaultViews={[]} hiddenColumns={[]} resizable={false} virtualize={false} groupBy={undefined} showPinMenu={false} className="auth-config-table min-w-0"

@@ -1,4 +1,5 @@
 import { useId, useRef, useState, type FormEvent } from 'react'
+import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Button, Checkbox, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Field, FieldDescription, FieldLabel, Input, PasswordInput, SimpleSelect, Text, useAnnounce } from '@gntik-ai/ui'
 import { InlineCallout, ValidationSummary, type ValidationIssue } from '@gntik-ai/blocks'
@@ -59,7 +60,9 @@ export function ProviderDialog({ tenantId, provider, aliases, returnFocus, onClo
     setIssues(found); setSubmits((count) => count + 1)
     if (found.length) return
     const clientSecret = secret.current?.value ?? ''
-    setSecretEpoch((epoch) => epoch + 1)
+    // Empty the input and commit the remount before the request starts, so no copy of the secret outlives the read above.
+    if (secret.current) secret.current.value = ''
+    flushSync(() => setSecretEpoch((epoch) => epoch + 1))
     inFlight.current = true; setBusy(true); setError(null)
     try {
       const result = await upsertTenantIdentityProvider(tenantId, alias, {

@@ -194,6 +194,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(box(parity, 'verifyEmail')).toHaveAttribute('aria-checked', 'true');
       await button(parity, 'discard').focus(); await expect(button(parity, 'discard')).toBeFocused();
       await parity.page.keyboard.press('Tab'); await expect(button(parity, 'save')).toBeFocused();
+      // Sequential navigation reaches Crear proveedor, the toolbar's single Tab stop, and comes back.
+      await parity.page.keyboard.press('Tab'); await expect(button(parity, 'createProvider')).toBeFocused();
+      await parity.page.keyboard.press('Shift+Tab'); await expect(button(parity, 'save')).toBeFocused();
       parity.network.setVariants({ 'auth-config-put': 'success' });
       await parity.page.keyboard.press('Enter');
       await expect(surface(parity).getByRole('region', { name: c.announcementRegion, exact: true })).toBeFocused();
