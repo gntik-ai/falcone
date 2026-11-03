@@ -1,0 +1,63 @@
+[
+  {
+    "name": "storage",
+    "data": [
+      {
+        "family": "storage",
+        "interface": "falcone:host/storage@0.1.0",
+        "scope": {
+          "prefixes": [
+            "uploads/"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "http",
+    "data": [
+      {
+        "family": "http",
+        "interface": "falcone:host/http@0.1.0",
+        "scope": {
+          "hosts": [
+            "api.example.com"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "event",
+    "data": [
+      {
+        "family": "event",
+        "interface": "falcone:host/events@0.1.0",
+        "scope": {
+          "topics": [
+            "orders.created"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "workflow",
+    "data": [
+      {
+        "family": "workflow",
+        "interface": "falcone:host/workflows@0.1.0",
+        "scope": {
+          "targets": [
+            "order-fulfilment"
+          ]
+        },
+        "guestGrantId": "grant-1",
+        "secretRef": {
+          "name": "orders-api",
+          "version": "3"
+        }
+      }
+    ]
+  }
+]
