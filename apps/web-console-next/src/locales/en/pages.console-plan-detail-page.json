@@ -94,7 +94,7 @@
     "unit": "Unit",
     "actions": "Actions",
     "unlimited": "Unlimited",
-    "unitCount": "count",
+    "unitCount": "{kind, select, other {count}}",
     "source_explicit": "Explicit",
     "source_default": "Default",
     "source_unlimited": "Unlimited",

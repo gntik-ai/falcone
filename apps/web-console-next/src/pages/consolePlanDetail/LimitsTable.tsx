@@ -92,7 +92,7 @@ export function LimitsTable({ rows, editable, drafts, versions, outcomes, busyKe
       </span>
     } },
     { id: 'source', header: t('limits.source'), sortable: false, cell: (row) => t(`limits.source_${row.source}`, { defaultValue: String(row.source).replace(/_/g, ' ') }) },
-    { id: 'unit', header: t('limits.unit'), sortable: false, cell: (row) => row.unit ?? t('limits.unitCount') },
+    { id: 'unit', header: t('limits.unit'), sortable: false, cell: (row) => row.unit ?? t('limits.unitCount', { kind: 'count' }) },
     { id: 'actions', header: t('limits.actions'), sortable: false, align: 'right', cell: (row) => {
       if (!editable) return null
       const key = row.dimensionKey
