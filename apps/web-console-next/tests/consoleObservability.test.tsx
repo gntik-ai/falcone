@@ -208,6 +208,33 @@ test('filters map to the legacy parameters and restart from the first page', asy
   expect(screen.getByRole('searchbox', { name: es.audit.actor })).toHaveValue('ana')
 })
 
+// D10: Desde and Hasta stay independent, as the two legacy date inputs were.
+test('the audit dates are independent: from only, to only, both, then cleared', async () => {
+  const filtered = (query: string) => `GET ${workspace}/audit-records?${audit}${query}`
+  const from = '&filter%5BoccurredAfter%5D=2026-06-10'
+  const to = '&filter%5BoccurredBefore%5D=2026-06-20'
+  setup({ [filtered(from)]: filteredPage, [filtered(to)]: filteredPage, [filtered(from + to)]: filteredPage }); open(); await ready()
+  fireEvent.click(tab(es.tabAudit)); await screen.findByRole('button', { name: 'evt-001' })
+  const pick = async (name: string, day: string) => {
+    fireEvent.click(screen.getByRole('combobox', { name })); await act(async () => {})
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: new RegExp(`${day}\\b`) })); await act(async () => {})
+  }
+  const clear = async (name: string) => { fireEvent.click(within(screen.getByRole('combobox', { name }).parentElement as HTMLElement).getByRole('button', { name: /Limpiar fecha/ })); await act(async () => {}) }
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 5, 15, 12) })
+  try {
+    await pick(es.audit.from, '10')
+    await waitFor(() => expect(list()).toContain(filtered(from)))
+    await clear(es.audit.from)
+    await pick(es.audit.to, '20')
+    await waitFor(() => expect(list()).toContain(filtered(to)))
+    await pick(es.audit.from, '10')
+    await waitFor(() => expect(list()).toContain(filtered(from + to)))
+    await clear(es.audit.to)
+    await clear(es.audit.from)
+  } finally { vi.useRealTimers() }
+  await waitFor(() => expect(list().filter((call) => call === `GET ${workspace}/audit-records?${audit}`).length).toBeGreaterThan(1))
+})
+
 test('the empty audit state offers Limpiar filtros, which restores the unfiltered first page', async () => {
   const filtered = `GET ${workspace}/audit-records?${audit}&filter%5BactorId%5D=ghost`
   setup({ [filtered]: { items: [], page: { hasMore: false, nextCursor: null } } }); open(); await ready()

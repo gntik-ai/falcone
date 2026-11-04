@@ -67,7 +67,7 @@ export const observabilityEndpoints: Record<string, PageEndpoint> = { ...metricE
 export const intendedDifferences = [
   'D1 Cargar mas with a loaded count replaces the 50-record cap note', 'D2 Export failure shows an error-panel with request id and Reintentar', 'D3 Event detail opens in a drawer',
   'D4 The api_requests series renders in a chart card', 'D5 Locale formatted timestamps', 'D6 Kit tones replace emerald, amber and red classes', 'D7 In-page 403 and 404 states',
-  'D8 Window reason in a tooltip linked by aria-describedby', 'D9 Kit tabs', 'D10 Date range filter with catalog labels (both dates are set together)', 'D11 Clear filters in the empty audit state',
+  'D8 Window reason in a tooltip linked by aria-describedby', 'D9 Kit tabs', 'D10 Two date pickers with catalog labels (Desde and Hasta are independent)', 'D11 Clear filters in the empty audit state',
   'D12 Primary export button', 'D13 Client-side dimension search',
 ]
 const manifest: ParityManifest & { intendedDifferences: string[] } = {

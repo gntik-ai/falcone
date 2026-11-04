@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import manifest, { overviewMixed } from './console-observability-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
+import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
 
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-observability-page.json`, import.meta.url), 'utf8'))]));
 const build = JSON.parse(readFileSync(new URL('../../../dist/.vite/manifest.json', import.meta.url), 'utf8'));
@@ -83,6 +84,20 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
   test.describe(`console-observability-page | ${role} | ${locale} | ${width}`, () => {
     test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
     const copy = bundles[locale];
+    // The shared harness only recognizes injected failures for selected endpoint families. The metrics fixtures
+    // inject exact status codes, so the browser's resource diagnostic for those URLs is expected; any other console
+    // error, page error or rejection stays a fault.
+    test.beforeEach(async ({ parity }) => {
+      const injected = [];
+      const scoped = (url) => new URL(url).pathname.startsWith('/v1/metrics/');
+      parity.page.on('response', (response) => { if (scoped(response.url()) && response.status() >= 400) injected.push({ url: response.url(), kind: String(response.status()) }); });
+      parity.page.on('requestfailed', (request) => { if (scoped(request.url())) injected.push({ url: request.url(), kind: 'network' }); });
+      parity.page.on('console', (message) => {
+        if (message.type() !== 'error' || !consumeResourceDiagnostic(message.text(), message.location().url, injected)) return;
+        const index = parity.faults.indexOf(`console.error: ${message.text()}`);
+        if (index >= 0) parity.faults.splice(index, 1);
+      });
+    });
     test.afterEach(async ({ parity }) => { allowlist(parity); });
     test('data', async ({ parity }) => {
       await open(parity);

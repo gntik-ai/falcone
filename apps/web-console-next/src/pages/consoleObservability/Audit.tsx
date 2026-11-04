@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Download } from 'lucide-react'
-import { Badge, Button, Drawer, DrawerBody, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, EmptyState, Field, FieldLabel, Input, JsonViewer, SimpleSelect, StatusTag, Text, Timestamp, useAnnounce } from '@gntik-ai/ui'
-import { DataTable, DateRangeFilter, DescriptionListCard, ErrorPanel, InlineCallout, LoadMoreFooter, NoAccessEmpty, PageToolbar, TableSkeleton, type DataTableColumn, type DescriptionItem } from '@gntik-ai/blocks'
+import { Badge, Button, DatePicker, Drawer, DrawerBody, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, EmptyState, Field, FieldLabel, Input, JsonViewer, SimpleSelect, StatusTag, Text, Timestamp, useAnnounce } from '@gntik-ai/ui'
+import { DataTable, DescriptionListCard, ErrorPanel, InlineCallout, LoadMoreFooter, NoAccessEmpty, PageToolbar, TableSkeleton, type DataTableColumn, type DescriptionItem } from '@gntik-ai/blocks'
 import { FailureState } from './Failure'
 import type { AuditFilters } from './api'
 import type { useAudit, useExport } from './hooks'
@@ -108,7 +108,7 @@ export function AuditPanel({ filters, onFilters, audit, exporter }: { filters: A
   const table = useRef<HTMLDivElement>(null)
   const loadedBefore = useRef(0)
   const running = exporter.state?.status === 'running'
-  const filterCount = [filters.actorId, filters.category, filters.result, filters.from || filters.to].filter(Boolean).length
+  const filterCount = [filters.actorId, filters.category, filters.result, filters.from, filters.to].filter(Boolean).length
   const records = data?.records ?? []
   const record = records.find((item) => item.eventId === selected) ?? null
   const change = (patch: Partial<AuditFilters>) => onFilters({ ...filters, ...patch })
@@ -154,9 +154,10 @@ export function AuditPanel({ filters, onFilters, audit, exporter }: { filters: A
           <Input aria-label={t('audit.category')} placeholder={t('audit.categoryPlaceholder')} value={filters.category} onChange={(event) => change({ category: event.target.value })} className="w-full min-w-0" /></Field>
         <Field><FieldLabel>{t('audit.result')}</FieldLabel>
           <SimpleSelect value={filters.result} onValueChange={(value) => change({ result: (value ?? '') as AuditFilters['result'] })} items={resultItems} aria-label={t('audit.result')} placeholder={t('audit.resultAll')} clearable={false} size="md" className="w-full min-w-0" /></Field>
-        <Field><FieldLabel>{t('audit.dates')}</FieldLabel>
-          <DateRangeFilter value={{ start: fromDay(filters.from), end: fromDay(filters.to) }} onValueChange={(range) => change({ from: toDay(range.start), to: toDay(range.end) })} presets={[]} clearable={true} disabled={false}
-            label={t('audit.dates')} placeholder={t('audit.datesPlaceholder')} labels={{ label: t('audit.dates'), placeholder: t('audit.datesPlaceholder'), clear: () => t('audit.datesClear') }} className="min-w-0" /></Field>
+        <Field><FieldLabel>{t('audit.from')}</FieldLabel>
+          <DatePicker value={fromDay(filters.from)} onValueChange={(date) => change({ from: toDay(date) })} placeholder={t('audit.fromPlaceholder')} aria-label={t('audit.from')} clearable={true} clearLabel={t('audit.fromClear')} locale={i18n.language} size="md" className="w-full min-w-0" /></Field>
+        <Field><FieldLabel>{t('audit.to')}</FieldLabel>
+          <DatePicker value={fromDay(filters.to)} onValueChange={(date) => change({ to: toDay(date) })} placeholder={t('audit.toPlaceholder')} aria-label={t('audit.to')} clearable={true} clearLabel={t('audit.toClear')} locale={i18n.language} size="md" className="w-full min-w-0" /></Field>
       </div>} />
     <div className="flex justify-end">
       <Button type="button" variant="primary" className="w-full sm:w-auto" disabled={running} loading={false} aria-busy={running} onClick={exporter.start}>

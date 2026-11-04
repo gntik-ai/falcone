@@ -26,14 +26,14 @@ Inspected from `fecb3a03` to the delivery base. `22072f17` adds the `not_enforce
 | D7 | 403 and 404 render in-page states instead of the raw error text; no backend text is shown | `ConsoleObservabilityPage.tsx:182`, `:333`, `console-metrics.ts:123-134` | vitest "metrics 403/404 ..."; spec `error-empty` |
 | D8 | The disabled window reason sits in a tooltip linked by `aria-describedby` | `ConsoleTimeRangeSelector.tsx:47-51` | vitest "tenant scope sends no series..."; spec `error-empty` |
 | D9 | Kit tabs replace the two outline buttons | `ConsoleObservabilityPage.tsx:165-170` | spec `data`, `accessibility` |
-| D10 | `date-range-filter` with catalog labels replaces the two native date inputs; both dates are set together, and the `from` and `to` values keep the `YYYY-MM-DD` form | `ConsoleObservabilityPage.tsx:220-227` | vitest "filters map to the legacy parameters..." (actor, category, result); spec `action` |
+| D10 | Two kit `DatePicker` fields with catalog labels replace the two native date inputs; Desde and Hasta stay independent and keep the `YYYY-MM-DD` form | `ConsoleObservabilityPage.tsx:220-227` | vitest "the audit dates are independent..."; spec `locale` |
 | D11 | The empty audit state offers `Limpiar filtros` | `ConsoleObservabilityPage.tsx:334` | vitest "the empty audit state offers Limpiar filtros..." |
 | D12 | `Exportar auditoria` is the primary button | `ConsoleObservabilityPage.tsx:232-241` | spec `responsive` (full width at 375) |
 | D13 | A client-side dimension search sits in the metrics toolbar and sends no request | none | vitest "the dimension search is local..." |
 
 ### D10 choice
 
-`DateRangeFilter` (blocks 0.11.0) accepts `labels`, `label` and `placeholder`, so the two date-picker fallback is not used. Its presets are passed empty so no English preset copy renders. The calendar chrome comes from the kit's `I18nProvider` locale. The spec `visual-review` check runs the locale assertion on the audit surface in es; any English chrome there reopens the fallback.
+`DateRangeFilter` (blocks 0.11.0) only commits complete ranges, so a from-only or to-only query, which the legacy page allowed, could not be issued. The two date-picker fallback is used instead: each `DatePicker` has its own catalog label, placeholder and clear label, and the calendar chrome comes from the kit's `I18nProvider` locale. The spec locale assertion runs on the audit surface in es; any English chrome there is a defect.
 
 ## Checks
 

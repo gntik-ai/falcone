@@ -22,7 +22,7 @@ Page: `console-observability-page`, wave `u2`, entry SHA256
   es/en catalogs, composed from the pinned gntik-ui 0.11.0 kit with explicit props: page-header
   (context line, quota posture status-tag linking to `/console/quotas`, kit tabs), page-toolbar,
   one chart-card series surface with its range toggle hidden, a meter per dimension, data-table with
-  `paginated={false}` plus load-more-footer, date-range-filter, a detail drawer with
+  `paginated={false}` plus load-more-footer, two independent date-picker fields for Desde and Hasta, a detail drawer with
   description-list-card and json-viewer, inline-callout, empty-states, skeletons and error-panel.
 - Add a page-local request module on `requestConsoleSessionJson` for the nine listed endpoints only:
   GET `tenants/{}/overview`, `usage`, `audit-records`; POST `tenants/{}/audit-exports`; GET
