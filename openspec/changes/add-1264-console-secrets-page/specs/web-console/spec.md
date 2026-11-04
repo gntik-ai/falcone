@@ -92,6 +92,10 @@ the session's sole principal.tenantIds entry, never activeTenantId.
 
 ### Requirement: Legacy hand-off, rollback and verification
 
+The migrated page SHALL preserve root-relative legacy rotation and history
+hand-offs and support rollback through its dispatch and migrated flag. Verification
+SHALL cover the approved parity scenarios and preserve existing repository gates.
+
 #### Scenario: Rotation and history remain legacy
 
 - **WHEN** Rotate or History is followed
