@@ -39,11 +39,11 @@ function ExportArea({ exporter }: { exporter: ReturnType<typeof useExport> }) {
   const statusLabels: Record<string, string> = { accepted: t('export.statusAccepted'), completed: t('export.statusCompleted'), failed: t('export.statusFailed'), queued: t('export.statusQueued') }
   let body = null
   if (state?.status === 'running') {
-    body = <div role="status" aria-busy={true}><InlineCallout tone="info" title={t('export.progressTitle')} description={t('export.progressDescription')} actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined} /></div>
+    body = <div><InlineCallout tone="info" title={t('export.progressTitle')} description={t('export.progressDescription')} actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined} /></div>
   } else if (state?.status === 'manifest') {
     const { manifest } = state
     const label = exportStatus(manifest)
-    body = <div role="status" className="space-y-3">
+    body = <div className="space-y-3">
       <InlineCallout tone="success" title={t('export.readyTitle')} actions={[{ label: t('export.download'), variant: 'secondary', onClick: () => download(manifest, manifest.exportId) }]} icon={undefined} dismissible={false} open={true} onDismiss={undefined}
         description={<span>{t('export.exportId')} <code className="font-mono text-xs">{manifest.exportId}</code></span>} />
       <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
@@ -56,7 +56,7 @@ function ExportArea({ exporter }: { exporter: ReturnType<typeof useExport> }) {
     const result = state.result
     const code = exportStatus(result)
     const id = exportId(result)
-    body = <div role="status"><InlineCallout tone="warning" title={t('export.unavailableTitle')} actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined}
+    body = <div><InlineCallout tone="warning" title={t('export.unavailableTitle')} actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined}
       description={<span className="block space-y-1"><span className="block">{exportMessage(result) ?? (code ? t('export.unavailableStatus', { status: code }) : t('export.unavailableGeneric'))}</span>
         <span className="block">{t('export.unavailableNoFile')}</span>{id && <span className="block">{t('export.request')} <code className="font-mono text-xs">{id}</code></span>}</span>} /></div>
   } else if (state?.status === 'error' && state.failure.status !== 401) {
@@ -148,7 +148,7 @@ export function AuditPanel({ filters, onFilters, audit, exporter }: { filters: A
   const moreError = more?.status === 'error' ? (more.failure?.requestId ? t('audit.moreErrorId', { requestId: more.failure.requestId }) : t('audit.moreError')) : ''
   return <section aria-label={t('audit.section')} className="min-w-0 space-y-4">
     <PageToolbar search={filters.actorId} defaultSearch="" onSearchChange={(value) => change({ actorId: value })} searchLabel={t('audit.actor')} searchPlaceholder={t('audit.actorPlaceholder')}
-      views={[]} view="" defaultView="" onViewChange={undefined} primaryAction={null} aria-label={t('audit.filters')} className="min-w-0"
+      views={[]} view="" defaultView="" onViewChange={undefined} primaryAction={null} aria-label={t('audit.filters')} className="min-w-0 [&>div:first-child]:flex-wrap"
       filters={<div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field><FieldLabel>{t('audit.category')}</FieldLabel>
           <Input aria-label={t('audit.category')} placeholder={t('audit.categoryPlaceholder')} value={filters.category} onChange={(event) => change({ category: event.target.value })} className="w-full min-w-0" /></Field>

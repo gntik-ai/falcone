@@ -79,7 +79,7 @@ export function MetricsPanel({ scope, window, onWindow, metrics }: { scope: Scop
     items={items} aria-label={t('metrics.windowLabel')} disabled={!workspaceScope} clearable={false} size="md" placeholder={t('metrics.windowLabel')} className="w-full min-w-0" />
   return <section aria-label={t('metrics.section')} className="min-w-0 space-y-4">
     <PageToolbar search={search} defaultSearch="" onSearchChange={setSearch} searchLabel={t('metrics.searchLabel')} searchPlaceholder={t('metrics.searchPlaceholder')}
-      views={[]} view="" defaultView="" onViewChange={undefined} primaryAction={null} aria-label={t('metrics.windowGroup')} className="min-w-0"
+      views={[]} view="" defaultView="" onViewChange={undefined} primaryAction={null} aria-label={t('metrics.windowGroup')} className="min-w-0 [&>div:first-child]:flex-wrap"
       filters={<div className="w-full min-w-0 sm:max-w-xs">
         <Field><div className="flex flex-wrap items-center gap-2"><FieldLabel>{t('metrics.windowLabel')}</FieldLabel>{!workspaceScope && <StatusTag status="notApplicable" label={t('metrics.windowNotApplicable')} statuses={{ notApplicable: { label: t('metrics.windowNotApplicable'), tone: 'neutral' } }} uppercase={false} />}</div>
           {workspaceScope ? select : <SimpleTooltip content={t('metrics.windowReason')} side="top" align="start" kbd="" variant="solid" arrow={true} delay={300} disabled={false} className="max-w-xs">

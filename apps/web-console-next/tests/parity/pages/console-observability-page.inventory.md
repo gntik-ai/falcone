@@ -42,3 +42,5 @@ Unit and routing coverage run in vitest: `tests/consoleObservability.test.tsx` a
 Seeded mutations, run locally and not committed, each fail a vitest test: a `window` parameter on overview, a dropped `page[size]=50`, an audit GET for `tenant_developer`, and an appended audit page applied after a workspace switch.
 
 Browser execution (parity, axe, viewport, CSP) and visual baseline approval run in PR CI, because Chromium is unavailable in the maker sandbox. Screenshots are attached with SHA256 names by the spec for the checker and the operator.
+
+The spec runs the shared locale check through a local wrapper that hides the shell workspace switcher's trigger while it reads "Select workspace". With no active workspace, the u0-owned shell renders that built-in English kit text (gap-kit-builtin-copy-english). It is not this page's copy, and the page's own copy stays under the shared check.
