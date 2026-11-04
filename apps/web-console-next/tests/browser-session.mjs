@@ -4,6 +4,7 @@ import { tenantMetricsEndpoints } from './parity/pages/consoleTenants.manifest.t
 import { catalogEndpoints, catalogResponse, isPlansQuery } from './parity/pages/console-plan-catalog-page.manifest.ts';
 import { allocationEndpoints } from './parity/pages/console-tenant-allocation-summary-page.manifest.ts';
 import { buildTenantPlanEndpoints, cspTenantId, isTenantPlanQuery } from './parity/pages/console-tenant-plan-page.manifest.ts';
+import { buildPlanDetailReads } from './parity/pages/console-plan-detail-page.manifest.ts';
 import { createEndpointRegistry } from './parity/endpoint-registry.ts';
 import { operationEndpoints } from './parity/pages/operationDetail.manifest.ts';
 import { runtimeEndpoints } from './parity/pages/consoleRuntime.manifest.ts';
@@ -16,6 +17,7 @@ export async function installSession(page, roles = ['superadmin'], capabilityVar
   const endpoints = createEndpointRegistry({}, () => ({}), {
     ...(typeof tenantMetricsEndpoints === 'undefined' ? {} : tenantMetricsEndpoints), ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints), ...(typeof buildTenantPlanEndpoints === 'undefined' ? {} : buildTenantPlanEndpoints(cspTenantId)),
     ...(typeof workspaceConsumptionEndpoints === 'undefined' ? {} : workspaceConsumptionEndpoints),
+    ...(typeof buildPlanDetailReads === 'undefined' ? {} : buildPlanDetailReads('sample-planId')),
     signupPolicy: { method: 'GET', path: '/v1/auth/signups/policy', fixtures: {
       success: { status: 200, body: buildConsoleSignupPolicyFixture() },
     } },

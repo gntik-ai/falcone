@@ -195,6 +195,9 @@ test.each(['success', 'retry', '401-success', '401-rejected'])('real lazy route,
   requests = strictFetch({
     [`GET ${tenantUrl}`]: { items: [] },
     'GET /v1/auth/signups/policy': buildConsoleSignupPolicyFixture(),
+    // The redirect now mounts the plan detail page, which reads the created plan and its limits.
+    'GET /v1/plans/p1': { id: 'p1', slug: 'starter-2026', displayName: 'Starter', status: 'draft', capabilities: {}, quotaDimensions: {} },
+    'GET /v1/plans/p1/limits': { planId: 'p1', profile: [] },
     [`POST ${path}`]: () => {
       count++
       if (variant.startsWith('401') && count === 1) return errorResponse(401)
