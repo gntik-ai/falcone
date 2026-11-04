@@ -60,6 +60,10 @@ export async function installSession(page, roles = ['superadmin'], capabilityVar
       await route.fulfill({ json: { items: [] } });
     } else if (route.request().method() === 'GET' && /^\/v1\/flows\/workspaces\/[^/]+\/flows\/[^/]+\/executions$/.test(url.pathname) && !url.search) {
       await route.fulfill({ json: { items: [], nextPageToken: null } });
+    } else if (route.request().method() === 'GET' && url.pathname === '/v1/secrets/inventory' && url.search === '?domain=platform') {
+      await route.fulfill({ json: { secrets: [], offset: 0, limit: 50 } });
+    } else if (route.request().method() === 'GET' && url.pathname === '/v1/secrets/inventory' && url.search === '?domain=tenant') {
+      await route.fulfill({ json: { secrets: [], offset: 0, limit: 50 } });
     } else {
       const request = route.request();
       let body;
