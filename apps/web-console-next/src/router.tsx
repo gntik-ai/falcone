@@ -91,6 +91,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'plans/new') return { ...route, element: lazyPage('pages.console-plan-create-page', () => import('./pages/consolePlanCreate')) }
         if (route.path === 'quotas') return { ...route, element: lazyPage('pages.console-quotas-page', () => import('./pages/consoleQuotas')) }
         if (route.path === 'workspaces/:workspaceId/realtime' && route.migrated) return { ...route, element: lazyPage('pages.console-realtime-page', () => import('./pages/consoleRealtime')) }
+        if (route.path === 'observability' && route.migrated) return { ...route, element: lazyPage('pages.console-observability-page', () => import('./pages/consoleObservability')) }
         if (route.path === 'runtime') return { ...route, element: lazyPage('pages.console-runtime-page', () => import('./pages/consoleRuntime')) }
         if (route.path === 'my-plan' && route.migrated) return { ...route, element: lazyPage('pages.console-tenant-plan-overview-page', () => import('./pages/consoleTenantPlanOverview')) }
         if (route.path === 'my-plan/allocation') return { ...route, element: lazyPage('pages.console-tenant-allocation-summary-page', () => import('./pages/consoleTenantAllocationSummary')) }

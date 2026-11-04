@@ -1,5 +1,6 @@
 import type { ParityManifest } from '../manifest'
 import { buildConsoleLoginSessionFixture } from '@in-falcone/console-api/fixtures'
+import { observabilityEndpoints } from './console-observability-page.manifest'
 
 export const loginPath = '/v1/auth/login-sessions'
 export const pendingPath = '/v1/auth/status-views/pending_activation'
@@ -11,6 +12,8 @@ const conflict = (statusView: string) => ({ status: 409, body: { status: 409, co
 const manifest: ParityManifest = {
   route: '/login', roles: ['superadmin', 'tenant_viewer'], sources: ['src/pages/login.tsx'],
   endpoints: {
+    // The read-only landing is the observability page, so its reads are registered for the tenant_viewer journeys.
+    ...observabilityEndpoints,
     login: { method: 'POST', path: loginPath, fixtures: {
       success: (role) => { const body = buildConsoleLoginSessionFixture(); body.principal!.platformRoles = [role]; return { status: 200, body } },
       'auth.login-sessions.409-pending-activation': conflict('pending_activation'),
