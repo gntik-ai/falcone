@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button, EmptyState, Page, Stepper, Tabs, TabsList, TabsPanel, TabsTab, Text, ToastProvider, useAnnounce, useToast } from '@gntik-ai/ui'
-import { ErrorPanel, InlineCallout, NoAccessEmpty, NotFoundEmpty, PageHeader, TableSkeleton } from '@gntik-ai/blocks'
+import { ErrorPanel, InlineCallout, ListSkeleton, NoAccessEmpty, NotFoundEmpty, PageHeader, TableSkeleton } from '@gntik-ai/blocks'
 import i18n from '../i18n'
 import es from '../locales/es/pages.console-plan-detail-page.json'
 import en from '../locales/en/pages.console-plan-detail-page.json'
@@ -230,12 +230,14 @@ function PlanDetail({ routeId }: { routeId: string }) {
   }
 
   const back = <RouterLink to="/console/plans" state={{ focusMainHeading: true }} className={`underline ${focus}`}>{t('back')}</RouterLink>
-  const header = <PageHeader as="div" wrapTitle={true} titleRef={heading} title={plan?.displayName ?? t('pageTitle')} description={t('description')} breadcrumbs={null}
+  const loadingNow = load.phase === 'loading' || (load.phase === 'error' && load.failure.status === 401 && !reloading)
+  // While loading, the header is a skeleton too; the labelled status in the body announces the load once.
+  const header = loadingNow ? <div aria-hidden={true} data-testid="header-skeleton" className="min-w-0"><ListSkeleton rows={1} label={t('load.loading')} className="min-w-0" /></div> : <PageHeader as="div" wrapTitle={true} titleRef={heading} title={plan?.displayName ?? t('pageTitle')} description={t('description')} breadcrumbs={null}
     status={plan?.status ?? ''} statuses={statuses} meta={plan ? [{ label: t('slug'), value: plan.slug, mono: true }] : []} actions={[]} tabs={null}
     labels={{ title: plan?.displayName ?? t('pageTitle'), description: t('description'), moreActions: t('actions'), sections: t('tabs.label') }} />
 
   let body: JSX.Element
-  if (load.phase === 'loading' || (load.phase === 'error' && load.failure.status === 401 && !reloading)) {
+  if (loadingNow) {
     body = <section role="status" aria-label={t('load.loading')} aria-busy={true}>
       <Text>{t('load.loadingDescription')}</Text><div aria-hidden={true}><TableSkeleton rows={4} columns={5} label={t('load.loading')} className="min-w-0" /></div>
     </section>

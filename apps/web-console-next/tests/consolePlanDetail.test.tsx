@@ -492,3 +492,15 @@ test('a load failure moves focus to the error panel and a successful Reintentar 
   fireEvent.click(screen.getByRole('button', { name: es.retry }))
   expect(await ready()).toHaveFocus()
 })
+
+test('while loading, the header and the body are skeletons behind one labelled status, then the page replaces them', async () => {
+  let release: (response: Response) => void = () => {}
+  requests = strictFetch({ [`GET ${base}`]: draft, [`GET ${limitsUrl}`]: () => new Promise<Response>((resolve) => { release = resolve }) })
+  open()
+  expect(await screen.findByRole('status', { name: es.load.loading })).toHaveAttribute('aria-busy', 'true')
+  expect(screen.getByTestId('header-skeleton')).toHaveAttribute('aria-hidden', 'true')
+  expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+  await act(async () => { release(json(profile)) })
+  expect(await ready()).toBeVisible()
+  expect(screen.queryByTestId('header-skeleton')).toBeNull()
+})
