@@ -55,6 +55,9 @@ function PlanDetail({ routeId }: { routeId: string }) {
   const [outcomes, setOutcomes] = useState<Record<string, RowOutcome | undefined>>({})
   const [busy, setBusy] = useState<Action | null>(null)
   const [feedback, setFeedback] = useState<{ action: Action; failure: Failure } | null>(null)
+  // A lifecycle request whose outcome is unknown. Unrelated feedback changes never clear it: only a successful or rejected
+  // retry, or closing the dialog that held it, resolves it.
+  const [unresolved, setUnresolved] = useState<{ action: Action; failure: Failure } | null>(null)
   const [saved, setSaved] = useState<{ title: string; message: string } | null>(null)
   const [denied, setDenied] = useState(false)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -96,8 +99,9 @@ function PlanDetail({ routeId }: { routeId: string }) {
   }, [feedback])
 
   const locked = denied || busy !== null
+  const shown = feedback ?? unresolved
   // A failed or lost lifecycle response leaves the outcome unresolved: only Reintentar may send that transition again.
-  const lifecycleUnresolved = feedback !== null && isLifecycle(feedback.action) && retryable(feedback.failure)
+  const lifecycleUnresolved = unresolved !== null
   const count = typeof plan?.assignedTenantCount === 'number' ? plan.assignedTenantCount : null
   const assignedSummary = count === null ? t('assignedUnknown') : t('assignedSummary', { count })
   const affected = count === null ? t('limits.affectedUnknown') : t('limits.affected', { count })
@@ -121,7 +125,7 @@ function PlanDetail({ routeId }: { routeId: string }) {
       toast.add({ title: message, description: undefined, tone: 'success', priority: 'low' })
       announce(message, 'polite')
       refocusHeading.current = true
-      setFeedback(null)
+      setFeedback(null); setUnresolved(null)
       setDialog((value) => value && { ...value, open: false })
       focusHeadingSoon()
     } else if (action.kind === 'delete') {
@@ -191,6 +195,7 @@ function PlanDetail({ routeId }: { routeId: string }) {
         setOutcomes((value) => ({ ...value, [action.key]: action.kind === 'set' ? 'failed' : 'resetFailed' }))
       }
       setFeedback({ action, failure })
+      if (isLifecycle(action)) setUnresolved(retryable(failure) ? { action, failure } : null)
     } finally {
       inFlight.current = false
       if (mounted.current) setBusy(null)
@@ -208,6 +213,8 @@ function PlanDetail({ routeId }: { routeId: string }) {
     if (inFlight.current) return
     setDialog((value) => value && { ...value, open: false })
     setFeedback((value) => value && isDialogAction(value.action) ? null : value)
+    // Closing the dialog discards its retry: the confirmation is needed again.
+    setUnresolved((value) => value && isDialogAction(value.action) ? null : value)
   }
   function save(key: string) {
     const row = rows.find((value) => value.dimensionKey === key)
@@ -255,8 +262,8 @@ function PlanDetail({ routeId }: { routeId: string }) {
     const calloutTitle = plan.status === 'draft' ? 'limits.calloutDraftTitle' : plan.status === 'active' ? (count === 0 ? 'limits.calloutActiveEmptyTitle' : 'limits.calloutActiveTitle') : 'limits.calloutReadOnlyTitle'
     const calloutBody = plan.status === 'draft' ? t('limits.calloutDraft') : plan.status === 'active' ? t('limits.calloutActive', { affected }) : t('limits.calloutReadOnly', { status })
     // Each failure renders once: Activar and a refused limit save above the tabs, other limit failures under the table.
-    const aboveTabs = feedback && !isDialogAction(feedback.action) && (feedback.action.kind === 'activate' || feedback.failure.status === 403) ? feedback : null
-    const shownFeedback = feedback && !isDialogAction(feedback.action) && !aboveTabs ? feedback : null
+    const aboveTabs = shown && !isDialogAction(shown.action) && (shown.action.kind === 'activate' || shown.failure.status === 403) ? shown : null
+    const shownFeedback = shown && !isDialogAction(shown.action) && !aboveTabs ? shown : null
     const lifecycleName = lifecycle ? t(`action.${lifecycle}`) : ''
     body = <>
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -305,12 +312,12 @@ function PlanDetail({ routeId }: { routeId: string }) {
         <TabsPanel value="assignments" keepMounted={false} className={`min-w-0 pt-4 ${focus}`}><AssignmentsPanel summary={assignedSummary} /></TabsPanel>
       </Tabs>
       {dialog && <ConfirmDialog key={dialog.id} kind={dialog.kind} open={dialog.open} plan={plan} action={dialog.action} busy={busy !== null} denied={denied}
-        failure={feedback && isDialogAction(feedback.action) ? feedback.failure : null}
+        failure={shown && isDialogAction(shown.action) ? shown.failure : null}
         description={dialog.kind === 'deprecate' ? t('dialog.deprecateDescription', { name: plan.displayName, impact: t('lifecycle.guidance.deprecate') })
           : dialog.kind === 'archive' ? t('dialog.archiveDescription', { name: plan.displayName, impact: t('lifecycle.guidance.archive') })
             : dialog.kind === 'delete' ? t('dialog.deleteDescription', { name: plan.displayName })
               : t('dialog.resetDescription', { dimension: dialog.label, impact: plan.status === 'active' ? t('dialog.resetImpactActive', { affected }) : t('dialog.resetImpactInactive') })}
-        onConfirm={() => void run(dialog.action)} onRetry={() => feedback && void run(feedback.action, true)} onClose={closeDialog} onClosed={() => setDialog((value) => value?.id === dialog.id ? null : value)} finalFocus={finalFocus} />}
+        onConfirm={() => void run(dialog.action)} onRetry={() => shown && void run(shown.action, true)} onClose={closeDialog} onClosed={() => setDialog((value) => value?.id === dialog.id ? null : value)} finalFocus={finalFocus} />}
     </>
   } else {
     body = <EmptyState title={t('load.notFoundTitle')} description={t('load.notFoundDescription')} titleAs="h2" bordered={false} primaryAction={null} secondaryAction={null} />

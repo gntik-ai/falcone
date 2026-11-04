@@ -179,6 +179,21 @@ test('a lost lifecycle response sends one POST, says the outcome is unknown and 
   expect(count(`POST ${lifecycleUrl}`)).toBe(1)
 })
 
+test('opening and cancelling an unrelated dialog keeps the unresolved lifecycle gate and its Reintentar panel', async () => {
+  setup({ [`POST ${lifecycleUrl}`]: network }); open(); await ready()
+  fireEvent.click(lifecycleButton(es.action.activate))
+  expect(await screen.findByTestId('mutation-feedback')).toBeVisible()
+  fireEvent.click(button(new RegExp(`^${es.action.delete}`)))
+  const dialog = await screen.findByRole('alertdialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: es.dialog.cancel }))
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  expect(lifecycleButton(es.action.activate)).toBeDisabled()
+  fireEvent.click(lifecycleButton(es.action.activate)); await wait()
+  expect(count(`POST ${lifecycleUrl}`)).toBe(1)
+  expect(within(screen.getByTestId('mutation-feedback')).getByText(es.feedback.outcomeUnknown)).toBeVisible()
+  expect(within(screen.getByTestId('mutation-feedback')).getByRole('button', { name: es.retry })).toBeVisible()
+})
+
 test('a lost lifecycle response applied by the backend reconciles through Reintentar with a plan-only reload', async () => {
   requests = strictFetch({ [`GET ${base}`]: sequence(() => json(draft), () => json(active)), [`GET ${limitsUrl}`]: profile,
     [`POST ${lifecycleUrl}`]: sequence(network, () => fail(409, { code: 'INVALID_TRANSITION' })) })
