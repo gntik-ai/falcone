@@ -9,6 +9,8 @@ import { canRevoke, revokeVersion, type SecretRow } from '../src/pages/consoleSe
 import { ProtectedRoute } from '../src/shell/session'
 import { login, renderWithSession, strictFetch } from './shell-support'
 import { boundTenantId, inventoryBody, platformGet, platformRow, revokePath, tenantGet, tenantRow } from './parity/pages/console-secrets-page.manifest'
+import { serverRows } from './parity/pages/console-mcp-servers-page.manifest'
+import { ready as runtimeReady } from './parity/pages/consoleRuntime.manifest'
 import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-secrets-page.json'
 import en from '../src/locales/en/pages.console-secrets-page.json'
@@ -28,6 +30,17 @@ const failure = (status: number) => () => Response.json({ code: `HTTP_${status}`
 const openDialog = async (name = tenantRow.name) => { await ready(); fireEvent.click(revoke(name)); return screen.findByRole('alertdialog') }
 beforeEach(() => { login(['superadmin'], [boundTenantId]); vi.stubGlobal('PointerEvent', MouseEvent) })
 afterEach(() => requests?.verify())
+
+test('keeps secrets labels from rejecting raw MCP and runtime metadata in the shared locale check', () => {
+  // The shared parity check treats every differing English catalog value as forbidden
+  // in Spanish, including catalogs belonging to pages that are not currently open.
+  const flatten = (catalog: object, prefix = ''): [string, string][] => Object.entries(catalog).flatMap(([key, value]) =>
+    typeof value === 'string' ? [[prefix + key, value]] : flatten(value, `${prefix}${key}.`))
+  const spanish = new Map(flatten(es))
+  const forbidden = new Set(flatten(en).filter(([key, value]) => value !== spanish.get(key) && !value.includes('{')).map(([, value]) => value))
+  const metadata = [runtimeReady.owner, ...serverRows.items.map((row) => row.lifecycleStatus)]
+  expect(metadata.filter((value) => forbidden.has(value))).toEqual([])
+})
 
 test.each(['es', 'en'] as const)('ports legacy inventory, translated badge and kit primitives in %s', async (locale) => {
   await i18n.changeLanguage(locale); setup(); open()
