@@ -9,8 +9,9 @@ const NAMESPACE = 'pages.console-plan-detail-page'
 // Row outcome of the last mutation on that row; the validity and dirtiness of the draft are derived.
 export type RowOutcome = 'saved' | 'failed' | 'reset' | 'resetFailed'
 const safeId = (key: string) => key.replace(/[^A-Za-z0-9_-]/g, '-')
-// The number field keeps its last parsed number while the text is incomplete ("-") or malformed ("1-"), so the visible text decides.
-const wellFormed = /^[-\u2212]?[\d.,\s\u00a0]*\d[\d.,\s\u00a0]*$/
+// The number field keeps its last parsed number while the text is incomplete ("-"), malformed ("1-", "9..0") or pasted, so the visible text decides.
+// One integer, an optional sign, and either plain digits or 3-digit groups, with at most one decimal separator at the end.
+const wellFormed = /^[-\u2212]?(?:\d+|\d{1,3}(?:[.,\s\u00a0]\d{3})+)(?:[.,]\d+)?$/
 const textState = (text: string): 'empty' | 'ok' | 'malformed' => text.trim() === '' ? 'empty' : wellFormed.test(text.trim()) ? 'ok' : 'malformed'
 const tones = { persisted: 'neutral', dirty: 'warning', invalid: 'destructive', saving: 'warning', resetting: 'warning', saved: 'success', reset: 'success', failed: 'destructive', resetFailed: 'destructive' } as const
 type RowState = keyof typeof tones
@@ -34,6 +35,21 @@ export function LimitsTable({ rows, editable, drafts, versions, outcomes, busyKe
   // Rows whose visible text is not a number, and the last number the field parsed (what it keeps showing while the text is garbled).
   const garbled = useRef<Record<string, boolean>>({})
   const lastParsed = useRef<Record<string, number | null>>({})
+  const fields = useRef<Record<string, HTMLElement | null>>({})
+  // Marks the row's draft invalid when its visible text is not a clean number; true when the text was rejected.
+  const rejectText = (key: string, text: string) => {
+    const state = textState(text)
+    garbled.current[key] = state === 'malformed'
+    // No digit at all reads as empty (required, as the legacy number input does); other malformed text is invalid.
+    if (state === 'malformed') onDraft(key, /\d/.test(text) ? Number.NaN : null)
+    return state === 'malformed'
+  }
+  // Submission re-reads the visible text: a paste updates the field's parsed number without any change event.
+  const submit = (key: string) => {
+    const text = fields.current[key]?.querySelector('input')?.value
+    if (text !== undefined && rejectText(key, text)) return
+    onSave(key)
+  }
   const stateOf = (row: LimitRow): RowState => {
     const key = row.dimensionKey
     if (busyKey?.key === key) return busyKey.reset ? 'resetting' : 'saving'
@@ -53,18 +69,14 @@ export function LimitsTable({ rows, editable, drafts, versions, outcomes, busyKe
       const draft = key in drafts ? drafts[key] : row.effectiveValue
       const validation = validateLimit(draft)
       const shown = key in drafts && garbled.current[key] && key in lastParsed.current ? lastParsed.current[key] : draft
-      const onTextChange = (event: ChangeEvent<HTMLElement>) => {
-        const text = (event.target as HTMLInputElement).value ?? ''
-        const state = textState(text)
-        garbled.current[key] = state === 'malformed'
-        // No digit at all reads as empty (required, as the legacy number input does); other malformed text is invalid.
-        if (state === 'malformed') onDraft(key, /\d/.test(text) ? Number.NaN : null)
-      }
+      const onTextChange = (event: ChangeEvent<HTMLElement>) => { rejectText(key, (event.target as HTMLInputElement).value ?? '') }
+      // The kit applies a paste without a change event and may ignore it, so read the text the field settled on.
+      const onPaste = () => { setTimeout(() => { const text = fields.current[key]?.querySelector('input')?.value; if (text !== undefined) rejectText(key, text) }, 0) }
       const onKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') onRestore(key)
-        else if (event.key === 'Enter') { event.preventDefault(); onSave(key) }
+        else if (event.key === 'Enter') { event.preventDefault(); submit(key) }
       }
-      return <div className="ml-auto w-36 min-w-0 text-left" onKeyDown={onKeyDown} onChange={onTextChange}>
+      return <div ref={(node) => { fields.current[key] = node }} className="ml-auto w-36 min-w-0 text-left" onKeyDown={onKeyDown} onChange={onTextChange} onPaste={onPaste}>
         <NumberInput key={versions[key] ?? 0} value={shown} step={1} size="md" align="end" id={`limit-${id}`} disabled={locked} invalid={!validation.valid}
           aria-label={t('limits.inputName', { dimension: row.displayLabel })} aria-describedby={validation.valid ? `limit-${id}-help` : `limit-${id}-help limit-${id}-error`}
           decrementLabel={t('limits.decrease', { dimension: row.displayLabel })} incrementLabel={t('limits.increase', { dimension: row.displayLabel })}
@@ -91,7 +103,7 @@ export function LimitsTable({ rows, editable, drafts, versions, outcomes, busyKe
       return <div className="flex flex-wrap justify-end gap-2">
         {/* aria-disabled keeps keyboard focus on Guardar after a successful save, when the row is no longer dirty. */}
         <Button type="button" variant="primary" size="sm" data-save-key={key} aria-disabled={!canSave} aria-busy={busy && !busyKey?.reset}
-          aria-label={t('limits.saveName', { dimension: row.displayLabel })} onClick={() => { if (canSave) onSave(key) }}>
+          aria-label={t('limits.saveName', { dimension: row.displayLabel })} onClick={() => { if (canSave) submit(key) }}>
           {t(busy && !busyKey?.reset ? 'limits.saving' : 'limits.save')}
         </Button>
         <Button type="button" variant="secondary" size="sm" data-reset-key={key} disabled={locked} aria-busy={busy && Boolean(busyKey?.reset)}

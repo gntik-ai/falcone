@@ -326,6 +326,29 @@ test.each([['-', 'required'], ['1-', 'invalid'], ['-.', 'required']] as const)('
   await waitFor(() => expect(bodiesOf(`PUT ${limitUrl}`)).toEqual([{ value: 9 }]))
 })
 
+const paste = (text: string) => {
+  const field = input(); fireEvent.focus(field); field.setSelectionRange(0, field.value.length)
+  fireEvent.paste(field, { clipboardData: { getData: () => text } })
+  return field
+}
+
+test.each([['1-', 'invalid'], ['9..0', 'invalid'], ['1.2.3', 'invalid'], ['12abc', 'invalid']] as const)('pasting malformed text %s sends nothing, not the number the field parsed', async (text, message) => {
+  setup({ [`PUT ${limitUrl}`]: () => json({ planId, dimensionKey: limitKey, newValue: 9, source: 'explicit' }) }); open(); await limitsTab()
+  const field = paste(text)
+  await waitFor(() => expect(screen.getByText(es.limits[message])).toBeVisible())
+  expect(field).toHaveValue(text)
+  fireEvent.keyDown(field, { key: 'Enter' })
+  fireEvent.click(button('Guardar límite de Workspace quota'))
+  expect(writes()).toEqual([])
+})
+
+test('pasting a clean number sends it once on Enter', async () => {
+  setup({ [`PUT ${limitUrl}`]: () => json({ planId, dimensionKey: limitKey, newValue: 500, source: 'explicit' }) }); open(); await limitsTab()
+  const field = paste('500'); expect(field).toHaveValue('500')
+  fireEvent.keyDown(field, { key: 'Enter' })
+  await waitFor(() => expect(bodiesOf(`PUT ${limitUrl}`)).toEqual([{ value: 500 }]))
+})
+
 test('-1 is accepted as unlimited and Guardar sends it', async () => {
   setup({ [`PUT ${limitUrl}`]: () => json({ planId, dimensionKey: limitKey, newValue: -1, source: 'explicit' }) }); open(); await limitsTab()
   type('-1'); fireEvent.click(button('Guardar límite de Workspace quota'))

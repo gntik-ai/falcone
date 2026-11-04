@@ -32,8 +32,9 @@ with explicit props and complete es-default/en copy, accessible names and announ
 - **THEN** Enter on a valid changed value SHALL send one PUT `{value}`; Escape, blur, focus,
   unchanged and invalid values SHALL send nothing; values below -1 SHALL fail validation and -1
   SHALL mean unlimited.
-- **AND** incomplete or malformed text in the field (for example `-`) SHALL be treated as invalid
-  from the visible text, so the last parsed number SHALL never be sent.
+- **AND** incomplete or malformed text in the field (for example `-`, `1-` or `9..0`), whether
+  typed or pasted, SHALL be treated as invalid from the visible text, which SHALL be re-read on
+  submission, so the last parsed number SHALL never be sent.
 - **AND** deprecated and archived plans SHALL expose no limit-mutation control.
 
 #### Scenario: Failures and lost responses
