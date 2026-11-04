@@ -109,7 +109,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.page.route('**/console/secrets/*/rotate', (route) => route.fulfill({ contentType: 'text/html', body: '<main>synthetic-legacy-rotation</main>' }));
       await surface(parity).getByRole('link', { name: named(c.rotateNamed, tenantRow.name), exact: true }).click(); await expect(parity.page).toHaveURL(new RegExp(`${href}$`));
     });
-    test('error-empty', async ({ parity }) => {
+    test('error-empty', async ({ parity, server }) => {
       const c = copy(parity);
       const loading = open(parity, {}, 'platform-secrets-loading-delayed'); await expect(parity.page.getByRole('status', { name: c.loading })).toBeVisible(); await loading; await ready(parity);
       await open(parity, {}, 'platform-secrets-empty'); await expect(surface(parity).getByRole('heading', { name: c.empty })).toBeVisible(); await expect(surface(parity).getByRole('table')).toHaveCount(0);
@@ -146,7 +146,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await open(parity, { revokeTenant: 'secret-revoke-401' }); await openDialog(parity); await typeName(parity); const before = parity.network.requests.length; await confirm(parity);
       await expect(parity.page).toHaveURL(/\/login$/);
       expect(parity.network.requests.slice(before).filter(({ method }) => method === 'POST').map(({ path }) => path)).toEqual([revokePath(tenantRow), '/v1/auth/login-sessions/synthetic-session/refresh']);
-      expect(await parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe('/console/secrets');
+      expect(await parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(server.url('console/secrets')).pathname);
     });
     test('accessibility', async ({ parity }) => {
       const c = copy(parity); await open(parity); await ready(parity); await check.assertAccessibility(parity); await assertLocale(parity);
