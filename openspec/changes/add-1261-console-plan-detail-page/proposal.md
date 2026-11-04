@@ -50,8 +50,6 @@ Page: `console-plan-detail-page`, wave `u2`, entry SHA256
   shows exactly one entry, the current status at `updatedAt`, and never infers past transitions.
 - Typed-name archive confirmation: Archivar requires the plan `displayName`, strengthening the
   legacy WARNING dialog.
-- After a failed limit save or reset the row returns to the loaded profile without an extra
-  limits GET.
 
 ## Routing and serving
 

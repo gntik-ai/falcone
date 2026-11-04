@@ -245,6 +245,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(dialog(parity).getByTestId('mutation-feedback')).toBeFocused();
       await check.assertAccessibility(parity);
       await open(parity, { 'plans.detail': '500-then-success' });
+      await expect(parity.page.getByTestId('load-error')).toBeFocused();
       await check.assertAccessibility(parity);
       await parity.page.getByRole('button', { name: c.retry, exact: true }).click();
       await expect(h1(parity)).toBeFocused();
@@ -306,6 +307,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await tab(parity, 'limits'); await input(parity).fill('500'); await saveButton(parity).click();
       await expect(parity.page.getByText(copy(parity).feedback.code.INVALID_LIMIT_VALUE, { exact: true })).toBeVisible();
       await snapshot(parity, info, 'limits.set-400-invalid-limit');
+      await openReady(parity, { 'plans.detail': 'draft', 'plans.limits.set': 'success' });
+      await tab(parity, 'limits'); await input(parity).fill('500'); await saveButton(parity).click();
+      await expect(parity.page.getByText(copy(parity).limits.savedTitle, { exact: true })).toBeVisible();
+      await snapshot(parity, info, 'limits.set-success');
+      await openReady(parity, { 'plans.detail': 'draft' });
+      await tab(parity, 'limits'); await resetButton(parity).click();
+      await expect(dialog(parity)).toBeVisible();
+      await snapshot(parity, info, 'reset-dialog');
       await openReady(parity, { 'plans.detail': 'draft', 'plans.lifecycle': '500' });
       await button(parity, named(parity, 'activate')).click();
       await expect(parity.page.getByTestId('mutation-feedback')).toBeVisible();

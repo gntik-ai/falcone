@@ -10,7 +10,7 @@ const NAMESPACE = 'pages.console-plan-detail-page'
 const focus = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
 
 // The failure of one mutation. Only localized copy renders: the transport message never leaves api.ts.
-export const MutationFeedback = forwardRef<HTMLDivElement, { action: Action; failure: Failure; busy: boolean; onRetry: () => void; titleAs: 'h2' | 'h3' }>(
+export const MutationFeedback = forwardRef<HTMLDivElement, { action: Action; failure: Failure; busy: boolean; onRetry: (() => void) | undefined; titleAs: 'h2' | 'h3' }>(
   function MutationFeedback({ action, failure, busy, onRetry, titleAs }, ref) {
     const { t } = useTranslation(NAMESPACE)
     if (failure.status === 401 && !failure.sessionRenewed) return null // The shared session transport redirects to the login.

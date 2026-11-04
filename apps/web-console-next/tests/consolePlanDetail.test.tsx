@@ -391,3 +391,73 @@ test('the typed gate, the retry and the 5xx copy never render transport text', a
   await within(dialog).findByRole('button', { name: es.retry })
   expect(document.body.textContent).not.toContain('PRIVATE_MARKER')
 })
+
+test.each([['delete', 'DELETE', base, draft], ['archive', 'POST', lifecycleUrl, deprecated]] as const)('a %s retry needs the typed plan name again: a cleared field removes Reintentar until the name matches', async (kind, method, url, record) => {
+  const retried = kind === 'delete' ? json({ planId, deleted: true }) : json({ planId, newStatus: 'archived' })
+  requests = strictFetch({ [`GET ${base}`]: record, [`GET ${limitsUrl}`]: profile, [`${method} ${url}`]: sequence(network, () => retried) })
+  open(); await ready()
+  fireEvent.click(kind === 'delete' ? button(new RegExp(`^${es.action.delete}`)) : lifecycleButton(es.action.archive))
+  const dialog = await screen.findByRole('alertdialog')
+  const field = within(dialog).getByLabelText(es.dialog.typeLabel)
+  fireEvent.change(field, { target: { value: planName } })
+  fireEvent.click(within(dialog).getByRole('button', { name: es.dialog[`${kind}Confirm` as 'deleteConfirm'] }))
+  await within(dialog).findByRole('button', { name: es.retry })
+  fireEvent.change(field, { target: { value: '' } })
+  expect(within(dialog).queryByRole('button', { name: es.retry })).toBeNull()
+  fireEvent.change(field, { target: { value: `${planName}x` } })
+  expect(within(dialog).queryByRole('button', { name: es.retry })).toBeNull()
+  expect(count(`${method} ${url}`)).toBe(1)
+  fireEvent.change(field, { target: { value: planName } })
+  fireEvent.click(within(dialog).getByRole('button', { name: es.retry }))
+  await waitFor(() => expect(count(`${method} ${url}`)).toBe(2))
+})
+
+test('a lifecycle retry rejected as an invalid transition reloads only the plan so the header is not stale', async () => {
+  requests = strictFetch({ [`GET ${base}`]: sequence(() => json(draft), () => json(active)), [`GET ${limitsUrl}`]: profile,
+    [`POST ${lifecycleUrl}`]: sequence(network, () => fail(409, { code: 'INVALID_TRANSITION' })) })
+  open(); await ready()
+  fireEvent.click(lifecycleButton(es.action.activate))
+  fireEvent.click(within(await screen.findByTestId('mutation-feedback')).getByRole('button', { name: es.retry }))
+  expect(await screen.findByText(es.feedback.code.INVALID_TRANSITION)).toBeVisible()
+  await waitFor(() => expect(lifecycleButton(es.action.deprecate)).toBeVisible())
+  expect(count(`POST ${lifecycleUrl}`)).toBe(2); expect(count(`GET ${base}`)).toBe(2); expect(count(`GET ${limitsUrl}`)).toBe(1)
+  expect(screen.queryByText(/ahora está/)).toBeNull()
+})
+
+test.each(['save', 'reset'] as const)('a failed limit %s reloads the limits profile once before it reports the failure', async (kind) => {
+  const method = kind === 'save' ? 'PUT' : 'DELETE'
+  requests = strictFetch({ [`GET ${base}`]: draft, [`GET ${limitsUrl}`]: profile, [`${method} ${limitUrl}`]: () => fail(500) })
+  open(); await limitsTab()
+  if (kind === 'save') { type('500'); fireEvent.click(button('Guardar límite de Workspaces')) }
+  else { fireEvent.click(button(/^Restablecer límite de Workspaces/)); fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: es.dialog.resetConfirm })) }
+  await screen.findByTestId('mutation-feedback')
+  expect(count(`GET ${limitsUrl}`)).toBe(2); expect(count(`${method} ${limitUrl}`)).toBe(1)
+  expect(screen.getByText(es.limits[kind === 'save' ? 'rowFailed' : 'rowResetFailed' as 'rowFailed'])).toBeVisible()
+})
+
+test('a failed Activar renders its error panel once, whichever tab is open', async () => {
+  setup({ [`POST ${lifecycleUrl}`]: () => fail(500) }); open(); await ready()
+  fireEvent.click(lifecycleButton(es.action.activate))
+  await screen.findByTestId('mutation-feedback')
+  await limitsTab()
+  expect(screen.getAllByTestId('mutation-feedback')).toHaveLength(1)
+})
+
+test('a refused limit save shows no-access once above the tabs and keeps it visible on every tab', async () => {
+  setup({ [`PUT ${limitUrl}`]: () => fail(403) }); open(); await limitsTab()
+  type('500'); fireEvent.click(button('Guardar límite de Workspaces'))
+  expect(await screen.findByRole('heading', { name: es.feedback.noAccessTitle })).toBeVisible()
+  for (const name of [es.tabs.limits, es.tabs.info, es.tabs.assignments]) {
+    await tab(name)
+    expect(screen.getAllByRole('heading', { name: es.feedback.noAccessTitle })).toHaveLength(1)
+  }
+})
+
+test('a load failure moves focus to the error panel and a successful Reintentar moves it to the h1', async () => {
+  requests = strictFetch({ [`GET ${base}`]: sequence(() => fail(500), () => json(draft)), [`GET ${limitsUrl}`]: profile })
+  open()
+  await screen.findByRole('heading', { level: 2, name: es.load.errorTitle })
+  await waitFor(() => expect(screen.getByTestId('load-error')).toHaveFocus())
+  fireEvent.click(screen.getByRole('button', { name: es.retry }))
+  expect(await ready()).toHaveFocus()
+})

@@ -35,7 +35,9 @@ export function ConfirmDialog({ kind, open, plan, description, action, busy, fai
   const canRetry = Boolean(shown && retryable(shown))
   useEffect(() => { if (shown) feedback.current?.focus() }, [shown])
   const destructive = kind !== 'deprecate'
-  const confirmDisabled = busy || blocked || (needsName && typed !== plan.displayName)
+  // The typed name gates the first send and every re-send: a cleared field removes Reintentar until it matches again.
+  const nameMatches = !needsName || typed === plan.displayName
+  const confirmDisabled = busy || blocked || !nameMatches
   return <AlertDialog open={open} onOpenChange={(next) => { if (!next && !busy) onClose() }} onOpenChangeComplete={(next) => { if (!next) onClosed() }}>
     <AlertDialogContent size="md" container={undefined} finalFocus={() => finalFocus() ?? true} className="min-w-0 max-w-full wrap-anywhere">
       <AlertDialogHeader tone={destructive ? 'destructive' : 'warning'} icon={undefined}>
@@ -50,7 +52,7 @@ export function ConfirmDialog({ kind, open, plan, description, action, busy, fai
             aria-describedby="plan-confirm-help" />
           <FieldDescription id="plan-confirm-help">{t('dialog.typeInstruction', { name: plan.displayName })}</FieldDescription>
         </Field>}
-        {shown && <MutationFeedback ref={feedback} action={action} failure={shown} busy={busy} onRetry={onRetry} titleAs="h3" />}
+        {shown && <MutationFeedback ref={feedback} action={action} failure={shown} busy={busy} onRetry={nameMatches ? () => { if (nameMatches) onRetry() } : undefined} titleAs="h3" />}
       </div>
       <AlertDialogFooter className="mt-5">
         <Button type="button" variant="secondary" disabled={busy} onClick={onClose}>{t(blocked || canRetry ? 'dialog.close' : 'dialog.cancel')}</Button>

@@ -67,6 +67,7 @@ function PlanDetail({ routeId }: { routeId: string }) {
   const lifecycleButton = useRef<HTMLButtonElement>(null)
   const deleteButton = useRef<HTMLButtonElement>(null)
   const feedbackBox = useRef<HTMLDivElement>(null)
+  const loadErrorBox = useRef<HTMLDivElement>(null)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
 
   // Both reads are load-bearing together, as in the legacy page: either failure replaces the whole detail.
@@ -87,6 +88,9 @@ function PlanDetail({ routeId }: { routeId: string }) {
   useEffect(() => {
     if (load.phase === 'ready' && recovering.current) { recovering.current = false; heading.current?.focus() }
   }, [load.phase])
+  useEffect(() => {
+    if (load.phase === 'error' && load.failure.status !== 401) loadErrorBox.current?.focus()
+  }, [load])
   useEffect(() => {
     if (feedback && feedback.failure.status !== 401) feedbackBox.current?.focus()
   }, [feedback])
@@ -161,8 +165,24 @@ function PlanDetail({ routeId }: { routeId: string }) {
       if (!mounted.current) return
       const failure = failureFrom(cause)
       if (failure.status === 403) setDenied(true)
+      // A lost lifecycle response may have been applied: the re-sent request can be rejected as an invalid transition, so
+      // a failed retry reloads the plan alone and the header never keeps a stale status.
+      if (retry && isLifecycle(action) && failure.status !== 401 && failure.status !== 403) {
+        try {
+          const fresh = await getPlan(plan.id)
+          if (mounted.current) setPlan(fresh)
+        } catch { /* The loaded plan stays. */ }
+        if (!mounted.current) return
+      }
       if (action.kind === 'set' || action.kind === 'reset') {
-        // The row returns to the persisted profile before it reports the failure.
+        // The row returns to the persisted profile before it reports the failure, as the legacy reconciliation read does.
+        if (failure.status !== 401) {
+          try {
+            const fresh = await getLimits(plan.id)
+            if (mounted.current) setRows(fresh.profile ?? [])
+          } catch { /* The loaded profile stays. */ }
+          if (!mounted.current) return
+        }
         setDrafts((value) => without(value, action.key))
         setVersions((value) => bump(value, action.key))
         setOutcomes((value) => ({ ...value, [action.key]: action.kind === 'set' ? 'failed' : 'resetFailed' }))
@@ -211,14 +231,16 @@ function PlanDetail({ routeId }: { routeId: string }) {
     </section>
   } else if (load.phase === 'error') {
     const failure = load.failure
-    body = failure.status === 403
-      ? <div role="alert" className="min-w-0"><NoAccessEmpty resource={t('pageTitle')} owner="" showRequestAccess={false} onRequestAccess={undefined} action={undefined} defaultRequested={false} titleAs="h2" bordered={false}
-        labels={{ title: () => t('load.noAccessTitle'), description: () => t('load.noAccessDescription'), request: '', requested: '', sent: '' }} /></div>
-      : failure.status === 404
-        ? <div role="alert" className="min-w-0"><NotFoundEmpty icon={undefined} title={t('load.notFoundTitle')} description={t('load.notFoundDescription')} action={back} titleAs="h2" bordered={false} /></div>
-        : <ErrorPanel title={t('load.errorTitle')} message={t(failure.status ? 'load.errorMessage' : 'load.networkMessage')} code={failure.status ?? null} requestId={failure.requestId ?? ''} details="" secondaryAction={null} titleAs="h2" announce={true}
-          onRetry={() => { recovering.current = true; setReloading(true); setAttempt((value) => value + 1) }} retrying={reloading} retryLabel={t('retry')}
-          labels={{ title: t('load.errorTitle'), message: t(failure.status ? 'load.errorMessage' : 'load.networkMessage'), support: '', retry: t('retry'), retrying: t('retrying'), retryingStatus: t('retrying'), requestId: t('requestId'), copyRequestId: t('copyRequestId'), copied: t('copied'), requestIdCopied: t('copied'), details: t('details') }} />
+    body = <div ref={loadErrorBox} tabIndex={-1} data-testid="load-error" className={`min-w-0 ${focus}`}>
+      {failure.status === 403
+        ? <div role="alert" className="min-w-0"><NoAccessEmpty resource={t('pageTitle')} owner="" showRequestAccess={false} onRequestAccess={undefined} action={undefined} defaultRequested={false} titleAs="h2" bordered={false}
+          labels={{ title: () => t('load.noAccessTitle'), description: () => t('load.noAccessDescription'), request: '', requested: '', sent: '' }} /></div>
+        : failure.status === 404
+          ? <div role="alert" className="min-w-0"><NotFoundEmpty icon={undefined} title={t('load.notFoundTitle')} description={t('load.notFoundDescription')} action={back} titleAs="h2" bordered={false} /></div>
+          : <ErrorPanel title={t('load.errorTitle')} message={t(failure.status ? 'load.errorMessage' : 'load.networkMessage')} code={failure.status ?? null} requestId={failure.requestId ?? ''} details="" secondaryAction={null} titleAs="h2" announce={true}
+            onRetry={() => { recovering.current = true; setReloading(true); setAttempt((value) => value + 1) }} retrying={reloading} retryLabel={t('retry')}
+            labels={{ title: t('load.errorTitle'), message: t(failure.status ? 'load.errorMessage' : 'load.networkMessage'), support: '', retry: t('retry'), retrying: t('retrying'), retryingStatus: t('retrying'), requestId: t('requestId'), copyRequestId: t('copyRequestId'), copied: t('copied'), requestIdCopied: t('copied'), details: t('details') }} />}
+    </div>
   } else if (plan) {
     const lifecycle = lifecycleActionFor(plan.status)
     const editable = plan.status === 'draft' || plan.status === 'active'
@@ -229,7 +251,9 @@ function PlanDetail({ routeId }: { routeId: string }) {
     const stateLabel = (value: string) => t(`status.${value}`)
     const calloutTitle = plan.status === 'draft' ? 'limits.calloutDraftTitle' : plan.status === 'active' ? (count === 0 ? 'limits.calloutActiveEmptyTitle' : 'limits.calloutActiveTitle') : 'limits.calloutReadOnlyTitle'
     const calloutBody = plan.status === 'draft' ? t('limits.calloutDraft') : plan.status === 'active' ? t('limits.calloutActive', { affected }) : t('limits.calloutReadOnly', { status })
-    const shownFeedback = feedback && !isDialogAction(feedback.action) ? feedback : null
+    // Each failure renders once: Activar and a refused limit save above the tabs, other limit failures under the table.
+    const aboveTabs = feedback && !isDialogAction(feedback.action) && (feedback.action.kind === 'activate' || feedback.failure.status === 403) ? feedback : null
+    const shownFeedback = feedback && !isDialogAction(feedback.action) && !aboveTabs ? feedback : null
     const lifecycleName = lifecycle ? t(`action.${lifecycle}`) : ''
     body = <>
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -253,7 +277,7 @@ function PlanDetail({ routeId }: { routeId: string }) {
         <Text id="plan-lifecycle-help" variant="supporting" tone="muted">{guidance}</Text>
         <Text id="plan-delete-help" variant="supporting" tone="muted">{plan.status === 'active' ? t('deleteHelpActive') : t('deleteHelp')}</Text>
       </section>
-      {feedback && feedback.action.kind === 'activate' && <MutationFeedback ref={feedbackBox} action={feedback.action} failure={feedback.failure} busy={busy !== null} onRetry={() => void run(feedback.action, true)} titleAs="h2" />}
+      {aboveTabs && <MutationFeedback ref={feedbackBox} action={aboveTabs.action} failure={aboveTabs.failure} busy={busy !== null} onRetry={() => void run(aboveTabs.action, true)} titleAs="h2" />}
       <Tabs value={tab} defaultValue={undefined} variant="underline" orientation="horizontal" onValueChange={(value) => setTab(value as Tab)} className="min-w-0">
         <TabsList activateOnFocus={true} indicator={false} fullWidth={false} aria-label={t('tabs.label')} className="flex max-w-full flex-nowrap overflow-x-auto">
           {(['info', 'capabilities', 'limits', 'assignments'] as const).map((value) => <TabsTab key={value} value={value} className={`shrink-0 ${focus}`}>{t(`tabs.${value}`)}</TabsTab>)}
@@ -272,7 +296,7 @@ function PlanDetail({ routeId }: { routeId: string }) {
               onSave={save} onReset={(row) => openDialog('reset', { kind: 'reset', key: row.dimensionKey }, row.displayLabel)} />
             : <EmptyState title={t('limits.emptyTitle')} description={t('limits.emptyDescription')} titleAs="h3" bordered={true} primaryAction={null} secondaryAction={null} />}
           {shownFeedback && <MutationFeedback ref={feedbackBox} action={shownFeedback.action} failure={shownFeedback.failure} busy={busy !== null} onRetry={() => void run(shownFeedback.action, true)} titleAs="h3" />}
-          {saved && !shownFeedback && <InlineCallout tone="success" title={saved.title} description={saved.message} actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined}
+          {saved && !shownFeedback && !aboveTabs && <InlineCallout tone="success" title={saved.title} description={saved.message} actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined}
             labels={{ title: saved.title, description: saved.message, upgrade: '', viewUsage: '' }} />}
         </TabsPanel>
         <TabsPanel value="assignments" keepMounted={false} className={`min-w-0 pt-4 ${focus}`}><AssignmentsPanel summary={assignedSummary} /></TabsPanel>
