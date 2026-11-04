@@ -181,9 +181,10 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         expect(exportsSent[0].body).toEqual({ filters: { actorId: 'ana' } });
       }
       // Tenant scope: tenant endpoints, no series, no window.
+      const tenantFrom = parity.network.requests.length;
       await open(parity, { workspaces: 'empty' });
-      expect(lines(parity).filter((line) => line.includes('/series'))).toEqual([]);
-      expect(lines(parity).filter((line) => line.includes('/tenants/synthetic-tenant/')).sort()).toEqual([`GET ${tenant}/audit-records?${audit}`, `GET ${tenant}/overview`, `GET ${tenant}/usage`].sort());
+      expect(lines(parity, tenantFrom).filter((line) => line.includes('/series'))).toEqual([]);
+      expect(lines(parity, tenantFrom).filter((line) => line.includes('/tenants/synthetic-tenant/')).sort()).toEqual([`GET ${tenant}/audit-records?${audit}`, `GET ${tenant}/overview`, `GET ${tenant}/usage`].sort());
       await open(parity, { workspaces: 'empty', 'metrics.tenant.overview': '500-then-success' });
       const retryFrom = parity.network.requests.length;
       await surface(parity).getByRole('button', { name: copy.error.retry, exact: true }).click();
@@ -248,10 +249,11 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await expect(surface(parity).getByRole('button', { name: copy.export.download })).toHaveCount(0);
       }
       // Restricted role: no Auditoria tab and no audit request.
+      const restrictedFrom = parity.network.requests.length;
       await withRole(parity, server, ['tenant_developer']);
       await expect(surface(parity).getByRole('tab', { name: copy.tabAudit, exact: true })).toHaveCount(0);
       await expect(surface(parity).getByRole('tab', { name: copy.tabMetrics, exact: true })).toBeVisible();
-      expect(parity.network.requests.filter((request) => /audit-(?:records|exports)/.test(request.path))).toEqual([]);
+      expect(parity.network.requests.slice(restrictedFrom).filter((request) => /audit-(?:records|exports)/.test(request.path))).toEqual([]);
       // 401: the shell refreshes once, then redirects to /login with the return path.
       const before = parity.network.requests.length;
       await open(parity, { 'metrics.workspace.overview': '401', refresh: '401' }).catch(() => {});
@@ -324,11 +326,13 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(surface(parity).getByText(copy.export.readyTitle, { exact: true })).toBeVisible();
       await check.assertRuntimeHealth(parity);
       // No audit request for the restricted role and no series request at tenant scope.
+      const restrictedFrom = parity.network.requests.length;
       await withRole(parity, server, ['tenant_developer']);
-      expect(parity.network.requests.filter((request) => /audit-/.test(request.path))).toEqual([]);
+      expect(parity.network.requests.slice(restrictedFrom).filter((request) => /audit-/.test(request.path))).toEqual([]);
       await check.assertRuntimeHealth(parity);
+      const tenantFrom = parity.network.requests.length;
       await open(parity, { workspaces: 'empty' });
-      expect(parity.network.requests.filter((request) => request.path.endsWith('/series'))).toEqual([]);
+      expect(parity.network.requests.slice(tenantFrom).filter((request) => request.path.endsWith('/series'))).toEqual([]);
       await check.assertRuntimeHealth(parity);
       allowlist(parity);
     });
@@ -365,7 +369,15 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await info.attach(`${name}-${locale}-${width}-${createHash('sha256').update(body).digest('hex')}`, { body, contentType: 'image/png' });
       }
       await open(parity); await capture('metrics-24h-mixed-posture');
-      await open(parity, { 'metrics.workspace.series': '7d' }); await capture('metrics-7d');
+      // Select the 7d window so the selector, chart label and summary match the seven-day points.
+      await open(parity, { 'metrics.workspace.series': '7d' });
+      const windowFrom = parity.network.requests.length;
+      await surface(parity).getByRole('combobox', { name: copy.metrics.windowLabel, exact: true }).click();
+      await parity.page.getByRole('option', { name: '7d', exact: true }).click();
+      await expect.poll(() => lines(parity, windowFrom)).toContain(`GET ${workspace}/series?metricKey=api_requests&window=7d`);
+      await expect(surface(parity).getByRole('combobox', { name: copy.metrics.windowLabel, exact: true })).toContainText('7d');
+      await expect(surface(parity).locator('[aria-busy="true"]')).toHaveCount(0);
+      await capture('metrics-7d');
       await open(parity, { workspaces: 'empty' }); await capture('tenant-scope-disabled-window');
       await open(parity, { 'metrics.workspace.overview': 'empty' }); await capture('metrics-empty');
       await open(parity, { 'metrics.workspace.overview': '500' }); await capture('metrics-error');
