@@ -312,6 +312,20 @@ test('Enter on a valid changed limit sends one PUT {value}; unchanged, invalid, 
   await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar límite de Workspace quota' })).toHaveFocus())
 })
 
+test.each([['-', 'required'], ['1-', 'invalid'], ['-.', 'required']] as const)('incomplete text %s in the limit field sends nothing, not the last parsed number', async (text, message) => {
+  setup({ [`PUT ${limitUrl}`]: () => json({ planId, dimensionKey: limitKey, newValue: 9, source: 'explicit' }) }); open(); await limitsTab()
+  type('9'); expect(screen.queryByText(es.limits.required)).toBeNull()
+  const field = type(text)
+  expect(field).toHaveValue(text)
+  expect(screen.getByText(es.limits[message])).toBeVisible()
+  fireEvent.keyDown(field, { key: 'Enter' })
+  fireEvent.click(button('Guardar límite de Workspace quota'))
+  expect(writes()).toEqual([])
+  type('9'); expect(screen.queryByText(es.limits[message])).toBeNull()
+  fireEvent.keyDown(input(), { key: 'Enter' })
+  await waitFor(() => expect(bodiesOf(`PUT ${limitUrl}`)).toEqual([{ value: 9 }]))
+})
+
 test('-1 is accepted as unlimited and Guardar sends it', async () => {
   setup({ [`PUT ${limitUrl}`]: () => json({ planId, dimensionKey: limitKey, newValue: -1, source: 'explicit' }) }); open(); await limitsTab()
   type('-1'); fireEvent.click(button('Guardar límite de Workspace quota'))

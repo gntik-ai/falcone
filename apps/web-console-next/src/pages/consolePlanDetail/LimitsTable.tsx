@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from 'react'
+import { useRef, type ChangeEvent, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, NumberInput, StatusTag, Text } from '@gntik-ai/ui'
 import { DataTable, type DataTableColumn } from '@gntik-ai/blocks'
@@ -9,6 +9,9 @@ const NAMESPACE = 'pages.console-plan-detail-page'
 // Row outcome of the last mutation on that row; the validity and dirtiness of the draft are derived.
 export type RowOutcome = 'saved' | 'failed' | 'reset' | 'resetFailed'
 const safeId = (key: string) => key.replace(/[^A-Za-z0-9_-]/g, '-')
+// The number field keeps its last parsed number while the text is incomplete ("-") or malformed ("1-"), so the visible text decides.
+const wellFormed = /^[-\u2212]?[\d.,\s\u00a0]*\d[\d.,\s\u00a0]*$/
+const textState = (text: string): 'empty' | 'ok' | 'malformed' => text.trim() === '' ? 'empty' : wellFormed.test(text.trim()) ? 'ok' : 'malformed'
 const tones = { persisted: 'neutral', dirty: 'warning', invalid: 'destructive', saving: 'warning', resetting: 'warning', saved: 'success', reset: 'success', failed: 'destructive', resetFailed: 'destructive' } as const
 type RowState = keyof typeof tones
 
@@ -28,6 +31,9 @@ export function LimitsTable({ rows, editable, drafts, versions, outcomes, busyKe
   onReset: (row: LimitRow) => void
 }) {
   const { t } = useTranslation(NAMESPACE)
+  // Rows whose visible text is not a number, and the last number the field parsed (what it keeps showing while the text is garbled).
+  const garbled = useRef<Record<string, boolean>>({})
+  const lastParsed = useRef<Record<string, number | null>>({})
   const stateOf = (row: LimitRow): RowState => {
     const key = row.dimensionKey
     if (busyKey?.key === key) return busyKey.reset ? 'resetting' : 'saving'
@@ -46,15 +52,23 @@ export function LimitsTable({ rows, editable, drafts, versions, outcomes, busyKe
       if (!editable) return <span className="tabular-nums">{row.effectiveValue === -1 ? t('limits.unlimited') : String(row.effectiveValue)}</span>
       const draft = key in drafts ? drafts[key] : row.effectiveValue
       const validation = validateLimit(draft)
+      const shown = key in drafts && garbled.current[key] && key in lastParsed.current ? lastParsed.current[key] : draft
+      const onTextChange = (event: ChangeEvent<HTMLElement>) => {
+        const text = (event.target as HTMLInputElement).value ?? ''
+        const state = textState(text)
+        garbled.current[key] = state === 'malformed'
+        // No digit at all reads as empty (required, as the legacy number input does); other malformed text is invalid.
+        if (state === 'malformed') onDraft(key, /\d/.test(text) ? Number.NaN : null)
+      }
       const onKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') onRestore(key)
         else if (event.key === 'Enter') { event.preventDefault(); onSave(key) }
       }
-      return <div className="ml-auto w-36 min-w-0 text-left" onKeyDown={onKeyDown}>
-        <NumberInput key={versions[key] ?? 0} value={draft} step={1} size="md" align="end" id={`limit-${id}`} disabled={locked} invalid={!validation.valid}
+      return <div className="ml-auto w-36 min-w-0 text-left" onKeyDown={onKeyDown} onChange={onTextChange}>
+        <NumberInput key={versions[key] ?? 0} value={shown} step={1} size="md" align="end" id={`limit-${id}`} disabled={locked} invalid={!validation.valid}
           aria-label={t('limits.inputName', { dimension: row.displayLabel })} aria-describedby={validation.valid ? `limit-${id}-help` : `limit-${id}-help limit-${id}-error`}
           decrementLabel={t('limits.decrease', { dimension: row.displayLabel })} incrementLabel={t('limits.increase', { dimension: row.displayLabel })}
-          onValueChange={(value) => onDraft(key, typeof value === 'number' && Number.isFinite(value) ? value : null)} />
+          onValueChange={(value) => { const next = typeof value === 'number' && Number.isFinite(value) ? value : null; lastParsed.current[key] = next; onDraft(key, next) }} />
         <span id={`limit-${id}-help`} className="sr-only">{t('limits.inputHelp')}</span>
         {!validation.valid && <Text id={`limit-${id}-error`} variant="supporting" tone="destructive" role="alert">{t(`limits.${validation.message === 'limitRequired' ? 'required' : 'invalid'}`)}</Text>}
       </div>
