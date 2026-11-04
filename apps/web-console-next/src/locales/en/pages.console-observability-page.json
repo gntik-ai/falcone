@@ -60,6 +60,7 @@
     "title": "API requests",
     "description": "api_requests series for the selected window",
     "label": "API requests",
+    "period": "Period",
     "loading": "Loading series",
     "empty": "No series data in this period",
     "summary": "Latest value: {latest}. Minimum: {min}. Maximum: {max}. Window: {window}.",

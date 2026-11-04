@@ -60,6 +60,7 @@
     "title": "Solicitudes de API",
     "description": "Serie api_requests de la ventana seleccionada",
     "label": "Solicitudes de API",
+    "period": "Periodo",
     "loading": "Cargando serie",
     "empty": "Sin datos de serie en este periodo",
     "summary": "Último valor: {latest}. Mínimo: {min}. Máximo: {max}. Ventana: {window}.",

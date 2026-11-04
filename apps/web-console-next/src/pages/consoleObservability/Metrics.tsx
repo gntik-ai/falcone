@@ -17,20 +17,22 @@ function Series({ view, window, loading }: { view: MetricsView | null; window: M
   const locale = i18n.language
   const numbers = new Intl.NumberFormat(locale)
   const label = t('series.label')
+  // The chart's screen-reader table takes its column headers from these keys, so both are localized.
+  const period = t('series.period')
   const points = view?.seriesPoints ?? []
   const windowText = t(`series.window${window}`)
   const time = new Intl.DateTimeFormat(locale, window === '24h' ? { hour: '2-digit', minute: '2-digit' } : { month: 'short', day: 'numeric' })
   // The legend shows the category key, so the localized label is the data key.
   const rows: Row[] = points.map((point) => {
     const date = new Date(point.timestamp)
-    return { time: Number.isNaN(date.getTime()) ? point.timestamp : time.format(date), [label]: point.value }
+    return { [period]: Number.isNaN(date.getTime()) ? point.timestamp : time.format(date), [label]: point.value }
   })
   const values = points.map((point) => point.value)
   const summary = points.length ? t('series.summary', { latest: numbers.format(values[values.length - 1]), min: numbers.format(stat(values, (list) => Math.min(...list))), max: numbers.format(stat(values, (list) => Math.max(...list))), window: windowText }) : null
   // One window select owns the range: the card's own toggle is hidden and its only option is the selected window.
   return <ChartCard<Row> title={t('series.title')} description={t('series.description')} titleAs="h2" kind="area" stacked={false} height={240}
     ranges={[{ value: window, label: windowText }]} dataByRange={{ [window]: rows }} range={window} defaultRange={window} onRangeChange={undefined} showRangeToggle={false}
-    index="time" categories={[label]} colors={['primary']} showLegend={true} valueFormatter={(value) => numbers.format(value)}
+    index={period} categories={[label]} colors={['primary']} showLegend={true} valueFormatter={(value) => numbers.format(value)}
     state={loading ? 'loading' : rows.length ? 'ready' : 'empty'} emptyMessage={t('series.empty')} errorMessage={undefined} onRetry={undefined} dataTable={true}
     action={undefined} footer={summary ? <span>{summary}</span> : undefined} className="min-w-0" />
 }

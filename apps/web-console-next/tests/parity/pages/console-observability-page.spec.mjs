@@ -281,9 +281,13 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await openAudit(parity, copy, { 'metrics.workspace.exports': variant });
         await exportButton(parity, copy).click();
         if (variant === 'slow') {
+          // The export stays pending (1.5 s fixture delay) while the running callout is scanned.
           await expect(surface(parity).getByRole('button', { name: copy.export.running, exact: true })).toHaveAttribute('aria-busy', 'true');
           await expect(surface(parity).getByRole('button', { name: copy.export.running, exact: true })).toBeDisabled();
           await expect(surface(parity).getByRole('status').filter({ hasText: copy.export.progressTitle })).toBeVisible();
+          await check.assertAccessibility(parity); await check.assertLocale(parity);
+          await expect(surface(parity).getByText(copy.export.readyTitle, { exact: true })).toBeVisible();
+          continue;
         }
         await expect(exportButton(parity, copy)).toBeVisible();
         await check.assertAccessibility(parity); await check.assertLocale(parity);
@@ -384,12 +388,24 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await openAudit(parity, copy, { 'metrics.workspace.records': 'first-page-has-more' }); await capture('audit-load-more');
       await surface(parity).getByRole('button', { name: 'evt-001', exact: true }).click(); await expect(dialog(parity)).toBeVisible(); await capture('audit-drawer');
       await parity.page.keyboard.press('Escape');
+      // The running callout is captured while the delayed export is still pending.
+      await openAudit(parity, copy, { 'metrics.workspace.exports': 'slow' });
+      await exportButton(parity, copy).click();
+      await expect(surface(parity).getByRole('status').filter({ hasText: copy.export.progressTitle })).toBeVisible();
+      await capture('export-running');
+      await expect(surface(parity).getByText(copy.export.readyTitle, { exact: true })).toBeVisible();
       for (const variant of ['manifest', 'accepted-no-manifest', '500']) {
         await openAudit(parity, copy, { 'metrics.workspace.exports': variant });
         await exportButton(parity, copy).click();
         await expect(exportButton(parity, copy)).toBeEnabled();
         await capture(`export-${variant}`);
       }
+      // Tenant scope export failure (audit.tenant.exports:500).
+      await open(parity, { workspaces: 'empty', 'metrics.tenant.exports': '500' });
+      await surface(parity).getByRole('tab', { name: copy.tabAudit, exact: true }).click();
+      await exportButton(parity, copy).click();
+      await expect(surface(parity).getByRole('heading', { name: copy.export.errorTitle, level: 2 })).toBeVisible();
+      await capture('export-tenant-500');
       await openAudit(parity, copy, { 'metrics.workspace.records': 'empty' }); await capture('audit-empty');
       await openAudit(parity, copy, { 'metrics.workspace.records': '500' }); await capture('audit-error');
       await open(parity, { tenants: 'empty' }); await capture('blocked');

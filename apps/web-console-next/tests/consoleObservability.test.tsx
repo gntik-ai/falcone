@@ -67,6 +67,10 @@ test.each(['es', 'en'] as const)('renders the series chart card with its text su
   expect(screen.getByRole('heading', { name: copy.series.title, level: 2 })).toBeVisible()
   expect(screen.getByText(new RegExp(`${copy.series.window24h}\\.$`))).toBeVisible()
   expect(screen.queryByRole('button', { name: /90/ })).not.toBeInTheDocument()
+  // The chart's screen-reader table uses localized column headers, never the raw index key.
+  const headers = screen.getAllByRole('columnheader', { hidden: true }).map((header) => header.textContent)
+  expect(headers).toEqual([copy.series.period, copy.series.label])
+  expect(headers).not.toContain('time')
   expect(screen.queryByText('Infrastructure cost')).not.toBeInTheDocument()
   expect(screen.queryByText('Compute')).not.toBeInTheDocument()
   const last = series24h.points.at(-1)!.value, values = series24h.points.map((point) => point.value), format = new Intl.NumberFormat(locale)
