@@ -46,7 +46,7 @@ const button = (name: string | RegExp) => screen.getByRole('button', { name })
 const lifecycleButton = (label: string) => button(new RegExp(`^${label} ${planName}`))
 const tab = async (name: string) => { await ready(); const item = screen.getByRole('tab', { name }); fireEvent.mouseDown(item); fireEvent.click(item); await wait() }
 const limitsTab = () => tab(es.tabs.limits)
-const input = (label = 'Workspaces') => screen.getByRole('textbox', { name: `${label}: valor del límite` }) as HTMLInputElement
+const input = (label = 'Workspace quota') => screen.getByRole('textbox', { name: `${label}: valor del límite` }) as HTMLInputElement
 const type = (value: string, label?: string) => { const field = input(label); fireEvent.focus(field); fireEvent.change(field, { target: { value } }); return field }
 
 test.each(['es', 'en'] as const)('renders the header, the stepper and the four tabs in %s from the two parallel reads', async (locale) => {
@@ -223,7 +223,7 @@ test('a 403 on a mutation renders no-access, keeps the data and disables every m
   expect(lifecycleButton(es.action.activate)).toBeDisabled()
   expect(button(new RegExp(`^${es.action.delete}`))).toBeDisabled()
   await limitsTab()
-  for (const name of ['Guardar límite de Workspaces', /^Restablecer límite de Workspaces/]) expect(button(name)).toHaveAttribute(name === 'Guardar límite de Workspaces' ? 'aria-disabled' : 'disabled')
+  for (const name of ['Guardar límite de Workspace quota', /^Restablecer límite de Workspace quota/]) expect(button(name)).toHaveAttribute(name === 'Guardar límite de Workspace quota' ? 'aria-disabled' : 'disabled')
   expect(input()).toBeDisabled()
   expect(screen.queryByText(/ahora está/)).toBeNull()
   expect(count(`POST ${lifecycleUrl}`)).toBe(1)
@@ -309,19 +309,19 @@ test('Enter on a valid changed limit sends one PUT {value}; unchanged, invalid, 
   expect(bodiesOf(`PUT ${limitUrl}`)).toEqual([{ value: 500 }])
   expect(count(`GET ${limitsUrl}`)).toBe(2)
   expect(input()).toHaveValue('500')
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar límite de Workspaces' })).toHaveFocus())
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar límite de Workspace quota' })).toHaveFocus())
 })
 
 test('-1 is accepted as unlimited and Guardar sends it', async () => {
   setup({ [`PUT ${limitUrl}`]: () => json({ planId, dimensionKey: limitKey, newValue: -1, source: 'explicit' }) }); open(); await limitsTab()
-  type('-1'); fireEvent.click(button('Guardar límite de Workspaces'))
+  type('-1'); fireEvent.click(button('Guardar límite de Workspace quota'))
   await waitFor(() => expect(bodiesOf(`PUT ${limitUrl}`)).toEqual([{ value: -1 }]))
 })
 
 test('after a limit save succeeds and the limits reload returns 500 the row shows the accepted value and Guardado', async () => {
   requests = strictFetch({ [`GET ${base}`]: draft, [`GET ${limitsUrl}`]: sequence(() => json(profile), () => fail(500)), [`PUT ${limitUrl}`]: () => json({ planId, dimensionKey: limitKey, newValue: 500, source: 'explicit' }) })
   open(); await limitsTab()
-  type('500'); fireEvent.click(button('Guardar límite de Workspaces'))
+  type('500'); fireEvent.click(button('Guardar límite de Workspace quota'))
   await waitFor(() => expect(screen.getByText(es.limits.rowSaved)).toBeVisible())
   expect(input()).toHaveValue('500'); expect(screen.queryByTestId('mutation-feedback')).toBeNull()
 })
@@ -329,7 +329,7 @@ test('after a limit save succeeds and the limits reload returns 500 the row show
 test('a failed save restores the row, names the attempted value and Reintentar re-sends the same value', async () => {
   requests = strictFetch({ [`GET ${base}`]: draft, [`GET ${limitsUrl}`]: profile, [`PUT ${limitUrl}`]: sequence(() => fail(500, { requestId: 'req_5' }), () => json({ planId, dimensionKey: limitKey, newValue: 500, source: 'explicit' })) })
   open(); await limitsTab()
-  type('500'); fireEvent.click(button('Guardar límite de Workspaces'))
+  type('500'); fireEvent.click(button('Guardar límite de Workspace quota'))
   const panel = await screen.findByTestId('mutation-feedback')
   expect(input()).toHaveValue('5'); expect(screen.getByText(es.limits.rowFailed)).toBeVisible()
   expect(within(panel).getByText('Valor intentado para max_workspaces: 500.')).toBeVisible()
@@ -340,7 +340,7 @@ test('a failed save restores the row, names the attempted value and Reintentar r
 
 test.each([['INVALID_LIMIT_VALUE', 400], ['PLAN_LIMITS_FROZEN', 409]])('%s restores the row and shows the localized callout without retry', async (code, status) => {
   setup({ [`PUT ${limitUrl}`]: () => fail(status, { code }) }); open(); await limitsTab()
-  type('500'); fireEvent.click(button('Guardar límite de Workspaces'))
+  type('500'); fireEvent.click(button('Guardar límite de Workspace quota'))
   expect(await screen.findByText(es.feedback.code[code as 'PLAN_LIMITS_FROZEN'])).toBeVisible()
   expect(input()).toHaveValue('5'); expect(screen.queryByRole('button', { name: es.retry })).toBeNull()
 })
@@ -348,7 +348,7 @@ test.each([['INVALID_LIMIT_VALUE', 400], ['PLAN_LIMITS_FROZEN', 409]])('%s resto
 test('Restablecer asks first, sends DELETE of the limit and reconciles; a network failure keeps the dialog for a retry', async () => {
   requests = strictFetch({ [`GET ${base}`]: draft, [`GET ${limitsUrl}`]: profile, [`DELETE ${limitUrl}`]: sequence(network, () => json({ planId, dimensionKey: limitKey, effectiveValue: 10, source: 'default' })) })
   open(); await limitsTab()
-  fireEvent.click(button(/^Restablecer límite de Workspaces/))
+  fireEvent.click(button(/^Restablecer límite de Workspace quota/))
   const dialog = await screen.findByRole('alertdialog')
   expect(writes()).toEqual([])
   fireEvent.click(within(dialog).getByRole('button', { name: es.dialog.resetConfirm }))
@@ -459,8 +459,8 @@ test.each(['save', 'reset'] as const)('a failed limit %s reloads the limits prof
   const method = kind === 'save' ? 'PUT' : 'DELETE'
   requests = strictFetch({ [`GET ${base}`]: draft, [`GET ${limitsUrl}`]: profile, [`${method} ${limitUrl}`]: () => fail(500) })
   open(); await limitsTab()
-  if (kind === 'save') { type('500'); fireEvent.click(button('Guardar límite de Workspaces')) }
-  else { fireEvent.click(button(/^Restablecer límite de Workspaces/)); fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: es.dialog.resetConfirm })) }
+  if (kind === 'save') { type('500'); fireEvent.click(button('Guardar límite de Workspace quota')) }
+  else { fireEvent.click(button(/^Restablecer límite de Workspace quota/)); fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: es.dialog.resetConfirm })) }
   await screen.findByTestId('mutation-feedback')
   expect(count(`GET ${limitsUrl}`)).toBe(2); expect(count(`${method} ${limitUrl}`)).toBe(1)
   expect(screen.getByText(es.limits[kind === 'save' ? 'rowFailed' : 'rowResetFailed' as 'rowFailed'])).toBeVisible()
@@ -476,7 +476,7 @@ test('a failed Activar renders its error panel once, whichever tab is open', asy
 
 test('a refused limit save shows no-access once above the tabs and keeps it visible on every tab', async () => {
   setup({ [`PUT ${limitUrl}`]: () => fail(403) }); open(); await limitsTab()
-  type('500'); fireEvent.click(button('Guardar límite de Workspaces'))
+  type('500'); fireEvent.click(button('Guardar límite de Workspace quota'))
   expect(await screen.findByRole('heading', { name: es.feedback.noAccessTitle })).toBeVisible()
   for (const name of [es.tabs.limits, es.tabs.info, es.tabs.assignments]) {
     await tab(name)

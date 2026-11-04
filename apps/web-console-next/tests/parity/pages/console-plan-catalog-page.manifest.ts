@@ -1,5 +1,6 @@
 import type { EndpointResponse, PageEndpoint, ParityManifest } from '../manifest'
 import type { PlanPage, PlanRecord } from '../../../src/pages/consolePlanCatalog/api'
+import { buildPlanDetailReads } from './console-plan-detail-page.manifest'
 
 export const plansPath = '/v1/plans'
 export const catalogPlans: PlanRecord[] = Array.from({ length: 45 }, (_, index) => ({
@@ -33,7 +34,8 @@ export const catalogEndpoints: Record<string, PageEndpoint> = {
   ])) },
 }
 const manifest: ParityManifest = {
-  route: '/console/plans', roles: ['superadmin'], endpoints: catalogEndpoints,
+  // Following a catalog link mounts the plan detail page, which reads the plan and its limits.
+  route: '/console/plans', roles: ['superadmin'], endpoints: { ...catalogEndpoints, ...buildPlanDetailReads('synthetic-plan-1') },
   fixtures: ['shell:superadmin', 'shell:plain-member', ...catalogVariants.map((variant) => `plans.list:${variant}`)],
   sources: ['src/pages/consolePlanCatalog.tsx', 'src/pages/consolePlanCatalog'],
   data: [{ name: 'catalog title', locator: { es: 'h1:text-is("Catálogo de planes")', en: 'h1:text-is("Plan catalog")' } }],

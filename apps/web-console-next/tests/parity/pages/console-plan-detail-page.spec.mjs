@@ -19,9 +19,9 @@ const named = (parity, key) => new RegExp(`^${copy(parity).action[key]} ${planNa
 const button = (parity, name) => parity.page.getByRole('button', { name });
 const dialog = (parity) => parity.page.getByRole('alertdialog');
 const h1 = (parity) => parity.page.locator('main h1');
-const input = (parity, label = 'Workspaces') => parity.page.getByRole('textbox', { name: `${label}: ${parity.locale === 'es' ? 'valor del límite' : 'limit value'}`, exact: true });
-const saveButton = (parity, label = 'Workspaces') => parity.page.getByRole('button', { name: copy(parity).limits.saveName.replace('{dimension}', label), exact: true });
-const resetButton = (parity, label = 'Workspaces') => parity.page.getByRole('button', { name: copy(parity).limits.resetName.replace('{dimension}', label), exact: true });
+const input = (parity, label = 'Workspace quota') => parity.page.getByRole('textbox', { name: `${label}: ${parity.locale === 'es' ? 'valor del límite' : 'limit value'}`, exact: true });
+const saveButton = (parity, label = 'Workspace quota') => parity.page.getByRole('button', { name: copy(parity).limits.saveName.replace('{dimension}', label), exact: true });
+const resetButton = (parity, label = 'Workspace quota') => parity.page.getByRole('button', { name: copy(parity).limits.resetName.replace('{dimension}', label), exact: true });
 const tab = (parity, key) => parity.page.getByRole('tab', { name: copy(parity).tabs[key], exact: true }).click();
 async function open(parity, variants = {}) {
   marks.set(parity, parity.network.requests.length);
@@ -69,7 +69,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await expect(parity.page.getByText('synthetic-plan', { exact: true })).toBeVisible();
         await expect(parity.page.getByRole('navigation', { name: c.lifecycle.sequence }).locator('[aria-current="step"]')).toContainText(c.status[status]);
         await expect(parity.page.getByRole('list', { name: c.info.timeline }).getByRole('listitem')).toHaveCount(1);
-        await expect(parity.page.getByText(c.info.timelineEntry, { exact: true })).toBeVisible();
+        await expect(parity.page.getByRole('list', { name: c.info.timeline }).getByRole('listitem')).toContainText(c.info.timelineEntry);
         await expect(parity.page.locator('main')).not.toContainText(/\$|€|renew|renov/i);
       }
       await openReady(parity, { 'plans.detail': 'active-3-tenants' });
@@ -162,7 +162,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await resetButton(parity).click();
       await dialog(parity).getByRole('button', { name: c.dialog.resetConfirm, exact: true }).click();
       await dialog(parity).getByRole('button', { name: c.retry, exact: true }).click();
-      await expect(parity.page.getByText(c.limits.rowReset, { exact: true })).toBeVisible();
+      // The Reset button label equals the en row status, so the status is read inside the table's row status cells.
+      await expect(parity.page.getByRole('table').getByRole('status').getByText(c.limits.rowReset, { exact: true })).toBeVisible();
       expect(sent(parity, 'DELETE', limitPath)).toHaveLength(2);
       // Load Reintentar re-sends both reads.
       await open(parity, { 'plans.detail': '500-then-success' });

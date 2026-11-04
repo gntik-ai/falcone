@@ -11,13 +11,14 @@ const record = (id: string, status: PlanStatus, extra: Partial<PlanRecord> = {})
   id, slug: id, displayName: planName, description: 'Synthetic description', status, capabilities: { sso: true, audit_export: false },
   quotaDimensions: {}, assignedTenantCount: 0, updatedAt: '2026-05-30T10:00:00Z', ...extra,
 })
+// Labels and units avoid words other catalogs translate, so the es locale check sees no untranslated English copy.
 export const limitRows: LimitRow[] = [
-  { dimensionKey: limitKey, displayLabel: 'Workspaces', unit: 'count', effectiveValue: 5, source: 'explicit' },
-  { dimensionKey: 'max_storage_gb', displayLabel: 'Storage', unit: 'GB', effectiveValue: 10, source: 'default' },
-  { dimensionKey: 'max_functions', displayLabel: 'Functions', unit: 'count', effectiveValue: -1, source: 'unlimited' },
-  { dimensionKey: 'max_members', displayLabel: 'Members', unit: 'count', effectiveValue: 25, source: 'default' },
-  { dimensionKey: 'max_api_keys', displayLabel: 'API keys', unit: 'count', effectiveValue: 0, source: 'explicit' },
-  { dimensionKey: 'max_events', displayLabel: 'Events', unit: 'events/day', effectiveValue: 1000, source: 'default' },
+  { dimensionKey: limitKey, displayLabel: 'Workspace quota', unit: 'workspaces', effectiveValue: 5, source: 'explicit' },
+  { dimensionKey: 'max_storage_gb', displayLabel: 'Storage quota', unit: 'GB', effectiveValue: 10, source: 'default' },
+  { dimensionKey: 'max_functions', displayLabel: 'Function quota', unit: 'functions', effectiveValue: -1, source: 'unlimited' },
+  { dimensionKey: 'max_members', displayLabel: 'Member quota', unit: 'members', effectiveValue: 25, source: 'default' },
+  { dimensionKey: 'max_api_keys', displayLabel: 'API key quota', unit: 'keys', effectiveValue: 0, source: 'explicit' },
+  { dimensionKey: 'max_events', displayLabel: 'Event quota', unit: 'events/day', effectiveValue: 1000, source: 'default' },
 ]
 const failures = { '401': { status: 401, body: { code: 'UNAUTHORIZED' } }, '403': failure(403, { code: 'FORBIDDEN' }), '404': failure(404, { code: 'NOT_FOUND' }), '500': failure(500, { requestId: 'req_synthetic_plan_500' }) }
 
