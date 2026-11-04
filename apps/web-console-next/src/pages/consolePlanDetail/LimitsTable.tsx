@@ -10,8 +10,8 @@ const NAMESPACE = 'pages.console-plan-detail-page'
 export type RowOutcome = 'saved' | 'failed' | 'reset' | 'resetFailed'
 const safeId = (key: string) => key.replace(/[^A-Za-z0-9_-]/g, '-')
 // The number field keeps its last parsed number while the text is incomplete ("-"), malformed ("1-", "9..0") or pasted, so the visible text decides.
-// One integer, an optional sign, and either plain digits or 3-digit groups, with at most one decimal separator at the end.
-const wellFormed = /^[-\u2212]?(?:\d+|\d{1,3}(?:[.,\s\u00a0]\d{3})+)(?:[.,]\d+)?$/
+// An optional sign and plain digits only. The field shows no grouping, and a separator is ambiguous across locales ("1,5" is a decimal in es but a grouped 15 to a browser in en-US), so any separator is rejected rather than interpreted.
+const wellFormed = /^[-\u2212]?\d+$/
 const textState = (text: string): 'empty' | 'ok' | 'malformed' => text.trim() === '' ? 'empty' : wellFormed.test(text.trim()) ? 'ok' : 'malformed'
 const tones = { persisted: 'neutral', dirty: 'warning', invalid: 'destructive', saving: 'warning', resetting: 'warning', saved: 'success', reset: 'success', failed: 'destructive', resetFailed: 'destructive' } as const
 type RowState = keyof typeof tones
@@ -31,7 +31,7 @@ export function LimitsTable({ rows, editable, drafts, versions, outcomes, busyKe
   onSave: (key: string) => void
   onReset: (row: LimitRow) => void
 }) {
-  const { t } = useTranslation(NAMESPACE)
+  const { t, i18n } = useTranslation(NAMESPACE)
   // Rows whose visible text is not a number, and the last number the field parsed (what it keeps showing while the text is garbled).
   const garbled = useRef<Record<string, boolean>>({})
   const lastParsed = useRef<Record<string, number | null>>({})
@@ -77,7 +77,7 @@ export function LimitsTable({ rows, editable, drafts, versions, outcomes, busyKe
         else if (event.key === 'Enter') { event.preventDefault(); submit(key) }
       }
       return <div ref={(node) => { fields.current[key] = node }} className="ml-auto w-36 min-w-0 text-left" onKeyDown={onKeyDown} onChange={onTextChange} onPaste={onPaste}>
-        <NumberInput key={versions[key] ?? 0} value={shown} step={1} size="md" align="end" id={`limit-${id}`} disabled={locked} invalid={!validation.valid}
+        <NumberInput key={versions[key] ?? 0} value={shown} step={1} locale={i18n.language} format={{ useGrouping: false }} size="md" align="end" id={`limit-${id}`} disabled={locked} invalid={!validation.valid}
           aria-label={t('limits.inputName', { dimension: row.displayLabel })} aria-describedby={validation.valid ? `limit-${id}-help` : `limit-${id}-help limit-${id}-error`}
           decrementLabel={t('limits.decrease', { dimension: row.displayLabel })} incrementLabel={t('limits.increase', { dimension: row.displayLabel })}
           onValueChange={(value) => { const next = typeof value === 'number' && Number.isFinite(value) ? value : null; lastParsed.current[key] = next; onDraft(key, next) }} />

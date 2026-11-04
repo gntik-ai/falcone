@@ -332,7 +332,7 @@ const paste = (text: string) => {
   return field
 }
 
-test.each([['1-', 'invalid'], ['9..0', 'invalid'], ['1.2.3', 'invalid'], ['12abc', 'invalid']] as const)('pasting malformed text %s sends nothing, not the number the field parsed', async (text, message) => {
+test.each([['1-', 'invalid'], ['9..0', 'invalid'], ['1.2.3', 'invalid'], ['12abc', 'invalid'], ['1,5', 'invalid'], ['1.5', 'invalid'], ['1,500', 'invalid'], ['1.500', 'invalid']] as const)('pasting malformed text %s sends nothing, not the number the field parsed', async (text, message) => {
   setup({ [`PUT ${limitUrl}`]: () => json({ planId, dimensionKey: limitKey, newValue: 9, source: 'explicit' }) }); open(); await limitsTab()
   const field = paste(text)
   await waitFor(() => expect(screen.getByText(es.limits[message])).toBeVisible())
@@ -340,6 +340,19 @@ test.each([['1-', 'invalid'], ['9..0', 'invalid'], ['1.2.3', 'invalid'], ['12abc
   fireEvent.keyDown(field, { key: 'Enter' })
   fireEvent.click(button('Guardar límite de Workspace quota'))
   expect(writes()).toEqual([])
+})
+
+test.each(['en-US', 'es-ES'])('typing 1,5 with the UI in es and the browser number locale %s sends nothing, not 15', async (browser) => {
+  const spy = vi.spyOn(navigator, 'language', 'get').mockReturnValue(browser)
+  try {
+    setup({ [`PUT ${limitUrl}`]: () => json({ planId, dimensionKey: limitKey, newValue: 15, source: 'explicit' }) }); open(); await limitsTab()
+    const field = type('1,5')
+    expect(field).toHaveValue('1,5')
+    expect(screen.getByText(es.limits.invalid)).toBeVisible()
+    fireEvent.keyDown(field, { key: 'Enter' })
+    fireEvent.click(button('Guardar límite de Workspace quota'))
+    expect(writes()).toEqual([])
+  } finally { spy.mockRestore() }
 })
 
 test('pasting a clean number sends it once on Enter', async () => {

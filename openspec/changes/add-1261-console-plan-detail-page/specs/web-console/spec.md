@@ -35,6 +35,9 @@ with explicit props and complete es-default/en copy, accessible names and announ
 - **AND** incomplete or malformed text in the field (for example `-`, `1-` or `9..0`), whether
   typed or pasted, SHALL be treated as invalid from the visible text, which SHALL be re-read on
   submission, so the last parsed number SHALL never be sent.
+- **AND** the field SHALL accept an optional sign and plain digits only, so a decimal or grouping
+  separator (for example `1,5` or `1.500`) SHALL be invalid whatever the UI language and the
+  browser number locale are, and the field SHALL show no digit grouping.
 - **AND** deprecated and archived plans SHALL expose no limit-mutation control.
 
 #### Scenario: Failures and lost responses
