@@ -123,6 +123,11 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await open(parity, {}, ['500', 'platform-secrets-static-inventory'], ['platform-secrets-static-inventory', 'platform-secrets-static-inventory']);
       await expect(surface(parity).getByRole('heading', { name: c.inventoryError })).toBeVisible(); const count = reads(parity).length;
       await surface(parity).getByRole('button', { name: c.retry, exact: true }).click(); await ready(parity); expect(reads(parity)).toHaveLength(count + 2);
+      await expect(surface(parity).locator('[role="region"][tabindex="-1"]')).toBeFocused();
+      await open(parity, {}, ['500', '500']);
+      await surface(parity).getByRole('button', { name: c.retry, exact: true }).click();
+      await expect.poll(() => reads(parity).length).toBe(4);
+      await expect(surface(parity).getByRole('button', { name: c.retry, exact: true })).toBeFocused();
       for (const variant of ['secret-revoke-403', 'secret-revoke-404-not-found']) {
         await open(parity, { revokeTenant: variant }); await openDialog(parity); await typeName(parity); await confirm(parity);
         const notFound = variant.includes('404'); await expect(dialog(parity).getByRole('heading', { name: c[notFound ? 'notFound' : 'noAccess'], exact: true })).toBeVisible();

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge, Button, EmptyState, I18nProvider, Link, LiveAnnouncer, Page, Text, Timestamp, ToastProvider, Toaster } from '@gntik-ai/ui'
 import { DataTable, PageHeader, PageToolbar, TableSkeleton, type DataTableColumn } from '@gntik-ai/blocks'
@@ -25,6 +25,8 @@ function InventoryContent() {
   const [attempt, setAttempt] = useState(0)
   const [result, setResult] = useState<{ tenant: string | null; attempt: number; rows?: SecretRow[]; failure?: Failure } | null>(null)
   const [dialog, setDialog] = useState<{ row: SecretRow; trigger: HTMLElement } | null>(null)
+  const inventory = useRef<HTMLDivElement>(null)
+  const focusAfterRetry = useRef(false)
   useEffect(() => {
     let active = true
     const controller = new AbortController()
@@ -38,6 +40,14 @@ function InventoryContent() {
   }, [tenant, attempt])
   const current = result?.tenant === tenant && result.attempt === attempt ? result : null
   const rows = current?.rows, failure = current?.failure
+  useLayoutEffect(() => {
+    if (!current || !focusAfterRetry.current) return
+    focusAfterRetry.current = false
+    // The loading skeleton removes the retry trigger; restore its keyboard position.
+    const retry = failure && Array.from(inventory.current?.querySelectorAll('button') ?? []).find((button) => button.textContent === t('retry'))
+    const target = retry || inventory.current
+    target?.focus()
+  }, [current, failure, t])
   const columns: DataTableColumn<SecretRow>[] = [
     { id: 'name', header: t('name'), sortable: false, cell: (row) => <Text variant="body" tone="default" className="wrap-anywhere">{row.name}</Text> },
     { id: 'domain', header: t('domain'), sortable: false, cell: (row) => t(`domains.${row.domain}`) },
@@ -56,13 +66,15 @@ function InventoryContent() {
   return <>
     {rows && <PageToolbar search="" defaultSearch="" onSearchChange={undefined} searchLabel={t('table')} searchPlaceholder={t('table')} views={[]} view="" defaultView="" onViewChange={undefined} primaryAction={null} aria-label={t('table')} className="secrets-toolbar min-w-0"
       filters={<div className="min-w-0 space-y-2"><Text as="p" variant="body" tone="default">{t('count', { count: rows.length })}</Text><Text as="p" variant="supporting" tone="muted">{t('returnedRows')}</Text></div>} />}
-    {failure ? <FailureState failure={failure} retry={() => setAttempt((value) => value + 1)} />
-      : !rows ? <section role="status" aria-label={t('loading')} aria-busy={true}><TableSkeleton rows={3} columns={6} label={t('loading')} className="min-w-0" /></section>
-      : !rows.length ? <EmptyState icon={undefined} title={t('empty')} description={t('emptyDescription')} primaryAction={null} secondaryAction={null} titleAs="h2" bordered={false} className="min-w-0" />
-      : <DataTable rows={rows} columns={columns} getRowId={(row) => row.path} getRowLabel={(row) => row.name} caption={t('table')} showCaption={false} paginated={false}
-          selectable={false} selectionMode="none" selectedIds={[]} selectionSummary={false} rowActions={undefined} toolbar={null} sort={null} defaultSort={null} manualSorting={true} loading={false} loadingRows={0} emptyState={null}
-          showDensityToggle={false} showColumnMenu={false} showViewSwitcher={false} views={[]} defaultViews={[]} hiddenColumns={[]} resizable={false} virtualize={false} groupBy={undefined} showPinMenu={false} className="secrets-table min-w-0"
-          labels={{ scrollRegion: t('table'), emptyTitle: t('empty'), emptyDescription: t('emptyDescription'), loading: () => t('loading') }} />}
+    <div ref={inventory} role="region" aria-label={t('table')} tabIndex={-1} className={`min-w-0 ${focusRing}`}>
+      {failure ? <FailureState failure={failure} retry={() => { focusAfterRetry.current = true; setAttempt((value) => value + 1) }} />
+        : !rows ? <section role="status" aria-label={t('loading')} aria-busy={true}><TableSkeleton rows={3} columns={6} label={t('loading')} className="min-w-0" /></section>
+        : !rows.length ? <EmptyState icon={undefined} title={t('empty')} description={t('emptyDescription')} primaryAction={null} secondaryAction={null} titleAs="h2" bordered={false} className="min-w-0" />
+        : <DataTable rows={rows} columns={columns} getRowId={(row) => row.path} getRowLabel={(row) => row.name} caption={t('table')} showCaption={false} paginated={false}
+            selectable={false} selectionMode="none" selectedIds={[]} selectionSummary={false} rowActions={undefined} toolbar={null} sort={null} defaultSort={null} manualSorting={true} loading={false} loadingRows={0} emptyState={null}
+            showDensityToggle={false} showColumnMenu={false} showViewSwitcher={false} views={[]} defaultViews={[]} hiddenColumns={[]} resizable={false} virtualize={false} groupBy={undefined} showPinMenu={false} className="secrets-table min-w-0"
+            labels={{ scrollRegion: t('table'), emptyTitle: t('empty'), emptyDescription: t('emptyDescription'), loading: () => t('loading') }} />}
+    </div>
     {dialog && <RevokeDialog row={dialog.row} trigger={dialog.trigger} onClose={() => setDialog(null)} />}
   </>
 }

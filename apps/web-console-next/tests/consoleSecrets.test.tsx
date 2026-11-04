@@ -146,7 +146,18 @@ test.each([500, 'network'])('inventory %s retry sends both GETs once and restore
   let fail = true
   setup({ [`GET ${platformGet}`]: () => { if (!fail) return Response.json(inventoryBody([platformRow])); if (status === 'network') throw new TypeError('synthetic-network'); return failure(500)() } }); open()
   await screen.findByRole('heading', { name: es.inventoryError }); expect(screen.queryByRole('table')).toBeNull()
-  fail = false; fireEvent.click(screen.getByRole('button', { name: es.retry })); await ready(); expect(calls().filter(({ method }) => method === 'GET')).toHaveLength(4)
+  const retry = screen.getByRole('button', { name: es.retry }); retry.focus()
+  fail = false; fireEvent.click(retry); await ready(); expect(calls().filter(({ method }) => method === 'GET')).toHaveLength(4)
+  expect(screen.getByRole('table').closest('[tabindex="-1"]')).toHaveFocus()
+})
+test.each([500, 403, 404, 'empty'] as const)('inventory retry restores focus after %s', async (outcome) => {
+  let attempt = 0
+  setup({ [`GET ${platformGet}`]: () => ++attempt === 1 ? failure(500)() : outcome === 'empty' ? Response.json(inventoryBody([])) : failure(outcome)() }, [], []); open()
+  const retry = await screen.findByRole('button', { name: es.retry }); retry.focus(); fireEvent.click(retry)
+  const heading = outcome === 'empty' ? es.empty : outcome === 403 ? es.noAccess : outcome === 404 ? es.notFound : es.inventoryError
+  await screen.findByRole('heading', { name: heading })
+  await waitFor(() => expect(outcome === 500 ? screen.getByRole('button', { name: es.retry }) : screen.getByRole('region', { name: es.table })).toHaveFocus())
+  expect(calls().filter(({ method }) => method === 'GET')).toHaveLength(4)
 })
 test.each([403, 404])('revoke %i stays in the dialog and closes with focus restored', async (status) => {
   setup({ [`POST ${revokePath(tenantRow)}`]: failure(status) }); open(); await openDialog(); typeName(); fireEvent.click(confirm())
