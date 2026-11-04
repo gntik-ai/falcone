@@ -12,7 +12,7 @@ import { LimitsTable, type RowOutcome } from './consolePlanDetail/LimitsTable'
 import { AssignmentsPanel, CapabilitiesPanel, InfoPanel, usePlanStatuses } from './consolePlanDetail/Panels'
 import { LocalizedToaster } from './consolePlanDetail/Toasts'
 import { deletePlan, failureFrom, getLimits, getPlan, removeLimit, setLimit, transitionPlan, type Failure, type LimitRow, type PlanRecord } from './consolePlanDetail/api'
-import { isDialogAction, isLifecycle, lifecycleActionFor, lifecycleOrder, targetOf, validateLimit, type Action, type DialogKind } from './consolePlanDetail/model'
+import { isDialogAction, isLifecycle, lifecycleActionFor, lifecycleOrder, retryable, targetOf, validateLimit, type Action, type DialogKind } from './consolePlanDetail/model'
 
 const NAMESPACE = 'pages.console-plan-detail-page'
 i18n.addResourceBundle('es', NAMESPACE, es)
@@ -96,6 +96,8 @@ function PlanDetail({ routeId }: { routeId: string }) {
   }, [feedback])
 
   const locked = denied || busy !== null
+  // A failed or lost lifecycle response leaves the outcome unresolved: only Reintentar may send that transition again.
+  const lifecycleUnresolved = feedback !== null && isLifecycle(feedback.action) && retryable(feedback.failure)
   const count = typeof plan?.assignedTenantCount === 'number' ? plan.assignedTenantCount : null
   const assignedSummary = count === null ? t('assignedUnknown') : t('assignedSummary', { count })
   const affected = count === null ? t('limits.affectedUnknown') : t('limits.affected', { count })
@@ -155,6 +157,7 @@ function PlanDetail({ routeId }: { routeId: string }) {
   // One request per user action. A retry sends the identical action again and nothing sends it on its own.
   async function run(action: Action, retry = false) {
     if (inFlight.current || !plan || denied) return
+    if (!retry && isLifecycle(action) && lifecycleUnresolved) return
     inFlight.current = true
     setBusy(action)
     setSaved(null)
@@ -166,8 +169,8 @@ function PlanDetail({ routeId }: { routeId: string }) {
       const failure = failureFrom(cause)
       if (failure.status === 403) setDenied(true)
       // A lost lifecycle response may have been applied: the re-sent request can be rejected as an invalid transition, so
-      // a failed retry reloads the plan alone and the header never keeps a stale status.
-      if (retry && isLifecycle(action) && failure.status !== 401 && failure.status !== 403) {
+      // a failed retry or a rejected transition reloads the plan alone and the header never keeps a stale status.
+      if (isLifecycle(action) && (retry ? failure.status !== 401 && failure.status !== 403 : failure.code === 'INVALID_TRANSITION')) {
         try {
           const fresh = await getPlan(plan.id)
           if (mounted.current) setPlan(fresh)
@@ -258,7 +261,7 @@ function PlanDetail({ routeId }: { routeId: string }) {
     body = <>
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <span className="w-full sm:w-auto">{back}</span>
-        {lifecycle && <Button ref={lifecycleButton} type="button" variant={lifecycle === 'activate' ? 'primary' : 'secondary'} className="w-full sm:w-auto" disabled={locked} aria-busy={activeBusy === lifecycle}
+        {lifecycle && <Button ref={lifecycleButton} type="button" variant={lifecycle === 'activate' ? 'primary' : 'secondary'} className="w-full sm:w-auto" disabled={locked || lifecycleUnresolved} aria-busy={activeBusy === lifecycle}
           aria-describedby="plan-lifecycle-help" aria-label={t(activeBusy === lifecycle ? 'action.busyName' : 'action.name', { action: lifecycleName, name: plan.displayName })}
           onClick={() => lifecycle === 'activate' ? void run({ kind: 'activate' }) : openDialog(lifecycle, { kind: lifecycle })}>
           {activeBusy === lifecycle ? t('action.updating') : lifecycleName}

@@ -173,6 +173,22 @@ test('a lost lifecycle response sends one POST, says the outcome is unknown and 
   expect(screen.queryByText(/ahora está/)).toBeNull(); expect(screen.queryByText('PRIVATE_MARKER network failure')).toBeNull()
   await wait(); await wait()
   expect(count(`POST ${lifecycleUrl}`)).toBe(1)
+  // The original trigger stays gated while the outcome is unresolved, so nothing but Reintentar can send it again.
+  expect(lifecycleButton(es.action.activate)).toBeDisabled()
+  fireEvent.click(lifecycleButton(es.action.activate)); await wait()
+  expect(count(`POST ${lifecycleUrl}`)).toBe(1)
+})
+
+test('a lost lifecycle response applied by the backend reconciles through Reintentar with a plan-only reload', async () => {
+  requests = strictFetch({ [`GET ${base}`]: sequence(() => json(draft), () => json(active)), [`GET ${limitsUrl}`]: profile,
+    [`POST ${lifecycleUrl}`]: sequence(network, () => fail(409, { code: 'INVALID_TRANSITION' })) })
+  open(); await ready()
+  fireEvent.click(lifecycleButton(es.action.activate))
+  const panel = await screen.findByTestId('mutation-feedback')
+  fireEvent.click(within(panel).getByRole('button', { name: es.retry }))
+  await waitFor(() => expect(lifecycleButton(es.action.deprecate)).toBeVisible())
+  expect(count(`POST ${lifecycleUrl}`)).toBe(2)
+  expect(count(`GET ${limitsUrl}`)).toBe(1)
 })
 
 test('a successful lifecycle shows the accepted status even when the reload GET fails', async () => {

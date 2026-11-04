@@ -41,7 +41,8 @@ with explicit props and complete es-default/en copy, accessible names and announ
   dialog, above the tabs (Activar) or under the table (Guardar), and Reintentar SHALL re-send the
   identical request.
 - **AND** a lost lifecycle response SHALL send one POST, show outcome-unknown copy and re-send only
-  after Reintentar; a lost plan or limit DELETE SHALL use the standard retry.
+  after Reintentar, and the original lifecycle trigger SHALL stay disabled while that outcome is
+  unresolved; a lost plan or limit DELETE SHALL use the standard retry.
 - **AND** a 403 SHALL render no-access and disable every mutation control.
 - **AND** a lifecycle POST or plan DELETE answered with 401 SHALL refresh the session once and
   SHALL NOT be replayed.

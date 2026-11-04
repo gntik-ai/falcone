@@ -194,6 +194,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await button(parity, named(parity, 'activate')).click();
       await expect(parity.page.getByText(c.feedback.outcomeUnknown, { exact: true })).toBeVisible();
       expect(sent(parity, 'POST', lifecyclePath)).toHaveLength(1);
+      // The original trigger is gated while the outcome is unresolved.
+      await expect(button(parity, named(parity, 'activate'))).toBeDisabled();
+      await parity.page.waitForTimeout(250);
+      expect(sent(parity, 'POST', lifecyclePath)).toHaveLength(1);
       await openReady(parity, { 'plans.detail': 'draft', 'plans.lifecycle': '500-unknown-code' });
       await button(parity, named(parity, 'activate')).click();
       await expect(parity.page.getByTestId('mutation-feedback')).toContainText('PLAN_SYNTHETIC_FAILURE');
