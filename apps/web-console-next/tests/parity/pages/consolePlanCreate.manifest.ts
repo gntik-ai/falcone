@@ -1,4 +1,5 @@
 import type { PageEndpoint, ParityManifest } from '../manifest'
+import { buildPlanDetailReads } from './console-plan-detail-page.manifest'
 
 export const planPath = '/v1/plans'
 export const planBody = { slug: 'starter-2026', displayName: 'Starter', description: '  Optional text  ', capabilities: {}, quotaDimensions: {} }
@@ -21,6 +22,8 @@ export const planFixtures = {
 }
 export const planEndpoints: Record<string, PageEndpoint> = {
   'plans.create': { method: 'POST', path: planPath, fixtures: planFixtures },
+  // The created plan's route now mounts the plan detail page, which reads the plan and its limits.
+  ...buildPlanDetailReads('p1'),
 }
 const manifest: ParityManifest = {
   route: '/console/plans/new', roles: ['superadmin'], endpoints: planEndpoints, fixtures: ['shell:superadmin', 'shell:superadmin-delayed', 'shell:plain-member', ...Object.keys(planFixtures).map((variant) => `plans.create:${variant}`)],
