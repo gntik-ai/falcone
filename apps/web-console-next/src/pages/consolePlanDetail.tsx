@@ -121,7 +121,7 @@ function PlanDetail({ routeId }: { routeId: string }) {
         if (mounted.current) setPlan(fresh)
       } catch { /* The accepted status stays. */ }
       if (!mounted.current) return
-      const message = t('success.lifecycle', { name: current.displayName, status: t(`statusLower.${accepted}`) })
+      const message = t('success.lifecycle', { name: current.displayName, status: accepted })
       toast.add({ title: message, description: undefined, tone: 'success', priority: 'low' })
       announce(message, 'polite')
       refocusHeading.current = true
@@ -259,10 +259,9 @@ function PlanDetail({ routeId }: { routeId: string }) {
     const activeBusy = busy && isLifecycle(busy) ? busy.kind : null
     const current = lifecycleOrder.indexOf(plan.status)
     const guidance = lifecycle ? t(`lifecycle.guidance.${lifecycle}`) : t(plan.status === 'archived' ? 'lifecycle.guidance.archived' : 'lifecycle.guidance.none')
-    const status = t(`statusLower.${plan.status}`)
     const stateLabel = (value: string) => t(`status.${value}`)
     const calloutTitle = plan.status === 'draft' ? 'limits.calloutDraftTitle' : plan.status === 'active' ? (count === 0 ? 'limits.calloutActiveEmptyTitle' : 'limits.calloutActiveTitle') : 'limits.calloutReadOnlyTitle'
-    const calloutBody = plan.status === 'draft' ? t('limits.calloutDraft') : plan.status === 'active' ? t('limits.calloutActive', { affected }) : t('limits.calloutReadOnly', { status })
+    const calloutBody = plan.status === 'draft' ? t('limits.calloutDraft') : plan.status === 'active' ? t('limits.calloutActive', { affected }) : t('limits.calloutReadOnly', { status: plan.status })
     // Each failure renders once: Activar and a refused limit save above the tabs, other limit failures under the table.
     const aboveTabs = shown && !isDialogAction(shown.action) && (shown.action.kind === 'activate' || shown.failure.status === 403) ? shown : null
     const shownFeedback = shown && !isDialogAction(shown.action) && !aboveTabs ? shown : null
@@ -298,7 +297,7 @@ function PlanDetail({ routeId }: { routeId: string }) {
         <TabsPanel value="capabilities" keepMounted={false} className={`min-w-0 pt-4 ${focus}`}><CapabilitiesPanel plan={plan} /></TabsPanel>
         <TabsPanel value="limits" keepMounted={false} className={`min-w-0 space-y-4 pt-4 ${focus}`}>
           <div className="space-y-1"><h2 className="text-sm font-semibold">{t('limits.title')}</h2>
-            <Text variant="supporting" tone="muted">{editable ? t('limits.helpEditable') : t('limits.helpReadOnly', { status })}</Text></div>
+            <Text variant="supporting" tone="muted">{editable ? t('limits.helpEditable') : t('limits.helpReadOnly', { status: plan.status })}</Text></div>
           <InlineCallout tone={plan.status === 'active' ? 'warning' : 'info'} title={t(calloutTitle)} description={calloutBody} actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined}
             labels={{ title: t(calloutTitle), description: calloutBody, upgrade: '', viewUsage: '' }} />
           {rows.length > 0

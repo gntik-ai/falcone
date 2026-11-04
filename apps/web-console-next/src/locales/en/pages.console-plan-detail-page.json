@@ -10,12 +10,6 @@
     "deprecated": "Deprecated",
     "archived": "Archived"
   },
-  "statusLower": {
-    "draft": "draft",
-    "active": "active",
-    "deprecated": "deprecated",
-    "archived": "archived"
-  },
   "lifecycle": {
     "title": "Lifecycle",
     "sequence": "Plan status sequence",
@@ -82,14 +76,14 @@
   "limits": {
     "title": "Base limits",
     "helpEditable": "Use -1 for unlimited. Changes stay as a local draft until you save the row.",
-    "helpReadOnly": "Limits are read-only because the plan is {status}.",
+    "helpReadOnly": "Limits are read-only because the plan is {status, select, draft {draft} active {active} deprecated {deprecated} archived {archived} other {archived}}.",
     "calloutDraftTitle": "Editing a draft",
     "calloutDraft": "These changes prepare the catalog before it is assigned to organizations. Type a whole number and use Save to confirm each row.",
     "calloutActiveTitle": "Editing an active plan",
     "calloutActiveEmptyTitle": "Editing an active plan with no assignments",
     "calloutActive": "{affected} Type a whole number and use Save to confirm each row; Reset asks for confirmation because it changes effective entitlements.",
     "calloutReadOnlyTitle": "Read-only limits",
-    "calloutReadOnly": "The plan is {status}; its limits can no longer be edited from this view.",
+    "calloutReadOnly": "The plan is {status, select, draft {draft} active {active} deprecated {deprecated} archived {archived} other {archived}}; its limits can no longer be edited from this view.",
     "affected": "{count, plural, =0 {No active organizations are currently affected.} one {Affects 1 active organization assigned to this plan.} other {Affects # active organizations assigned to this plan.}}",
     "affectedUnknown": "The number of affected organizations is not available in this detail.",
     "caption": "Plan limits",
@@ -188,7 +182,7 @@
     }
   },
   "success": {
-    "lifecycle": "{name} is now {status}.",
+    "lifecycle": "{name} is now {status, select, draft {draft} active {active} deprecated {deprecated} archived {archived} other {archived}}.",
     "deleted": "Plan {name} was deleted.",
     "closeToast": "Close notification",
     "notifications": "Notifications"

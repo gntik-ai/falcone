@@ -10,12 +10,6 @@
     "deprecated": "Obsoleto",
     "archived": "Archivado"
   },
-  "statusLower": {
-    "draft": "borrador",
-    "active": "activo",
-    "deprecated": "obsoleto",
-    "archived": "archivado"
-  },
   "lifecycle": {
     "title": "Ciclo de vida",
     "sequence": "Secuencia de estados del plan",
@@ -82,14 +76,14 @@
   "limits": {
     "title": "Límites base",
     "helpEditable": "Usa -1 para indicar sin límite. Los cambios quedan como borrador local hasta que guardas la fila.",
-    "helpReadOnly": "Los límites son de solo lectura porque el plan está {status}.",
+    "helpReadOnly": "Los límites son de solo lectura porque el plan está {status, select, draft {borrador} active {activo} deprecated {obsoleto} archived {archivado} other {archivado}}.",
     "calloutDraftTitle": "Editando borrador",
     "calloutDraft": "Estos cambios preparan el catálogo antes de asignarlo a organizaciones. Escribe un valor entero y usa Guardar para confirmar cada fila.",
     "calloutActiveTitle": "Editando plan activo",
     "calloutActiveEmptyTitle": "Editando plan activo sin asignaciones",
     "calloutActive": "{affected} Escribe un valor entero y usa Guardar para confirmar cada fila; Restablecer pide confirmación porque cambia derechos efectivos.",
     "calloutReadOnlyTitle": "Límites de solo lectura",
-    "calloutReadOnly": "El plan está {status}; sus límites ya no aceptan edición desde esta vista.",
+    "calloutReadOnly": "El plan está {status, select, draft {borrador} active {activo} deprecated {obsoleto} archived {archivado} other {archivado}}; sus límites ya no aceptan edición desde esta vista.",
     "affected": "{count, plural, =0 {Actualmente no hay organizaciones activas afectadas.} one {Afecta a 1 organización activa asignada a este plan.} other {Afecta a # organizaciones activas asignadas a este plan.}}",
     "affectedUnknown": "El número de organizaciones afectadas no está disponible en este detalle.",
     "caption": "Límites del plan",
@@ -188,7 +182,7 @@
     }
   },
   "success": {
-    "lifecycle": "{name} ahora está {status}.",
+    "lifecycle": "{name} ahora está {status, select, draft {borrador} active {activo} deprecated {obsoleto} archived {archivado} other {archivado}}.",
     "deleted": "El plan {name} se eliminó.",
     "closeToast": "Cerrar notificación",
     "notifications": "Notificaciones"
