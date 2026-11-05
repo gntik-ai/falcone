@@ -137,7 +137,7 @@ test('route workspace overrides stored context, then tenant switching clears it 
   expect(snapshot).toEqual({ userId: 'synthetic-user', tenantId: 't2', workspaceId: null, updatedAt: expect.any(String) })
 })
 
-test.each([['superadmin', 'Vista general de la consola', '/console/overview'], ['platform_auditor', 'Página pendiente', '/console/observability']] as const)('index chooses the permission landing for %s', async (role, heading, destination) => {
+test.each([['superadmin', 'Vista general de la consola', '/console/overview'], ['platform_auditor', 'Observabilidad bloqueada', '/console/observability']] as const)('index chooses the permission landing for %s', async (role, heading, destination) => {
   login([role])
   requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
   open('/console')
