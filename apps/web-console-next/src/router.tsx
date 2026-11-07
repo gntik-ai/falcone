@@ -102,6 +102,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'mcp/servers/:mcpServerId' && route.migrated) return { ...route, element: lazyPage('pages.console-mcp-server-detail-page', () => import('./pages/consoleMcpServerDetail')) }
         if (route.path === 'functions-registry' && route.migrated) return { ...route, element: lazyPage('pages.console-function-registry-page', () => import('./pages/consoleFunctionRegistry')) }
         if (route.path === 'functions/data' && route.migrated) return { ...route, element: lazyPage('pages.console-functions-data-page', () => import('./pages/consoleFunctionsData')) }
+        if (route.path === 'members' && route.migrated) return { ...route, element: lazyPage('pages.console-members-page', () => import('./pages/consoleMembers')) }
         if (route.path === 'secrets' && route.migrated) return { ...route, element: lazyPage('pages.console-secrets-page', () => import('./pages/consoleSecrets')) }
         if (route.path === 'auth-config' && route.migrated) return { ...route, element: lazyPage('pages.console-auth-config-page', () => import('./pages/consoleAuthConfig')) }
         if (route.path === 'realtime/changes' && route.migrated) return { ...route, element: lazyPage('pages.console-realtime-changes-page', () => import('./pages/consoleRealtimeChanges')) }

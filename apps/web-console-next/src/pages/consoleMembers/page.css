@@ -1,0 +1,3 @@
+/* Resource-index composition without the kit's optional search control. */
+.members-toolbar > div > div:first-child { display: none; }
+.members-table { max-width: 100%; }
