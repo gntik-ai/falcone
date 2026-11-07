@@ -103,3 +103,16 @@ legacy 401/403/409/422 messages and generic operation fallback for other errors;
 backend messages never render. Create and IAM retain their separate console-errors
 mapping. Regression tests cover closing create during submission and clearing
 revoke/resend errors on the wizard-close reload.
+
+The second checker follow-up imports the workspace bootstrap fixture explicitly
+and validates the rollback requirement text with strict OpenSpec validation. The
+blocked invite uses the kit assertive callout with its denial reason and announces
+Access blocked instead of a step. The read-only indicator keeps its recourse in
+a visually hidden text child, matching the legacy text-content assertion.
+
+The es/en browser journey now selects members:users-401 and asserts one refresh,
+one users replay, login and preserved return intent. Accessibility coverage checks
+the manager directory, every wizard step, email and missing-role validation, the
+failed Finish summary and the tenant_viewer indicator, including its reason. Back,
+Next and Finish are activated by keyboard; successful Close, Exit and Escape
+restore Invite focus. Browser execution remains deferred to PR CI.

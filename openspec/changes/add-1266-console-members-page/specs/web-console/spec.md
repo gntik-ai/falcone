@@ -97,6 +97,9 @@ denial reason. Backend authorization remains authoritative.
 
 ### Requirement: Rollback and parity verification
 
+The members migration SHALL support rollback to legacy navigation and mocked
+parity verification in both locales at every required viewport.
+
 #### Scenario: Disable migration
 
 - **WHEN** the members migrated flag is removed

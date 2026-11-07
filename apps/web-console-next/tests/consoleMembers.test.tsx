@@ -92,11 +92,14 @@ test('a tenant switch during loading never exposes the previous rows', async () 
 test('hides management and invitations for viewers, exposing role and reason', async () => {
   vi.mocked(usePermissions).mockReturnValue(getConsolePermissions(['tenant_viewer'])); setup(); open(); await ready()
   expect(screen.queryByRole('button', { name: es.invite })).toBeNull(); expect(screen.queryByRole('button', { name: es.create })).toBeNull()
-  expect(screen.getByLabelText(new RegExp(es.roleLabels.tenant_viewer))).toBeVisible(); expect(calls().some(({ path }) => path === invitationsPath)).toBe(false)
+  const indicator = screen.getByTestId('members-read-only-indicator')
+  expect(indicator).toBeVisible(); expect(indicator).toHaveTextContent(es.roleLabels.tenant_viewer)
+  expect(indicator).toHaveTextContent(/contacta con un administrador/i); expect(indicator).toHaveTextContent(es.reasons.tenant_viewer); expect(calls().some(({ path }) => path === invitationsPath)).toBe(false)
 })
 test('rechecks persisted roles at open and blocks without metrics or invitation POST', async () => {
   setup(); open(); await ready(); const session = login(['tenant_owner'], [tenantId]); session.principal!.platformRoles = ['tenant_viewer']; persistConsoleShellSession(session)
-  await openInvite(); expect(screen.getByRole('heading', { name: es.blocked })).toBeVisible(); expect(calls().some(({ path }) => path.includes('/metrics/'))).toBe(false); expect(writes()).toEqual([])
+  await openInvite(); expect(screen.getByRole('alert')).toHaveTextContent(es.blocked); expect(screen.getByRole('alert')).toHaveTextContent(es.reasons.tenant_viewer)
+  expect(screen.getByTestId('members-invite').querySelector('[aria-live="polite"]')).toHaveTextContent(es.blocked); expect(calls().some(({ path }) => path.includes('/metrics/'))).toBe(false); expect(writes()).toEqual([])
   fireEvent.keyDown(screen.getByTestId('members-invite'), { key: 'Escape' }); await waitFor(() => expect(screen.getByRole('button', { name: es.invite })).toHaveFocus())
 })
 test('uses four steps, focuses heading, marks invalid email and role, and enables summary edits', async () => {

@@ -15,7 +15,7 @@
 MCP validate_page is unavailable; use the supplied pinned kit snapshot and
 repository checks. No screenshots are claimed from this sandbox.
 
-The scoped page/routing/rollback/overview checks pass (50 tests), as do legacy
-members (19), console-api (52), separate shell fixtures (3) and static gates.
-The broad normal suite also reports failures in untouched tests; delivery output
-records its final result for the platform's base comparison and PR CI.
+The scoped members/routing/rollback checks pass (46 tests), as do legacy members
+(19), console-api (52), separate shell fixtures (3), production build and static
+gates. Delivery output records the final normal-suite result. Browser execution
+and operator review remain pending as listed above.

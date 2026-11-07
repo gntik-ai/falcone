@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
-import manifest, { endpoints, firstUsers, invitationsPath, nextUsers, pending, proof, rolesGet, tenant, tenantId, usersPath } from './console-members-page.manifest.ts';
+import manifest, { endpoints, firstUsers, invitationsPath, nextUsers, pending, proof, rolesGet, tenant, tenantId, usersPath, workspace } from './console-members-page.manifest.ts';
 import { seedHistoryPrincipal } from './console-flow-history-page.session.mjs';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
@@ -135,7 +135,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       expect(p.network.requests).toContainEqual({ method: 'POST', path: `${invitationsPath}/${pending.id}/revocation`, body: {} }); expect(p.network.requests).toContainEqual({ method: 'POST', path: `${invitationsPath}/${pending.id}/resend`, body: { email: 'guest@example.test' } });
       expect(p.network.requests.filter(({ path }) => path.startsWith('/v1/metrics/'))).toHaveLength(4);
     });
-    test('error-empty', async ({ parity: p }) => {
+    test('error-empty', async ({ parity: p, server }) => {
       const c = copy(p);
       for (const [name, variant, text] of [
         ['membersUsers', 'members:realm-users-empty', c.usersEmpty], ['membersRoles', 'members:realm-roles-empty', c.rolesEmpty],
@@ -170,12 +170,56 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await p.page.getByRole('textbox', { name: c.resendEmail }).fill('guest@example.test'); await action(p, 'generateLink').click();
       await expect(surface(p).getByRole('alert')).toHaveText(c.resendFailure);
       await expect(surface(p).getByRole('table', { name: c.invitations })).toContainText(pending.id);
+      // A successful refresh followed by another users 401 must stop at login.
+      p.network.setVariants({ membersUsers: 'members:users-401' });
+      const beforeUnauthorized = p.network.requests.length;
+      await p.page.goto(server.url(manifest.route.slice(1)));
+      await expect(p.page).toHaveURL(/\/login$/);
+      const unauthorized = p.network.requests.slice(beforeUnauthorized);
+      expect(unauthorized.filter(({ path }) => path === firstUsers)).toHaveLength(2);
+      expect(unauthorized.filter(({ method, path }) => method === 'POST' && path === '/v1/auth/login-sessions/synthetic-session/refresh')).toHaveLength(1);
+      expect(await p.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(server.url(manifest.route.slice(1))).pathname);
     });
     test('accessibility', async ({ parity: p }) => {
-      await open(p); await ready(p); await check.assertAccessibility(p); const c = copy(p); await invite(p);
-      await check.assertAccessibility(p); await action(p, 'next').focus(); await p.page.keyboard.press('Enter');
-      await action(p, 'next').focus(); await p.page.keyboard.press('Enter'); await expect(wizard(p).getByRole('alert')).toHaveText(c.emailInvalid); await expect(wizard(p).locator('[aria-current="step"]:visible').first()).toBeVisible();
-      await p.page.keyboard.press('Escape'); await expect(action(p, 'invite')).toBeFocused();
+      const c = copy(p);
+      const activate = async (key) => { await action(p, key).focus(); await p.page.keyboard.press('Enter'); };
+      const accessible = async () => { await check.assertAccessibility(p); await assertMembersLocale(p); };
+      await open(p, { membersInvite: 'members:invitation-500' }); await ready(p); await accessible();
+      await invite(p); await accessible();
+      await activate('next');
+      await expect(action(p, 'next')).toBeEnabled(); await activate('next');
+      await expect(wizard(p).getByRole('alert')).toHaveText(c.emailInvalid);
+      await expect(wizard(p).locator('[aria-current="step"]:visible').first()).toContainText(c.email);
+      await accessible();
+      await wizard(p).getByRole('textbox', { name: c.email }).fill('guest@example.test');
+      await expect(wizard(p).getByText(c.quotaPending, { exact: true })).toHaveCount(0);
+      await activate('next'); await activate('next');
+      await expect(wizard(p).getByRole('alert')).toHaveText(c.roleRequired);
+      await expect(wizard(p).locator('[aria-current="step"]:visible').first()).toContainText(c.role);
+      await accessible();
+      await activate('back');
+      await expect(wizard(p).getByRole('textbox', { name: c.email })).toHaveValue('guest@example.test');
+      await activate('next'); await chooseRole(p); await activate('next');
+      await expect(wizard(p).getByRole('heading', { name: c.summary })).toBeVisible(); await accessible();
+      await activate('finish');
+      await expect(wizard(p).getByRole('alert')).toHaveText(c.inviteFailure);
+      await expect(action(p, 'finish')).toBeFocused();
+      await expect(wizard(p).getByRole('heading', { name: c.summary })).toBeVisible();
+      await expect(wizard(p).getByText('guest@example.test', { exact: true })).toBeVisible();
+      await accessible();
+      p.network.setVariants({ membersInvite: 'members:invitation-accepted' });
+      await activate('finish'); await expect(action(p, 'finish')).toHaveCount(0);
+      await activate('close'); await expect(action(p, 'invite')).toBeFocused();
+      await invite(p); await activate('exit'); await expect(action(p, 'invite')).toBeFocused();
+      await invite(p); await p.page.keyboard.press('Escape'); await expect(action(p, 'invite')).toBeFocused();
+      await action(p, 'create').click(); await activate('close'); await expect(action(p, 'create')).toBeFocused();
+      await p.page.addInitScript(seedHistoryPrincipal, { platformRoles: ['tenant_viewer'] });
+      await p.page.reload(); await ready(p);
+      const indicator = surface(p).getByTestId('members-read-only-indicator');
+      await expect(indicator).toBeVisible(); await expect(indicator).toContainText(c.roleLabels.tenant_viewer);
+      await expect(indicator).toContainText(c.reasons.tenant_viewer);
+      await expect(action(p, 'invite')).toHaveCount(0); await expect(action(p, 'create')).toHaveCount(0);
+      await accessible();
     });
     test('runtime-health', async ({ parity: p }) => {
       await open(p, { membersUsers: 'members:realm-users-150-delayed-continuation' }); await ready(p); await invite(p);
@@ -192,10 +236,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       // Deliberately diverge shell and persisted session roles: the toolbar remains managerial.
       await p.page.evaluate(() => { const key = 'in-falcone.console-shell-session'; const value = JSON.parse(sessionStorage.getItem(key)); value.principal.platformRoles = ['tenant_viewer']; sessionStorage.setItem(key, JSON.stringify(value)); });
       const startBlocked = p.network.requests.length;
-      await invite(p); await expect(wizard(p).getByRole('heading', { name: c.blocked })).toBeVisible();
+      await invite(p); await expect(wizard(p).getByRole('alert')).toContainText(c.blocked);
+      await expect(wizard(p).getByRole('alert')).toContainText(c.reasons.tenant_viewer);
+      await expect(wizard(p).locator('[aria-live="polite"]')).toHaveText(c.blocked);
       expect(p.network.requests.slice(startBlocked).filter(({ method, path }) => method === 'POST' || path.startsWith('/v1/metrics/'))).toEqual([]);
       await screenshot(p, info, 'members-invite-permission-denied'); await action(p, 'exit').click();
-      await p.page.addInitScript(seedHistoryPrincipal, { platformRoles: ['tenant_viewer'] }); await p.page.reload(); await ready(p); await expect(action(p, 'invite')).toHaveCount(0); await screenshot(p, info, 'members-role-tenant-viewer');
+      await p.page.addInitScript(seedHistoryPrincipal, { platformRoles: ['tenant_viewer'] }); await p.page.reload(); await ready(p); await expect(action(p, 'invite')).toHaveCount(0);
+      await expect(surface(p).getByTestId('members-read-only-indicator')).toContainText(c.roleLabels.tenant_viewer);
+      await expect(surface(p).getByTestId('members-read-only-indicator')).toContainText(c.reasons.tenant_viewer); await screenshot(p, info, 'members-role-tenant-viewer');
       await open(p, { membersUsers: 'members:users-500' }); await expect(surface(p).getByRole('button', { name: c.usersRetry })).toBeVisible(); await screenshot(p, info, 'members-users-500');
     });
     test('kit-conformance', async ({ parity: p }) => { await open(p); await ready(p); await check.kitConformance(manifest); await assertMembersLocale(p); });
