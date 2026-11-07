@@ -14,6 +14,7 @@ export function Invitations({ tenantId, reload }: { tenantId: string; reload: nu
   useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   const load = useCallback((signal: AbortSignal) => listInvitations(tenantId, signal), [tenantId])
   const result = useList(load, revision + reload)
+  useEffect(() => { setError('') }, [reload])
   async function mutate(id: string, resend: boolean) {
     if (lock.current) return
     lock.current = true; setBusy(true); setError('')

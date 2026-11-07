@@ -168,5 +168,9 @@
   },
   "createDenied": "No tienes permisos para crear usuarios en esta organización.",
   "restrictedAction": "Acción restringida",
-  "expiryColumn": "Caduca"
+  "expiryColumn": "Caduca",
+  "inviteSessionExpired": "Tu sesión ha expirado. Vuelve a iniciar sesión.",
+  "inviteDenied": "No tienes permisos para completar esta operación.",
+  "inviteConflict": "El recurso ya existe o entra en conflicto con otro.",
+  "inviteInvalid": "Los datos enviados no son válidos."
 }

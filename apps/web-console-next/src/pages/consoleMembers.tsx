@@ -53,7 +53,7 @@ function Directory({ tenantId, realmId, tenantLabel }: { tenantId: string; realm
     <section aria-label={t('roles')} className="min-w-0 space-y-4"><Heading title={t('roles')} description={t('rolesDescription')} />
       {roles?.failure ? <ListFailure kind="roles" failure={roles.failure} retry={() => setRolesRevision((value) => value + 1)} /> : !roles?.rows ? <Loading label={t('rolesLoading')} /> : roles.rows.length ? <Table rows={roles.rows} columns={roleColumns} id={(role) => role.roleName} label={t('rolesTable')} /> : <Empty title={t('rolesEmpty')} />}
     </section>
-    {manage && inviteOpen && <InviteWizard key={context.activeWorkspaceId} tenantId={tenantId} workspaceId={context.activeWorkspaceId ?? ''} onClose={closeInvite} />}
+    {manage && inviteOpen && <InviteWizard returnFocusRef={inviteTrigger} key={context.activeWorkspaceId} tenantId={tenantId} workspaceId={context.activeWorkspaceId ?? ''} onClose={closeInvite} />}
   </Page>
 }
 export default function ConsoleMembersPage() {

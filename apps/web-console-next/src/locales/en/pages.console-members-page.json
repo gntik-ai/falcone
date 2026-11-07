@@ -168,5 +168,9 @@
   },
   "createDenied": "You do not have permission to create users in this organization.",
   "restrictedAction": "Restricted action",
-  "expiryColumn": "Expires"
+  "expiryColumn": "Expires",
+  "inviteSessionExpired": "Your session has expired. Sign in again.",
+  "inviteDenied": "You do not have permission to complete this operation.",
+  "inviteConflict": "The resource already exists or conflicts with another.",
+  "inviteInvalid": "The submitted data is invalid."
 }

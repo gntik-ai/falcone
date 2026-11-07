@@ -19,8 +19,7 @@ export function CreateUser({ tenantId, roles, onCreated }: { tenantId: string; r
     locked.current = true; setBusy(true); setError(''); setDenied(false)
     try {
       await createUser(tenantId, data)
-      if (!active.current) return
-      setData({ username: '', email: '', password: '', role: 'tenant_developer' })
+      if (active.current) setData({ username: '', email: '', password: '', role: 'tenant_developer' })
       announce(t('created')); onCreated()
     } catch (cause) {
       if (active.current) {

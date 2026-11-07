@@ -103,6 +103,8 @@ test('uses four steps, focuses heading, marks invalid email and role, and enable
   setup(); open(); await openInvite(); expect(screen.queryByLabelText(/mensaje/i)).toBeNull(); next()
   expect(screen.getByRole('button', { name: es.next })).toBeEnabled(); next(); expect(await screen.findByRole('alert')).toHaveTextContent(es.emailInvalid)
   expect(screen.getAllByText(new RegExp(es.stepError)).length).toBeGreaterThan(0)
+  const fullStepper = screen.getAllByRole('navigation', { name: es.steps })[0]
+  expect(fullStepper.querySelector('[aria-current="step"]')).toHaveTextContent(es.email)
   fireEvent.change(screen.getByRole('textbox', { name: new RegExp(es.email) }), { target: { value: 'guest@example.test' } }); await act(async () => { await Promise.resolve() }); next(); next(); expect(screen.getByRole('alert')).toHaveTextContent(es.roleRequired)
   fireEvent.click(screen.getByRole('combobox', { name: es.role })); const option = await screen.findByRole('option', { name: es.workspaceRoles.workspace_developer }); fireEvent.pointerDown(option); fireEvent.click(option); next()
   fireEvent.click(screen.getByRole('button', { name: es.editNamed.replace('{name}', es.email) })); expect(screen.getByRole('textbox', { name: new RegExp(es.email) })).toHaveValue('guest@example.test'); expect(writes()).toEqual([])
@@ -117,7 +119,7 @@ test.each(['pending', 'exhausted', 'failed'])('blocks pending and exhausted quot
   else { expect(screen.getByRole('alert')).toHaveTextContent(kind === 'pending' ? es.quotaPending : es.quotaExhausted); expect(writes()).toEqual([]) }
   if (release) await act(async () => release())
 })
-test('submits the exact body once on double Finish, keeps the proof out of persistence and clears on Close', async () => {
+test.each(['close', 'escape'])('submits once on double Finish, focuses success and clears the proof on %s', async (exit) => {
   setup(); open(); await summary(); const button = screen.getByRole('button', { name: es.finish }); fireEvent.click(button); fireEvent.click(button)
   expect(await screen.findByLabelText(es.oneTimeLink)).toHaveValue(`${location.origin}/invitations/${tenantId}/${proof.id}#token=${proof.token}`)
   expect(writes()).toEqual([{ method: 'POST', path: invitationsPath, body: { email: 'guest@example.test', role: 'workspace_developer', workspaceId } }])
@@ -126,13 +128,18 @@ test('submits the exact body once on double Finish, keeps the proof out of persi
   expect(JSON.stringify({ localStorage, sessionStorage })).not.toContain(proof.token)
   expect([...document.querySelectorAll('[aria-live]')].map((node) => node.textContent).join(' ')).not.toContain(proof.token)
   expect(location.search + location.hash).not.toContain(proof.token)
-  expect(screen.queryByRole('button', { name: es.finish })).toBeNull(); fireEvent.click(screen.getByRole('button', { name: es.close }))
+  expect(screen.queryByRole('button', { name: es.finish })).toBeNull()
+  const heading = screen.getByRole('heading', { name: es.invitationReady })
+  expect(heading).toHaveFocus()
+  expect(screen.getByRole('dialog')).toHaveAccessibleDescription(es.inviteHelp)
+  if (exit === 'close') fireEvent.click(screen.getByRole('button', { name: es.close }))
+  else fireEvent.keyDown(heading, { key: 'Escape' })
   await waitFor(() => expect(screen.getByRole('button', { name: es.invite })).toHaveFocus()); expect(screen.queryByLabelText(es.oneTimeLink)).toBeNull()
   await waitFor(() => expect(calls().filter(({ path, method }) => path === invitationsPath && method === 'GET')).toHaveLength(2))
 })
 test.each(['500', 'network'])('keeps summary and values after invitation %s, localizes error and restores Finish focus', async (kind) => {
   setup({ [`POST ${invitationsPath}`]: kind === '500' ? failure(500) : () => { throw new TypeError('synthetic-raw-message') } }); open(); await summary(); fireEvent.click(screen.getByRole('button', { name: es.finish }))
-  expect(await screen.findByRole('alert')).toHaveTextContent(kind === '500' ? es.serviceUnavailable : es.inviteFailure)
+  expect(await screen.findByRole('alert')).toHaveTextContent(es.inviteFailure)
   expect(screen.getByRole('heading', { name: es.summary })).toBeVisible(); expect(screen.getByText('guest@example.test')).toBeVisible(); await waitFor(() => expect(screen.getByRole('button', { name: es.finish })).toHaveFocus())
   fireEvent.click(screen.getByRole('button', { name: es.finish })); await waitFor(() => expect(writes()).toHaveLength(2)); expect(screen.queryByText('synthetic-raw-message')).toBeNull()
 })
@@ -205,4 +212,40 @@ test('invitation 401 uses exactly one refresh and one replay with the same body 
   expect(writes().map(({ path }) => path)).toEqual([invitationsPath, '/v1/auth/login-sessions/synthetic-session/refresh', invitationsPath])
   const posts = requests.mock.mock.calls.filter(([path]) => path === invitationsPath).filter(([, init]) => init?.method === 'POST')
   expect(posts[0][1]?.body).toEqual(posts[1][1]?.body); expect(new Headers(posts[0][1]?.headers).get('X-Request-Id')).toBe(new Headers(posts[1][1]?.headers).get('X-Request-Id'))
+})
+
+test.each([[401, es.inviteSessionExpired], [403, es.inviteDenied], [409, es.inviteConflict], [422, es.inviteInvalid]] as const)('keeps legacy localized invitation %s copy instead of backend messages', async (status, message) => {
+  setup({ [`POST ${invitationsPath}`]: failure(status), 'POST /v1/auth/login-sessions/synthetic-session/refresh': buildConsoleRefreshSessionFixture() })
+  open(); await summary(); fireEvent.click(screen.getByRole('button', { name: es.finish }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(message)
+  expect(screen.queryByText('synthetic-raw-message')).toBeNull()
+  expect(screen.getByRole('heading', { name: es.summary })).toBeVisible()
+  expect(screen.getByRole('button', { name: es.finish })).toHaveFocus()
+})
+test('reloads users when creation succeeds after the create panel was closed', async () => {
+  let release!: () => void
+  const pendingCreate = new Promise<void>((resolve) => { release = resolve })
+  setup({ [`POST /v1/tenants/${tenantId}/users`]: async () => { await pendingCreate; return Response.json({}) } })
+  open(); await ready(); fireEvent.click(screen.getByRole('button', { name: es.create }))
+  fireEvent.change(screen.getByRole('textbox', { name: new RegExp(es.username) }), { target: { value: 'jdoe' } })
+  fireEvent.change(screen.getByLabelText(new RegExp(es.password)), { target: { value: 'synthetic-password-0001' } })
+  fireEvent.click(screen.getByRole('button', { name: es.create })); await waitFor(() => expect(writes()).toHaveLength(1))
+  fireEvent.click(screen.getByRole('button', { name: es.close })); expect(screen.queryByLabelText(new RegExp(es.password))).toBeNull()
+  await act(async () => release())
+  await waitFor(() => expect(calls().filter(({ path }) => path === firstUsers)).toHaveLength(2))
+  await ready(); expect(screen.getByRole('button', { name: es.create })).toHaveFocus()
+})
+test.each(['revoke', 'resend'])('clears a failed %s error when closing the wizard reloads invitations', async (action) => {
+  setup({ [`POST ${invitationsPath}/${pending.id}/${action === 'revoke' ? 'revocation' : 'resend'}`]: failure(500) })
+  open(); await ready(); await screen.findByRole('table', { name: es.invitations })
+  fireEvent.click(screen.getByRole('button', { name: es[action === 'revoke' ? 'revokeNamed' : 'resendNamed'].replace('{id}', pending.id) }))
+  if (action === 'resend') {
+    fireEvent.change(screen.getByRole('textbox', { name: es.resendEmail }), { target: { value: 'guest@example.test' } })
+    fireEvent.click(screen.getByRole('button', { name: es.generateLink }))
+  }
+  expect(await screen.findByRole('alert')).toHaveTextContent(es[action === 'revoke' ? 'revokeFailure' : 'resendFailure'])
+  await openInvite(); fireEvent.click(screen.getByRole('button', { name: es.exit }))
+  await screen.findByRole('table', { name: es.invitations })
+  expect(screen.queryByRole('alert')).toBeNull()
+  expect(calls().filter(({ path, method }) => path === invitationsPath && method === 'GET')).toHaveLength(2)
 })

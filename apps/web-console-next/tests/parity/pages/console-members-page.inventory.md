@@ -6,7 +6,9 @@ clean base a19f40ab9e160cd522c110efd50c30b2f5e0d708. Blueprint SHA256
 approved entry a83361e00e7de747bedde12c9704cce06be574b7ee1813b9b0b1387e3b5f1073.
 Hermes kit snapshot d329505fdb463883ff0d707b084c9817e4b01bdc13ce7e5f3d98aa8aa7bc84b9,
 ui/blocks/templates 0.11.0, tokens 0.3.0. MCP is unavailable; installed types verify
-WizardLayout's explicit error status support. No kit-gap workaround is needed.
+WizardLayout's explicit error status support. Its full Stepper omits aria-current
+for error status, so the supported rich label slot carries aria-current on the
+current errored step; the kit still owns the indicator, layout and navigation.
 
 ## Requests and preserved actions
 
@@ -37,7 +39,9 @@ its existing per-attempt Idempotency-Key generation and preserved X-Request-Id.
 - Metrics load on wizard open rather than legacy mount.
 - Enabled Next validates and announces the current step; kit error marks persist.
 - Summary Edit controls return to each field's step.
-- Focus-mode WizardLayout replaces the legacy dialog; open focuses the heading.
+- Fullscreen overlay-mode WizardLayout replaces the legacy dialog; open focuses
+  the heading. The kit owns the portal, modal isolation, Escape and focus return.
+  Its description and step announcements use the legacy localized copy.
 - Failed invitation GET clears prior rows rather than retaining stale ones.
 - Users follow the approved cursor contract and deduplicate overlapping userIds.
 
@@ -74,3 +78,28 @@ axe, viewport, parity and CSP runs are deferred to CI. The checker assesses the
 visual spec and fixtures in source. Kit composition uses Page plus explicit
 resource-index blocks to avoid sample rows, search, paging or management actions
 that ResourceIndexPage adds but legacy does not have.
+
+## Checker follow-up
+
+The page-local locale assertion retains the shared locale rules with one narrow
+exception for legacy catalog labels: Email and formatConsoleEnumLabel lifecycle
+values (Draft, Provisioning, Pending activation, Active, Suspended, Soft deleted,
+Deleted). These are deliberately identical in this page's es/en catalogs. Other
+pages translate the same English words, making the shared cross-catalog rule
+reject this page's preserved Spanish copy. No product copy or shared assertion
+was changed; all other English-copy and untranslated-key checks remain active.
+
+Required-password journeys use the label including the kit's required marker.
+The no-tenant fixture now returns no tenant on both collection and own-tenant
+bootstrap paths. Responsive checks inspect the active modal while the kit hides
+the underlying shell main. Current-step assertions select the visible stepper.
+Double activation dispatches two clicks on the same Finish element; it does not
+wait for a removed button before dispatching the second activation.
+
+Success uses the kit step announcement to announce completion and focus the proof
+heading inside the modal; Escape and Cerrar both dismiss proof,
+return focus and reload invitations once. Invite failures preserve the localized
+legacy 401/403/409/422 messages and generic operation fallback for other errors;
+backend messages never render. Create and IAM retain their separate console-errors
+mapping. Regression tests cover closing create during submission and clearing
+revoke/resend errors on the wizard-close reload.

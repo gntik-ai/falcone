@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import manifest, { endpoints, firstUsers, invitationsPath, nextUsers, pending, proof, rolesGet, tenant, tenantId, usersPath, workspace } from './console-members-page.manifest.ts';
+import { readdir, readFile } from 'node:fs/promises';
+import manifest, { endpoints, firstUsers, invitationsPath, nextUsers, pending, proof, rolesGet, tenant, tenantId, usersPath } from './console-members-page.manifest.ts';
 import { seedHistoryPrincipal } from './console-flow-history-page.session.mjs';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
@@ -10,13 +11,50 @@ const copy = (p) => bundles[p.locale];
 const surface = (p) => p.page.getByTestId('console-members-page');
 const wizard = (p) => p.page.getByTestId('members-invite');
 const action = (p, key) => p.page.getByRole('button', { name: copy(p)[key], exact: true });
+const password = (p) => p.page.getByLabel(copy(p).password).and(p.page.locator('input'));
 const ready = (p) => expect(surface(p).getByRole('table', { name: copy(p).usersTable })).toBeVisible();
-async function invite(p) { await ready(p); await action(p, 'invite').click(); await expect(wizard(p).getByRole('heading', { name: copy(p).invite })).toBeFocused(); }
+async function invite(p) { await ready(p); await action(p, 'invite').click(); await expect(wizard(p).getByRole('heading', { name: copy(p).invite })).toBeFocused(); await expect(p.page.getByRole('dialog')).toHaveAccessibleDescription(copy(p).inviteHelp); }
 async function chooseRole(p) { await wizard(p).getByRole('combobox', { name: copy(p).role }).click(); await p.page.getByRole('option', { name: copy(p).workspaceRoles.workspace_developer }).click(); }
 async function summary(p) {
   await invite(p); await action(p, 'next').click(); await wizard(p).getByRole('textbox', { name: copy(p).email }).fill('guest@example.test');
   await expect(wizard(p).getByText(copy(p).quotaPending, { exact: true })).toHaveCount(0); await action(p, 'next').click(); await chooseRole(p); await action(p, 'next').click();
   await expect(wizard(p).getByRole('heading', { name: copy(p).summary })).toBeVisible();
+}
+// Legacy Email and formatConsoleEnumLabel copy are intentionally shared by es/en.
+// Keep the shared locale rules, excluding only these explicitly inventoried labels
+// from cross-page catalog collisions (for example Email vs another page's Correo).
+async function assertMembersLocale(p) {
+  await expect(p.page.locator('html')).toHaveAttribute('lang', p.locale);
+  const forbidden = new Set(['Search...', 'Search…', 'No results found.', 'No results found', 'Loading...', 'Loading…', 'Toggle sidebar', 'Open menu', 'Close menu', 'Select an option', 'Select workspace', 'Previous page', 'Next page']);
+  const flatten = (object, prefix = '') => Object.entries(object).flatMap(([key, value]) => typeof value === 'string' ? [[prefix + key, value]] : flatten(value, `${prefix}${key}.`));
+  const legacy = new Set([bundles.es.email, ...Object.values(bundles.es.lifecycleStates)]);
+  if (p.locale === 'es') for (const file of await readdir(new URL('../../../src/locales/en/', import.meta.url))) {
+    if (!file.endsWith('.json')) continue;
+    const english = flatten(JSON.parse(await readFile(new URL(`../../../src/locales/en/${file}`, import.meta.url), 'utf8')));
+    const spanish = new Map(flatten(JSON.parse(await readFile(new URL(`../../../src/locales/es/${file}`, import.meta.url), 'utf8'))));
+    for (const [key, value] of english) if (value !== spanish.get(key) && !value.includes('{') && !legacy.has(value)) forbidden.add(value);
+  }
+  const values = await p.page.evaluate(() => {
+    const values = [];
+    for (const element of document.body.querySelectorAll('*')) {
+      const style = getComputedStyle(element);
+      if (['SCRIPT', 'STYLE'].includes(element.tagName) || style.display === 'none' || style.visibility === 'hidden' || !element.getClientRects().length) continue;
+      for (const attribute of ['aria-label', 'title', 'placeholder', 'alt']) if (element.hasAttribute(attribute)) values.push(element.getAttribute(attribute));
+      for (const id of (element.getAttribute('aria-labelledby') ?? '').split(/\s+/)) if (id) values.push(document.getElementById(id)?.textContent ?? '');
+      for (const child of element.childNodes) if (child.nodeType === Node.TEXT_NODE) values.push(child.textContent);
+      if (typeof element.innerText === 'string') values.push(element.innerText);
+      if (element.matches('input[type="button"], input[type="submit"], input[type="reset"]')) values.push(element.value);
+    }
+    return values.map((value) => value.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  });
+  const bad = values.filter((text) => /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/.test(text) || (p.locale === 'es' && forbidden.has(text)));
+  expect(bad, `locale: unexpected copy ${bad.join(', ')}`).toEqual([]);
+}
+async function assertWizardResponsive(p, width) {
+  await p.page.setViewportSize({ width, height: 900 });
+  await expect(p.page.getByRole('dialog')).toBeVisible();
+  const sizes = await p.page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+  expect(sizes.scrollWidth).toBeLessThanOrEqual(sizes.clientWidth);
 }
 async function screenshot(p, info, name) {
   const body = await p.page.screenshot({ fullPage: true, animations: 'disabled' });
@@ -35,7 +73,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         if (request.method() !== 'GET') return route.fallback();
         p.network.requests.push({ method: 'GET', path: url.pathname + url.search, body: undefined });
         const value = noRealm ? { ...tenant, identityContext: {} } : tenant;
-        await route.fulfill({ json: url.pathname === '/v1/tenants' ? { items: noTenant ? [] : [value], page: { after: null } } : { tenant: value } });
+        await route.fulfill({ json: url.pathname === '/v1/tenants' ? { items: noTenant ? [] : [value], page: { after: null } } : { tenant: noTenant ? null : value } });
       });
       await p.page.route(/\/v1\/workspaces\?.*$/, async (route) => {
         const url = new URL(route.request().url());
@@ -77,21 +115,21 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(surface(p).getByText('synthetic-user-0', { exact: true })).toHaveCount(0);
       await opening; await ready(p);
       await expect(surface(p).getByRole('table', { name: c.usersTable }).getByRole('row')).toHaveCount(151);
-      await check.assertLocale(p);
+      await assertMembersLocale(p);
     });
     test('action', async ({ parity: p }) => {
       await open(p); await ready(p); const c = copy(p); await action(p, 'create').click();
-      await p.page.getByRole('textbox', { name: c.username }).fill('jdoe'); await p.page.getByLabel(c.password, { exact: true }).fill('synthetic-password-0001'); await action(p, 'create').click();
-      await expect(p.page.getByLabel(c.password, { exact: true })).toHaveCount(0);
+      await p.page.getByRole('textbox', { name: c.username }).fill('jdoe'); await password(p).fill('synthetic-password-0001'); await action(p, 'create').click();
+      await expect(password(p)).toHaveCount(0);
       expect(p.network.requests.filter(({ method }) => method === 'POST')).toContainEqual({ method: 'POST', path: `/v1/tenants/${tenantId}/users`, body: { username: 'jdoe', password: 'synthetic-password-0001', roles: ['tenant_developer'] } });
       await summary(p);
       await p.page.getByRole('button', { name: c.editNamed.replace('{name}', c.email) }).click();
       await expect(wizard(p).getByRole('textbox', { name: c.email })).toHaveValue('guest@example.test');
       await action(p, 'next').click(); await action(p, 'next').click();
-      await action(p, 'finish').dblclick(); await expect(p.page.getByRole('textbox', { name: c.oneTimeLink })).toHaveValue(new RegExp(`/invitations/${tenantId}/${proof.id}#token=${proof.token}$`));
+      await action(p, 'finish').evaluate((button) => { button.click(); button.click(); }); await expect(p.page.getByRole('textbox', { name: c.oneTimeLink })).toHaveValue(new RegExp(`/invitations/${tenantId}/${proof.id}#token=${proof.token}$`));
       const invitationPosts = p.network.requests.filter(({ method, path }) => method === 'POST' && path === invitationsPath);
-      expect(invitationPosts).toEqual([{ method: 'POST', path: invitationsPath, body: { email: 'guest@example.test', role: 'workspace_developer', workspaceId: workspace.workspaceId } }]);
-      await expect(action(p, 'finish')).toHaveCount(0); await action(p, 'close').click(); await expect(action(p, 'invite')).toBeFocused(); await expect(p.page.getByRole('textbox', { name: c.oneTimeLink })).toHaveCount(0);
+      expect(invitationPosts).toEqual([{ method: 'POST', path: invitationsPath, body: { email: 'guest@example.test', role: 'workspace_developer', workspaceId: 'synthetic-workspace' } }]);
+      await expect(action(p, 'finish')).toHaveCount(0); await expect(wizard(p).getByRole('heading', { name: c.invitationReady })).toBeFocused(); await p.page.keyboard.press('Escape'); await expect(action(p, 'invite')).toBeFocused(); await expect(p.page.getByRole('textbox', { name: c.oneTimeLink })).toHaveCount(0);
       await surface(p).getByRole('button', { name: c.revokeNamed.replace('{id}', pending.id) }).click(); await expect(surface(p).getByRole('table', { name: c.invitations })).toBeVisible();
       await surface(p).getByRole('button', { name: c.resendNamed.replace('{id}', pending.id) }).click(); await p.page.getByRole('textbox', { name: c.resendEmail }).fill('guest@example.test'); await action(p, 'generateLink').click(); await expect(p.page.getByRole('textbox', { name: c.oneTimeLink })).toBeVisible(); await action(p, 'hideLink').click();
       expect(p.network.requests).toContainEqual({ method: 'POST', path: `${invitationsPath}/${pending.id}/revocation`, body: {} }); expect(p.network.requests).toContainEqual({ method: 'POST', path: `${invitationsPath}/${pending.id}/resend`, body: { email: 'guest@example.test' } });
@@ -112,17 +150,17 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         expect(p.network.requests.filter(({ path }) => path.startsWith(usersPath)).slice(-2).map(({ path }) => path)).toEqual([firstUsers, nextUsers]);
       }
       for (const [shell, text] of [['shell:tenant-none', c.noTenant], ['shell:tenant-without-realm', c.noRealm]]) { const start = p.network.requests.length; await open(p, {}, shell); await expect(surface(p).getByText(text)).toBeVisible(); expect(p.network.requests.slice(start).filter(({ path }) => /\/v1\/(?:iam|metrics)|\/invitations$/.test(path))).toEqual([]); }
-      await open(p, { membersInvite: 'members:invitation-500' }); await summary(p); await action(p, 'finish').click(); await expect(wizard(p).getByRole('alert')).toHaveText(c.serviceUnavailable); await expect(action(p, 'finish')).toBeFocused();
+      await open(p, { membersInvite: 'members:invitation-500' }); await summary(p); await action(p, 'finish').click(); await expect(wizard(p).getByRole('alert')).toHaveText(c.inviteFailure); await expect(action(p, 'finish')).toBeFocused();
       await action(p, 'exit').click();
       await open(p, { membersWorkspaceQuotas: 'members:quotas-exhausted' }); await invite(p); await action(p, 'next').click(); await wizard(p).getByRole('textbox', { name: c.email }).fill('guest@example.test'); await expect(wizard(p).getByText(c.quotaPending)).toHaveCount(0); await action(p, 'next').click(); await expect(wizard(p).getByRole('alert')).toHaveText(c.quotaExhausted);
       await action(p, 'exit').click();
       for (const [variant, message] of [['members:create-user-403', c.restrictedAction], ['members:create-user-500', c.serviceUnavailable], ['members:create-user-network', c.createFailure]]) {
         await open(p, { membersCreate: variant }); await ready(p); await action(p, 'create').click();
         await p.page.getByRole('textbox', { name: c.username }).fill('jdoe');
-        await p.page.getByLabel(c.password, { exact: true }).fill('synthetic-password-0001'); await action(p, 'create').click();
+        await password(p).fill('synthetic-password-0001'); await action(p, 'create').click();
         await expect(surface(p).getByRole('alert')).toContainText(message);
-        await expect(p.page.getByLabel(c.password, { exact: true })).toHaveAttribute('type', 'password');
-        await expect(p.page.getByLabel(c.password, { exact: true })).toHaveValue('synthetic-password-0001');
+        await expect(password(p)).toHaveAttribute('type', 'password');
+        await expect(password(p)).toHaveValue('synthetic-password-0001');
       }
       await open(p, { membersRevoke: 'members:invitation-revoke-500', membersResend: 'members:invitation-resend-500' }); await ready(p);
       await surface(p).getByRole('button', { name: c.revokeNamed.replace('{id}', pending.id) }).click();
@@ -136,7 +174,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     test('accessibility', async ({ parity: p }) => {
       await open(p); await ready(p); await check.assertAccessibility(p); const c = copy(p); await invite(p);
       await check.assertAccessibility(p); await action(p, 'next').focus(); await p.page.keyboard.press('Enter');
-      await action(p, 'next').focus(); await p.page.keyboard.press('Enter'); await expect(wizard(p).getByRole('alert')).toHaveText(c.emailInvalid); await expect(wizard(p).locator('[aria-current="step"]').first()).toBeVisible();
+      await action(p, 'next').focus(); await p.page.keyboard.press('Enter'); await expect(wizard(p).getByRole('alert')).toHaveText(c.emailInvalid); await expect(wizard(p).locator('[aria-current="step"]:visible').first()).toBeVisible();
       await p.page.keyboard.press('Escape'); await expect(action(p, 'invite')).toBeFocused();
     });
     test('runtime-health', async ({ parity: p }) => {
@@ -144,7 +182,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect.poll(() => p.network.requests.filter(({ path }) => path.startsWith('/v1/metrics/')).length).toBe(4); await expect(p.page).toHaveURL(/\/console\/members$/); await check.assertRuntimeHealth(p);
     });
     test('responsive', async ({ parity: p }) => {
-      await open(p); await ready(p); await check.assertResponsive(p, width); await invite(p); await check.assertResponsive(p, width);
+      await open(p); await ready(p); await check.assertResponsive(p, width); await invite(p); await assertWizardResponsive(p, width);
     });
     test('visual-review', async ({ parity: p }, info) => {
       const c = copy(p); await open(p); await ready(p); await screenshot(p, info, 'members-role-tenant-owner');
@@ -160,6 +198,6 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await p.page.addInitScript(seedHistoryPrincipal, { platformRoles: ['tenant_viewer'] }); await p.page.reload(); await ready(p); await expect(action(p, 'invite')).toHaveCount(0); await screenshot(p, info, 'members-role-tenant-viewer');
       await open(p, { membersUsers: 'members:users-500' }); await expect(surface(p).getByRole('button', { name: c.usersRetry })).toBeVisible(); await screenshot(p, info, 'members-users-500');
     });
-    test('kit-conformance', async ({ parity: p }) => { await open(p); await ready(p); await check.kitConformance(manifest); await check.assertLocale(p); });
+    test('kit-conformance', async ({ parity: p }) => { await open(p); await ready(p); await check.kitConformance(manifest); await assertMembersLocale(p); });
   });
 }
