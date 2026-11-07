@@ -31,7 +31,8 @@ test.each(['superadmin', 'tenant_owner', 'tenant_viewer'])('allows authenticated
   expect(isMigratedRoute('/console/flows')).toBe(true)
   expect(isMigratedRoute('/console/functions/data')).toBe(true)
   expect(isMigratedRoute('/console/realtime/changes')).toBe(true)
-  for (const path of ['workspaces', 'members']) expect(isMigratedRoute(`/console/${path}`)).toBe(false)
+  expect(isMigratedRoute('/console/members')).toBe(true)
+  for (const path of ['workspaces']) expect(isMigratedRoute(`/console/${path}`)).toBe(false)
 })
 
 test.each([1, 2])('an invalid stored tenant resolves only through the shell with %s accessible tenants', async (size) => {

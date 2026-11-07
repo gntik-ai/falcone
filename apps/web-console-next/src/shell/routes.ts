@@ -16,7 +16,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'database' },
   { path: 'functions-registry', migrated: true },
   { path: 'iam-access', guard: 'superadmin' },
-  { path: 'members' },
+  { path: 'members', migrated: true },
   { path: 'plans', migrated: true, guard: 'superadmin', handle: { platformGlobal: true } },
   { path: 'plans/new', migrated: true, guard: 'superadmin', handle: { platformGlobal: true } },
   { path: 'plans/:planId', migrated: true, guard: 'superadmin', handle: { platformGlobal: true } },
