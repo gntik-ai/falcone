@@ -73,7 +73,7 @@ test.each(['iam-access', 'plans', 'auth', 'tenants/t1/plan'].flatMap((path) =>
   login(roles)
   requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] }, 'GET /v1/plans?page=1&pageSize=20': { items: [], total: 0, page: 1, pageSize: 20 }, ...tenantPlanRoutes })
   open(`/console/${path}`)
-  expect(await screen.findByRole('heading', { name: roles.includes('superadmin') ? path === 'plans' ? 'Catálogo de planes' : path === 'tenants/t1/plan' ? 'Plan de la organización' : 'Página pendiente' : 'Acceso denegado' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: roles.includes('superadmin') ? path === 'plans' ? 'Catálogo de planes' : path === 'tenants/t1/plan' ? 'Plan de la organización' : path === 'auth' ? 'Gestión Auth/IAM' : 'Página pendiente' : 'Acceso denegado' })).toBeVisible()
   expect(screen.getByRole('navigation', { name: 'Navegación de consola' })).toBeVisible()
 })
 

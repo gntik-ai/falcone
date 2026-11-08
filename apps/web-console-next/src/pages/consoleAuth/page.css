@@ -1,0 +1,5 @@
+/* Resource-index composition without the kit's optional search control: Auth/IAM applications have no search or filters. */
+.auth-toolbar > div > div:first-child { display: none; }
+/* Tables scroll inside their own region; the page never overflows horizontally. */
+.auth-table { max-width: 100%; }
+.auth-table th, .auth-table td { overflow-wrap: anywhere; }
