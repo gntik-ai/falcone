@@ -13,7 +13,7 @@ const start = async (locale: Locale, routes: Record<string, unknown> = {}, roles
   ;({ requests } = open({ routes, roles }))
   return ready(locale)
 }
-const field = (label: string) => screen.getByLabelText(new RegExp(`^${label.replace(/[()]/g, '\\$&')}`))
+const field = (label: string) => screen.getByLabelText(new RegExp(`^${label.replace(/[\\()]/g, '\\$&')}`))
 const set = (label: string, value: string) => fireEvent.change(field(label), { target: { value } })
 const press = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
 const saved = (text: string) => screen.findAllByText(text)

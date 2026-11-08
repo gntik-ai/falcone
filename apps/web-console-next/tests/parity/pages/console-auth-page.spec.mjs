@@ -11,7 +11,7 @@ const fill = (template, values) => Object.entries(values).reduce((text, [key, va
 const surface = (p) => p.page.getByTestId('console-auth-page');
 const wizard = (p) => p.page.getByTestId('auth-wizard');
 const button = (p, name) => p.page.getByRole('button', { name, exact: true });
-const field = (p, label) => p.page.getByLabel(new RegExp(`^${label.replace(/[()]/g, '\\$&')}`));
+const field = (p, label) => p.page.getByLabel(new RegExp(`^${label.replace(/[\\()]/g, '\\$&')}`));
 const ready = (p) => expect(surface(p).getByRole('table', { name: copy(p).apps.table })).toBeVisible();
 const reads = (p, path) => p.network.requests.filter(({ method, path: sent }) => method === 'GET' && canonicalPath(sent) === canonicalPath(path));
 const sections = ['users', 'roles', 'scopes', 'clients'];
@@ -232,7 +232,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await button(p, c.panel.close).click();
       const trigger = button(p, c.wizard.open);
       await trigger.click(); await expect(wizard(p)).toBeVisible();
-      await expect(wizard(p).locator('[aria-current="step"]').first()).toBeVisible(); await accessible();
+      await expect(wizard(p).locator('[aria-current="step"]:visible').first()).toBeVisible(); await accessible();
       await toReviewFrom(p); await accessible();
       await p.page.keyboard.press('Escape');
       await expect(trigger).toBeFocused();
