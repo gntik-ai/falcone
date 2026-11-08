@@ -18,8 +18,10 @@ const ready = (p) => expect(grid(p)).toBeVisible();
 const rowButton = (p, kind, name = active.displayName) => surface(p).getByRole('button', { name: fill(copy(p).row[`${kind}Named`], { name }), exact: true });
 const alertDialog = (p) => p.page.getByRole('alertdialog');
 const disclosure = (p, mode) => p.page.getByRole('dialog', { name: copy(p).disclosure[`${mode}Title`] });
-const polite = (p) => p.page.locator('[data-live-announcer="polite"]');
-const assertive = (p) => p.page.locator('[data-live-announcer="assertive"]');
+// The shell owns a live announcer of its own (route loading), so the page's regions are found by the text they hold.
+const announcement = (p, level, text) => p.page.locator(`[data-live-announcer="${level}"]`).filter({ hasText: text });
+const polite = (p) => ({ text: (text) => expect(announcement(p, 'polite', text)).not.toHaveCount(0) });
+const assertive = (p) => ({ text: (text) => expect(announcement(p, 'assertive', text)).not.toHaveCount(0) });
 const heading = (p) => p.page.locator('main h1');
 const nameField = (p) => surface(p).getByRole('textbox', { name: copy(p).create.nameLabel, exact: true });
 const submit = (p) => surface(p).getByRole('button', { name: copy(p).create.submit, exact: true });
@@ -101,16 +103,22 @@ async function switchTenant(p) {
   }, tenantBId);
 }
 async function switchWorkspace(p, modalOpen = false) {
-  const trigger = p.page.getByRole('button', { name: new RegExp(common[p.locale].shell.workspace), includeHidden: true }).first();
+  // The context panel lives in the main region; the navigation drawer holds a second switcher while open.
+  const trigger = p.page.locator('main').getByRole('button', { name: new RegExp(common[p.locale].shell.workspace), includeHidden: true }).first();
+  const option = p.page.getByRole('menuitemradio', { name: /Other Workspace/ });
   if (!modalOpen) {
     await trigger.click();
-    await p.page.getByRole('menuitemradio', { name: /Other Workspace/ }).click();
+    await option.click();
     return;
   }
   // An open modal makes the rest of the page inert to pointer input, so the pointer sequence that a
   // user outside the modal would produce is replayed as DOM events. The menu opens in its own portal.
-  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) await trigger.dispatchEvent(type, { bubbles: true, button: 0 });
-  await p.page.getByRole('menuitemradio', { name: /Other Workspace/ }).dispatchEvent('click');
+  // The sequence is repeated only while the menu is not open, so it never toggles an open menu closed.
+  await expect(async () => {
+    if (!(await option.count())) for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) await trigger.dispatchEvent(type, { bubbles: true, button: 0 });
+    await expect(option).toHaveCount(1, { timeout: 2000 });
+  }).toPass({ timeout: 20_000 });
+  await option.dispatchEvent('click');
 }
 
 // Performs the user steps that send an action's request and returns its surface and trigger.
@@ -281,7 +289,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
       // Create: Enter submits one POST, refetches once, announces the id and clears the field.
       await open(p); await ready(p); let since = mark(p);
       await nameField(p).fill('Created service'); await nameField(p).press('Enter');
-      await expect(nameField(p)).toHaveValue(''); await expect(polite(p)).toContainText(fill(c.create.created, { id: 'synthetic-sa-created' }));
+      await expect(nameField(p)).toHaveValue(''); await polite(p).text(fill(c.create.created, { id: 'synthetic-sa-created' }));
       await expectTraffic(p, since, { writes: [{ method: 'POST', path: base(), body: { displayName: 'Created service', entityType: 'service_account', desiredState: 'active' } }], reads: 1 });
       // Revelar: masked disclosure, toggle found again by its new name, copy and the clipboard fallback.
       await open(p); await ready(p); since = mark(p);
@@ -301,7 +309,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
       await p.page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }));
       await reveal.getByRole('button', { name: c.disclosure.copyAria, exact: true }).click();
       await expect(reveal.getByText(c.disclosure.copyFallback, { exact: true })).toBeVisible();
-      await expect(polite(p)).toContainText(c.disclosure.copyFallback);
+      await polite(p).text(c.disclosure.copyFallback);
       await reveal.getByRole('button', { name: c.disclosure.close, exact: true }).click();
       await expect(rowButton(p, 'reveal')).toBeFocused();
       await expectTraffic(p, since, { writes: [{ method: 'POST', path: issuancePath(active.serviceAccountId), body: { requestedByUserId: 'synthetic-user' } }], reads: 1 });
@@ -320,7 +328,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
       await dialog.getByRole('button', { name: c.confirm.rotate.action, exact: true }).click();
       const fresh = disclosure(p, 'rotate');
       await expect(fresh).toBeVisible(); await expect(fresh.getByText(rotatedSecret, { exact: true })).toBeVisible(); await expect(fresh).toBeFocused();
-      await expect(polite(p)).toContainText(fill(c.feedback.rotated, { name: active.displayName }));
+      await polite(p).text(fill(c.feedback.rotated, { name: active.displayName }));
       await screenshot(p, info, 'rotation-disclosure');
       await fresh.getByRole('button', { name: c.disclosure.close, exact: true }).click(); await expect(rowButton(p, 'rotate')).toBeFocused();
       await expectTraffic(p, since, { writes: [{ method: 'POST', path: rotationPath(active.serviceAccountId), body: { reason: 'Console rotate' } }], reads: 1 });
@@ -332,7 +340,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
         expect(pageWrites(p, since)).toEqual([]);
         await alertDialog(p).getByRole('textbox', { name: c.confirm.typedName, exact: true }).fill(active.displayName);
         await alertDialog(p).getByRole('button', { name: c.confirm[act].action, exact: true }).click();
-        await expect(alertDialog(p)).toHaveCount(0); await expect(polite(p)).toContainText(outcome);
+        await expect(alertDialog(p)).toHaveCount(0); await polite(p).text(outcome);
         await expect.poll(() => pageWrites(p, since).length).toBe(1); await expect.poll(() => listReads(p, since).length).toBe(1); await settle(p);
         expect(pageWrites(p, since)).toHaveLength(1); expect(listReads(p, since)).toHaveLength(1);
       }
@@ -387,7 +395,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
           } else {
             await expect(retryIn(region, p)).toBeFocused();
             if (status === '500') await expect(region).toContainText(requestId);
-            await expect(assertive(p)).toContainText(c.failure.title[act]);
+            await assertive(p).text(c.failure.title[act]);
             await expect(p.page.locator('[role="dialog"][aria-modal="true"]')).toHaveCount(0);
             p.network.setVariants({ [targets[act].name]: 'success' });
             await retryIn(region, p).click(); await succeeded(p, act); await settle(p);
@@ -407,7 +415,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
       for (const [act, outcome] of [['revoke', c.feedback.alreadyRevoked], ['delete', c.feedback.alreadyDeleted]]) {
         await open(p, { [targets[act].name]: 'network', serviceAccountsList: act === 'revoke' ? 'active-then-revoked' : 'active-then-without' }); await ready(p);
         const since = mark(p); const { surface: region } = await drive(p, act);
-        await retryIn(region, p).click(); await expect(alertDialog(p)).toHaveCount(0); await expect(polite(p)).toContainText(fill(outcome, { name: active.displayName }));
+        await retryIn(region, p).click(); await expect(alertDialog(p)).toHaveCount(0); await polite(p).text(fill(outcome, { name: active.displayName }));
         expect(writesTo(p, act, since)).toHaveLength(1); expect(listReads(p, since)).toHaveLength(1);
         // Not applied: one list read, then exactly one new write.
         await open(p, { [targets[act].name]: ['network', 'success'] }); await ready(p);
@@ -442,7 +450,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
         const posts = writesTo(p, act, since);
         expect(posts).toHaveLength(2); expect(posts[0].body).toEqual(posts[1].body);
         expect(p.network.requests.slice(since).filter(({ method, path }) => method === 'POST' && path.endsWith('/refresh'))).toHaveLength(1);
-        await expect(polite(p)).toContainText(c.feedback.sessionRenewed);
+        await polite(p).text(c.feedback.sessionRenewed);
       }
       for (const act of acts) {
         await open(p, { [targets[act].name]: '401', refresh: '401' }); await ready(p);
@@ -467,7 +475,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
       await rowButton(p, 'rotate').click();
       await alertDialog(p).getByRole('textbox', { name: c.confirm.typedName, exact: true }).fill(active.displayName);
       await p.page.keyboard.press('Enter');
-      await expect(retryIn(alertDialog(p), p)).toBeFocused(); await expect(assertive(p)).toContainText(c.failure.title.rotate); await accessible();
+      await expect(retryIn(alertDialog(p), p)).toBeFocused(); await assertive(p).text(c.failure.title.rotate); await accessible();
       await p.page.keyboard.press('Escape');
       for (const status of ['403', '404', '409', '429', 'network']) {
         await open(p, { serviceAccountsRevoke: status }); await ready(p); await drive(p, 'revoke');

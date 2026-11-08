@@ -33,12 +33,14 @@ export async function errorEmpty(parity, manifest) {
 async function awaitTransitions(page) {
   await page.evaluate(async () => {
     const frame = () => new Promise((done) => requestAnimationFrame(() => done()));
-    for (let round = 0; round < 3; round += 1) {
+    // A transition starts one frame after the node mounts, so a single empty reading proves nothing: require
+    // several consecutive frames with no finite animation running, within a bounded number of frames.
+    let quiet = 0;
+    for (let round = 0; round < 120 && quiet < 4; round += 1) {
       await frame();
-      const running = document.getAnimations().filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime ?? 0));
-      await Promise.all(running.map((animation) => animation.finished.catch(() => undefined)));
+      const running = document.getAnimations().filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime ?? 0) && animation.playState !== 'finished');
+      if (running.length) { quiet = 0; await Promise.all(running.map((animation) => animation.finished.catch(() => undefined))); } else quiet += 1;
     }
-    await frame();
   });
 }
 export async function assertAccessibility(parity) {
