@@ -120,6 +120,24 @@ test.each(locales.flatMap((locale) => acts.flatMap((act) => ['500', 'network'].m
   void trigger
 })
 
+test.each(locales.flatMap((locale) => (['rotate', 'revoke', 'delete'] as const).flatMap((act) => ['500', 'network'].map((kind) => ({ locale, act, kind })))))('Reintentar on a failed $act ($kind) needs the exact typed name and resends nothing while it differs ($locale)', async ({ locale, act, kind }) => {
+  const c = copy[locale]
+  const first = kind === 'network' ? () => { throw new TypeError('synthetic-network') } : failure(500)
+  await start(locale, sequence(act, first as () => Response, 'ok'))
+  const { surface } = await drive(act, locale)
+  const dialog = await surface()
+  expect(await within(dialog).findByRole('button', { name: c.failure.retry })).toBeEnabled()
+  const writes = writesTo(act).length
+  typeName(dialog, 'Billing servic', locale)
+  expect(within(dialog).getByRole('button', { name: c.confirm[act].action })).toBeDisabled()
+  expect(within(dialog).queryByRole('button', { name: c.failure.retry })).toBeNull()
+  expect(writesTo(act)).toHaveLength(writes)
+  typeName(dialog, 'Billing service', locale)
+  const retry = await within(dialog).findByRole('button', { name: c.failure.retry })
+  fireEvent.click(retry)
+  await waitFor(() => expect(writesTo(act)).toHaveLength(writes + 1))
+})
+
 test.each(locales.flatMap((locale) => (['revoke', 'delete'] as const).flatMap((act) => [409, 429, 503].map((status) => ({ locale, act, status })))))('$act keeps the legacy mapped message for $status and lets the user confirm again after 429 ($locale)', async ({ locale, act, status }) => {
   const c = copy[locale]
   const message = status === 409 ? c.errors.conflict : status === 429 ? c.errors.rateLimit : c.errors.unavailable

@@ -30,7 +30,8 @@ interface Props {
   failure: Failure
   name: string
   pending: boolean
-  onRetry: () => void
+  // Omitted when a resend is not allowed, which hides Reintentar.
+  onRetry: (() => void) | undefined
   // Closes the surface; the caller returns focus to the triggering control.
   onClose: () => void
   // Closes the surface, refetches the list and moves focus to the page heading (404 only).

@@ -35,6 +35,8 @@ export function ConfirmDialog({ action, account, open, pending, failure, onConfi
   // Keep the keyboard on a live control once the pending confirm button unmounts its focus.
   useLayoutEffect(() => { if (!pending && failure && !terminal && document.activeElement === document.body) confirmButton.current?.focus() }, [pending, failure, terminal])
   function submit(event: FormEvent) { event.preventDefault(); if (matches && !pending) onConfirm() }
+  // Reintentar resends the destructive request, so it needs the same exact name as the confirm button.
+  const retry = () => { if (matches && !pending) onRetry() }
   return <AlertDialog open={open} onOpenChange={(next, event) => { if (!next && pending) { event.cancel(); return } if (!next) onClose() }} onOpenChangeComplete={(next) => { if (!next) onClosed() }}>
     <AlertDialogContent size="md" aria-modal="true" container={undefined} initialFocus={() => input.current} finalFocus={finalFocus} className="min-w-0 max-w-full wrap-anywhere">
       <AlertDialogHeader tone="destructive" icon={undefined}>
@@ -51,7 +53,7 @@ export function ConfirmDialog({ action, account, open, pending, failure, onConfi
               placeholder={name} className={`w-full min-w-0 ${focusRing}`} onChange={(event) => setTyped(event.target.value)} />
             <FieldDescription id={`${id}-help`} aria-live="polite">{t(mismatch ? 'confirm.nameMismatch' : 'confirm.typedInstruction', { name })}</FieldDescription>
           </Field>
-          {failure && <FailureView scope={action} failure={failure} name={name} pending={pending} onRetry={onRetry} onClose={onClose} onBack={onBack} onAlertShown={() => confirmButton.current?.focus()} />}
+          {failure && <FailureView scope={action} failure={failure} name={name} pending={pending} onRetry={matches ? retry : undefined} onClose={onClose} onBack={onBack} onAlertShown={() => confirmButton.current?.focus()} />}
           <AlertDialogFooter className="mt-5 flex-wrap gap-2">
             <AlertDialogCancel disabled={pending} className={focusRing}>{t('confirm.cancel')}</AlertDialogCancel>
             <Button ref={confirmButton} type="submit" variant="destructive" size="md" loading={pending} disabled={pending || !matches} aria-busy={pending} iconOnly={false} icon={undefined} trailingIcon={undefined} className={focusRing}>{t(`confirm.${action}.action`)}</Button>
