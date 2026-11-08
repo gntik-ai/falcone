@@ -6,7 +6,9 @@ import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
 
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-auth-page.json`, import.meta.url), 'utf8'))]));
+const memberBundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-members-page.json`, import.meta.url), 'utf8'))]));
 const copy = (p) => bundles[p.locale];
+const members = (p) => memberBundles[p.locale];
 const fill = (template, values) => Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, value), template);
 const surface = (p) => p.page.getByTestId('console-auth-page');
 const wizard = (p) => p.page.getByTestId('auth-wizard');
@@ -143,6 +145,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await button(p, fill(c.panel.disableNamed, { alias: 'Corp OIDC' })).click();
       await expect.poll(() => sent(start).length).toBe(2);
       expect(sent(start)[0]).toMatchObject({ method: 'PUT', path: `${providersPath(portal.applicationId)}/corp-oidc`, body: { providerId: 'corp-oidc', enabled: false } });
+      // Edit the provider; the panel stays open for the same application after the toggle reload.
+      start = mark();
+      await button(p, fill(c.panel.editNamed, { alias: 'Corp OIDC' })).click();
+      await field(p, c.provider.displayName).fill('Corporate OIDC 2');
+      await button(p, c.provider.save).click();
+      await expect.poll(() => sent(start).length).toBe(2);
+      expect(sent(start)[0]).toMatchObject({ method: 'PUT', path: `${providersPath(portal.applicationId)}/corp-oidc`, body: { providerId: 'corp-oidc', displayName: 'Corporate OIDC 2' } });
+      expect(sent(start)[1]).toMatchObject({ method: 'GET', path: applicationsGet });
       start = mark();
       await button(p, fill(c.panel.detachNamed, { alias: 'Corp OIDC' })).click();
       await p.page.getByRole('alertdialog').getByRole('button', { name: c.confirm.confirm, exact: true }).click();
@@ -245,7 +255,13 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await toReview(p);
       await expect(p.page).toHaveURL(/\/console\/auth$/);
       await p.page.keyboard.press('Escape');
-      await expect(surface(p).getByRole('link', { name: c.openMembers })).toHaveAttribute('href', /\/console\/members$/);
+      await check.assertRuntimeHealth(p);
+      // Abrir miembros navigates to the members page without a fault or an unmatched request.
+      const link = surface(p).getByRole('link', { name: c.openMembers });
+      await expect(link).toHaveAttribute('href', /\/console\/members$/);
+      await link.click();
+      await expect(p.page).toHaveURL(/\/console\/members$/);
+      await expect(p.page.getByRole('heading', { level: 1, name: members(p).title })).toBeVisible();
       await check.assertRuntimeHealth(p);
     });
 

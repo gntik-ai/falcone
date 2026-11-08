@@ -6,7 +6,7 @@ import {
   type Application, type ApplicationForm, type Failure, type Provider, type ProviderForm,
 } from './api'
 import { ApplicationFormView, ProviderFormView } from './Forms'
-import { Action, Callout, Empty, Grid, Loading, SectionFailure, focusRing, useCopy, useFailureText, useLoad } from './ui'
+import { Action, Callout, Empty, Grid, Loading, SectionFailure, focusRing, useCopy, useFailureText, useLoadState } from './ui'
 
 type Confirm = { kind: 'delete'; application: Application; trigger: string } | { kind: 'detach'; application: Application; provider: Provider; trigger: string }
 const trigger = (kind: string, id: string) => `${kind}:${id}`
@@ -35,11 +35,15 @@ export function Applications({ workspaceId }: { workspaceId: string | null }) {
   const inFlight = useRef(false)
   const blocked = !workspaceId
   const load = useCallback((signal: AbortSignal) => workspaceId ? listApplications(workspaceId, signal) : Promise.resolve([]), [workspaceId])
-  const result = useLoad(load, revision)
+  const { current: result, last } = useLoadState(load, revision)
   const applications = result?.data ?? []
   const visible = applications.filter((application) => application.state !== 'soft_deleted')
-  const editing = formMode?.kind === 'edit' ? applications.find((application) => application.applicationId === formMode.id) ?? null : null
-  const providerApplication = applications.find((application) => application.applicationId === panelId) ?? null
+  // The open forms and the provider panel read the last settled list, so a reload after an unrelated successful
+  // mutation does not unmount them or discard what was typed. The tables above never show it as fresh.
+  const known = last?.data ?? []
+  const refreshing = result === null && known.length > 0
+  const editing = formMode?.kind === 'edit' ? known.find((application) => application.applicationId === formMode.id) ?? null : null
+  const providerApplication = known.find((application) => application.applicationId === panelId) ?? null
   const providerRows = useMemo(() => applications.flatMap((application) => (application.federatedProviders ?? []).map((provider) => ({ ...provider, applicationLabel: application.displayName || application.slug }))), [applications])
 
   // The single place a successful mutation reports: one toast, one announcement, one list reload.
@@ -168,7 +172,7 @@ export function Applications({ workspaceId }: { workspaceId: string | null }) {
           { id: 'add-provider', label: t('panel.add'), variant: 'primary', disabled: providerApplication.protocol === 'api_key', onClick: () => { setEditingProvider(null); setProviderKey((value) => value + 1) } }]} />
       {providerApplication.protocol === 'api_key' ? <Empty title={t('panel.apiKeyUnsupported')} /> : <>
         {notice && <Callout message={notice} />}
-        {(providerApplication.federatedProviders ?? []).length === 0 ? <Empty title={t('panel.empty')} testId="auth-panel-empty" /> : <ul className="min-w-0 space-y-3">
+        {(providerApplication.federatedProviders ?? []).length === 0 ? <Empty title={t('panel.empty')} testId="auth-panel-empty" /> : <ul aria-busy={refreshing} className="min-w-0 space-y-3">
           {(providerApplication.federatedProviders ?? []).map((provider) => <li key={provider.providerId} className="flex min-w-0 flex-col gap-3 rounded-lg border border-border p-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2"><Text as="span" variant="body" tone="default" className="font-medium">{provider.alias}</Text><Chip>{t(`enums.${provider.protocol}`, { defaultValue: provider.protocol })}</Chip><Chip>{t(`enums.${provider.providerMode}`, { defaultValue: provider.providerMode })}</Chip></div>
@@ -176,9 +180,9 @@ export function Applications({ workspaceId }: { workspaceId: string | null }) {
               <Enabled value={provider.enabled ?? true} />
             </div>
             <div className="flex flex-wrap gap-2">
-              <Action aria-label={t('panel.editNamed', { alias: provider.alias })} onClick={() => { setEditingProvider(provider); setProviderKey((value) => value + 1); setNotice(null) }}>{t('panel.edit')}</Action>
-              <Action disabled={busy} aria-label={t(provider.enabled ?? true ? 'panel.disableNamed' : 'panel.enableNamed', { alias: provider.alias })} onClick={() => void toggle(provider)}>{t(provider.enabled ?? true ? 'panel.disable' : 'panel.enable')}</Action>
-              <Action disabled={busy} aria-label={t('panel.detachNamed', { alias: provider.alias })} onClick={() => askConfirm({ kind: 'detach', application: providerApplication, provider, trigger: trigger('detach', provider.providerId) })} {...row('detach', provider.providerId)}>{t('panel.detach')}</Action>
+              <Action disabled={refreshing} aria-label={t('panel.editNamed', { alias: provider.alias })} onClick={() => { setEditingProvider(provider); setProviderKey((value) => value + 1); setNotice(null) }}>{t('panel.edit')}</Action>
+              <Action disabled={busy || refreshing} aria-label={t(provider.enabled ?? true ? 'panel.disableNamed' : 'panel.enableNamed', { alias: provider.alias })} onClick={() => void toggle(provider)}>{t(provider.enabled ?? true ? 'panel.disable' : 'panel.enable')}</Action>
+              <Action disabled={busy || refreshing} aria-label={t('panel.detachNamed', { alias: provider.alias })} onClick={() => askConfirm({ kind: 'detach', application: providerApplication, provider, trigger: trigger('detach', provider.providerId) })} {...row('detach', provider.providerId)}>{t('panel.detach')}</Action>
             </div>
           </li>)}
         </ul>}

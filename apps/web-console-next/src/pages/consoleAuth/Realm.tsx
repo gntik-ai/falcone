@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Badge, CodeBlock, CopyButton, Tabs, TabsList, TabsPanel, TabsTab, Text } from '@gntik-ai/ui'
+import { Badge, CodeBlock, CopyButton, Skeleton, Tabs, TabsList, TabsPanel, TabsTab, Text } from '@gntik-ai/ui'
 import { KpiRow, SectionHeader, type DataTableColumn } from '@gntik-ai/blocks'
 import { loadRealmSection, type Failure, type IamClient, type IamScope, type RealmSection } from './api'
 import { Action, Empty, Grid, Loading, SectionFailure, focusRing, useCopy, useLoad } from './ui'
@@ -37,12 +37,7 @@ export function Realm({ realmId, workspaceId, workspaceLabel }: { realmId: strin
   const label = (section: RealmSection) => t(`sections.${section}`)
   const failure = (section: RealmSection) => results[section]?.failure
   const failed = (section: RealmSection) => Boolean(failure(section))
-  const value = (section: RealmSection) => {
-    const result = results[section]
-    if (!result) return t('kpi.loading')
-    if (result.failure) return '—'
-    return String(result.data?.items?.length ?? 0)
-  }
+  const value = (section: RealmSection) => (failed(section) ? '—' : String(results[section]?.data?.items?.length ?? 0))
 
   const scopeColumns: DataTableColumn<IamScope>[] = [
     { id: 'scope', header: t('scopes.scope'), sortable: false, cell: (scope) => scope.scopeName },
@@ -62,9 +57,14 @@ export function Realm({ realmId, workspaceId, workspaceLabel }: { realmId: strin
   return <section aria-labelledby="auth-realm-heading" className="min-w-0 space-y-6">
     <SectionHeader title={t('realm.title')} description={t('realm.description')} count={undefined} actions={[]} as="h2" bordered={false} headingId="auth-realm-heading" className="min-w-0" />
     {compatibility && <div><Chip>{`${compatibility.provider} · ${compatibility.contractVersion}`}</Chip></div>}
-    <div aria-busy={sections.some((section) => !results[section])}>
-      <KpiRow label={t('kpi.label')} variant="cards" showTrends={false} className="min-w-0"
-        items={sections.map((section) => ({ id: section, label: t(`kpi.${section}`), value: value(section), delta: undefined, trend: undefined, trendTone: undefined }))} />
+    <div role="group" aria-label={t('kpi.label')} aria-busy={sections.some((section) => !results[section])} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {sections.map((section) => results[section]
+        ? <KpiRow key={section} label={label(section)} variant="cards" showTrends={false} className="min-w-0 sm:grid-cols-1"
+          items={[{ id: section, label: t(`kpi.${section}`), value: value(section), delta: undefined, trend: undefined, trendTone: undefined }]} />
+        : <div key={section} role="status" aria-label={t('kpi.loadingNamed', { label: t(`kpi.${section}`) })} aria-busy={true} className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm">
+          <Text as="span" variant="body" tone="muted">{t(`kpi.${section}`)}</Text>
+          <Skeleton shape="block" className="h-7 w-16" />
+        </div>)}
     </div>
     {(['users', 'roles'] as const).filter(failed).map((section) => <SectionFailure key={section} kind="realm" section={label(section)} testId={`auth-section-${section}-error`} failure={failure(section)!} onRetry={() => retry(section)} backHref="/console/overview" />)}
     <div className="grid min-w-0 gap-6 xl:grid-cols-2">

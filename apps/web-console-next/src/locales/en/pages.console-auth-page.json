@@ -67,7 +67,7 @@
   },
   "kpi": {
     "label": "Realm totals",
-    "loading": "Loading…",
+    "loadingNamed": "Loading {label}…",
     "users": "Users",
     "roles": "Roles",
     "scopes": "Scopes",

@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { ConsoleContextProvider } from '../src/shell/context'
 import { PermissionsProvider } from '../src/shell/permissions'
@@ -17,9 +17,9 @@ export const failure = (status: number, extra: Record<string, unknown> = {}) => 
 export const accepted = () => Response.json({ status: 'accepted' }, { status: 202 })
 
 // The realm and workspace come from the tenant bootstrap; `realm: false` drops the identity context.
-export const shellRoutes = ({ realm = true, tenants = true, workspaces = true }: { realm?: boolean; tenants?: boolean; workspaces?: boolean } = {}): Record<string, unknown> => ({
+export const shellRoutes = ({ realm = true, tenants = true, workspaces = true, more = [] }: { realm?: boolean; tenants?: boolean; workspaces?: boolean; more?: unknown[] } = {}): Record<string, unknown> => ({
   [`GET ${tenantUrl}`]: { items: tenants ? [realm ? tenant : { ...tenant, identityContext: {} }] : [], page: { after: null } },
-  [`GET ${workspaceUrl(tenant.tenantId)}`]: { items: workspaces ? [workspace] : [], page: { after: null } },
+  [`GET ${workspaceUrl(tenant.tenantId)}`]: { items: workspaces ? [workspace, ...more] : [], page: { after: null } },
 })
 // Vitest passes the URL string through unchanged: brackets stay literal there.
 export const realmKey = (section: string) => `GET ${realmPath(section)}?page[size]=100`
@@ -28,10 +28,10 @@ export const pageRoutes = (): Record<string, unknown> => ({
   [`GET ${applicationsGet}`]: collection([portal, webhook, retired]),
 })
 
-export function open({ roles: platformRoles = ['superadmin'], routes = {}, shell = {} }: { roles?: string[]; routes?: Record<string, unknown>; shell?: Parameters<typeof shellRoutes>[0] } = {}) {
+export function open({ roles: platformRoles = ['superadmin'], routes = {}, shell = {}, aside = null }: { roles?: string[]; routes?: Record<string, unknown>; shell?: Parameters<typeof shellRoutes>[0]; aside?: ReactNode } = {}) {
   login(platformRoles)
   const requests = strictFetch({ ...shellRoutes(shell), ...pageRoutes(), ...routes })
-  const view = renderWithSession(<StrictMode><ConsoleContextProvider><PermissionsProvider><ConsoleAuthPage /></PermissionsProvider></ConsoleContextProvider></StrictMode>)
+  const view = renderWithSession(<StrictMode><ConsoleContextProvider><PermissionsProvider><ConsoleAuthPage />{aside}</PermissionsProvider></ConsoleContextProvider></StrictMode>)
   return { requests, view }
 }
 export const calls = (requests: ReturnType<typeof strictFetch>) => requests.mock.mock.calls.map(([path, init]) => ({

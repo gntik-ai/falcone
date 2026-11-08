@@ -26,8 +26,10 @@ export const iamClientsPath = `/v1/workspaces/${workspaceId}/iam/clients`
 export const tenant = { ...buildTenantCollectionFixture().items[0], tenantId, displayName: 'Synthetic Tenant', identityContext: { consoleUserRealm: realmId } }
 export const workspace = { ...buildWorkspaceCollectionFixture().items[0], workspaceId, tenantId }
 
-export const users = [{ userId: 'synthetic-user-1' }, { userId: 'synthetic-user-2' }, { userId: 'synthetic-user-3' }]
-export const roles = [{ roleName: 'synthetic-admin' }, { roleName: 'synthetic-viewer' }]
+// Full member shapes, so the Abrir miembros journey can render the members page from the same fixtures.
+const member = (index: number) => ({ userId: `synthetic-user-${index}`, username: `synthetic-user-${index}`, enabled: true, state: 'active', realmRoles: [], requiredActions: [] })
+export const users = [member(1), member(2), member(3)]
+export const roles = ['synthetic-admin', 'synthetic-viewer'].map((roleName) => ({ roleName, composite: false, compositeRoles: [] }))
 export const scopes = [
   { scopeName: 'openid', protocol: 'openid-connect', isDefault: true, isOptional: false, includeInTokenScope: true, assignedClientIds: ['console-web'] },
   { scopeName: 'profile', protocol: 'openid-connect', isDefault: false, isOptional: true, includeInTokenScope: true, assignedClientIds: ['console-web', 'partner-api'] },
@@ -81,6 +83,15 @@ export const endpoints: Record<string, PageEndpoint> = {
     method: 'POST', path: iamClientsPath, fixtures: writes('iam-clients.post.201', { status: 201, body: { iamClientId: 'new-client', clientSecret: syntheticSecret } }, { 'iam-clients.post.500': failure(500) }),
   },
 }
+// Only the Abrir miembros journey reads these: the members page they belong to is not part of this page's own requests.
+const membersEndpoints: Record<string, PageEndpoint> = {
+  authMembersInvitations: { method: 'GET', path: `/v1/tenants/${tenantId}/invitations`, fixtures: { success: { body: { items: [] } } } },
+  authMembersTenantQuotas: { method: 'GET', path: `/v1/metrics/tenants/${tenantId}/quotas`, fixtures: { success: { body: { dimensions: [] } } } },
+  authMembersTenantOverview: { method: 'GET', path: `/v1/metrics/tenants/${tenantId}/overview`, fixtures: { success: { body: { hardLimitDimensions: [] } } } },
+  authMembersWorkspaceQuotas: { method: 'GET', path: `/v1/metrics/workspaces/${workspaceId}/quotas`, fixtures: { success: { body: { dimensions: [] } } } },
+  authMembersWorkspaceOverview: { method: 'GET', path: `/v1/metrics/workspaces/${workspaceId}/overview`, fixtures: { success: { body: { hardLimitDimensions: [] } } } },
+}
+Object.assign(endpoints, membersEndpoints)
 const manifest: ParityManifest = {
   route: '/console/auth', roles: ['superadmin'], endpoints,
   fixtures: [...new Set(Object.values(endpoints).flatMap((endpoint) => Object.keys(endpoint.fixtures))), 'shell.superadmin', 'shell.tenant-owner', 'shell.no-tenant', 'shell.tenant-without-realm', 'shell.no-workspace', 'shell.superadmin-without-manage-iam', 'shell.session-expired'],

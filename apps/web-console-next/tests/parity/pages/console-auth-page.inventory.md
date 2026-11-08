@@ -38,11 +38,11 @@ selection, Abrir miembros and failed mutations send none.
   to the wizard, which echoed `apiError.message` for 409, 422 and other statuses).
 - The wizard type defaults to Público, the value legacy sent when the select was untouched, so the review
   step shows what is sent.
-- The kpi tiles show a loading word instead of a skeleton while their read is in flight.
+- Each kpi tile shows its own skeleton while its read is in flight; completed tiles stay visible.
 - The wizard blocked state renders inline with a Cerrar action instead of the legacy page state.
 
 ## Not run in the sandbox
 
 Chromium cannot launch there: parity, axe, locale, responsive and CSP browser runs and the visual
-baselines run in PR CI. The Abrir miembros link is asserted by its href; following it needs the members
-page endpoints, which this page's harness does not register.
+baselines run in PR CI. The mirrored journey also edits a provider and follows the Abrir miembros link
+to the members page; the manifest registers the members page reads for that last step only.

@@ -9,18 +9,28 @@ import { Wizard } from './consoleAuth/Wizard'
 import { Action, Empty, Loading, LocalizedToaster, NAMESPACE, focusRing } from './consoleAuth/ui'
 import './consoleAuth/page.css'
 
-function Surface({ realmId, workspaceId, workspaceLabel }: { realmId: string; workspaceId: string | null; workspaceLabel: string | null }) {
+// Wizard state belongs to one workspace; it resets when the workspace changes.
+function Actions({ workspaceId, workspaceLabel }: { workspaceId: string | null; workspaceLabel: string | null }) {
   const { t } = useTranslation(NAMESPACE)
   const [wizardOpen, setWizardOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
-  return <div className="min-w-0 space-y-6">
+  return <>
     <div className="flex min-w-0 flex-wrap items-center gap-3">
       <Action ref={trigger} variant="primary" onClick={() => setWizardOpen(true)}>{t('wizard.open')}</Action>
       <Link href="/console/members" tone="primary" underline="always" external={false} externalLabel="" className={focusRing}>{t('openMembers')}</Link>
     </div>
     {wizardOpen && <Wizard workspaceId={workspaceId} workspaceLabel={workspaceLabel} returnFocusRef={trigger} onClose={() => setWizardOpen(false)} />}
+  </>
+}
+
+// The realm sections depend on the realm only, so a workspace change keeps their data and the selected client.
+// The wizard and the applications depend on the workspace and restart when it changes.
+function Surface({ realmId, workspaceId, workspaceLabel }: { realmId: string; workspaceId: string | null; workspaceLabel: string | null }) {
+  const scope = workspaceId ?? ''
+  return <div className="min-w-0 space-y-6">
+    <Actions key={scope} workspaceId={workspaceId} workspaceLabel={workspaceLabel} />
     <Realm realmId={realmId} workspaceId={workspaceId} workspaceLabel={workspaceLabel} />
-    <Applications workspaceId={workspaceId} />
+    <Applications key={scope} workspaceId={workspaceId} />
   </div>
 }
 
@@ -38,7 +48,7 @@ export default function ConsoleAuthPage() {
   const body = context.loading ? <Loading label={t('loading')} />
     : !tenant ? <Empty title={t('empty.noTenant')} testId="console-section-empty" />
       : !realm ? <Empty title={t('empty.noRealm')} testId="console-section-empty" />
-        : <Surface key={`${tenant.tenantId}|${realm}|${workspace?.workspaceId ?? ''}`} realmId={realm} workspaceId={workspace?.workspaceId ?? null} workspaceLabel={workspace?.displayName ?? null} />
+        : <Surface key={`${tenant.tenantId}|${realm}`} realmId={realm} workspaceId={workspace?.workspaceId ?? null} workspaceLabel={workspace?.displayName ?? null} />
   return <I18nProvider locale={language.language} messages={{ 'common.close': t('wizard.close'), 'common.cancel': t('form.cancel'), 'error.retry': t('failure.retry') }}>
     <LiveAnnouncer><ToastProvider timeout={5000} limit={3} toastManager={undefined}>
       <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} className="min-w-0 space-y-6 wrap-anywhere" data-testid="console-auth-page"

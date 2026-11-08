@@ -67,7 +67,7 @@
   },
   "kpi": {
     "label": "Totales del realm",
-    "loading": "Cargando…",
+    "loadingNamed": "Cargando {label}…",
     "users": "Usuarios",
     "roles": "Roles",
     "scopes": "Alcances",

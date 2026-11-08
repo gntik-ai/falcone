@@ -79,7 +79,9 @@ export function Grid<T extends object>({ rows, columns, id, label, empty }: { ro
     showDensityToggle={false} showColumnMenu={false} showViewSwitcher={false} views={[]} defaultViews={[]} hiddenColumns={[]} resizable={false} virtualize={false} groupBy={undefined} showPinMenu={false} className="min-w-0 auth-table" labels={{ scrollRegion: label, emptyTitle: empty, emptyDescription: '', loading: () => label }} />
 }
 
-export function useLoad<T>(load: (signal: AbortSignal) => Promise<T>, revision: number) {
+// `current` is the result for this revision, or null while it loads. `last` is the newest settled result of any
+// revision, so a caller can keep an open form mounted across a reload without showing old data as fresh.
+export function useLoadState<T>(load: (signal: AbortSignal) => Promise<T>, revision: number) {
   const [state, setState] = useState<{ revision: number; data?: T; failure?: Failure } | null>(null)
   useEffect(() => {
     const controller = new AbortController()
@@ -92,8 +94,9 @@ export function useLoad<T>(load: (signal: AbortSignal) => Promise<T>, revision: 
     })
     return () => { active = false; controller.abort() }
   }, [load, revision])
-  return state?.revision === revision ? state : null
+  return { current: state?.revision === revision ? state : null, last: state }
 }
+export const useLoad = <T,>(load: (signal: AbortSignal) => Promise<T>, revision: number) => useLoadState(load, revision).current
 
 // Kit 0.11.0 exposes closeLabel but no viewport label prop.
 export function LocalizedToaster() {
