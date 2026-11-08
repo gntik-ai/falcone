@@ -112,13 +112,22 @@ async function switchWorkspace(p, modalOpen = false) {
     return;
   }
   // An open modal makes the rest of the page inert to pointer input, so the pointer sequence that a
-  // user outside the modal would produce is replayed as DOM events. The menu opens in its own portal.
-  // The sequence is repeated only while the menu is not open, so it never toggles an open menu closed.
+  // user outside the modal would produce is replayed as DOM events. The menu opens in its own portal and
+  // the modal's focus handling can close it again between two separate steps, so the option is selected in
+  // the same task in which it appears. The sequence is repeated only while the menu is not open.
   await expect(async () => {
-    if (!(await option.count())) for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) await trigger.dispatchEvent(type, { bubbles: true, button: 0 });
-    await expect(option).toHaveCount(1, { timeout: 2000 });
+    await trigger.evaluate(async (element) => {
+      const find = () => [...document.querySelectorAll('[role="menuitemradio"]')].find((item) => /Other Workspace/.test(item.textContent ?? ''));
+      if (!find()) for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) element.dispatchEvent(new (type.startsWith('pointer') ? PointerEvent : MouseEvent)(type, { bubbles: true, cancelable: true, button: 0 }));
+      const started = Date.now();
+      const item = await new Promise((resolve) => {
+        const tick = () => { const found = find(); if (found || Date.now() - started > 2000) resolve(found); else requestAnimationFrame(tick); };
+        tick();
+      });
+      if (!item) throw new Error('workspace menu did not open');
+      item.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    });
   }).toPass({ timeout: 20_000 });
-  await option.dispatchEvent('click');
 }
 
 // Performs the user steps that send an action's request and returns its surface and trigger.
@@ -302,7 +311,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
       await reveal.getByRole('button', { name: c.disclosure.show, exact: true }).click();
       const hide = reveal.getByRole('button', { name: c.disclosure.hide, exact: true });
       await expect(hide).toHaveAttribute('aria-pressed', 'true');
-      await expect(reveal.getByRole('textbox', { name: c.disclosure.secretValue, exact: true })).toHaveValue(syntheticSecret);
+      await expect(reveal.getByRole('textbox', { name: c.disclosure.secretLabel, exact: true })).toHaveValue(syntheticSecret);
       await reveal.getByRole('button', { name: c.disclosure.copyAria, exact: true }).click();
       await expect(reveal.getByText(c.disclosure.copied, { exact: true })).toBeVisible();
       await expect.poll(() => p.page.evaluate(() => window.__copied)).toEqual([syntheticSecret]);
@@ -584,7 +593,7 @@ async function compareWithLegacy(p, info) {
         await expect(dialog).toBeVisible();
         credentialId = (await dialog.locator('dd').first().textContent())?.trim();
         if (mode === 'legacy') secret = (await dialog.locator('pre').textContent())?.trim();
-        else if (flow === 'reveal') { await dialog.getByRole('button', { name: k.disclosure.show, exact: true }).click(); secret = await dialog.getByRole('textbox', { name: k.disclosure.secretValue, exact: true }).inputValue(); }
+        else if (flow === 'reveal') { await dialog.getByRole('button', { name: k.disclosure.show, exact: true }).click(); secret = await dialog.getByRole('textbox', { name: k.disclosure.secretLabel, exact: true }).inputValue(); }
         else secret = (await dialog.getByText(rotatedSecret, { exact: true }).textContent())?.trim();
       } else if (flow === 'revoke') { await named('revoke').click(); await confirm('revoke', mode === 'legacy' ? 'Confirmar' : k.confirm.revoke.action); }
       else { await named('delete').click(); await confirm('delete', k.confirm.delete.action); }
