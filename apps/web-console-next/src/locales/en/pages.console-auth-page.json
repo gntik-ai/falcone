@@ -344,7 +344,11 @@
     "failureTitle": "The IAM client could not be created",
     "failureFallback": "The requested operation could not be completed.",
     "blockedTitle": "Access blocked",
-    "blockedFallback": "Not allowed."
+    "blockedFallback": "Not allowed.",
+    "blockedDeveloper": "Your role (Developer · read-only) lets you view the organization and workspace context, but not create, change or delete resources. Contact an organization administrator if you need this access.",
+    "blockedViewer": "Your role (Viewer · read-only) lets you view dashboards, audit and effective permissions, but not create, change or delete resources. Contact an organization administrator if you need this access.",
+    "blockedNoRole": "Your current session has no role with recognized write permissions. Contact an organization administrator if you think this is a mistake.",
+    "blockedGeneric": "Your current role does not include this permission. Contact an organization or workspace administrator if you need this access."
   },
   "labelValue": "{label}: {value}"
 }

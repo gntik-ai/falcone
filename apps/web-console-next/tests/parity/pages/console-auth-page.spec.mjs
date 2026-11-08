@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import manifest, { applicationPath, applicationsGet, applicationsPath, endpoints, iamClientsPath, portal, providersPath, realmGet, realmId, syntheticSecret, tenant, tenantId, workspace } from './console-auth-page.manifest.ts';
+import manifest, { applicationPath, applicationsGet, applicationsPath, canonicalPath, endpoints, iamClientsPath, portal, providersPath, realmGet, realmId, syntheticSecret, tenant, tenantId, workspace } from './console-auth-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
@@ -13,7 +13,7 @@ const wizard = (p) => p.page.getByTestId('auth-wizard');
 const button = (p, name) => p.page.getByRole('button', { name, exact: true });
 const field = (p, label) => p.page.getByLabel(new RegExp(`^${label.replace(/[()]/g, '\\$&')}`));
 const ready = (p) => expect(surface(p).getByRole('table', { name: copy(p).apps.table })).toBeVisible();
-const reads = (p, path) => p.network.requests.filter(({ method, path: sent }) => method === 'GET' && sent === path);
+const reads = (p, path) => p.network.requests.filter(({ method, path: sent }) => method === 'GET' && canonicalPath(sent) === canonicalPath(path));
 const sections = ['users', 'roles', 'scopes', 'clients'];
 async function screenshot(p, info, name) {
   const body = await p.page.screenshot({ fullPage: true, animations: 'disabled' });
@@ -73,8 +73,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         const url = new URL(request.path, 'http://synthetic.test');
         expect(pageRequests.has(`${request.method} ${url.pathname}`) || shellPaths.has(url.pathname), `unexpected request ${request.method} ${request.path}`).toBe(true);
         expect(url.pathname.startsWith('/v1/metrics/')).toBe(false);
-        if (request.method === 'GET' && url.pathname.startsWith('/v1/iam/realms/')) expect(request.path).toBe(realmGet(url.pathname.split('/').pop()));
-        if (request.method === 'GET' && url.pathname === applicationsPath) expect(request.path).toBe(applicationsGet);
+        if (request.method === 'GET' && url.pathname.startsWith('/v1/iam/realms/')) expect(canonicalPath(request.path)).toBe(canonicalPath(realmGet(url.pathname.split('/').pop())));
+        if (request.method === 'GET' && url.pathname === applicationsPath) expect(canonicalPath(request.path)).toBe(canonicalPath(applicationsGet));
       }
       await check.assertRuntimeHealth(p);
     });
@@ -96,7 +96,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await clients.getByRole('button', { name: 'partner-api', exact: true }).click();
       await expect(surface(p).getByText('client_id=partner-api')).toBeVisible();
       await expect(surface(p).getByText('client_secret=<CLIENT_SECRET>')).toBeVisible();
-      for (const section of sections) expect(reads(p, `/v1/iam/realms/${realmId}/${section}?page%5Bsize%5D=100`)).toHaveLength(1);
+      for (const section of sections) expect(reads(p, `/v1/iam/realms/${realmId}/${section}?page[size]=100`)).toHaveLength(1);
       expect(reads(p, applicationsGet)).toHaveLength(1);
       expect(p.network.requests.filter(({ method }) => method !== 'GET')).toEqual([]);
       await check.assertLocale(p);
@@ -163,10 +163,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       const visible = async (variants, locator, shell = '') => { await open(p, variants, shell); await expect(locator).toBeVisible(); };
       await visible({ authUsers: 'iam.realm.users.500' }, surface(p).getByTestId('auth-section-users-error').getByRole('button', { name: c.failure.retry }));
       await expect(surface(p).getByTestId('auth-section-users-error')).toContainText('500'); await expect(surface(p).getByTestId('auth-section-users-error')).toContainText('req_synthetic_console_auth');
-      p.network.setVariants({ authUsers: 'success' }); const before = reads(p, `/v1/iam/realms/${realmId}/users?page%5Bsize%5D=100`).length;
+      p.network.setVariants({ authUsers: 'success' }); const before = reads(p, `/v1/iam/realms/${realmId}/users?page[size]=100`).length;
       await surface(p).getByTestId('auth-section-users-error').getByRole('button', { name: c.failure.retry }).click();
       await expect(surface(p).getByTestId('auth-section-users-error')).toHaveCount(0);
-      expect(reads(p, `/v1/iam/realms/${realmId}/users?page%5Bsize%5D=100`)).toHaveLength(before + 1);
+      expect(reads(p, `/v1/iam/realms/${realmId}/users?page[size]=100`)).toHaveLength(before + 1);
       await open(p, { authScopes: 'iam.realm.scopes.400' });
       await expect(surface(p).getByTestId('auth-section-scopes-error').getByText(c.failure.noRetry)).toBeVisible();
       await expect(surface(p).getByTestId('auth-section-scopes-error').getByRole('button', { name: c.failure.retry })).toHaveCount(0);

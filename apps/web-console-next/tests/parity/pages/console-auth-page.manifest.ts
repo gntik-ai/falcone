@@ -9,7 +9,14 @@ export const realmId = 'synthetic-auth-realm'
 export const syntheticSecret = 'synthetic-client-secret-not-real'
 export const requestId = 'req_synthetic_console_auth'
 export const realmPath = (section: string) => `/v1/iam/realms/${realmId}/${section}`
-export const realmGet = (section: string) => `${realmPath(section)}?page%5Bsize%5D=100`
+// The client sends literal brackets and a browser may or may not percent-encode them, so requests are compared
+// by path plus decoded, sorted query pairs instead of by raw string.
+export const canonicalPath = (raw: string) => {
+  const url = new URL(raw, 'http://synthetic.test')
+  const pairs = [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}=${value}`)
+  return pairs.length ? `${url.pathname}?${pairs.join('&')}` : url.pathname
+}
+export const realmGet = (section: string) => `${realmPath(section)}?page[size]=100`
 export const applicationsPath = `/v1/workspaces/${workspaceId}/applications`
 export const applicationsGet = `${applicationsPath}?limit=100`
 export const applicationPath = (id: string) => `${applicationsPath}/${id}`

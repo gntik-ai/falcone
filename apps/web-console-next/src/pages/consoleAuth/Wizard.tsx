@@ -6,6 +6,16 @@ import { getConsolePermissions } from '@in-falcone/console-api/permissions'
 import { createIamClient, failureOf, type Failure, type IamClientData } from './api'
 import { Action, Callout, focusRing, useCopy, useFailureText } from './ui'
 
+const DENY_ACTION = 'iam.clients.manage'
+// The shared permission helper returns Spanish deny text, so the page maps each of its reasons to a localized key.
+const denyKey = (reason: string | null): string => {
+  if (reason === null) return 'wizard.blockedFallback'
+  const reasonFor = (roles: string[]) => getConsolePermissions(roles).denyReason(DENY_ACTION)
+  if (reason === reasonFor(['tenant_developer'])) return 'wizard.blockedDeveloper'
+  if (reason === reasonFor(['tenant_viewer'])) return 'wizard.blockedViewer'
+  if (reason === reasonFor([])) return 'wizard.blockedNoRole'
+  return 'wizard.blockedGeneric'
+}
 const TYPES = ['public', 'confidential', 'service_account'] as const
 const SCOPES = ['openid', 'profile', 'email']
 type Status = { state: 'idle' } | { state: 'submitting' } | { state: 'success'; clientId: string } | { state: 'error'; failure: Failure }
@@ -18,7 +28,7 @@ export function Wizard({ workspaceId, workspaceLabel, returnFocusRef, onClose }:
   // Permissions are re-read from the persisted session when the wizard opens (legacy useWizardPermissionCheck).
   const [roles] = useState(() => readConsoleShellSession()?.principal?.platformRoles ?? [])
   const permissions = getConsolePermissions(roles)
-  const allowed = permissions.can('iam.clients.manage')
+  const allowed = permissions.can(DENY_ACTION)
   const [current, setCurrent] = useState(0)
   const [data, setData] = useState<IamClientData>({ clientType: 'public', clientId: '', redirectUris: '', scopes: [] })
   const [validation, setValidation] = useState<{ step: number; message: string } | null>(null)
@@ -30,7 +40,7 @@ export function Wizard({ workspaceId, workspaceLabel, returnFocusRef, onClose }:
 
   if (!allowed) {
     return <section aria-label={t('wizard.blockedTitle')} className="min-w-0 space-y-3" data-testid="auth-wizard-blocked">
-      <EmptyState icon={undefined} title={t('wizard.blockedTitle')} description={permissions.denyReason('iam.clients.manage') ?? t('wizard.blockedFallback')} secondaryAction={null} titleAs="h2" bordered={false} className="min-w-0"
+      <EmptyState icon={undefined} title={t('wizard.blockedTitle')} description={t(denyKey(permissions.denyReason(DENY_ACTION)))} secondaryAction={null} titleAs="h2" bordered={false} className="min-w-0"
         primaryAction={<Action onClick={() => { onClose(); requestAnimationFrame(() => returnFocusRef.current?.focus()) }}>{t('wizard.close')}</Action>} />
     </section>
   }

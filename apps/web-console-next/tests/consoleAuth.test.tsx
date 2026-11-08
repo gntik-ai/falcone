@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import i18n from '../src/i18n'
-import { applicationsGet, portal, realmGet, requestId } from './parity/pages/console-auth-page.manifest'
+import { applicationsGet, canonicalPath, portal, realmGet, requestId } from './parity/pages/console-auth-page.manifest'
 import { applicationReads, calls, copy, failure, fill, open, pageCalls, ready, realmKey, writes, type Locale } from './consoleAuth-support'
 
 let requests: ReturnType<typeof open>['requests']
@@ -41,7 +41,7 @@ test.each(locales)('loads exactly the five legacy reads and renders the realm an
     'GET /v1/iam/realms/synthetic-auth-realm/scopes?page[size]=100', 'GET /v1/iam/realms/synthetic-auth-realm/users?page[size]=100', `GET ${applicationsGet}`,
   ].sort())
   expect(calls(requests).filter(({ path }) => path.startsWith('/v1/metrics/'))).toEqual([])
-  expect(realmGet('users')).toContain('page%5Bsize%5D=100')
+  expect(canonicalPath(realmGet('users'))).toBe(canonicalPath('/v1/iam/realms/synthetic-auth-realm/users?page%5Bsize%5D=100'))
 })
 
 test.each(locales)('selecting a client row drives the connection snippets without any request in %s', async (locale) => {

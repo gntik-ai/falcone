@@ -115,15 +115,19 @@ test('a failed submit shows the error panel with Reintentar in the review step a
   expect(applicationReads(requests)).toHaveLength(1)
 })
 
-test('without the manage_iam permission the wizard shows the deny reason and no stepper', async () => {
-  const c = copy.es
-  await start('es')
-  const key = 'in-falcone.console-shell-session'
-  const session = JSON.parse(sessionStorage.getItem(key)!); session.principal.platformRoles = ['tenant_viewer']; sessionStorage.setItem(key, JSON.stringify(session))
+const denied: Array<[string, string[], 'blockedViewer' | 'blockedDeveloper' | 'blockedNoRole']> = [
+  ['tenant_viewer', ['tenant_viewer'], 'blockedViewer'], ['tenant_developer', ['tenant_developer'], 'blockedDeveloper'], ['no role', [], 'blockedNoRole'],
+]
+test.each(locales.flatMap((locale) => denied.map((row) => [locale, ...row] as const)))('without the manage_iam permission (%s, %s) the wizard shows the localized deny reason and no stepper', async (locale, _name, roles, key) => {
+  const c = copy[locale]
+  await start(locale)
+  const storageKey = 'in-falcone.console-shell-session'
+  const session = JSON.parse(sessionStorage.getItem(storageKey)!); session.principal.platformRoles = roles; sessionStorage.setItem(storageKey, JSON.stringify(session))
   fireEvent.click(screen.getByRole('button', { name: c.wizard.open }))
   const blocked = await screen.findByTestId('auth-wizard-blocked')
   expect(within(blocked).getByRole('heading', { name: c.wizard.blockedTitle })).toBeVisible()
-  expect(blocked.textContent).not.toBe(c.wizard.blockedTitle)
+  expect(blocked).toHaveTextContent(c.wizard[key])
+  if (locale === 'en') expect(blocked.textContent).not.toMatch(/Tu rol|Tu sesión|permisos|Contacta/)
   expect(screen.queryByTestId('auth-wizard')).toBeNull(); expect(screen.queryByRole('list', { name: c.wizard.stepsLabel })).toBeNull()
   expect(writes(requests)).toEqual([])
   fireEvent.click(within(blocked).getByRole('button', { name: c.wizard.close }))

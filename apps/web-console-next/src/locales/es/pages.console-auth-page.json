@@ -344,7 +344,11 @@
     "failureTitle": "No se pudo crear el cliente IAM",
     "failureFallback": "No se pudo completar la operación solicitada.",
     "blockedTitle": "Acceso bloqueado",
-    "blockedFallback": "No permitido."
+    "blockedFallback": "No permitido.",
+    "blockedDeveloper": "Tu rol (Developer · solo lectura) permite consultar el contexto de la organización y del área de trabajo, pero no crear, modificar ni eliminar recursos. Contacta con un administrador de la organización si necesitas este acceso.",
+    "blockedViewer": "Tu rol (Viewer · solo lectura) permite consultar dashboards, auditoría y permisos efectivos, pero no crear, modificar ni eliminar recursos. Contacta con un administrador de la organización si necesitas este acceso.",
+    "blockedNoRole": "Tu sesión actual no tiene un rol con permisos de escritura reconocido. Contacta con un administrador de la organización si crees que esto es un error.",
+    "blockedGeneric": "Tu rol actual no incluye este permiso. Contacta con un administrador de la organización o del área de trabajo si necesitas este acceso."
   },
   "labelValue": "{label}: {value}"
 }
