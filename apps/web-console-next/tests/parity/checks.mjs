@@ -28,7 +28,23 @@ export async function errorEmpty(parity, manifest) {
     await expect(locate(parity, state.locator), `error-empty: ${state.fixture} ${state.variant}`).toBeVisible();
   }
 }
+// Dialogs fade in and out. axe reads computed colours, so a scan taken halfway through a transition
+// measures blended colours and reports contrast failures that do not exist at rest.
+async function awaitTransitions(page) {
+  await page.evaluate(async () => {
+    const frame = () => new Promise((done) => requestAnimationFrame(() => done()));
+    // A transition starts one frame after the node mounts, so a single empty reading proves nothing: require
+    // several consecutive frames with no finite animation running, within a bounded number of frames.
+    let quiet = 0;
+    for (let round = 0; round < 120 && quiet < 4; round += 1) {
+      await frame();
+      const running = document.getAnimations().filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime ?? 0) && animation.playState !== 'finished');
+      if (running.length) { quiet = 0; await Promise.all(running.map((animation) => animation.finished.catch(() => undefined))); } else quiet += 1;
+    }
+  });
+}
 export async function assertAccessibility(parity) {
+  await awaitTransitions(parity.page);
   const result = await new AxeBuilder({ page: parity.page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
   expect(result.violations.filter((v) => ['serious', 'critical'].includes(v.impact)), 'accessibility: serious/critical axe violations').toEqual([]);
 }

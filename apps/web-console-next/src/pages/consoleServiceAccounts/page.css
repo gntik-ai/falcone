@@ -1,0 +1,6 @@
+/* The table scrolls inside its own region; the page never overflows horizontally. */
+.service-accounts-table table { table-layout: fixed; width: 100%; }
+.service-accounts-table th, .service-accounts-table td { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 1023px) {
+  .service-accounts-table table { min-width: 56rem; }
+}
