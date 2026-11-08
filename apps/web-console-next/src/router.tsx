@@ -88,6 +88,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'plans') return { ...route, element: <Guard kind="superadmin">{lazyPage('pages.console-plan-catalog-page', () => import('./pages/consolePlanCatalog'))}</Guard> }
         if (route.path === 'tenants/:tenantId/plan' && route.migrated) return { ...route, element: <Guard kind="superadmin">{lazyPage('pages.console-tenant-plan-page', () => import('./pages/consoleTenantPlan'))}</Guard> }
         if (route.path === 'plans/:planId' && route.migrated) return { ...route, element: <Guard kind="superadmin">{lazyPage('pages.console-plan-detail-page', () => import('./pages/consolePlanDetail'))}</Guard> }
+        if (route.path === 'auth' && route.migrated) return { ...route, element: <Guard kind="superadmin">{lazyPage('pages.console-auth-page', () => import('./pages/consoleAuth'))}</Guard> }
         if (route.path === 'plans/new') return { ...route, element: lazyPage('pages.console-plan-create-page', () => import('./pages/consolePlanCreate')) }
         if (route.path === 'quotas') return { ...route, element: lazyPage('pages.console-quotas-page', () => import('./pages/consoleQuotas')) }
         if (route.path === 'workspaces/:workspaceId/realtime' && route.migrated) return { ...route, element: lazyPage('pages.console-realtime-page', () => import('./pages/consoleRealtime')) }
