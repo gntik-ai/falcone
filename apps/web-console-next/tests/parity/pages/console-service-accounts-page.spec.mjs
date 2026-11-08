@@ -219,10 +219,13 @@ const viewer = {
   },
 };
 
+// Tracing stays off: a trace would record the synthetic secrets shown by the disclosure journeys.
+// trace is a worker-scoped option, so it must be set at file level and not inside a describe group.
+test.use({ trace: 'off' });
+
 for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`console-service-accounts-page | ${role} | ${locale} | ${width}`, () => {
-    // Tracing stays off: a trace would record the synthetic secrets shown by the disclosure journeys.
-    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: endpoints, trace: 'off' });
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: endpoints });
     registerHooks();
     const open = (p, variants = {}) => p.open(manifest.route, variants);
 
