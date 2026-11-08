@@ -200,7 +200,7 @@ export function Content({ workspaceId, tenantActive, heading, focusHeading, onCh
     </section>
 
     {list.failure ? <FailureView scope="list" failure={list.failure} name="" pending={false} autoFocus={list.attempt > 0} onRetry={list.reload} onClose={list.reload} onBack={onChooseWorkspace} />
-      : !rows ? <section role="status" aria-label={t('states.loading')} aria-busy={true} className="min-w-0"><Text as="p" variant="body" tone="muted">{t('states.loadingDescription')}</Text><TableSkeleton rows={3} columns={6} label={t('states.loading')} className="min-w-0" /></section>
+      : list.loading || !rows ? <section role="status" aria-label={t('states.loading')} aria-busy={true} className="min-w-0"><Text as="p" variant="body" tone="muted">{t('states.loadingDescription')}</Text><TableSkeleton rows={3} columns={6} label={t('states.loading')} className="min-w-0" /></section>
         : !rows.length ? <EmptyState icon={undefined} title={t('states.empty')} description={t('states.emptyDescription')} primaryAction={null} secondaryAction={null} titleAs="h2" bordered={false} className="min-w-0" />
           : <AccountsTable rows={rows} blocked={blocked} blockedReason={blockedReason} busy={busy} onReveal={(account) => void reveal(account)}
             onConfirm={(action, account, trigger) => setConfirm({ action, account, trigger, open: true, pending: false, failure: null, precheck: false, returnTo: 'trigger' })} />}

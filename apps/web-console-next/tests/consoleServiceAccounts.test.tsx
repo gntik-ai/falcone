@@ -234,6 +234,28 @@ test.each(locales)('revoke keeps the irreversibility line, posts once after the 
   expect(announced()).toContain(c.feedback.revoked)
 })
 
+test.each(locales)('a delayed post-mutation refetch shows the loading state instead of stale rows and actions in %s', async (locale) => {
+  const c = copy[locale]
+  let reads = 0
+  let release!: () => void
+  const held = new Promise<void>((resolve) => { release = resolve })
+  await start(locale, { routes: {
+    [`POST ${revocationPath(active.serviceAccountId)}`]: created({}, 200),
+    [`GET ${base()}`]: async () => { if (++reads > 1) await held; return Response.json(list(reads === 1 ? mixed : [{ ...active, credentialStatus: { state: 'revoked' } }, revoked, expiring])) },
+  } })
+  fireEvent.click(rowButton('revoke', 'Billing service', locale))
+  const dialog = await screen.findByRole('alertdialog')
+  typeName(dialog, 'Billing service', locale)
+  fireEvent.click(within(dialog).getByRole('button', { name: c.confirm.revoke.action }))
+  expect(await screen.findByRole('status', { name: c.states.loading })).toBeVisible()
+  // While the refetch is pending no stale row or row action stays available.
+  expect(screen.queryByRole('table')).toBeNull()
+  expect(screen.queryByRole('button', { name: fill(c.row.revealNamed, { name: 'Billing service' }) })).toBeNull()
+  release()
+  expect(await table(locale)).toBeVisible()
+  expect(listGets()).toHaveLength(2)
+})
+
 test.each(locales)('delete keeps the irreversibility line and sends DELETE only after the exact name in %s', async (locale) => {
   const c = copy[locale]
   await start(locale, { routes: { [`DELETE ${accountPath(active.serviceAccountId)}`]: created({}, 200), [`GET ${base()}`]: list([revoked, expiring]) } })
