@@ -79,9 +79,16 @@ region or the open confirmation. No disclosure SHALL open and no row SHALL chang
 
 #### Scenario: Network failure of a terminal action
 
-- **WHEN** Reintentar follows a network failure of Revocar or Eliminar
+- **WHEN** Reintentar or the primary Revocar or Eliminar button follows a network failure of that action
 - **THEN** one list read SHALL come first; an already applied change SHALL be reported without a write,
   otherwise exactly one write SHALL follow.
+- **WHEN** a 429 or another mapped alert failed the action
+- **THEN** the primary button SHALL send the write directly, with no list read.
+
+#### Scenario: Dismissing a create or Revelar alert
+
+- **WHEN** a mapped create or Revelar failure (409, 429) is shown and focus rests on Crear or Revelar
+- **THEN** Escape SHALL close the alert and keep focus on that control.
 
 #### Scenario: Session refresh
 

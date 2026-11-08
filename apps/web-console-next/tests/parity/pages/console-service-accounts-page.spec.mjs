@@ -92,9 +92,17 @@ async function switchTenant(p) {
     select.dispatchEvent(new Event('change', { bubbles: true }));
   }, tenantBId);
 }
-async function switchWorkspace(p) {
-  await p.page.getByRole('button', { name: new RegExp(common[p.locale].shell.workspace) }).first().click();
-  await p.page.getByRole('menuitemradio', { name: /Other Workspace/ }).click();
+async function switchWorkspace(p, modalOpen = false) {
+  const trigger = p.page.getByRole('button', { name: new RegExp(common[p.locale].shell.workspace), includeHidden: true }).first();
+  if (!modalOpen) {
+    await trigger.click();
+    await p.page.getByRole('menuitemradio', { name: /Other Workspace/ }).click();
+    return;
+  }
+  // An open modal makes the rest of the page inert to pointer input, so the pointer sequence that a
+  // user outside the modal would produce is replayed as DOM events. The menu opens in its own portal.
+  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) await trigger.dispatchEvent(type, { bubbles: true, button: 0 });
+  await p.page.getByRole('menuitemradio', { name: /Other Workspace/ }).dispatchEvent('click');
 }
 
 // Performs the user steps that send an action's request and returns its surface and trigger.
@@ -131,32 +139,95 @@ async function succeeded(p, act) {
   void c;
 }
 
-for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
-  test.describe(`console-service-accounts-page | tenant_owner | ${locale} | ${width}`, () => {
+// Console, response and request bookkeeping shared by every cell.
+function registerHooks() {
+  test.beforeEach(async ({ parity: p }) => {
+    const failures = [];
+    const scoped = (url) => /\/v1\/workspaces\/[^/]+\/service-accounts|\/v1\/auth\/login-sessions\/[^/]+\/refresh/.test(new URL(url).pathname);
+    p.page.on('response', (response) => { if (scoped(response.url()) && response.status() >= 400) failures.push({ url: response.url(), kind: String(response.status()) }); });
+    p.page.on('requestfailed', (request) => { if (scoped(request.url())) failures.push({ url: request.url(), kind: 'network' }); });
+    p.page.on('console', (message) => {
+      if (message.type() !== 'error' || !consumeResourceDiagnostic(message.text(), message.location().url, failures)) return;
+      const index = p.faults.indexOf(`console.error: ${message.text()}`); if (index >= 0) p.faults.splice(index, 1);
+    });
+  });
+  test.afterEach(async ({ parity: p }) => {
+    const pageRequests = new Set(Object.values(endpoints).map(({ method, path }) => `${method} ${path}`));
+    const shellPaths = new Set(['/v1/tenants', '/v1/tenants/synthetic-tenant', `/v1/tenants/${tenantBId}`, '/v1/workspaces', '/v1/auth/signups/policy', '/v1/auth/login-sessions/synthetic-session/refresh']);
+    for (const request of p.network.requests) {
+      const url = new URL(request.path, 'http://synthetic.test');
+      expect(pageRequests.has(`${request.method} ${url.pathname}`) || shellPaths.has(url.pathname), `unexpected request ${request.method} ${url.pathname}`).toBe(true);
+    }
+    await check.assertRuntimeHealth(p);
+  });
+}
+
+// The read-only role is its own report cell: every write control is disabled with its reason and nothing is sent.
+const viewerOpen = (p, variants = {}) => p.open(manifest.route, variants);
+const writeControls = ['reveal', 'rotate', 'revoke', 'delete'];
+const readOnlyNotice = (p) => surface(p).getByRole('status').filter({ hasText: copy(p).notice.readOnlyTitle }).first();
+async function assertReadOnly(p) {
+  const c = copy(p);
+  // The role label and reason come from this page's catalog, never from the shared Spanish text.
+  await expect(readOnlyNotice(p)).toContainText(c.roles.tenant_viewer); await expect(readOnlyNotice(p)).toContainText(c.denyReasons.tenant_viewer);
+  for (const kind of writeControls) { await expect(rowButton(p, kind)).toBeDisabled(); await expect(rowButton(p, kind)).toHaveAttribute('title', c.denyReasons.tenant_viewer); }
+  await expect(submit(p)).toBeDisabled();
+}
+const viewer = {
+  async data(p) {
+    const c = copy(p);
+    await viewerOpen(p); await ready(p);
+    for (const header of [c.table.name, c.table.clientState, c.table.credential, c.table.access, c.table.expires, c.table.actions]) await expect(grid(p).getByRole('columnheader', { name: header, exact: true })).toBeVisible();
+    await expect(grid(p).getByRole('row')).toHaveCount(4);
+    await expect(surface(p).getByText('Synthetic Tenant · Synthetic Workspace')).toBeVisible();
+    await assertReadOnly(p); await assertServiceAccountsLocale(p);
+  },
+  async action(p) {
+    await viewerOpen(p); await ready(p); const since = mark(p);
+    // Disabled controls and a typed name send nothing; Enter in the field does not submit.
+    await nameField(p).fill('Blocked'); await nameField(p).press('Enter');
+    for (const kind of writeControls) await rowButton(p, kind).click({ force: true });
+    await settle(p);
+    await expect(alertDialog(p)).toHaveCount(0); await expect(p.page.locator('[role="dialog"][aria-modal="true"]')).toHaveCount(0);
+    expect(pageWrites(p, since)).toEqual([]);
+  },
+  async errorEmpty(p, server) {
+    const c = copy(p);
+    await viewerOpen(p, { serviceAccountsList: 'service-accounts-empty' }); await expect(surface(p).getByRole('heading', { name: c.states.empty })).toBeVisible(); await expect(readOnlyNotice(p)).toBeVisible(); await expect(submit(p)).toBeDisabled();
+    await viewerOpen(p, { serviceAccountsList: 'service-accounts-403' }); await expect(surface(p).getByRole('heading', { name: c.states.listNoAccessTitle })).toBeVisible();
+    await viewerOpen(p, { serviceAccountsList: 'service-accounts-404' }); await expect(surface(p).getByRole('heading', { name: c.states.listNotFoundTitle })).toBeVisible();
+    for (const variant of ['service-accounts-500', 'service-accounts-network']) {
+      await viewerOpen(p, { serviceAccountsList: variant }); await expect(retryIn(surface(p), p)).toBeVisible();
+      p.network.setVariants({ serviceAccountsList: 'success' }); await retryIn(surface(p), p).click(); await ready(p);
+      await assertReadOnly(p);
+    }
+    p.network.setVariants({ serviceAccountsList: 'service-accounts-loading-delayed' });
+    const navigation = p.page.goto(server.url(manifest.route.slice(1)));
+    await expect(surface(p).getByRole('status', { name: c.states.loading })).toBeVisible();
+    await navigation; await ready(p);
+    await assertServiceAccountsLocale(p);
+  },
+  async accessibility(p) {
+    const accessible = async () => { await check.assertAccessibility(p); await assertServiceAccountsLocale(p); };
+    await viewerOpen(p); await ready(p); await accessible();
+    await viewerOpen(p, { serviceAccountsList: 'service-accounts-500' }); await expect(retryIn(surface(p), p)).toBeVisible(); await accessible();
+  },
+  async visual(p, info) {
+    // Variants are reset before each capture, so the read-only capture always shows the list.
+    await viewerOpen(p, { serviceAccountsList: 'service-accounts-500' }); await expect(retryIn(surface(p), p)).toBeVisible(); await screenshot(p, info, 'viewer-list-500');
+    await viewerOpen(p, { serviceAccountsList: 'success' }); await ready(p); await screenshot(p, info, 'read-only');
+  },
+};
+
+for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
+  test.describe(`console-service-accounts-page | ${role} | ${locale} | ${width}`, () => {
     // Tracing stays off: a trace would record the synthetic secrets shown by the disclosure journeys.
-    test.use({ role: 'tenant_owner', locale, viewport: { width, height: 900 }, pageEndpoints: endpoints, trace: 'off' });
-    test.beforeEach(async ({ parity: p }) => {
-      const failures = [];
-      const scoped = (url) => /\/v1\/workspaces\/[^/]+\/service-accounts|\/v1\/auth\/login-sessions\/[^/]+\/refresh/.test(new URL(url).pathname);
-      p.page.on('response', (response) => { if (scoped(response.url()) && response.status() >= 400) failures.push({ url: response.url(), kind: String(response.status()) }); });
-      p.page.on('requestfailed', (request) => { if (scoped(request.url())) failures.push({ url: request.url(), kind: 'network' }); });
-      p.page.on('console', (message) => {
-        if (message.type() !== 'error' || !consumeResourceDiagnostic(message.text(), message.location().url, failures)) return;
-        const index = p.faults.indexOf(`console.error: ${message.text()}`); if (index >= 0) p.faults.splice(index, 1);
-      });
-    });
-    test.afterEach(async ({ parity: p }) => {
-      const pageRequests = new Set(Object.values(endpoints).map(({ method, path }) => `${method} ${path}`));
-      const shellPaths = new Set(['/v1/tenants', '/v1/tenants/synthetic-tenant', `/v1/tenants/${tenantBId}`, '/v1/workspaces', '/v1/auth/signups/policy', '/v1/auth/login-sessions/synthetic-session/refresh']);
-      for (const request of p.network.requests) {
-        const url = new URL(request.path, 'http://synthetic.test');
-        expect(pageRequests.has(`${request.method} ${url.pathname}`) || shellPaths.has(url.pathname), `unexpected request ${request.method} ${url.pathname}`).toBe(true);
-      }
-      await check.assertRuntimeHealth(p);
-    });
+    test.use({ role, locale, viewport: { width, height: 900 }, pageEndpoints: endpoints, trace: 'off' });
+    registerHooks();
     const open = (p, variants = {}) => p.open(manifest.route, variants);
 
     test('data', async ({ parity: p }) => {
+      if (role === 'tenant_viewer') return viewer.data(p);
       const c = copy(p);
       await open(p); await ready(p);
       for (const header of [c.table.name, c.table.clientState, c.table.credential, c.table.access, c.table.expires, c.table.actions]) await expect(grid(p).getByRole('columnheader', { name: header, exact: true })).toBeVisible();
@@ -171,14 +242,13 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       // Context switches with each surface open: nothing is sent, the surface and draft are gone, the new context shows, focus lands on the heading.
       await installSwitchShell(p);
       for (const kind of ['workspace', 'tenant']) for (const open_ of ['confirmation', 'disclosure', 'failure']) {
-        if (kind === 'workspace' && open_ !== 'failure') continue; // the open modal makes the workspace menu inert; Vitest covers it.
         await open(p, open_ === 'failure' ? { serviceAccountsIssue: '500' } : {}); await ready(p);
         await nameField(p).fill('Draft name');
         if (open_ === 'confirmation') { await rowButton(p, 'rotate').click(); await alertDialog(p).getByRole('textbox', { name: c.confirm.typedName, exact: true }).fill(active.displayName); }
         else if (open_ === 'disclosure') { await rowButton(p, 'reveal').click(); await expect(disclosure(p, 'reveal')).toBeVisible(); }
         else { await rowButton(p, 'reveal').click(); await expect(retryIn(surface(p), p)).toBeVisible(); }
         const since = mark(p);
-        if (kind === 'tenant') await switchTenant(p); else await switchWorkspace(p);
+        if (kind === 'tenant') await switchTenant(p); else await switchWorkspace(p, open_ !== 'failure');
         await expect(grid(p)).toContainText('Other workspace service');
         await expect(p.page.locator('[role="alertdialog"], [role="dialog"][aria-modal="true"]')).toHaveCount(0);
         await expect(retryIn(surface(p), p)).toHaveCount(0);
@@ -191,6 +261,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     });
 
     test('action', async ({ parity: p }, info) => {
+      if (role === 'tenant_viewer') return viewer.action(p);
+      test.setTimeout(300_000);
       const c = copy(p);
       // Create: Enter submits one POST, refetches once, announces the id and clears the field.
       await open(p); await ready(p); let since = mark(p);
@@ -251,11 +323,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await expect(alertDialog(p)).toHaveCount(0); await expect(polite(p)).toContainText(outcome); await settle(p);
         expect(pageWrites(p, since)).toHaveLength(1); expect(listReads(p, since)).toHaveLength(1);
       }
-      // Both builds, same fixtures: requests, refetch counts and disclosure content match (Spanish only: the legacy page has no English).
-      if (locale === 'es' && width === 1280) await compareWithLegacy(p, info);
+      // Both builds, same fixtures, in every locale and width cell: requests, refetch counts and disclosure content match.
+      // The legacy page is Spanish only, so its controls are located with the Spanish copy.
+      await compareWithLegacy(p, info);
     });
 
     test('error-empty', async ({ parity: p, server }) => {
+      if (role === 'tenant_viewer') return viewer.errorEmpty(p, server);
+      test.setTimeout(300_000);
       const c = copy(p);
       // List states.
       await open(p, { serviceAccountsList: 'service-accounts-empty' }); await expect(surface(p).getByRole('heading', { name: c.states.empty })).toBeVisible();
@@ -327,6 +402,26 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await retryIn(second.surface, p).click(); await expect(alertDialog(p)).toHaveCount(0); await settle(p);
         expect(writesTo(p, act, again)).toHaveLength(2);
       }
+      // The primary button is no shortcut: after an uncertain outcome it also reads the list before the one new write.
+      for (const act of ['revoke', 'delete']) {
+        await open(p, { [targets[act].name]: ['network', 'success'] }); await ready(p);
+        const since = mark(p); const { surface: region } = await drive(p, act);
+        await expect(retryIn(region, p)).toBeVisible();
+        const after = mark(p);
+        await region.getByRole('button', { name: c.confirm[act].action, exact: true }).click();
+        await expect(alertDialog(p)).toHaveCount(0); await settle(p);
+        expect(p.network.requests[after]).toMatchObject({ method: 'GET', path: base() });
+        expect(writesTo(p, act, since)).toHaveLength(2);
+      }
+      // Escape dismisses a mapped create or Revelar alert from the control that regains focus.
+      for (const [act, name, trigger] of [['create', 'serviceAccountsCreate', submit], ['issue', 'serviceAccountsIssue', (q) => rowButton(q, 'reveal')]]) for (const status of ['409', '429']) {
+        await open(p, { [name]: status }); await ready(p);
+        await drive(p, act);
+        await expect(trigger(p)).toBeFocused();
+        await expect(surface(p).getByRole('alert')).toBeVisible();
+        await p.page.keyboard.press('Escape');
+        await expect(surface(p).getByRole('alert')).toHaveCount(0); await expect(trigger(p)).toBeFocused();
+      }
       // 401: a successful refresh resends once with a fresh key; a failed one sends no resend and leads to login with the return path.
       for (const act of acts) {
         await open(p, { [targets[act].name]: 'refresh-ok' }); await ready(p);
@@ -344,16 +439,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         expect(p.network.requests.slice(since).filter(({ method, path }) => method === 'POST' && path.endsWith('/refresh'))).toHaveLength(1);
         expect(await p.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(server.url(manifest.route.slice(1))).pathname);
       }
-      // Read-only roles and missing context.
-      await p.page.addInitScript(seedHistoryPrincipal, { platformRoles: ['tenant_viewer'] });
-      await open(p); await ready(p);
-      await expect(surface(p).getByRole('status').filter({ hasText: c.notice.readOnlyTitle }).first()).toBeVisible();
-      for (const kind of ['reveal', 'rotate', 'revoke', 'delete']) await expect(rowButton(p, kind)).toBeDisabled();
-      await expect(submit(p)).toBeDisabled();
-      await assertServiceAccountsLocale(p);
     });
 
     test('accessibility', async ({ parity: p }) => {
+      if (role === 'tenant_viewer') return viewer.accessibility(p);
       const c = copy(p);
       const accessible = async () => { await check.assertAccessibility(p); await assertServiceAccountsLocale(p); };
       await open(p, { serviceAccountsRotate: '500', serviceAccountsIssue: '403' }); await ready(p); await accessible();
@@ -403,6 +492,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
 
     test('runtime-health', async ({ parity: p }) => {
       await open(p); await ready(p);
+      if (role === 'tenant_viewer') { await check.assertRuntimeHealth(p); expect(p.faults.join('\n')).not.toContain(syntheticSecret); return; }
       await rowButton(p, 'reveal').click(); await expect(disclosure(p, 'reveal')).toBeVisible();
       await disclosure(p, 'reveal').getByRole('button', { name: copy(p).disclosure.close, exact: true }).click();
       await expect(p.page).toHaveURL(/\/console\/service-accounts$/);
@@ -413,12 +503,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
 
     test('responsive', async ({ parity: p }) => {
       await open(p); await ready(p); await check.assertResponsive(p, width);
+      if (role === 'tenant_viewer') return;
       await rowButton(p, 'reveal').click(); await expect(disclosure(p, 'reveal')).toBeInViewport();
       const sizes = await p.page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
       expect(sizes.scrollWidth).toBeLessThanOrEqual(sizes.clientWidth);
     });
 
     test('visual-review', async ({ parity: p }, info) => {
+      if (role === 'tenant_viewer') return viewer.visual(p, info);
       const c = copy(p);
       // A fresh fixture set before every capture: variants never leak between states.
       await open(p); await ready(p); await screenshot(p, info, 'service-accounts-list');
@@ -430,8 +522,6 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await open(p, { serviceAccountsRotate: '403' }); await ready(p); await drive(p, 'rotate'); await expect(alertDialog(p).getByRole('heading', { name: c.failure.noAccessTitle })).toBeVisible(); await screenshot(p, info, 'rotate-403');
       await open(p, { serviceAccountsRotate: '500' }); await ready(p); await drive(p, 'rotate'); await expect(retryIn(alertDialog(p), p)).toBeVisible(); await screenshot(p, info, 'rotate-500');
       await open(p, { serviceAccountsList: 'service-accounts-500' }); await expect(retryIn(surface(p), p)).toBeVisible(); await screenshot(p, info, 'list-500');
-      await p.page.addInitScript(seedHistoryPrincipal, { platformRoles: ['tenant_viewer'] });
-      await open(p, { serviceAccountsList: 'success' }); await ready(p); await screenshot(p, info, 'read-only');
     });
 
     test('kit-conformance', async ({ parity: p }) => {
@@ -446,34 +536,37 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
 // Runs the same journeys against the legacy build and the Next build and compares what both send and show.
 async function compareWithLegacy(p, info) {
   const c = copy(p);
+  const viewport = p.page.viewportSize();
   const run = async (mode) => {
+    // The legacy page has only Spanish copy; the Next page uses the cell's locale.
+    const k = mode === 'legacy' ? bundles.es : c;
     const results = {};
     for (const flow of ['create', 'reveal', 'rotate', 'revoke', 'delete']) {
-      const legacy = mode === 'legacy' ? await openLegacy({ browser: p.page.context().browser(), role: 'tenant_owner', locale: p.locale, viewport: { width: 1280, height: 900 }, pageEndpoints: endpoints, route: manifest.route }) : null;
+      const legacy = mode === 'legacy' ? await openLegacy({ browser: p.page.context().browser(), role: 'tenant_owner', locale: 'es', viewport, pageEndpoints: endpoints, route: manifest.route }) : null;
       const page = legacy ? legacy.page : p.page;
       const requests = legacy ? legacy.requests : p.network.requests;
       if (!legacy) await p.open(manifest.route);
       await expect(page.getByRole('table')).toBeVisible();
       const since = requests.length;
-      const named = (kind) => page.getByRole('button', { name: fill(c.row[`${kind}Named`], { name: active.displayName }), exact: true });
+      const named = (kind) => page.getByRole('button', { name: fill(k.row[`${kind}Named`], { name: active.displayName }), exact: true });
       const confirm = async (act, label) => {
         const dialog = page.getByRole('alertdialog');
-        if (mode === 'next' || act === 'delete') await (mode === 'next' ? dialog.getByRole('textbox', { name: c.confirm.typedName, exact: true }) : dialog.getByPlaceholder(active.displayName)).fill(active.displayName);
+        if (mode === 'next' || act === 'delete') await (mode === 'next' ? dialog.getByRole('textbox', { name: k.confirm.typedName, exact: true }) : dialog.getByPlaceholder(active.displayName)).fill(active.displayName);
         await dialog.getByRole('button', { name: label, exact: true }).click();
       };
       let secret = null, credentialId = null;
-      if (flow === 'create') { await page.getByRole('textbox', { name: c.create.nameLabel, exact: true }).fill('Created service'); await page.getByRole('button', { name: c.create.submit, exact: true }).click(); }
+      if (flow === 'create') { await page.getByRole('textbox', { name: k.create.nameLabel, exact: true }).fill('Created service'); await page.getByRole('button', { name: k.create.submit, exact: true }).click(); }
       else if (flow === 'reveal' || flow === 'rotate') {
         await named(flow === 'reveal' ? 'reveal' : 'rotate').click();
-        if (flow === 'rotate' && mode === 'next') await confirm('rotate', c.confirm.rotate.action);
-        const dialog = page.getByRole('dialog', { name: flow === 'reveal' ? c.disclosure.revealTitle : c.disclosure.rotateTitle });
+        if (flow === 'rotate' && mode === 'next') await confirm('rotate', k.confirm.rotate.action);
+        const dialog = page.getByRole('dialog', { name: flow === 'reveal' ? k.disclosure.revealTitle : k.disclosure.rotateTitle });
         await expect(dialog).toBeVisible();
         credentialId = (await dialog.locator('dd').first().textContent())?.trim();
         if (mode === 'legacy') secret = (await dialog.locator('pre').textContent())?.trim();
-        else if (flow === 'reveal') { await dialog.getByRole('button', { name: c.disclosure.show, exact: true }).click(); secret = await dialog.getByRole('textbox', { name: c.disclosure.secretValue, exact: true }).inputValue(); }
+        else if (flow === 'reveal') { await dialog.getByRole('button', { name: k.disclosure.show, exact: true }).click(); secret = await dialog.getByRole('textbox', { name: k.disclosure.secretValue, exact: true }).inputValue(); }
         else secret = (await dialog.getByText(rotatedSecret, { exact: true }).textContent())?.trim();
-      } else if (flow === 'revoke') { await named('revoke').click(); await confirm('revoke', mode === 'legacy' ? 'Confirmar' : c.confirm.revoke.action); }
-      else { await named('delete').click(); await confirm('delete', c.confirm.delete.action); }
+      } else if (flow === 'revoke') { await named('revoke').click(); await confirm('revoke', mode === 'legacy' ? 'Confirmar' : k.confirm.revoke.action); }
+      else { await named('delete').click(); await confirm('delete', k.confirm.delete.action); }
       await page.waitForTimeout(500);
       results[flow] = { requests: requests.slice(since).filter(({ path }) => path.includes('/service-accounts')).map(({ method, path, body }) => ({ method, path, body })), secret, credentialId };
       if (legacy) { expect(legacy.faults).toEqual([]); await legacy.close(); }

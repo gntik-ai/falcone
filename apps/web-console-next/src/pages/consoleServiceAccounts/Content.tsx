@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, EmptyState, Field, FieldLabel, Input, Text, useAnnounce, useToast } from '@gntik-ai/ui'
 import { InlineCallout, SectionHeader, TableSkeleton } from '@gntik-ai/blocks'
@@ -11,6 +11,7 @@ import { Disclosure, type DisclosureMode } from './Disclosure'
 import { ConfirmDialog, type ConfirmAction } from './Confirm'
 import { FailureView, focusRing } from './Failure'
 import { AccountsTable, credentialHelpId, triggerSelector } from './Table'
+import { useRoleCopy } from './roles'
 
 type Outcome<T> = { ok: true; value: T; renewed: boolean } | { ok: false; failure: Failure } | null
 interface ConfirmState {
@@ -45,9 +46,10 @@ export function Content({ workspaceId, tenantActive, heading, focusHeading, onCh
   const { t } = useTranslation('pages.console-service-accounts-page')
   const announce = useAnnounce(), toast = useToast()
   const permissions = usePermissions()
+  const roleCopy = useRoleCopy()
   const list = useList(workspaceId)
   const blocked = !tenantActive || !permissions.can('workspace.write')
-  const blockedReason = !tenantActive ? t('notice.tenantInactive') : permissions.denyReason('workspace.write') ?? ''
+  const blockedReason = !tenantActive ? t('notice.tenantInactive') : roleCopy.denyReason() ?? ''
   const id = useId()
   const alive = useRef(true)
   const inFlight = useRef(new Set<string>())
@@ -120,7 +122,7 @@ export function Content({ workspaceId, tenantActive, heading, focusHeading, onCh
   }
   const backFromIssue = () => { setIssue(null); list.reload(); heading.current?.focus() }
 
-  async function submitConfirm(retry: boolean) {
+  async function submitConfirm() {
     const current = confirmRef.current
     if (!current || blocked) return
     const { action, account } = current
@@ -128,7 +130,8 @@ export function Content({ workspaceId, tenantActive, heading, focusHeading, onCh
     if (!begin(key)) return
     patchConfirm({ pending: true })
     try {
-      if (retry && current.precheck && action !== 'rotate') {
+      // Every send, primary or Reintentar, reads the list first while the earlier outcome is unknown.
+      if (current.precheck && action !== 'rotate') {
         const check = await attempt(() => listServiceAccounts(workspaceId))
         if (!check) return
         if (!check.ok) { patchConfirm({ pending: false, failure: check.failure }); return }
@@ -157,12 +160,27 @@ export function Content({ workspaceId, tenantActive, heading, focusHeading, onCh
     if (current.returnTo === 'heading') return heading.current ?? true
     return returnFocus(current.action, current.account.serviceAccountId)()
   }
-  const escape = (close: () => void) => (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); close() } }
+  // Escape dismisses a create or Revelar failure from wherever focus rests (the failure surface, the
+  // name field, Crear or the row's Revelar button). An open dialog keeps its own Escape.
+  const dismissals = useRef({ create: dismissCreate, issue: dismissIssue })
+  dismissals.current = { create: dismissCreate, issue: dismissIssue }
+  const hasDialog = confirm !== null || disclosure !== null
+  const hasCreateFailure = create.failure !== null, hasIssueFailure = Boolean(issue?.failure)
+  useEffect(() => {
+    if (hasDialog || (!hasCreateFailure && !hasIssueFailure)) return
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (hasCreateFailure) dismissals.current.create()
+      if (hasIssueFailure) dismissals.current.issue()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [hasDialog, hasCreateFailure, hasIssueFailure])
 
   const rows = list.rows
   return <div className="min-w-0 space-y-6">
     {blocked && <InlineCallout tone="warning" title={t(tenantActive ? 'notice.readOnlyTitle' : 'notice.tenantInactiveTitle')}
-      description={tenantActive ? t('notice.readOnly', { role: permissions.highestRoleLabel, reason: permissions.denyReason('workspace.write') ?? '' }) : t('notice.tenantInactive')}
+      description={tenantActive ? t('notice.readOnly', { role: roleCopy.roleLabel, reason: roleCopy.denyReason() ?? '' }) : t('notice.tenantInactive')}
       actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined} className="min-w-0"
       labels={{ title: t('notice.readOnlyTitle'), description: blockedReason, upgrade: '', viewUsage: '' }} />}
     <section aria-labelledby={`${id}-create`} className="min-w-0 space-y-4">
@@ -176,7 +194,7 @@ export function Content({ workspaceId, tenantActive, heading, focusHeading, onCh
           {t(create.pending ? 'create.submitting' : 'create.submit')}
         </Button>
       </form>
-      {create.failure && <div role="group" aria-label={t('failure.title.create')} onKeyDown={escape(dismissCreate)}>
+      {create.failure && <div role="group" aria-label={t('failure.title.create')}>
         <FailureView scope="create" failure={create.failure} name={name} pending={create.pending} onRetry={() => void submitCreate()} onClose={dismissCreate} onBack={backFromCreate} onAlertShown={() => createButton.current?.focus()} />
       </div>}
     </section>
@@ -187,13 +205,13 @@ export function Content({ workspaceId, tenantActive, heading, focusHeading, onCh
           : <AccountsTable rows={rows} blocked={blocked} blockedReason={blockedReason} busy={busy} onReveal={(account) => void reveal(account)}
             onConfirm={(action, account, trigger) => setConfirm({ action, account, trigger, open: true, pending: false, failure: null, precheck: false, returnTo: 'trigger' })} />}
     <p id={credentialHelpId} className="sr-only">{t('table.credentialHelp')}</p>
-    <div role="group" aria-label={t('failure.title.issue')} className="min-w-0" onKeyDown={escape(dismissIssue)} hidden={!issue?.failure}>
+    <div role="group" aria-label={t('failure.title.issue')} className="min-w-0" hidden={!issue?.failure}>
       {issue?.failure && <FailureView scope="issue" failure={issue.failure} name={accountName(issue.account)} pending={issue.pending} onRetry={() => void reveal(issue.account)} onClose={dismissIssue} onBack={backFromIssue}
         onAlertShown={() => (document.querySelector<HTMLElement>(triggerSelector('reveal', issue.account.serviceAccountId)))?.focus()} />}
     </div>
 
     {confirm && <ConfirmDialog action={confirm.action} account={confirm.account} open={confirm.open} pending={confirm.pending} failure={confirm.failure}
-      onConfirm={() => void submitConfirm(false)} onRetry={() => void submitConfirm(true)} onClose={() => patchConfirm({ open: false, returnTo: 'trigger' })}
+      onConfirm={() => void submitConfirm()} onRetry={() => void submitConfirm()} onClose={() => patchConfirm({ open: false, returnTo: 'trigger' })}
       onBack={() => { patchConfirm({ open: false, returnTo: 'heading' }); list.reload() }} onClosed={() => setConfirm(null)} finalFocus={confirmFinalFocus} />}
     {disclosure && <Disclosure mode={disclosure.mode} credential={disclosure.credential} open={disclosure.open} onClose={() => setDisclosure((current) => current && { ...current, open: false })} onClosed={() => setDisclosure(null)}
       finalFocus={() => returnFocus(disclosure.mode, disclosure.account.serviceAccountId)()} />}

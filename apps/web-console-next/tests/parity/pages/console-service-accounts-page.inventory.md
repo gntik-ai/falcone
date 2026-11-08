@@ -38,13 +38,24 @@ idempotent (fresh Idempotency-Key per attempt, including the shared client's sin
 
 ## Browser journeys (`console-service-accounts-page.spec.mjs`)
 
-Twelve cells: es and en at 375, 768 and 1280 px. Tracing is off for the whole describe because the
-disclosure journeys show synthetic secrets; screenshots mask them. The spec compares both builds in the es 1280 cell:
-`console-service-accounts-page.legacy.mjs` serves the legacy bundle (an existing `apps/web-console/dist`, or
-`LEGACY_CONSOLE_DIST`, or a one-off build) with the same session, clock and mocked backend, and the journeys
-create, reveal, rotate, revoke and delete must send the same requests, refetch the same number of times and disclose
-the same credential id and secret. Write counts are per-scenario deltas because the harness keeps requests
-across `parity.open` calls. Workspace switches with a modal open are covered by Vitest only: the open modal makes the
-shell's workspace menu inert, so the browser journey switches tenants through the native tenant select and
-the workspace through the menu only with the non-modal failure surface open.
+Twelve report cells: the roles `tenant_owner` and `tenant_viewer`, each in es and en at 375, 768 and 1280 px, with
+the eight checks in every cell. The owner cells carry the write journeys; the viewer cells assert the read-only
+notice (role label and reason from this page's catalog), every write control disabled with its reason, no request
+sent, the list states, axe, responsive, runtime health, the read-only capture and the colour lint. Tracing is off for
+the whole file because the disclosure journeys show synthetic secrets; screenshots mask them, and variants are reset
+before every capture.
+
+Every owner cell compares both builds: `console-service-accounts-page.legacy.mjs` serves the legacy bundle (an existing
+`apps/web-console/dist`, or `LEGACY_CONSOLE_DIST`, or a one-off build) with the same session, clock, viewport and
+mocked backend, and the create, reveal, rotate, revoke and delete journeys must send the same requests, refetch the
+same number of times and disclose the same credential id and secret. The legacy page is Spanish only, so its controls
+are located with the Spanish copy in every cell. Write counts are per-scenario deltas because the harness keeps
+requests across `parity.open` calls.
+
+Context switches (tenant and workspace) run with a confirmation, a disclosure and a failure open. The open modal makes
+the shell's workspace menu inert to pointer input, so for the two modal cases the spec replays the pointer events
+on the menu trigger and item as DOM events; Vitest covers the same switches with the real shell context.
+
+The primary Revocar and Eliminar buttons read the list first after a network failure, like Reintentar. Escape
+dismisses a mapped create or Revelar alert (409, 429) from the control that regains focus.
 The Spanish locale check allows the legacy client-state labels `Enabled` and `Disabled`, for this page only.

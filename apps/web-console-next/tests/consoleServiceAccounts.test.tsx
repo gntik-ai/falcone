@@ -276,7 +276,7 @@ test('a revoked credential disables Revelar and Rotar with the reason, and keeps
 test.each(locales)('tenant_viewer sees the read-only notice, every write control disabled with its reason, and sends no write in %s', async (locale) => {
   const c = copy[locale]
   await start(locale, { roles: ['tenant_viewer'] })
-  expect(screen.getAllByRole('status').some((node) => node.textContent?.includes('Viewer · solo lectura'))).toBe(true)
+  expect(screen.getAllByRole('status').some((node) => node.textContent?.includes(locale === 'es' ? 'Viewer · solo lectura' : 'Viewer · read-only'))).toBe(true)
   for (const kind of ['reveal', 'rotate', 'revoke', 'delete'] as const) {
     const button = rowButton(kind, 'Billing service', locale)
     expect(button).toBeDisabled()
@@ -354,4 +354,29 @@ test.each(['create', 'reveal', 'rotate', 'revoke', 'delete'] as const)('401 with
   expect(calls(requests).filter(({ path: url }) => url.endsWith('/refresh'))).toHaveLength(1)
   expect(modal()).toBeNull()
   expect(document.body.textContent).not.toContain(syntheticSecret)
+})
+
+test.each([['tenant_viewer', 'Viewer · read-only', 'can view dashboards'], ['tenant_developer', 'Developer · read-only', 'can view the organization']] as const)('the English read-only notice and tooltips for %s carry no Spanish role label or reason', async (role, label, reasonFragment) => {
+  await start('en', { roles: [role] })
+  const notice = screen.getAllByRole('status').find((node) => node.textContent?.includes(copy.en.notice.readOnlyTitle))!
+  expect(notice.textContent).toContain(label)
+  expect(notice.textContent).toContain(reasonFragment)
+  expect(notice.textContent).not.toMatch(/solo lectura|Tu rol|Contacta/)
+  expect(rowButton('reveal', 'Billing service', 'en').getAttribute('title')).toContain(reasonFragment)
+  expect(rowButton('delete', 'Billing service', 'en').getAttribute('title')).not.toMatch(/solo lectura|Tu rol|Contacta/)
+  expect(screen.getByRole('button', { name: copy.en.create.submit }).getAttribute('title') ?? '').not.toMatch(/solo lectura|Tu rol|Contacta/)
+})
+
+test.each([[[], 'No role assigned'], [['unknown_role'], 'Role without recognized write permissions']] as const)('the English notice for roles %j localizes the fail-closed copy', async (roles, label) => {
+  await start('en', { roles: [...roles] })
+  const notice = screen.getAllByRole('status').find((node) => node.textContent?.includes(copy.en.notice.readOnlyTitle))!
+  expect(notice.textContent).toContain(label)
+  expect(notice.textContent).not.toMatch(/Tu sesión|Tu rol|Contacta/)
+})
+
+test('the Spanish read-only notice keeps the legacy role label and reason', async () => {
+  await start('es', { roles: ['tenant_viewer'] })
+  const notice = screen.getAllByRole('status').find((node) => node.textContent?.includes(copy.es.notice.readOnlyTitle))!
+  expect(notice.textContent).toContain('Viewer · solo lectura')
+  expect(notice.textContent).toContain(copy.es.denyReasons.tenant_viewer)
 })

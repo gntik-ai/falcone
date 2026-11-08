@@ -8,7 +8,8 @@
 - [x] Add per-surface failure handling, retry, precheck after network failure and focus rules.
 - [x] Add the context-switch reset, stale response discard and workspace gates.
 - [x] Port the legacy tests and add component, request, route and rollback coverage.
-- [x] Add the parity manifest, journey, legacy comparison and inventory.
+- [x] Add the parity manifest, the twelve-cell journey (tenant_owner and tenant_viewer), the legacy comparison in every owner cell and the inventory.
+- [x] Localize the read-only role label and deny reason through the page catalog.
 - [ ] Run browser parity, axe, short-viewport and CSP gates in PR CI.
 - [ ] Obtain operator review of the CI visual baselines and R3 approval.
 - [ ] Independent checker review before merge.

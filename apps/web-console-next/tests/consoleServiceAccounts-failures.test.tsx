@@ -102,7 +102,7 @@ test.each(locales.flatMap((locale) => acts.flatMap((act) => ['500', 'network'].m
   await waitFor(() => expect(document.activeElement).toBe(retry))
   if (kind === '500') expect(region).toHaveTextContent('req_synthetic_service_accounts')
   expect(document.body.textContent).not.toContain('synthetic-backend-message')
-  expect(announced()).toContain(c.failure.title[act])
+  await waitFor(() => expect(announced()).toContain(c.failure.title[act]))
   expect(modal()).toBeNull()
   // Row state is unchanged by the failure (the page is behind the modal for confirmations).
   if (act === 'create' || act === 'issue') expect(rowButton('revoke', 'Billing service', locale)).toBeEnabled()
@@ -249,4 +249,56 @@ test.each(acts)('401 with a successful refresh resends %s once with fresh keys, 
   expect(calls(requests).filter(({ path }) => path.endsWith('/refresh'))).toHaveLength(1)
   expect((await screen.findAllByText(c.feedback.sessionRenewed)).length).toBeGreaterThan(0)
   expect(writesTo(act)).toHaveLength(2)
+})
+
+test.each(['revoke', 'delete'] as const)('after a network failure the primary %s button also reads the list first and sends one new write only when the change was not applied', async (act) => {
+  const c = copy.en
+  let reads = 0
+  await start('en', { ...sequence(act, () => { throw new TypeError('synthetic-network') }, 'ok'), [`GET ${base()}`]: () => { reads++; return Response.json(list(mixed)) } })
+  const { surface } = await drive(act, 'en')
+  const dialog = await surface()
+  await within(dialog).findByRole('button', { name: c.failure.retry })
+  // The typed name still matches and nothing is pending, so the primary button is enabled; it must not skip the read.
+  fireEvent.click(within(dialog).getByRole('button', { name: c.confirm[act].action }))
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  expect(writesTo(act)).toHaveLength(2)
+  expect(reads).toBe(3)
+})
+
+test.each(['revoke', 'delete'] as const)('after a network failure the primary %s button reports an applied change without a second write', async (act) => {
+  const c = copy.es
+  let reads = 0
+  await start('es', { ...route(act, () => { throw new TypeError('synthetic-network') }), [`GET ${base()}`]: () => Response.json(++reads === 1 ? list(mixed) : list([revoked, expiring])) })
+  const { surface } = await drive(act, 'es')
+  const dialog = await surface()
+  await within(dialog).findByRole('button', { name: c.failure.retry })
+  fireEvent.click(within(dialog).getByRole('button', { name: c.confirm[act].action }))
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  expect(writesTo(act)).toHaveLength(1)
+  expect(announced()).toContain(fill(c.feedback[act === 'revoke' ? 'alreadyRevoked' : 'alreadyDeleted'], { name: 'Billing service' }))
+})
+
+test.each(locales.flatMap((locale) => [409, 429].map((status) => ({ locale, status }))))('create alert $status: Escape from the focused Crear closes the failure in $locale', async ({ locale, status }) => {
+  const c = copy[locale]
+  await start(locale, route('create', failure(status)))
+  await drive('create', locale)
+  const crear = await screen.findByRole('button', { name: c.create.submit })
+  await waitFor(() => expect(crear).toHaveFocus())
+  expect(screen.getByRole('alert')).toBeVisible()
+  fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+  expect(crear).toHaveFocus()
+  expect(screen.getByRole('textbox', { name: c.create.nameLabel })).toHaveValue('Created service')
+})
+
+test.each(locales.flatMap((locale) => [409, 429].map((status) => ({ locale, status }))))('reveal alert $status: Escape from the focused Revelar closes the failure in $locale', async ({ locale, status }) => {
+  await start(locale, route('issue', failure(status)))
+  await drive('issue', locale)
+  const reveal = rowButton('reveal', 'Billing service', locale)
+  await waitFor(() => expect(reveal).toHaveFocus())
+  expect(screen.getByRole('alert')).toBeVisible()
+  fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+  expect(reveal).toHaveFocus()
+  expect(writesTo('issue')).toHaveLength(1)
 })
