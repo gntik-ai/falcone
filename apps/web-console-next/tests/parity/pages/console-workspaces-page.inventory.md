@@ -77,6 +77,11 @@ refresh and tenant-switch cancellation. Routing tests use the actual App, shell
 and guard with the /next basename. Only the existing overview-shell workspaces
 migration expectation changes.
 
+The workspaces sidebar entry uses in-app navigation. Detail-page breadcrumbs
+retain their existing legacy inventory handoff through a breadcrumb-scoped link
+provider, preserving the unchanged docs breadcrumb assertion. The arrival test
+waits for the deferred quota reads before checking the exact request log.
+
 The browser spec has all eight executable criteria in es and en at 375, 768 and
 1280 pixels. It asserts allowed requests, payloads, retry counts, keyboard focus,
 axe serious/critical results, locale, direct and client-side arrival, runtime/CSP

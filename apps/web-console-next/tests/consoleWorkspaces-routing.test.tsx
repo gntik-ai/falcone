@@ -27,7 +27,7 @@ test('arrives in-app from overview through the migrated /next shell link', async
   setup(); open('/console/overview'); expect(isMigratedRoute('/console/workspaces')).toBe(true)
   await waitFor(() => expect(document.querySelector('a[href="/next/console/workspaces"]')).toBeInTheDocument()); const link = document.querySelector('a[href="/next/console/workspaces"]')!; fireEvent.click(link); await screen.findByRole('heading', { name: es.title }, { timeout: 10000 })
   const shellReads = new Set([`/v1/tenants/${tenantId}`, workspaceUrl(tenantId)])
-  expect(requests.mock.mock.calls.map(([path]) => path).filter((path) => !shellReads.has(String(path)))).toEqual([quotasPath, overviewPath])
+  await waitFor(() => expect(requests.mock.mock.calls.map(([path]) => path).filter((path) => !shellReads.has(String(path)))).toEqual([quotasPath, overviewPath]))
 })
 test('a failed create refresh redirects to login with basename intent and never resends', async () => {
   setup({ [`POST ${createPath}`]: () => Response.json({ code: 'UNAUTHORIZED' }, { status: 401 }), 'POST /v1/auth/login-sessions/synthetic-session/refresh': () => Response.json({ code: 'UNAUTHORIZED' }, { status: 401 }), 'GET /v1/auth/signups/policy': { selfServiceEnabled: false, mode: 'invitation' } }); open('/console/workspaces'); await finish(); await screen.findByLabelText('Usuario', {}, { timeout: 10000 })
