@@ -28,6 +28,14 @@ const pageWrites = (p, since) => p.network.requests.slice(since).filter(({ metho
 const listReads = (p, since) => p.network.requests.slice(since).filter(({ method, path }) => method === 'GET' && path === base());
 const settle = (p) => p.page.waitForTimeout(300);
 const mark = (p) => p.network.requests.length;
+// Counts are read after the expected traffic has arrived and then once more after a quiet period, so a late
+// extra request still fails the assertion.
+async function expectTraffic(p, since, { writes, reads }) {
+  await expect.poll(() => pageWrites(p, since).length, { message: 'page writes arrived' }).toBe(writes.length);
+  await expect.poll(() => listReads(p, since).length, { message: 'list reads arrived' }).toBe(reads);
+  await settle(p);
+  expect(pageWrites(p, since)).toEqual(writes); expect(listReads(p, since)).toHaveLength(reads);
+}
 
 // The Spanish page keeps the legacy client-state labels (Enabled, Disabled) on purpose. The allowance
 // is specific to this page: every other shared rule of the locale check still applies.
@@ -231,6 +239,8 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
 
     test('data', async ({ parity: p }) => {
       if (role === 'tenant_viewer') return viewer.data(p);
+      // Twelve page loads and six context switches take longer than the 60 s default on a busy runner.
+      test.setTimeout(300_000);
       const c = copy(p);
       await open(p); await ready(p);
       for (const header of [c.table.name, c.table.clientState, c.table.credential, c.table.access, c.table.expires, c.table.actions]) await expect(grid(p).getByRole('columnheader', { name: header, exact: true })).toBeVisible();
@@ -265,17 +275,18 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
 
     test('action', async ({ parity: p }, info) => {
       if (role === 'tenant_viewer') return viewer.action(p);
-      test.setTimeout(300_000);
+      // The legacy bundle is built on first use when no build is supplied (LEGACY_CONSOLE_DIST), which can take minutes.
+      test.setTimeout(900_000);
       const c = copy(p);
       // Create: Enter submits one POST, refetches once, announces the id and clears the field.
       await open(p); await ready(p); let since = mark(p);
       await nameField(p).fill('Created service'); await nameField(p).press('Enter');
-      await expect(nameField(p)).toHaveValue(''); await expect(polite(p)).toContainText(fill(c.create.created, { id: 'synthetic-sa-created' })); await settle(p);
-      expect(pageWrites(p, since)).toEqual([{ method: 'POST', path: base(), body: { displayName: 'Created service', entityType: 'service_account', desiredState: 'active' } }]);
-      expect(listReads(p, since)).toHaveLength(1);
+      await expect(nameField(p)).toHaveValue(''); await expect(polite(p)).toContainText(fill(c.create.created, { id: 'synthetic-sa-created' }));
+      await expectTraffic(p, since, { writes: [{ method: 'POST', path: base(), body: { displayName: 'Created service', entityType: 'service_account', desiredState: 'active' } }], reads: 1 });
       // Revelar: masked disclosure, toggle found again by its new name, copy and the clipboard fallback.
       await open(p); await ready(p); since = mark(p);
-      await p.page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(p.page.url()).origin });
+      // The clipboard is observed through the page's own writeText call: no browser permission is involved.
+      await p.page.evaluate(() => { window.__copied = []; Object.defineProperty(navigator.clipboard, 'writeText', { configurable: true, value: async (text) => { window.__copied.push(text); } }); });
       await rowButton(p, 'reveal').click();
       const reveal = disclosure(p, 'reveal');
       await expect(reveal).toBeVisible(); await expect(reveal).toHaveAttribute('aria-modal', 'true');
@@ -286,15 +297,14 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
       await expect(reveal.getByRole('textbox', { name: c.disclosure.secretValue, exact: true })).toHaveValue(syntheticSecret);
       await reveal.getByRole('button', { name: c.disclosure.copyAria, exact: true }).click();
       await expect(reveal.getByText(c.disclosure.copied, { exact: true })).toBeVisible();
-      expect(await p.page.evaluate(() => navigator.clipboard.readText())).toBe(syntheticSecret);
+      await expect.poll(() => p.page.evaluate(() => window.__copied)).toEqual([syntheticSecret]);
       await p.page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }));
       await reveal.getByRole('button', { name: c.disclosure.copyAria, exact: true }).click();
       await expect(reveal.getByText(c.disclosure.copyFallback, { exact: true })).toBeVisible();
       await expect(polite(p)).toContainText(c.disclosure.copyFallback);
       await reveal.getByRole('button', { name: c.disclosure.close, exact: true }).click();
-      await expect(rowButton(p, 'reveal')).toBeFocused(); await settle(p);
-      expect(pageWrites(p, since)).toEqual([{ method: 'POST', path: issuancePath(active.serviceAccountId), body: { requestedByUserId: 'synthetic-user' } }]);
-      expect(listReads(p, since)).toHaveLength(1);
+      await expect(rowButton(p, 'reveal')).toBeFocused();
+      await expectTraffic(p, since, { writes: [{ method: 'POST', path: issuancePath(active.serviceAccountId), body: { requestedByUserId: 'synthetic-user' } }], reads: 1 });
       // Rotar: Cancelar and Escape send nothing; the exact name sends one POST; one refetch; the fresh secret in the code block.
       await open(p); await ready(p); since = mark(p);
       await rowButton(p, 'rotate').click();
@@ -312,9 +322,8 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
       await expect(fresh).toBeVisible(); await expect(fresh.getByText(rotatedSecret, { exact: true })).toBeVisible(); await expect(fresh).toBeFocused();
       await expect(polite(p)).toContainText(fill(c.feedback.rotated, { name: active.displayName }));
       await screenshot(p, info, 'rotation-disclosure');
-      await fresh.getByRole('button', { name: c.disclosure.close, exact: true }).click(); await expect(rowButton(p, 'rotate')).toBeFocused(); await settle(p);
-      expect(pageWrites(p, since)).toEqual([{ method: 'POST', path: rotationPath(active.serviceAccountId), body: { reason: 'Console rotate' } }]);
-      expect(listReads(p, since)).toHaveLength(1);
+      await fresh.getByRole('button', { name: c.disclosure.close, exact: true }).click(); await expect(rowButton(p, 'rotate')).toBeFocused();
+      await expectTraffic(p, since, { writes: [{ method: 'POST', path: rotationPath(active.serviceAccountId), body: { reason: 'Console rotate' } }], reads: 1 });
       // Revocar and Eliminar: nothing is sent before the exact name; each success refetches once and is announced.
       for (const [act, outcome] of [['revoke', c.feedback.revoked], ['delete', c.feedback.deleted]]) {
         await open(p); await ready(p); since = mark(p);
@@ -323,7 +332,8 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
         expect(pageWrites(p, since)).toEqual([]);
         await alertDialog(p).getByRole('textbox', { name: c.confirm.typedName, exact: true }).fill(active.displayName);
         await alertDialog(p).getByRole('button', { name: c.confirm[act].action, exact: true }).click();
-        await expect(alertDialog(p)).toHaveCount(0); await expect(polite(p)).toContainText(outcome); await settle(p);
+        await expect(alertDialog(p)).toHaveCount(0); await expect(polite(p)).toContainText(outcome);
+        await expect.poll(() => pageWrites(p, since).length).toBe(1); await expect.poll(() => listReads(p, since).length).toBe(1); await settle(p);
         expect(pageWrites(p, since)).toHaveLength(1); expect(listReads(p, since)).toHaveLength(1);
       }
       // Both builds, same fixtures, in every locale and width cell: requests, refetch counts and disclosure content match.

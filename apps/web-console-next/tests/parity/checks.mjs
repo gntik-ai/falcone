@@ -28,7 +28,21 @@ export async function errorEmpty(parity, manifest) {
     await expect(locate(parity, state.locator), `error-empty: ${state.fixture} ${state.variant}`).toBeVisible();
   }
 }
+// Dialogs fade in and out. axe reads computed colours, so a scan taken halfway through a transition
+// measures blended colours and reports contrast failures that do not exist at rest.
+async function awaitTransitions(page) {
+  await page.evaluate(async () => {
+    const frame = () => new Promise((done) => requestAnimationFrame(() => done()));
+    for (let round = 0; round < 3; round += 1) {
+      await frame();
+      const running = document.getAnimations().filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime ?? 0));
+      await Promise.all(running.map((animation) => animation.finished.catch(() => undefined)));
+    }
+    await frame();
+  });
+}
 export async function assertAccessibility(parity) {
+  await awaitTransitions(parity.page);
   const result = await new AxeBuilder({ page: parity.page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
   expect(result.violations.filter((v) => ['serious', 'critical'].includes(v.impact)), 'accessibility: serious/critical axe violations').toEqual([]);
 }
