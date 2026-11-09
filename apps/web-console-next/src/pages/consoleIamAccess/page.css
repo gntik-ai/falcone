@@ -1,6 +1,3 @@
-/* The users table scrolls inside its own region; the page never overflows horizontally. */
+/* The users table wraps long cells and scrolls inside the kit's own scroll region; the page never overflows horizontally. */
 .iam-users-table table { width: 100%; }
 .iam-users-table th, .iam-users-table td { white-space: normal; overflow-wrap: anywhere; }
-@media (max-width: 1279px) {
-  .iam-users-table table { min-width: 30rem; }
-}
