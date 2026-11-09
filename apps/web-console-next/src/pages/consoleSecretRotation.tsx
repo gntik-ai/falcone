@@ -58,7 +58,9 @@ function RotationContent({ path }: { path: string }) {
       const error = failureOf(cause, newValue)
       setFailure(error); setSubmitCount((value) => value + 1)
       const message = t('submitFailure', { message: error.message || t('networkError') })
-      toast.add({ title: message, description: undefined, tone: 'destructive', priority: 'high' }); announce(message, 'assertive')
+      // The explicit announcer carries urgency. High-priority kit toasts hide
+      // their focusable root until F6, which violates aria-hidden-focus.
+      toast.add({ title: message, description: undefined, tone: 'destructive', priority: 'low' }); announce(message, 'assertive')
     } finally {
       flight.current = false
       if (mounted.current) setSaving(false)
@@ -101,13 +103,17 @@ function LocalizedToaster() {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   useLayoutEffect(() => {
     if (!container) return
-    const translate = () => {
+    const syncAccessibility = () => {
       const viewport = container.querySelector('[role="region"]')
       if (viewport && viewport.getAttribute('aria-label') !== t('notifications')) viewport.setAttribute('aria-label', t('notifications'))
+      // The pinned kit also hides collapsed toast close buttons while leaving
+      // them tabbable. Keep those controls exposed without touching the modal's
+      // background hiding or decorative icons.
+      viewport?.querySelectorAll('button[aria-hidden="true"]').forEach((button) => button.setAttribute('aria-hidden', 'false'))
     }
-    translate()
-    const observer = new MutationObserver(translate)
-    observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label'] })
+    syncAccessibility()
+    const observer = new MutationObserver(syncAccessibility)
+    observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label', 'aria-hidden'] })
     return () => observer.disconnect()
   }, [container, t])
   return <><div ref={setContainer} />{container && <Toaster closeLabel={t('closeToast')} container={container} className="max-w-full" />}</>

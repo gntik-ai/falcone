@@ -211,6 +211,37 @@ test.each([400, 403, 200])('submit %i retains result focus after the confirmatio
   }
   expect(writes()).toHaveLength(1)
 })
+test.each(['es', 'en'] as const)('keeps rotation feedback and its dismiss button accessible before hover or focus in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const c = locale === 'es' ? es : en
+  let status = 200
+  setup({ [`POST ${base}/rotate`]: () => Response.json(status === 200 ? rotationResult : failure(status).body, { status }) })
+  open(); await screen.findByRole('table', { name: c.historyTitle })
+  for (status of [200, 400, 403]) {
+    fireEvent.click(screen.getByRole('button', { name: c.submit }))
+    const confirmation = await screen.findByRole('alertdialog')
+    fireEvent.change(within(confirmation).getByRole('textbox', { name: c.typedPath }), { target: { value: secretPath } })
+    fireEvent.click(within(confirmation).getByRole('button', { name: c.confirm }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    const notifications = screen.getByRole('region', { name: c.notifications })
+    const dismiss = await within(notifications).findByRole('button', { name: c.closeToast })
+    const feedback = within(notifications).getByRole('dialog')
+    expect(feedback).not.toHaveAttribute('aria-modal', 'true')
+    expect(dismiss.closest('[aria-hidden="true"]')).toBeNull()
+    expect(feedback.closest('[aria-hidden="true"]')).toBeNull()
+    const target = status === 200 ? screen.getByRole('button', { name: c.submit }) : within(screen.getByTestId('validation-summary')).getByRole('region')
+    expect(target).toHaveFocus()
+    if (status !== 200) expect(document.querySelector('[data-live-announcer="assertive"]')).toHaveTextContent('synthetic-rotation-error')
+    // The viewport expands and collapses on focus/hover; neither state may hide
+    // a still-focusable close button from assistive technology.
+    fireEvent.focus(notifications); fireEvent.blur(notifications, { relatedTarget: target })
+    fireEvent.mouseEnter(notifications); fireEvent.mouseLeave(notifications)
+    await waitFor(() => expect(dismiss.closest('[aria-hidden="true"]')).toBeNull())
+    fireEvent.click(dismiss)
+    await waitFor(() => expect(within(notifications).queryByRole('dialog')).toBeNull())
+  }
+  expect(writes()).toHaveLength(3)
+})
 test('submit failure focuses the summary when the response arrives after the dialog closes', async () => {
   let failRequest!: () => void
   setup({ [`POST ${base}/rotate`]: () => new Promise<Response>((resolve) => { failRequest = () => resolve(Response.json(failure(403).body, { status: 403 })) }) })

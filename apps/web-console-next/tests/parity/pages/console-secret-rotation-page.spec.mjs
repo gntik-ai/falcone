@@ -218,9 +218,20 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.page.keyboard.press('Escape'); await expect(dialog(parity)).toHaveCount(0); await expect(button(parity, 'submit')).toBeFocused();
       for (const fixture of ['rotation-rotate-400', 'rotation-rotate-403']) {
         await parity.open(route, { rotationSubmit: fixture }); await ready(parity); await confirm(parity); await expect(dialog(parity)).toHaveCount(0); await expect(parity.page.getByTestId('validation-summary').getByRole('region')).toBeFocused();
+        const notifications = parity.page.getByRole('region', { name: c.notifications });
+        const dismiss = notifications.getByRole('button', { name: c.closeToast, exact: true });
+        await expect(dismiss).toBeVisible();
+        await expect(notifications.getByRole('dialog')).toBeVisible();
         await test.step(`audit the focused ${fixture} validation summary`, () => check.assertAccessibility(parity)); await assertLocale(parity);
         await parity.page.getByTestId('validation-summary').getByRole('link').click(); await expect(surface(parity).getByLabel(c.justification, { exact: true })).toBeFocused();
+        await parity.page.keyboard.press('F6'); await expect(notifications).toBeFocused();
+        await parity.page.keyboard.press('Tab'); await expect(notifications.getByRole('dialog')).toBeFocused();
+        await parity.page.keyboard.press('Tab'); await expect(dismiss).toBeFocused();
+        await parity.page.keyboard.press('Enter'); await expect(notifications.getByRole('dialog')).toHaveCount(0);
       }
+      await parity.open(route, { rotationSubmit: 'rotation-rotate-ok' }); await ready(parity); await confirm(parity); await expect(dialog(parity)).toHaveCount(0);
+      await expect(parity.page.getByRole('region', { name: c.notifications }).getByRole('button', { name: c.closeToast, exact: true })).toBeVisible();
+      await test.step('audit success feedback before hover or focus', () => check.assertAccessibility(parity)); await assertLocale(parity);
     });
     test('kit-conformance', async () => { await check.kitConformance(manifest); });
     test('runtime-health', async ({ parity }) => {
