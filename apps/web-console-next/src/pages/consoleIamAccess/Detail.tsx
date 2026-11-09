@@ -24,7 +24,7 @@ interface Props {
 }
 
 function Header({ title }: { title: string }) {
-  return <SectionHeader title={title} description={undefined} count={undefined} actions={[]} as="h2" headingId="iam-user-detail-heading" bordered={false} className="min-w-0" />
+  return <SectionHeader title={title} description={null} count={undefined} actions={[]} as="h2" headingId="iam-user-detail-heading" bordered={false} className="min-w-0" />
 }
 
 export function Detail({ user, detail, busy, allRoles, allGroups, onStatus, onDelete, onRemoveRole, onRemoveGroup, onAssignRole, onAddGroup, onRetry, onBack }: Props) {
@@ -79,13 +79,13 @@ export function Detail({ user, detail, busy, allRoles, allGroups, onStatus, onDe
             { id: 'status', label: t('detail.summary.status'), render: statusTag },
           ]} />
         <div className="min-w-0 space-y-3">
-          <SectionHeader title={t('detail.summary.history')} description={undefined} count={undefined} actions={[]} as="h3" headingId={undefined} bordered={false} className="min-w-0" />
+          <SectionHeader title={t('detail.summary.history')} description={null} count={undefined} actions={[]} as="h3" headingId={undefined} bordered={false} className="min-w-0" />
           <StatusTimeline events={[]} label={t('detail.summary.history')} emptyLabel={t('detail.summary.historyEmpty')} showFewerLabel={t('detail.summary.showFewer')} showEarlierLabel={(count: number) => t('detail.summary.showEarlier', { count })} actorLabel={t('detail.summary.actor')} maxVisible={undefined} timeFormat="relative" className="min-w-0" />
           <Text as="p" variant="body" tone="muted">{t('detail.summary.historyNote')}</Text>
         </div>
       </TabsPanel>
       <TabsPanel value="roles" className="min-w-0 space-y-4 pt-4">
-        <SectionHeader title={t('detail.roles.heading')} description={undefined} count={undefined} actions={[]} as="h3" headingId={undefined} bordered={false} className="min-w-0" />
+        <SectionHeader title={t('detail.roles.heading')} description={null} count={undefined} actions={[]} as="h3" headingId={undefined} bordered={false} className="min-w-0" />
         <div className="flex min-w-0 flex-wrap gap-2">
           {detail.roles.length === 0 && <Text as="span" variant="body" tone="muted">{t('detail.roles.none')}</Text>}
           {detail.roles.map((role) => {
@@ -100,7 +100,7 @@ export function Detail({ user, detail, busy, allRoles, allGroups, onStatus, onDe
           clearable={false} clearLabel="" onClear={undefined} loadOptions={undefined} className={`w-full min-w-0 ${focusRing}`} triggerRef={(element: HTMLButtonElement | null) => { element?.setAttribute('data-focus-key', 'assign-role') }} items={assignableRoles.map((value) => ({ value, label: value }))} />
       </TabsPanel>
       <TabsPanel value="groups" className="min-w-0 space-y-4 pt-4">
-        <SectionHeader title={t('detail.groups.heading')} description={undefined} count={undefined} actions={[]} as="h3" headingId={undefined} bordered={false} className="min-w-0" />
+        <SectionHeader title={t('detail.groups.heading')} description={null} count={undefined} actions={[]} as="h3" headingId={undefined} bordered={false} className="min-w-0" />
         <div className="flex min-w-0 flex-wrap gap-2">
           {detail.groups.length === 0 && <Text as="span" variant="body" tone="muted">{t('detail.groups.none')}</Text>}
           {detail.groups.map((group) => <Badge key={group.id} tone="neutral" variant="outline" size="md" shape="rounded" dot={false} onRemove={undefined} removeLabel="" className="max-w-full gap-1 whitespace-normal break-all">

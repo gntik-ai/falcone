@@ -224,3 +224,16 @@ test('Recargar restarts from the first users page and keeps the selection', asyn
   expect(screen.getByRole('heading', { name: fill(copy.es.detail.heading, { name: 'ada' }) })).toBeVisible()
   await waitFor(() => expect(search()).toHaveFocus())
 })
+
+test.each(['es', 'en'] as const)('the detail headings never render the kit sample copy in %s', async (locale: Locale) => {
+  await i18n.changeLanguage(locale); setup(); open()
+  await table(locale)
+  const page = screen.getByTestId('console-iam-access-page')
+  expect(page).not.toHaveTextContent('Guardrails applied to every deployment')
+  await selectUser('ada', locale)
+  for (const name of ['summary', 'roles', 'groups'] as const) {
+    await openTab(name, locale)
+    expect(page).not.toHaveTextContent('Guardrails applied to every deployment')
+    expect(page).not.toHaveTextContent('Add policy')
+  }
+})
