@@ -8,7 +8,7 @@ import { readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import ConsoleSecretRotationPage from '../src/pages/consoleSecretRotation'
 import { ProtectedRoute } from '../src/shell/session'
 import { login, strictFetch } from './shell-support'
-import { base, confirmed, failure, history, mixed, pending, rotationResult, route, secretPath, syntheticValue, timedOut } from './parity/pages/console-secret-rotation-page.manifest'
+import { base, confirmed, failure, history, mixed, nonterminal, pending, rotationResult, route, secretPath, syntheticValue, timedOut } from './parity/pages/console-secret-rotation-page.manifest'
 import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-secret-rotation-page.json'
 import en from '../src/locales/en/pages.console-secret-rotation-page.json'
@@ -56,6 +56,18 @@ test.each(['es', 'en'] as const)('ports legacy consumer rendering and token pane
   expect(screen.getByRole('spinbutton', { name: c.inputName })).toHaveValue(1800)
   expect(screen.queryByRole('navigation', { name: c.pagination })).toBeNull()
   expect(calls()).toEqual([{ method: 'GET', path: historyUrl, body: undefined }, { method: 'GET', path: `${base}/consumer-status`, body: undefined }])
+})
+test.each(['es', 'en'] as const)('shows failed consumers with a destructive translated label and preserves other states while polling in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const c = locale === 'es' ? es : en
+  vi.useFakeTimers()
+  setup({ [`GET ${base}/consumer-status`]: nonterminal }); const view = open(); await flush()
+  const table = screen.getByRole('table', { name: c.consumersTitle })
+  expect(within(table).getByText(c.states.failed)).toHaveAttribute('data-status', 'failed')
+  expect(within(table).getByText(c.states.failed).querySelector('[aria-hidden="true"]')).toHaveClass('bg-destructive')
+  for (const state of ['reloading', 'unknown']) expect(within(table).getByText(state, { exact: true })).toBeVisible()
+  expect(reads()).toHaveLength(1); await advance(5000); expect(reads()).toHaveLength(2)
+  view.unmount(); await advance(10000); expect(reads()).toHaveLength(2)
 })
 test.each(['es', 'en'] as const)('ports legacy submit with exact body, preserved masked fields and localized feedback in %s', async (locale) => {
   setup(); open(); await ready(); change(es.inputName, '900'); change(es.justification, 'planned rotation'); change(es.newValue, syntheticValue)

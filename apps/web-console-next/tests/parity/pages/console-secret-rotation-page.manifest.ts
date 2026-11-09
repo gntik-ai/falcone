@@ -14,6 +14,11 @@ export const mixed = { consumers: [
   { consumer_id: 'synthetic-function', reload_mechanism: 'webhook', state: 'timeout' },
 ] }
 export const pending = { consumers: [mixed.consumers[1]] }
+export const nonterminal = { consumers: [
+  { consumer_id: 'synthetic-failed', reload_mechanism: 'restart', state: 'failed' },
+  { consumer_id: 'synthetic-reloading', reload_mechanism: 'webhook', state: 'reloading' },
+  { consumer_id: 'synthetic-unknown', reload_mechanism: 'api_reload', state: 'unknown' },
+] }
 export const confirmed = { consumers: [{ ...mixed.consumers[1], state: 'confirmed' }] }
 export const timedOut = { consumers: [{ ...mixed.consumers[1], state: 'timeout' }] }
 export const rotationResult = { rotationId: 'synthetic-rotation', vaultVersionNew: 8, vaultVersionOld: 7, gracePeriodSeconds: 3600, graceExpiresAt: '2026-06-01T13:00:00Z' }
@@ -29,6 +34,7 @@ export const historyFixtures: Record<string, EndpointFixture | EndpointFixture[]
 }
 export const consumerFixtures: Record<string, EndpointFixture | EndpointFixture[]> = {
   success: { body: mixed }, 'rotation-consumers-mixed': { body: mixed }, 'rotation-consumers-empty': { body: { consumers: [] } },
+  'rotation-consumers-failed-and-unknown': { body: nonterminal },
   'rotation-consumers-pending-then-confirmed': [{ body: pending }, { body: confirmed }], 'rotation-consumers-all-timeout': { body: timedOut },
   'rotation-consumers-500-then-ok': [{ body: mixed }, failure(500), { body: pending }],
   'rotation-consumers-network-then-ok': [{ body: mixed }, { network: true }, { body: pending }],

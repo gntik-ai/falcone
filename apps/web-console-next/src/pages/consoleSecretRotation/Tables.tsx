@@ -29,7 +29,7 @@ export function RotationLists({ path }: { path: string }) {
   const consumerColumns: DataTableColumn<Consumer>[] = [
     { id: 'id', header: t('consumer'), sortable: false, cell: (row) => row.consumer_id },
     { id: 'mechanism', header: t('mechanism'), sortable: false, cell: (row) => row.reload_mechanism },
-    { id: 'state', header: t('state'), sortable: false, cell: (row) => <StatusTag status={row.state} label={t(['confirmed', 'pending', 'timeout'].includes(row.state) ? `states.${row.state}` : 'states.unknown')} statuses={{ confirmed: { label: t('states.confirmed'), tone: 'success' }, pending: { label: t('states.pending'), tone: 'warning' }, timeout: { label: t('states.timeout'), tone: 'destructive' } }} variant="soft" size="sm" shape="rounded" uppercase={false} /> },
+    { id: 'state', header: t('state'), sortable: false, cell: (row) => <StatusTag status={row.state} label={['confirmed', 'pending', 'timeout', 'failed'].includes(row.state) ? t(`states.${row.state}`) : row.state} statuses={{ confirmed: { label: t('states.confirmed'), tone: 'success' }, pending: { label: t('states.pending'), tone: 'warning' }, timeout: { label: t('states.timeout'), tone: 'destructive' }, failed: { label: t('states.failed'), tone: 'destructive' } }} variant="soft" size="sm" shape="rounded" uppercase={false} /> },
   ]
   const empty = (section: 'history' | 'consumers') => <EmptyState title={t(`${section}Empty`)} description={t(`${section}EmptyDescription`)} icon={undefined} primaryAction={null} secondaryAction={null} titleAs="h3" bordered={false} className="min-w-0" />
   const skeleton = (columns: number) => <div role="status" aria-label={t('loading')} aria-busy={true}><TableSkeleton rows={3} columns={columns} label={t('loading')} className="min-w-0" /></div>

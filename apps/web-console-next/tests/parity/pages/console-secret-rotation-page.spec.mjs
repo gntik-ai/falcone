@@ -104,6 +104,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
           const after = consumers(parity).length; await parity.page.clock.runFor(15000); expect(consumers(parity)).toHaveLength(after);
         }
       }
+      await parity.open(route, { rotationConsumers: 'rotation-consumers-failed-and-unknown' }); await ready(parity);
+      for (const state of [c.states.failed, 'reloading', 'unknown']) await expect(section(parity, 'consumers').getByText(state, { exact: true })).toBeVisible();
+      const nonterminalReads = consumers(parity).length;
+      await parity.page.clock.runFor(5000); await expect.poll(() => consumers(parity).length).toBe(nonterminalReads + 1);
       for (const fixture of ['rotation-consumers-500-then-ok', 'rotation-consumers-network-then-ok']) {
         const updatedAt = await parity.page.evaluate(() => new Date().toISOString());
         await parity.open(route, { rotationConsumers: fixture }); await ready(parity);
