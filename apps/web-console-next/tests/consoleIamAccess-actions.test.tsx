@@ -53,6 +53,15 @@ test('a created user on another page is revealed so its row can take focus', asy
   await waitFor(() => expect(row).toHaveFocus())
 })
 
+test('create user with a malformed email is blocked by native validation and sends no request', async () => {
+  setup({}); open(); await table()
+  fireEvent.change(usernameField(), { target: { value: 'grace' } })
+  fireEvent.change(form().getByRole('textbox', { name: c.forms.user.email }), { target: { value: 'not-an-email' } })
+  submitUser()
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(writes()).toEqual([])
+})
+
 test('create user without an id in the response focuses the username field', async () => {
   setup({ [`POST ${usersPath}`]: created({}) }); open(); await table()
   fireEvent.change(usernameField(), { target: { value: 'grace' } }); submitUser()

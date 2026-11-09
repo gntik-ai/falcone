@@ -47,7 +47,7 @@ export function Forms({ roles, busy, onCreateUser, onCreateRole, onCreateGroup }
 
   return <section aria-label={t('forms.label')} className="min-w-0 space-y-6">
     <FormSection title={t('forms.user.title')} description={t('forms.user.description')} actions={null} headingLevel="h2" divided={false} labels={{ title: t('forms.user.title'), description: t('forms.user.description') }} className="min-w-0">
-      <form onSubmit={submitUser} noValidate className="grid min-w-0 gap-4" data-testid="iam-create-user-form">
+      <form onSubmit={submitUser} className="grid min-w-0 gap-4" data-testid="iam-create-user-form">
         <Field invalid={false} disabled={false} className="min-w-0">
           <FieldLabel required>{t('forms.user.username')}</FieldLabel>
           <Input data-focus-key="create-user-username" size="md" value={user.username} onValueChange={(username) => setUser((current) => ({ ...current, username }))} autoComplete="username" placeholder={t('forms.user.usernamePlaceholder')} disabled={busy} invalid={false}
