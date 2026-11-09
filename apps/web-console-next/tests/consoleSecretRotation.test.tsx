@@ -206,9 +206,22 @@ test.each([['500', 'es'], ['network', 'es'], ['500', 'en'], ['network', 'en']])(
   await advance(4999); expect(reads()).toHaveLength(3); await advance(1); expect(reads()).toHaveLength(4)
 })
 test.each(['500', 'network'])('never retries a failed POST over sixty seconds after %s', async (status) => {
-  setup({ [`POST ${base}/rotate`]: status === 'network' ? () => { throw new TypeError('synthetic') } : errorResponse(500) }); open(); await ready()
-  submit(); await confirm(); await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull()); expect(writes()).toHaveLength(1)
-  vi.useFakeTimers(); await advance(60000); expect(writes()).toHaveLength(1)
+  // Freeze before submission so a retry scheduled by the failed request would advance too.
+  vi.useFakeTimers()
+  setup({ [`POST ${base}/rotate`]: status === 'network' ? () => { throw new TypeError('synthetic') } : errorResponse(500) }); open(); await flush()
+  const sendWithClock = async () => {
+    submit(); await advance(0)
+    const dialog = screen.getByRole('alertdialog')
+    fireEvent.change(within(dialog).getByRole('textbox', { name: es.typedPath }), { target: { value: secretPath } })
+    fireEvent.click(within(dialog).getByRole('button', { name: es.confirm }))
+    await advance(1000)
+  }
+  await sendWithClock()
+  expect(screen.getByTestId('validation-summary')).toHaveTextContent(es.validationTitle)
+  expect(writes()).toHaveLength(1)
+  await advance(60000)
+  expect(screen.queryByRole('alertdialog')).toBeNull(); expect(writes()).toHaveLength(1)
+  await sendWithClock(); expect(writes()).toHaveLength(2)
 })
 test.each([200, 500])('single-flight keeps both actions disabled during pending POST %i', async (status) => {
   let release!: () => void; const held = new Promise<void>((resolve) => { release = resolve })

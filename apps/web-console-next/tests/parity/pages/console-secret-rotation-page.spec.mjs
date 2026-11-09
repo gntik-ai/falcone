@@ -92,14 +92,23 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(surface(parity).getByRole('spinbutton', { name: c.inputName })).toHaveValue('1800'); await assertLocale(parity);
       await parity.page.clock.install();
       for (const fixture of ['rotation-consumers-empty', 'rotation-consumers-pending-then-confirmed', 'rotation-consumers-all-timeout']) {
-        await parity.open(route, { rotationConsumers: fixture }); await ready(parity); const before = consumers(parity).length;
+        await parity.open(route, { rotationConsumers: fixture }); await ready(parity);
+        // The timer starts after the consumer response, independently of history.
+        if (fixture === 'rotation-consumers-empty') await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersEmpty })).toBeVisible();
+        else await expect(section(parity, 'consumers').getByText(c.states[fixture === 'rotation-consumers-all-timeout' ? 'timeout' : 'pending'], { exact: true })).toBeVisible();
+        const before = consumers(parity).length;
         await parity.page.clock.runFor(5000);
         await expect.poll(() => consumers(parity).length).toBe(before + (fixture === 'rotation-consumers-all-timeout' ? 0 : 1));
-        if (fixture !== 'rotation-consumers-empty') { const after = consumers(parity).length; await parity.page.clock.runFor(15000); expect(consumers(parity)).toHaveLength(after); }
+        if (fixture !== 'rotation-consumers-empty') {
+          await expect(section(parity, 'consumers').getByText(c.states[fixture === 'rotation-consumers-all-timeout' ? 'timeout' : 'confirmed'], { exact: true })).toBeVisible();
+          const after = consumers(parity).length; await parity.page.clock.runFor(15000); expect(consumers(parity)).toHaveLength(after);
+        }
       }
       for (const fixture of ['rotation-consumers-500-then-ok', 'rotation-consumers-network-then-ok']) {
         const updatedAt = await parity.page.evaluate(() => new Date().toISOString());
-        await parity.open(route, { rotationConsumers: fixture }); await ready(parity); await parity.page.clock.runFor(5000);
+        await parity.open(route, { rotationConsumers: fixture }); await ready(parity);
+        await expect(section(parity, 'consumers').getByRole('table', { name: c.consumersTitle })).toBeVisible();
+        await parity.page.clock.runFor(5000);
         await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersError })).toBeVisible();
         await expect(section(parity, 'consumers').getByRole('table', { name: c.staleTable })).toBeVisible();
         await expect(section(parity, 'consumers')).toContainText(c.stale.replace('{time}', await localizedTime(parity, updatedAt)));
@@ -117,6 +126,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await button(parity, 'submit').click(); await parity.page.keyboard.press('Escape'); await expect(dialog(parity)).toHaveCount(0); await expect(button(parity, 'submit')).toBeFocused();
       await confirm(parity); await expect(dialog(parity)).toHaveCount(0);
       expect(posts(parity).at(-1)).toEqual({ method: 'POST', path: `${base}/rotate`, body: { gracePeriodSeconds: 3600, justification: 'synthetic planned rotation', newValue: syntheticValue } });
+      await expect(parity.page.locator('[data-live-announcer="polite"]')).toHaveCount(1);
+      await expect(parity.page.locator('[data-live-announcer="assertive"]')).toHaveCount(1);
       await expect(parity.page.locator('[data-live-announcer="polite"]')).toContainText(String(rotationResult.vaultVersionNew));
       const expiry = await localizedTime(parity, rotationResult.graceExpiresAt);
       await expect(parity.page.locator('[data-live-announcer="polite"]')).toContainText(expiry);
