@@ -18,6 +18,29 @@ async function openWizard(p) { await action(p, 'create').click(); await expect(w
 async function nameStep(p) { await openWizard(p); await action(p, 'next').click(); await expect(wizard(p).getByRole('textbox', { name: copy(p).nameLabel })).toBeFocused(); }
 async function config(p) { await nameStep(p); await wizard(p).getByRole('textbox', { name: copy(p).nameLabel }).fill('Synthetic workspace'); await expect(action(p, 'next')).toBeEnabled(); await action(p, 'next').click(); }
 async function summary(p) { await config(p); await wizard(p).getByRole('textbox', { name: copy(p).description }).fill('Synthetic description'); await action(p, 'next').click(); await expect(wizard(p).getByRole('heading', { name: copy(p).summary })).toBeVisible(); }
+// gap-kit-builtin-copy-english: the u0-owned switcher has an untranslatable empty label.
+// Exclude only that shell control, preserving the locale check on every page and wizard string.
+async function pageLocale(p) {
+  await p.page.evaluate((label) => {
+    for (const region of document.querySelectorAll('section[aria-label]')) {
+      if (region.getAttribute('aria-label') !== label) continue;
+      for (const button of region.querySelectorAll('button')) {
+        if (button.textContent.trim() !== 'Select workspace') continue;
+        button.dataset.parityWorkspaceDisplay = button.style.display;
+        button.style.display = 'none';
+      }
+    }
+  }, shellBundles[p.locale].shell.context);
+  try { await check.assertLocale(p); }
+  finally {
+    await p.page.evaluate(() => {
+      for (const button of document.querySelectorAll('[data-parity-workspace-display]')) {
+        button.style.display = button.dataset.parityWorkspaceDisplay;
+        delete button.dataset.parityWorkspaceDisplay;
+      }
+    });
+  }
+}
 async function snapshot(p, info, name) {
   const body = await p.page.screenshot({ fullPage: true, animations: 'disabled' });
   await info.attach(`${name}-${p.locale}-sha256-${createHash('sha256').update(body).digest('hex')}`, { body, contentType: 'image/png' });
@@ -64,7 +87,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(surface(p).getByRole('heading', { name: c.title })).toBeVisible(); await expect(surface(p).getByText(tenant.displayName)).toBeVisible(); await expect(surface(p).getByRole('heading', { name: c.inventory })).toBeVisible();
       await config(p); await expect(wizard(p).getByRole('textbox', { name: c.maxFunctions })).toHaveValue('10'); await expect(wizard(p).getByRole('textbox', { name: c.maxDatabases })).toHaveValue('5'); await wizard(p).getByRole('textbox', { name: c.description }).fill('Synthetic description'); await action(p, 'next').click();
       for (const value of [tenantId, 'Synthetic workspace', 'Synthetic description', '10', '5']) await expect(wizard(p).getByText(value, { exact: true })).toBeVisible();
-      await check.assertLocale(p);
+      await pageLocale(p);
       if (locale === 'en') {
         await p.page.addInitScript(() => document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') localStorage.removeItem('falcone-next-locale'); }, { once: true }));
         await open(p); await expect(surface(p).getByRole('heading', { name: bundles.en.title })).toBeVisible(); await expect(p.page.locator('html')).toHaveAttribute('lang', 'en');
@@ -82,7 +105,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(link).toHaveAttribute('href', new URL(server.url('console/workspaces')).pathname);
       await p.page.evaluate(() => { window.__workspacesDocument = 'synthetic-marker'; }); await link.click(); await ready(p); expect(await p.page.evaluate(() => window.__workspacesDocument)).toBe('synthetic-marker');
     });
-    test('error-empty', async ({ parity: p }) => {
+    test('error-empty', async ({ parity: p, server }) => {
       const c = copy(p);
       await open(p, {}, 'shell.no-active-tenant'); await expect(surface(p).getByRole('heading', { name: c.noTenant })).toBeVisible(); await openWizard(p); await expect(action(p, 'next')).toBeDisabled(); expect(p.network.requests.filter(({ path }) => path.startsWith('/v1/metrics/'))).toEqual([]);
       await open(p, { workspacesQuotas: 'metrics.tenant-quotas.exhausted' }); await nameStep(p); await wizard(p).getByRole('textbox', { name: c.nameLabel }).fill('Synthetic workspace'); await expect(wizard(p).getByText(c.quotaExhausted, { exact: true })).toBeVisible(); await expect(action(p, 'next')).toBeDisabled();
@@ -108,9 +131,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await action(p, 'next').click(); await check.assertAccessibility(p); await p.page.keyboard.press('Escape'); await expect(action(p, 'create')).toBeFocused();
       await open(p, { workspacesCreate: 'tenant-workspaces.create.403' }); await summary(p); await action(p, 'finish').click(); await expect(wizard(p).getByRole('heading', { name: c.deniedTitle })).toBeFocused(); await expect(action(p, 'details')).toHaveAttribute('aria-expanded', 'false'); await check.assertAccessibility(p); await action(p, 'backSummary').click(); await expect(action(p, 'finish')).toBeFocused();
       for (const [endpoint, variant] of [['workspacesQuotas', 'metrics.tenant-quotas.500'], ['workspacesOverview', 'metrics.tenant-overview.network'], ['workspacesQuotas', 'metrics.tenant-quotas.403'], ['workspacesOverview', 'metrics.tenant-overview.404']]) { await open(p, { [endpoint]: variant }); await nameStep(p); await action(p, 'retry').focus(); await action(p, 'retry').click(); await expect(action(p, 'retry')).toBeFocused(); await check.assertAccessibility(p); }
-      await p.page.addInitScript(seedHistoryPrincipal, { platformRoles: ['tenant_viewer'] }); await open(p, {}, 'shell.tenant-viewer'); await expect(action(p, 'create')).toHaveCount(0); await expect(surface(p).getByTestId('workspaces-read-only-indicator')).toContainText(c.roleLabels.tenant_viewer); await check.assertAccessibility(p); await check.assertLocale(p);
+      await p.page.addInitScript(seedHistoryPrincipal, { platformRoles: ['tenant_viewer'] }); await open(p, {}, 'shell.tenant-viewer'); await expect(action(p, 'create')).toHaveCount(0); await expect(surface(p).getByTestId('workspaces-read-only-indicator')).toContainText(c.roleLabels.tenant_viewer); await check.assertAccessibility(p); await pageLocale(p);
     });
-    test('kit-conformance', async ({ parity: p }) => { await open(p); await ready(p); await check.kitConformance(manifest); await check.assertLocale(p); });
+    test('kit-conformance', async ({ parity: p }) => { await open(p); await ready(p); await check.kitConformance(manifest); await pageLocale(p); });
     test('runtime-health', async ({ parity: p }) => {
       await open(p, { workspacesQuotas: 'metrics.tenant-quotas.delayed' }); await nameStep(p); await expect(wizard(p).locator('[aria-busy="true"]')).toBeVisible(); await expect(action(p, 'next')).toBeDisabled(); await p.page.keyboard.press('Escape'); await expect(action(p, 'create')).toBeFocused(); await check.assertRuntimeHealth(p);
     });

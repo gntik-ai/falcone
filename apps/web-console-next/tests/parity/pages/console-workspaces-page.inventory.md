@@ -13,7 +13,7 @@ Installed UI, blocks and templates remain 0.11.0; tokens remain 0.3.0. No MCP
 server is available, so validate_page is NOT_RUN. Installed declarations confirm
 the snapshot's component interfaces. The existing u0 API, session, shell, i18n,
 CSP and parity foundations are reused. The shell preserves legacy inventory links
-in page content and translates its empty workspace control without kit fallback copy.
+in page content and retains the foundation's unchanged workspace switcher.
 
 ## API parity
 
@@ -82,10 +82,14 @@ The workspaces sidebar and mobile navigation entries use in-app navigation.
 Page content and breadcrumbs retain their existing legacy inventory handoff
 through a content-scoped link provider, preserving the unchanged realtime back
 links and docs breadcrumb assertion. Routing regressions assert both realtime
-403/404 root links and the migrated shell entry. The empty workspace control uses
-a disabled kit button with existing common-catalog copy; it offers no selection
-when the bootstrap returns no workspaces. The arrival test waits for the deferred
-quota reads before checking the exact request log.
+403/404 root links and the migrated shell entry. This compatibility adapter is
+needed to keep the existing page contracts unchanged when the migrated flag
+changes the sidebar destination. The foundation's empty WorkspaceSwitcher keeps
+its built-in English "Select workspace" label, as the existing overview parity
+fixture requires. Under gap-kit-builtin-copy-english, only that shell control is
+temporarily hidden during this page's locale assertion, following the existing
+observability-page pattern. Every page and wizard string remains checked. The
+arrival test waits for the deferred quota reads before checking the exact log.
 
 CI repair corrects the new browser journey to open the mobile drawer below the
 sidebar breakpoint and select the visible navigation entry by its translated
@@ -93,9 +97,20 @@ name. An aborted create has no server response, so its expanded technical detail
 must contain the browser's fetch error rather than the HTTP fixtures' synthetic
 server message; neither message may appear in announcements. The stored 401
 return intent must exactly match the harness base path, including /next/ when set.
-No pre-existing test or CI gate is changed. The flow-history 401-rejected failure
-is an existing harness race between counting the active-context region and
+No pre-existing test or CI gate is changed by this repair. The flow-history
+401-rejected log shows a race between counting the active-context region and
 asserting its attribute after a login redirect; both files are unchanged from base.
+That path still needs CI/base verification and is left unchanged here.
+
+The checker repair restores the foundation's WorkspaceSwitcher instead of changing
+shared shell copy to satisfy a page-local assertion. The new routing test checks
+the existing switcher contract and the translated page content; its previous
+disabled-button expectations were outside this page's acceptance criteria. The
+error-empty journey explicitly requests its server fixture before checking the
+basename-aware login return intent. Wizard result announcements use the page's
+live announcer rather than duplicating the same result in the layout's polite
+step announcement. Success feedback includes a toast and a polite live
+announcement while the result is open.
 
 The browser spec has all eight executable criteria in es and en at 375, 768 and
 1280 pixels. It asserts allowed requests, payloads, retry counts, keyboard focus,

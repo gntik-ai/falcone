@@ -1,7 +1,7 @@
 import { LayoutDashboard, Shield } from 'lucide-react'
 import { Suspense, useState, useEffect, type ComponentPropsWithRef } from 'react'
 import { AppSidebar, AppTopbar } from '@gntik-ai/blocks'
-import { SidebarLayout, Breadcrumbs, Button, WorkspaceSwitcher, LinkProvider, MobileNav, type NavGroup } from '@gntik-ai/ui'
+import { SidebarLayout, Breadcrumbs, WorkspaceSwitcher, LinkProvider, MobileNav, type NavGroup } from '@gntik-ai/ui'
 import { Link, Outlet, useLocation, matchRoutes, type RouteObject } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
@@ -105,12 +105,9 @@ function ContextPanel() {
       <option value="">{t('shell.selectTenant')}</option>
       {context.tenants.map((tenant) => <option key={tenant.tenantId} value={tenant.tenantId}>{tenant.displayName}</option>)}
     </select></label>
-    {context.workspaces.length === 0
-      ? <Button type="button" variant="secondary" size="md" disabled={true} loading={false} iconOnly={false}
-          icon={undefined} trailingIcon={undefined} aria-label={t('shell.workspace')}>{t('shell.selectWorkspace')}</Button>
-      : <WorkspaceSwitcher workspaces={context.workspaces.map((workspace) => ({ id: workspace.workspaceId, name: workspace.displayName }))}
-          currentId={context.activeWorkspaceId ?? ''} onSelect={(workspace) => context.selectWorkspace(workspace.id)} label={t('shell.workspace')}
-          emptyText={t('shell.selectWorkspace')} />}
+    <WorkspaceSwitcher workspaces={context.workspaces.map((workspace) => ({ id: workspace.workspaceId, name: workspace.displayName }))}
+      currentId={context.activeWorkspaceId ?? ''} onSelect={(workspace) => context.selectWorkspace(workspace.id)} label={t('shell.workspace')}
+      emptyText={t('shell.selectWorkspace')} />
     {permissions.isReadOnly && <span>{t('shell.readOnly')}</span>}
     {context.error && <p role="status">{context.error.status === 403 ? t('states.forbidden.body') : t('states.network.body')}</p>}
   </section>
