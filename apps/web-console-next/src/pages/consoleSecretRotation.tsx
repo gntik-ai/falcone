@@ -11,13 +11,14 @@ import { BackLink, focusRing } from './consoleSecretRotation/States'
 import { ConfirmRotation } from './consoleSecretRotation/ConfirmRotation'
 import { RotationLists } from './consoleSecretRotation/Tables'
 import { failureOf, type Failure } from './consoleSecretRotation/state'
+import { formatRotationTime } from './consoleSecretRotation/formatTime'
 import './consoleSecretRotation/page.css'
 
 i18n.addResourceBundle('es', 'pages.console-secret-rotation-page', es)
 i18n.addResourceBundle('en', 'pages.console-secret-rotation-page', en)
 
 function RotationContent({ path }: { path: string }) {
-  const { t } = useTranslation('pages.console-secret-rotation-page')
+  const { t, i18n } = useTranslation('pages.console-secret-rotation-page')
   const announce = useAnnounce(), toast = useToast()
   const [grace, setGrace] = useState(1800)
   const [justification, setJustification] = useState('')
@@ -44,7 +45,7 @@ function RotationContent({ path }: { path: string }) {
     try {
       const result = await initiateSecretRotation(path, { gracePeriodSeconds: grace, justification, newValue })
       if (!mounted.current) return
-      const message = t('success', { version: result.vaultVersionNew, expiry: result.graceExpiresAt ?? t('missing') })
+      const message = t('success', { version: result.vaultVersionNew, expiry: formatRotationTime(result.graceExpiresAt, i18n.language, t('missing')) })
       toast.add({ title: message, description: undefined, tone: 'success', priority: 'low' }); announce(message, 'polite')
     } catch (cause) {
       if (!mounted.current) return

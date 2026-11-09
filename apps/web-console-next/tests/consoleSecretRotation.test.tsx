@@ -20,6 +20,7 @@ const setup = (routes: Record<string, unknown> = {}) => {
 const calls = () => requests.mock.mock.calls.map(([path, init]) => ({ method: init?.method ?? 'GET', path: String(path), body: init?.body ? JSON.parse(String(init.body)) : undefined }))
 const writes = () => calls().filter(({ method }) => method === 'POST')
 const reads = () => calls().filter(({ path }) => path.endsWith('/consumer-status'))
+const localizedTime = (value: string, locale: string) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 function open(path = route, protect = false) {
   const page = <ConsoleSecretRotationPage />
   return render(<StrictMode><MemoryRouter initialEntries={[path]}><Routes><Route path="/console/secrets/:encodedSecretPath/rotate" element={protect ? <ProtectedRoute>{page}</ProtectedRoute> : page} /><Route path="/login" element={<div data-testid="login" />} /></Routes></MemoryRouter></StrictMode>)
@@ -54,15 +55,23 @@ test.each(['es', 'en'] as const)('ports legacy consumer rendering and token pane
   expect(screen.queryByRole('navigation', { name: c.pagination })).toBeNull()
   expect(calls()).toEqual([{ method: 'GET', path: historyUrl, body: undefined }, { method: 'GET', path: `${base}/consumer-status`, body: undefined }])
 })
-test('ports legacy submit with exact request body, confirmation and preserved masked fields', async () => {
+test.each(['es', 'en'] as const)('ports legacy submit with exact body, preserved masked fields and localized feedback in %s', async (locale) => {
   setup(); open(); await ready(); change(es.inputName, '900'); change(es.justification, 'planned rotation'); change(es.newValue, syntheticValue)
   submit(); const dialog = await screen.findByRole('alertdialog'); expect(within(dialog).getByRole('button', { name: es.confirm })).toBeDisabled(); expect(dialog.textContent).not.toContain(syntheticValue)
-  await confirm(); await waitFor(() => expect(writes()).toHaveLength(1))
+  // Use the active locale at confirmation, including after a language change.
+  await act(async () => { await i18n.changeLanguage(locale) })
+  const c = locale === 'es' ? es : en
+  fireEvent.change(within(dialog).getByRole('textbox', { name: c.typedPath }), { target: { value: secretPath } })
+  fireEvent.click(within(dialog).getByRole('button', { name: c.confirm }))
+  await waitFor(() => expect(writes()).toHaveLength(1))
   expect(writes()).toEqual([{ method: 'POST', path: `${base}/rotate`, body: { gracePeriodSeconds: 900, justification: 'planned rotation', newValue: syntheticValue } }])
-  expect(screen.getByLabelText(es.inputName)).toHaveValue(900); expect(screen.getByLabelText(es.justification)).toHaveValue('planned rotation')
-  expect(screen.getByLabelText(es.newValue)).toHaveValue(syntheticValue); expect(screen.getByLabelText(es.newValue)).toHaveAttribute('type', 'password')
-  await waitFor(() => expect(document.body.textContent).toContain(rotationResult.graceExpiresAt))
-  expect(document.body.textContent).not.toContain(syntheticValue); expect(screen.getByRole('button', { name: es.submit })).toBeEnabled()
+  expect(screen.getByLabelText(c.inputName)).toHaveValue(900); expect(screen.getByLabelText(c.justification)).toHaveValue('planned rotation')
+  expect(screen.getByLabelText(c.newValue)).toHaveValue(syntheticValue); expect(screen.getByLabelText(c.newValue)).toHaveAttribute('type', 'password')
+  const message = i18n.t('success', { ns: 'pages.console-secret-rotation-page', version: rotationResult.vaultVersionNew, expiry: localizedTime(rotationResult.graceExpiresAt, locale) })
+  await waitFor(() => expect(screen.getByRole('region', { name: c.notifications })).toHaveTextContent(message))
+  expect(document.querySelector('[data-live-announcer="polite"]')).toHaveTextContent(message)
+  expect(document.body.textContent).not.toContain(rotationResult.graceExpiresAt)
+  expect(document.body.textContent).not.toContain(syntheticValue); expect(screen.getByRole('button', { name: c.submit })).toBeEnabled()
 })
 test.each([120, 0, 90000])('sends unclamped %i with an empty required justification and clamps only the slider', async (value) => {
   setup(); open(); await ready(); change(es.inputName, value === 0 ? '' : String(value))
@@ -123,9 +132,38 @@ test.each([400, 403, 404, 500, 503, 'network'] as const)('submit %s focuses summ
   open(); await ready(); change(es.newValue, syntheticValue); submit(); await confirm()
   await waitFor(() => expect(within(screen.getByTestId('validation-summary')).getByRole('region')).toHaveFocus())
   expect(document.body.textContent).not.toContain(syntheticValue); expect(screen.getByLabelText(es.newValue)).toHaveValue(syntheticValue)
+  expect(screen.getByTestId('validation-summary')).toHaveTextContent(status === 'network' ? es.networkError : 'synthetic error …')
   expect(writes()).toHaveLength(1); expect(screen.queryByRole('alertdialog')).toBeNull()
   fireEvent.click(within(screen.getByTestId('validation-summary')).getByRole('link')); expect(screen.getByLabelText(es.justification)).toHaveFocus()
   submit(); await confirm(); await waitFor(() => expect(writes()).toHaveLength(2))
+})
+test.each(['es', 'en'] as const)('localizes network and non-JSON submit errors on every feedback surface in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const c = locale === 'es' ? es : en
+  const failures = [
+    () => { throw new TypeError('Failed to fetch') },
+    () => new Response('synthetic upstream failure', { status: 500, statusText: 'Internal Server Error' }),
+    () => new Response(null, { status: 503 }),
+    () => new Response('{invalid-json', { status: 502, headers: { 'content-type': 'application/json' } }),
+  ]
+  let attempt = 0
+  setup({ [`POST ${base}/rotate`]: () => failures[attempt++]() }); open()
+  await screen.findByRole('table', { name: c.historyTitle })
+  change(c.newValue, syntheticValue)
+  const message = i18n.t('submitFailure', { ns: 'pages.console-secret-rotation-page', message: c.networkError })
+  for (let index = 0; index < failures.length; index++) {
+    fireEvent.click(screen.getByRole('button', { name: c.submit }))
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.change(within(dialog).getByRole('textbox', { name: c.typedPath }), { target: { value: secretPath } })
+    fireEvent.click(within(dialog).getByRole('button', { name: c.confirm }))
+    await waitFor(() => expect(within(screen.getByTestId('validation-summary')).getByRole('region')).toHaveFocus())
+    expect(screen.getByTestId('validation-summary')).toHaveTextContent(message)
+    await waitFor(() => expect(screen.getByRole('region', { name: c.notifications })).toHaveTextContent(message))
+    expect(document.querySelector('[data-live-announcer="assertive"]')).toHaveTextContent(message)
+    expect(document.body.textContent).not.toMatch(/Failed to fetch|Internal Server Error|Request failed|invalid-json/)
+    expect(document.body.textContent).not.toContain(syntheticValue)
+    expect(writes()).toHaveLength(index + 1)
+  }
 })
 test.each([confirmed, timedOut])('stops polling on a nonempty terminal collection', async (terminal) => {
   vi.useFakeTimers(); let attempt = 0; setup({ [`GET ${base}/consumer-status`]: () => Response.json(++attempt === 1 ? pending : terminal) })
@@ -136,16 +174,20 @@ test.each(['empty', '404', '500', 'network'])('continues one poll every five sec
   vi.useFakeTimers(); setup({ [`GET ${base}/consumer-status`]: state === 'empty' ? { consumers: [] } : state === 'network' ? () => { throw new TypeError('synthetic') } : errorResponse(Number(state)) })
   const view = open(); await flush(); expect(reads()).toHaveLength(1); await advance(15000); expect(reads()).toHaveLength(4); view.unmount(); await advance(60000); expect(reads()).toHaveLength(4)
 })
-test.each(['500', 'network'])('consumer %s retry marks retained rows stale, replaces them and reschedules one timer', async (state) => {
-  vi.useFakeTimers(); let attempt = 0
+test.each([['500', 'es'], ['network', 'es'], ['500', 'en'], ['network', 'en']])('consumer %s retry localizes stale times in %s and reschedules one timer', async (state, locale) => {
+  await i18n.changeLanguage(locale)
+  const c = locale === 'es' ? es : en
+  vi.useFakeTimers(); const updatedAt = '2026-06-01T12:34:56.789Z'; vi.setSystemTime(new Date(updatedAt)); let attempt = 0
   setup({ [`GET ${base}/consumer-status`]: () => {
     attempt++; if (attempt === 1) return Response.json(mixed)
     if (attempt === 2) { if (state === 'network') throw new TypeError('synthetic'); return Response.json(failure(500).body, { status: 500 }) }
     return Response.json(pending)
   } })
-  open(); await flush(); await advance(5000); expect(screen.getByRole('table', { name: es.staleTable })).toBeVisible(); expect(screen.getByText(/Datos desactualizados/)).toBeVisible()
-  await advance(1000); fireEvent.click(within(screen.getByTestId('rotation-consumers')).getByRole('button', { name: es.retry })); await flush()
-  expect(reads()).toHaveLength(3); expect(screen.queryByText(/Datos desactualizados/)).toBeNull(); expect(screen.queryByText('synthetic-apisix')).toBeNull()
+  const stale = i18n.t('stale', { ns: 'pages.console-secret-rotation-page', time: localizedTime(updatedAt, locale) })
+  open(); await flush(); await advance(5000); expect(screen.getByRole('table', { name: c.staleTable })).toBeVisible(); expect(screen.getByText(stale)).toBeVisible()
+  expect(screen.getByTestId('rotation-consumers')).not.toHaveTextContent(updatedAt)
+  await advance(1000); fireEvent.click(within(screen.getByTestId('rotation-consumers')).getByRole('button', { name: c.retry })); await flush()
+  expect(reads()).toHaveLength(3); expect(screen.queryByText(stale)).toBeNull(); expect(screen.queryByText('synthetic-apisix')).toBeNull()
   await advance(4999); expect(reads()).toHaveLength(3); await advance(1); expect(reads()).toHaveLength(4)
 })
 test.each(['500', 'network'])('never retries a failed POST over sixty seconds after %s', async (status) => {

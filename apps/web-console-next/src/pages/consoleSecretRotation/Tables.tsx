@@ -4,6 +4,7 @@ import { DataTable, SectionHeader, TableSkeleton, type DataTableColumn } from '@
 import type { SecretConsumerStatus } from './api'
 import { ReadFailure } from './States'
 import { useConsumers, useHistory } from './useRotationReads'
+import { formatRotationTime } from './formatTime'
 
 type Row = Record<string, unknown>
 function RotationTable<T>({ rows, columns, label, rowId }: { rows: T[]; columns: DataTableColumn<T>[]; label: string; rowId: (row: T) => string }) {
@@ -41,7 +42,7 @@ export function RotationLists({ path }: { path: string }) {
     <section aria-labelledby="rotation-consumers-heading" className="min-w-0 space-y-4" data-testid="rotation-consumers">
       <SectionHeader title={t('consumersTitle')} description={t('consumerCount', { count: consumers.data?.consumers.length ?? 0 })} count={consumers.data?.consumers.length ?? 0} actions={[]} as="h2" bordered={false} headingId="rotation-consumers-heading" className="min-w-0" />
       {consumers.failure && <ReadFailure failure={consumers.failure} section="consumers" retry={consumers.retry} />}
-      {consumers.failure && consumers.data && <Text as="p" variant="supporting" tone="warning">{t('stale', { time: consumers.updatedAt })}</Text>}
+      {consumers.failure && consumers.data && <Text as="p" variant="supporting" tone="warning">{t('stale', { time: formatRotationTime(consumers.updatedAt, i18n.language, t('missing')) })}</Text>}
       {!consumers.data ? !consumers.failure && skeleton(3) : consumers.data.consumers.length ? <RotationTable rows={consumers.data.consumers} columns={consumerColumns} label={t(consumers.failure ? 'staleTable' : 'consumersTitle')} rowId={(row) => row.consumer_id} /> : !consumers.failure && empty('consumers')}
     </section>
   </div>

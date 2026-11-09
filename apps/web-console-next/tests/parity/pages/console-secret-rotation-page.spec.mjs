@@ -14,6 +14,7 @@ const button = (p, key) => p.page.getByRole('button', { name: copy(p)[key], exac
 const posts = (p) => p.network.requests.filter(({ method, path }) => method === 'POST' && path.startsWith(base));
 const consumers = (p) => p.network.requests.filter(({ path }) => path === `${base}/consumer-status`);
 const ready = (p) => expect(section(p, 'history').getByRole('table')).toBeVisible();
+const localizedTime = (p, value) => p.page.evaluate(({ value, locale }) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)), { value, locale: p.locale });
 async function confirm(p) {
   await button(p, 'submit').click();
   await expect(dialog(p)).toBeVisible();
@@ -80,9 +81,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         if (fixture !== 'rotation-consumers-empty') { const after = consumers(parity).length; await parity.page.clock.runFor(15000); expect(consumers(parity)).toHaveLength(after); }
       }
       for (const fixture of ['rotation-consumers-500-then-ok', 'rotation-consumers-network-then-ok']) {
+        const updatedAt = await parity.page.evaluate(() => new Date().toISOString());
         await parity.open(route, { rotationConsumers: fixture }); await ready(parity); await parity.page.clock.runFor(5000);
         await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersError })).toBeVisible();
         await expect(section(parity, 'consumers').getByRole('table', { name: c.staleTable })).toBeVisible();
+        await expect(section(parity, 'consumers')).toContainText(c.stale.replace('{time}', await localizedTime(parity, updatedAt)));
+        await expect(section(parity, 'consumers')).not.toContainText(updatedAt);
         const before = consumers(parity).length; await section(parity, 'consumers').getByRole('button', { name: c.retry, exact: true }).click();
         await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersError })).toHaveCount(0);
         expect(consumers(parity)).toHaveLength(before + 1); await parity.page.clock.runFor(4999); expect(consumers(parity)).toHaveLength(before + 1);
@@ -97,7 +101,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await confirm(parity); await expect(dialog(parity)).toHaveCount(0);
       expect(posts(parity).at(-1)).toEqual({ method: 'POST', path: `${base}/rotate`, body: { gracePeriodSeconds: 3600, justification: 'synthetic planned rotation', newValue: syntheticValue } });
       await expect(parity.page.locator('[data-live-announcer="polite"]')).toContainText(String(rotationResult.vaultVersionNew));
-      await expect(parity.page.locator('[data-live-announcer="polite"]')).toContainText(rotationResult.graceExpiresAt);
+      const expiry = await localizedTime(parity, rotationResult.graceExpiresAt);
+      await expect(parity.page.locator('[data-live-announcer="polite"]')).toContainText(expiry);
+      await expect(parity.page.getByRole('region', { name: c.notifications })).toContainText(expiry);
+      await expect(parity.page.locator('body')).not.toContainText(rotationResult.graceExpiresAt);
       await expect(surface(parity).getByLabel(c.newValue, { exact: true })).toHaveValue(syntheticValue);
       await expect(surface(parity).getByLabel(c.newValue, { exact: true })).toHaveAttribute('type', 'password');
       await button(parity, 'next').click(); await expect(section(parity, 'history').getByText('synthetic-page-two', { exact: true })).toBeVisible();
@@ -127,6 +134,13 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       for (const fixture of ['rotation-rotate-400', 'rotation-rotate-403', 'rotation-rotate-404', 'rotation-rotate-500', 'rotation-rotate-503', 'rotation-rotate-network']) {
         await parity.open(route, { rotationSubmit: fixture }); await ready(parity); await fill(parity); const before = posts(parity).length; await confirm(parity);
         await expect(parity.page.getByTestId('validation-summary').getByRole('region')).toBeFocused(); await noLeak(parity); expect(posts(parity)).toHaveLength(before + 1);
+        if (fixture === 'rotation-rotate-network') {
+          const message = c.submitFailure.replace('{message}', c.networkError);
+          await expect(parity.page.getByTestId('validation-summary')).toContainText(message);
+          await expect(parity.page.getByRole('region', { name: c.notifications })).toContainText(message);
+          await expect(parity.page.locator('[data-live-announcer="assertive"]')).toContainText(message);
+          await expect(parity.page.locator('body')).not.toContainText('Failed to fetch');
+        }
       }
       for (const fixture of ['rotation-rotate-slow', 'rotation-rotate-slow-500']) {
         await parity.open(route, { rotationSubmit: fixture }); await ready(parity); const before = posts(parity).length; await confirm(parity);
@@ -193,7 +207,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.open(route, { rotationHistory: 'rotation-history-page1', rotationConsumers: 'rotation-consumers-mixed' }); await ready(parity); await fill(parity); await capture(parity, info, 'unsaved-paged-history-mixed-consumers');
       await button(parity, 'submit').click(); await capture(parity, info, 'confirm-destructive'); await button(parity, 'cancel').click();
       await parity.open(route, { rotationSubmit: 'rotation-rotate-slow' }); await ready(parity); await fill(parity); await confirm(parity); await expect(button(parity, 'submit')).toBeDisabled(); await expect(dialog(parity)).toHaveCount(0); await capture(parity, info, 'saving'); await expect(button(parity, 'submit')).toBeEnabled();
-      await parity.open(route, { rotationSubmit: 'rotation-rotate-ok' }); await ready(parity); await fill(parity); await confirm(parity); await expect(parity.page.getByRole('region', { name: c.notifications })).toContainText(rotationResult.graceExpiresAt); await capture(parity, info, 'success');
+      await parity.open(route, { rotationSubmit: 'rotation-rotate-ok' }); await ready(parity); await fill(parity); await confirm(parity); await expect(parity.page.getByRole('region', { name: c.notifications })).toContainText(await localizedTime(parity, rotationResult.graceExpiresAt)); await capture(parity, info, 'success');
       for (const fixture of ['rotation-rotate-400', 'rotation-rotate-403']) {
         await parity.open(route, { rotationSubmit: fixture }); await ready(parity); await fill(parity); await confirm(parity); await expect(parity.page.getByTestId('validation-summary').getByRole('region')).toBeFocused(); await capture(parity, info, fixture);
       }
