@@ -40,7 +40,7 @@ export function Users({ total, loaded, loading, busy, search, filtered, paged, p
       const id = userIdOf(user), selected = selectedUserId === id
       return <div className="min-w-0">
         <button type="button" data-focus-key={`user-row-${id}`} aria-pressed={selected} onClick={() => onSelect(id)}
-          className={`min-h-6 max-w-full text-left font-medium text-foreground underline-offset-4 hover:underline ${selected ? 'underline' : ''} ${focusRing}`}>{user.username}</button>
+          className={`inline-flex min-h-6 min-w-6 max-w-full items-center text-left font-medium text-foreground underline-offset-4 hover:underline ${selected ? 'underline' : ''} ${focusRing}`}>{user.username}</button>
         <span className="block break-all font-mono text-xs text-muted-foreground">{id}</span>
       </div>
     } },
