@@ -17,6 +17,13 @@ async function openTab(p, name) { await surface(p).getByRole('tab', { name: copy
 async function choose(p, label, option) { await surface(p).getByRole('combobox', { name: label }).click(); await p.page.getByRole('option', { name: option, exact: true }).click(); }
 const userForm = (p) => surface(p).getByTestId('iam-create-user-form');
 const username = (p) => userForm(p).getByRole('textbox', { name: new RegExp(`^${copy(p).forms.user.username}`) });
+// The shared diagnostic allow-list has no 502; the continuation-502 fixture is the only IAM failure that needs it.
+function consumeBadGateway(text, url, injected) {
+  if (!/^Failed to load resource: the server responded with a status of 502(?: \([^\n]*\))?$/.test(text)) return false;
+  const index = injected.findIndex((failure) => failure.url === url && failure.kind === '502');
+  if (index < 0) return false;
+  injected.splice(index, 1); return true;
+}
 const requestsSince = (p, start) => p.network.requests.slice(start);
 const writesOf = (p, start = 0) => requestsSince(p, start).filter(({ method }) => method !== 'GET');
 async function screenshot(p, info, name) {
@@ -35,7 +42,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       p.page.on('response', (response) => { if (scoped(response.url()) && response.status() >= 400) failures.push({ url: response.url(), kind: String(response.status()) }); });
       p.page.on('requestfailed', (request) => { if (scoped(request.url())) failures.push({ url: request.url(), kind: 'network' }); });
       p.page.on('console', (message) => {
-        if (message.type() !== 'error' || !consumeResourceDiagnostic(message.text(), message.location().url, failures)) return;
+        if (message.type() !== 'error' || !(consumeResourceDiagnostic(message.text(), message.location().url, failures) || consumeBadGateway(message.text(), message.location().url, failures))) return;
         const index = p.faults.indexOf(`console.error: ${message.text()}`); if (index >= 0) p.faults.splice(index, 1);
       });
     });
@@ -75,7 +82,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(userForm(p).getByLabel(c.forms.user.password, { exact: true })).toHaveAttribute('type', 'password');
       await userForm(p).getByRole('combobox', { name: c.forms.user.role }).click(); await p.page.getByRole('option', { name: 'editor', exact: true }).click();
       await userForm(p).getByRole('button', { name: c.forms.user.submit }).click();
-      await expect(surface(p).getByRole('button', { name: 'ada' })).toBeVisible();
+      await expect(button(p, 'ada')).toBeVisible();
       expect(writesOf(p, start)).toContainEqual({ method: 'POST', path: usersPath, body: { enabled: true, emailVerified: true, username: 'grace', email: 'grace@example.test', bootstrapCredentials: { temporaryPassword: 'synthetic-secret-0001' }, realmRoles: ['editor'] } });
       await expect(p.page.locator('body')).not.toContainText('synthetic-secret-0001');
       await open(p); await selectAda(p); start = p.network.requests.length;

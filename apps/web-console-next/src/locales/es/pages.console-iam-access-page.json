@@ -85,7 +85,7 @@
       "description": "Crea un principal en el realm activo.",
       "username": "Usuario",
       "usernamePlaceholder": "ada",
-      "email": "Email",
+      "email": "Correo electrónico",
       "emailPlaceholder": "ada@example.test",
       "help": "Indica un usuario; el email es opcional.",
       "password": "Contraseña temporal",
@@ -130,7 +130,7 @@
     "noun": "usuarios",
     "columns": {
       "username": "Usuario",
-      "email": "Email",
+      "email": "Correo electrónico",
       "status": "Estado",
       "actions": "Acciones"
     },
@@ -184,7 +184,7 @@
     "summary": {
       "title": "Datos del usuario",
       "username": "Usuario",
-      "email": "Email",
+      "email": "Correo electrónico",
       "id": "Id",
       "status": "Estado",
       "copy": "Copiar {label}",
