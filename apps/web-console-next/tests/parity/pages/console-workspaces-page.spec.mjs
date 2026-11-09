@@ -6,6 +6,7 @@ import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-workspaces-page.json`, import.meta.url), 'utf8'))]));
+const shellBundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/common.json`, import.meta.url), 'utf8'))]));
 const copy = (p) => bundles[p.locale];
 const surface = (p) => p.page.getByTestId('console-workspaces-page');
 const wizard = (p) => p.page.getByTestId('workspace-wizard');
@@ -75,7 +76,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       expect(metrics(p, quotasPath)).toHaveLength(1); expect(metrics(p, overviewPath)).toHaveLength(1); await summary(p); await action(p, 'finish').evaluate((button) => { button.click(); button.click(); });
       await expect(wizard(p).getByTestId('workspace-create-success').getByRole('heading', { name: c.successTitle })).toBeVisible(); expect(writes(p)).toEqual([{ method: 'POST', path: createPath, body: { name: 'Synthetic workspace', description: 'Synthetic description', initialLimits: { maxFunctions: 10, maxDatabases: 5 } } }]); await action(p, 'exit').click(); await expect(action(p, 'create')).toBeFocused();
       await open(p, { workspacesCreate: 'tenant-workspaces.create.500-then-success' }); await summary(p); await action(p, 'finish').click(); await action(p, 'retry').click(); await expect(wizard(p).getByTestId('workspace-create-success').getByRole('heading', { name: c.successTitle })).toBeVisible(); expect(writes(p)).toHaveLength(3); expect(writes(p).slice(-2)[0].body).toEqual(writes(p).at(-1).body);
-      await p.page.goto(server.url('console/overview')); const link = p.page.locator(`a[href="${new URL(server.url('console/workspaces')).pathname}"]`).first(); await expect(link).toHaveAttribute('href', /\/console\/workspaces$/);
+      await p.page.goto(server.url('console/overview'));
+      if (width < 1024) await p.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
+      const link = p.page.getByRole('navigation').getByRole('link', { name: shellBundles[locale].navigation.workspaces, exact: true });
+      await expect(link).toHaveAttribute('href', new URL(server.url('console/workspaces')).pathname);
       await p.page.evaluate(() => { window.__workspacesDocument = 'synthetic-marker'; }); await link.click(); await ready(p); expect(await p.page.evaluate(() => window.__workspacesDocument)).toBe('synthetic-marker');
     });
     test('error-empty', async ({ parity: p }) => {
@@ -86,12 +90,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await open(p, { [endpoint]: `${prefix}.${kind}-then-success` }); await nameStep(p); await wizard(p).getByRole('textbox', { name: c.nameLabel }).fill('Synthetic workspace'); await expect(action(p, 'next')).toBeEnabled(); const before = [metrics(p, quotasPath).length, metrics(p, overviewPath).length]; await action(p, 'retry').click(); await expect(action(p, 'retry')).toHaveCount(0); await expect(wizard(p).getByRole('textbox', { name: c.nameLabel })).toBeFocused(); expect(metrics(p, quotasPath)).toHaveLength(before[0] + 1); expect(metrics(p, overviewPath)).toHaveLength(before[1] + 1);
       }
       for (const kind of ['403', '404', '409', '422', '500', 'network']) {
-        await open(p, { workspacesCreate: `tenant-workspaces.create.${kind}` }); await summary(p); await action(p, 'finish').click(); await expect(action(p, 'details')).toHaveAttribute('aria-expanded', 'false'); await expect(wizard(p).getByText(rawMessage, { exact: true })).toHaveCount(0); const announcements = await p.page.locator('[aria-live], [role="alert"]').allTextContents(); expect(announcements.join(' ')).not.toContain(rawMessage); await action(p, 'details').click(); await expect(wizard(p).getByText(new RegExp(rawMessage))).toBeVisible(); await action(p, 'backSummary').click(); await expect(action(p, 'finish')).toBeFocused();
+        await open(p, { workspacesCreate: `tenant-workspaces.create.${kind}` }); await summary(p); await action(p, 'finish').click(); await expect(action(p, 'details')).toHaveAttribute('aria-expanded', 'false'); await expect(wizard(p).getByText(rawMessage, { exact: true })).toHaveCount(0); const announcements = await p.page.locator('[aria-live], [role="alert"]').allTextContents(); expect(announcements.join(' ')).not.toContain(rawMessage); expect(announcements.join(' ')).not.toContain('Failed to fetch'); await action(p, 'details').click(); await expect(wizard(p).getByText(kind === 'network' ? 'Failed to fetch' : new RegExp(rawMessage), { exact: true })).toBeVisible(); await action(p, 'backSummary').click(); await expect(action(p, 'finish')).toBeFocused();
       }
       let posts = [];
       p.page.on('request', (request) => { if (new URL(request.url()).pathname === createPath) posts.push(request); });
       await open(p, { workspacesCreate: 'tenant-workspaces.create.401-refresh-success' }); await summary(p); await action(p, 'finish').click(); await expect(wizard(p).getByTestId('workspace-create-success').getByRole('heading', { name: c.successTitle })).toBeVisible(); expect(posts).toHaveLength(2); expect(posts[0].postDataJSON()).toEqual(posts[1].postDataJSON()); expect(posts[0].headers()['idempotency-key']).not.toBe(posts[1].headers()['idempotency-key']);
-      posts = []; await open(p, { workspacesCreate: 'tenant-workspaces.create.401-refresh-failure', refresh: '401' }); await summary(p); await action(p, 'finish').click(); await expect(p.page).toHaveURL(/\/login$/); expect(posts).toHaveLength(1); expect(await p.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toMatch(/\/next\/console\/workspaces$|^\/console\/workspaces$/);
+      posts = []; await open(p, { workspacesCreate: 'tenant-workspaces.create.401-refresh-failure', refresh: '401' }); await summary(p); await action(p, 'finish').click(); await expect(p.page).toHaveURL(/\/login$/); expect(posts).toHaveLength(1); expect(await p.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(server.url('console/workspaces')).pathname);
     });
     test('accessibility', async ({ parity: p }) => {
       const c = copy(p); await open(p); await ready(p); await check.assertAccessibility(p); await nameStep(p); const input = wizard(p).getByRole('textbox', { name: c.nameLabel }); await input.fill('   '); await expect(input).toHaveAttribute('aria-invalid', 'true'); await expect(input).toHaveAccessibleDescription(c.nameRequired); await expect(action(p, 'next')).toBeDisabled(); await check.assertAccessibility(p);

@@ -12,7 +12,8 @@ f03f36ef74718541cba4200309d136f7953de292522146a1dd01c005edd1e7bb.
 Installed UI, blocks and templates remain 0.11.0; tokens remain 0.3.0. No MCP
 server is available, so validate_page is NOT_RUN. Installed declarations confirm
 the snapshot's component interfaces. The existing u0 API, session, shell, i18n,
-CSP and parity foundations are used without modification.
+CSP and parity foundations are reused. The shell preserves legacy inventory links
+in page content and translates its empty workspace control without kit fallback copy.
 
 ## API parity
 
@@ -77,10 +78,24 @@ refresh and tenant-switch cancellation. Routing tests use the actual App, shell
 and guard with the /next basename. Only the existing overview-shell workspaces
 migration expectation changes.
 
-The workspaces sidebar entry uses in-app navigation. Detail-page breadcrumbs
-retain their existing legacy inventory handoff through a breadcrumb-scoped link
-provider, preserving the unchanged docs breadcrumb assertion. The arrival test
-waits for the deferred quota reads before checking the exact request log.
+The workspaces sidebar and mobile navigation entries use in-app navigation.
+Page content and breadcrumbs retain their existing legacy inventory handoff
+through a content-scoped link provider, preserving the unchanged realtime back
+links and docs breadcrumb assertion. Routing regressions assert both realtime
+403/404 root links and the migrated shell entry. The empty workspace control uses
+a disabled kit button with existing common-catalog copy; it offers no selection
+when the bootstrap returns no workspaces. The arrival test waits for the deferred
+quota reads before checking the exact request log.
+
+CI repair corrects the new browser journey to open the mobile drawer below the
+sidebar breakpoint and select the visible navigation entry by its translated
+name. An aborted create has no server response, so its expanded technical details
+must contain the browser's fetch error rather than the HTTP fixtures' synthetic
+server message; neither message may appear in announcements. The stored 401
+return intent must exactly match the harness base path, including /next/ when set.
+No pre-existing test or CI gate is changed. The flow-history 401-rejected failure
+is an existing harness race between counting the active-context region and
+asserting its attribute after a login redirect; both files are unchanged from base.
 
 The browser spec has all eight executable criteria in es and en at 375, 768 and
 1280 pixels. It asserts allowed requests, payloads, retry counts, keyboard focus,

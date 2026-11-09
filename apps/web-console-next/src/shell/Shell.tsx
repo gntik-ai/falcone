@@ -1,7 +1,7 @@
 import { LayoutDashboard, Shield } from 'lucide-react'
 import { Suspense, useState, useEffect, type ComponentPropsWithRef } from 'react'
 import { AppSidebar, AppTopbar } from '@gntik-ai/blocks'
-import { SidebarLayout, Breadcrumbs, WorkspaceSwitcher, LinkProvider, MobileNav, type NavGroup } from '@gntik-ai/ui'
+import { SidebarLayout, Breadcrumbs, Button, WorkspaceSwitcher, LinkProvider, MobileNav, type NavGroup } from '@gntik-ai/ui'
 import { Link, Outlet, useLocation, matchRoutes, type RouteObject } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
@@ -25,8 +25,8 @@ function ShellLink({ href, children, ...props }: ComponentPropsWithRef<'a'>) {
     : <LegacyLink href={href} {...props}>{children}</LegacyLink>
 }
 
-function BreadcrumbLink(props: ComponentPropsWithRef<'a'>) {
-  // Preserve the existing workspace inventory handoff from detail pages.
+function ContentLink(props: ComponentPropsWithRef<'a'>) {
+  // Preserve existing workspace inventory handoffs in page content and breadcrumbs.
   // The sidebar separately opts into the migrated workspace creation page.
   return props.href === '/console/workspaces' ? <LegacyLink {...props} /> : <ShellLink {...props} />
 }
@@ -84,13 +84,13 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
           currentHref={pathname} navGroups={groups} onNavigate={closeDrawer} />
       </>}
       topbar={<><MobileNav className="lg:hidden" groups={groups} currentHref={pathname} label={t('shell.navigation')}
-        open={drawerOpen} onOpenChange={setDrawerOpen} footer={!platformGlobal && <ContextPanel />} /><LayoutDashboard role="img" aria-label={t('shell.console')} className="shrink-0" size={20} /><AppTopbar breadcrumb={<LinkProvider component={BreadcrumbLink}><Breadcrumbs items={breadcrumbs} /></LinkProvider>} environment={null} search={null} notifications={null} theme={null} user={null} />
+        open={drawerOpen} onOpenChange={setDrawerOpen} footer={!platformGlobal && <ContextPanel />} /><LayoutDashboard role="img" aria-label={t('shell.console')} className="shrink-0" size={20} /><AppTopbar breadcrumb={<LinkProvider component={ContentLink}><Breadcrumbs items={breadcrumbs} /></LinkProvider>} environment={null} search={null} notifications={null} theme={null} user={null} />
         {roles.includes('superadmin') && <Link to="/admin" className="inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring">
           <Shield aria-hidden="true" size={18} /><span className="sr-only sm:not-sr-only">{t('shell.adminConsole')}</span>
         </Link>}<AccountMenu /></>}>
       {!platformGlobal && <ContextPanel />}
       <div className="p-4 sm:p-6">
-        <ShellErrorBoundary key={pathname}><Suspense fallback={<StatusPage state="loading" />}><Outlet /></Suspense></ShellErrorBoundary>
+        <ShellErrorBoundary key={pathname}><Suspense fallback={<StatusPage state="loading" />}><LinkProvider component={ContentLink}><Outlet /></LinkProvider></Suspense></ShellErrorBoundary>
       </div>
     </SidebarLayout>
   </LinkProvider>
@@ -105,9 +105,12 @@ function ContextPanel() {
       <option value="">{t('shell.selectTenant')}</option>
       {context.tenants.map((tenant) => <option key={tenant.tenantId} value={tenant.tenantId}>{tenant.displayName}</option>)}
     </select></label>
-    <WorkspaceSwitcher workspaces={context.workspaces.map((workspace) => ({ id: workspace.workspaceId, name: workspace.displayName }))}
-      currentId={context.activeWorkspaceId ?? ''} onSelect={(workspace) => context.selectWorkspace(workspace.id)} label={t('shell.workspace')}
-      emptyText={t('shell.selectWorkspace')} />
+    {context.workspaces.length === 0
+      ? <Button type="button" variant="secondary" size="md" disabled={true} loading={false} iconOnly={false}
+          icon={undefined} trailingIcon={undefined} aria-label={t('shell.workspace')}>{t('shell.selectWorkspace')}</Button>
+      : <WorkspaceSwitcher workspaces={context.workspaces.map((workspace) => ({ id: workspace.workspaceId, name: workspace.displayName }))}
+          currentId={context.activeWorkspaceId ?? ''} onSelect={(workspace) => context.selectWorkspace(workspace.id)} label={t('shell.workspace')}
+          emptyText={t('shell.selectWorkspace')} />}
     {permissions.isReadOnly && <span>{t('shell.readOnly')}</span>}
     {context.error && <p role="status">{context.error.status === 403 ? t('states.forbidden.body') : t('states.network.body')}</p>}
   </section>
