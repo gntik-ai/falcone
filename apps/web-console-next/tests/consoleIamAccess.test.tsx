@@ -88,6 +88,27 @@ test('a network failure on the continuation shows the error panel, and Reintenta
   expect(screen.getByText(fill(copy.es.users.pageStatus, { page: 1, pages: 25 }))).toBeVisible()
 })
 
+test('a retry after a failed reload keeps the stale users hidden until the continuation completes, and keeps the selection', async () => {
+  let attempt = 0, release!: () => void
+  const held = new Promise<void>((resolve) => { release = resolve })
+  setup({ ...twoPages(), [`GET ${nextUsers}`]: async () => {
+    attempt += 1
+    if (attempt === 1) return Response.json(listOf(users250.slice(200)))
+    if (attempt === 2) throw new TypeError('Failed to fetch')
+    await held
+    return Response.json(listOf(users250.slice(200)))
+  } }); open()
+  await selectUser()
+  fireEvent.click(screen.getByRole('button', { name: copy.es.users.reload }))
+  fireEvent.click(await screen.findByRole('button', { name: copy.es.catalogError.retry }))
+  await waitFor(() => expect(attempt).toBe(3))
+  expect(screen.queryByRole('table')).toBeNull(); expect(screen.queryByText(/Página 1 de/)).toBeNull(); expect(screen.queryByText('user-001')).toBeNull()
+  await act(async () => { release(); await held })
+  await table()
+  expect(screen.getByText(fill(copy.es.users.pageStatus, { page: 1, pages: 25 }))).toBeVisible()
+  expect(await screen.findByRole('heading', { name: fill(copy.es.detail.heading, { name: 'ada' }) })).toBeVisible()
+})
+
 test.each([[500, copy.es.errors.status['5xx']], [404, copy.es.errors.status['404']]])('a %s on the catalogue shows its error panel with retry', async (status, message) => {
   setup({ [`GET ${firstUsers}`]: failure(status) }); open()
   expect(await screen.findByRole('heading', { name: copy.es.catalogError.title })).toBeVisible()

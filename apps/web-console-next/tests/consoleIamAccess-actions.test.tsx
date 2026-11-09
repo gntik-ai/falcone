@@ -93,6 +93,13 @@ test('create user stays disabled while the username is empty and while a mutatio
   await waitFor(() => expect(isDisabled(screen.getByRole('button', { name: c.users.reload }))).toBe(false))
 })
 
+test('the username, role name and group name inputs expose the legacy required semantics', async () => {
+  setup(); open(); await table()
+  const names = [['iam-create-user-form', c.forms.user.username], ['iam-create-role-form', c.forms.role.name], ['iam-create-group-form', c.forms.group.name]] as const
+  for (const [formId, label] of names) expect(within(screen.getByTestId(formId)).getByRole('textbox', { name: new RegExp(`^${label}`) })).toBeRequired()
+  expect(form().getByRole('textbox', { name: c.forms.user.email })).not.toBeRequired()
+})
+
 test.each([['role', rolesPath, 'roleName', c.forms.role, 'roleCreated'], ['group', groupsPath, 'name', c.forms.group, 'groupCreated']] as const)('create %s reloads the catalogue, keeps the selection and focuses the name field', async (_, path, field, labels, success) => {
   setup({ [`POST ${path}`]: created({}) }); open(); await selectUser()
   const before = calls().length, formId = path === rolesPath ? 'iam-create-role-form' : 'iam-create-group-form'

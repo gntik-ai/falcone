@@ -84,7 +84,11 @@ export function useIamAccess(realm: string, notify: Notify) {
       if (options.success) notifyRef.current(options.success.key, options.success.values)
       restoreFocus(options.focusKey)
     } catch (cause) {
-      if (mounted.current && sequence === catalogSeq.current) setLoadFailure(failureOf(cause))
+      if (mounted.current && sequence === catalogSeq.current) {
+        // A failed load discards the previous collection so a retry never shows it as fresh; the selection id is kept separately.
+        setCatalog(null)
+        setLoadFailure(failureOf(cause))
+      }
     } finally {
       if (mounted.current && sequence === catalogSeq.current) setLoading(false)
     }

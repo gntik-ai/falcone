@@ -50,7 +50,7 @@ export function Forms({ roles, busy, onCreateUser, onCreateRole, onCreateGroup }
       <form onSubmit={submitUser} className="grid min-w-0 gap-4" data-testid="iam-create-user-form">
         <Field invalid={false} disabled={false} className="min-w-0">
           <FieldLabel required>{t('forms.user.username')}</FieldLabel>
-          <Input data-focus-key="create-user-username" size="md" value={user.username} onValueChange={(username) => setUser((current) => ({ ...current, username }))} autoComplete="username" placeholder={t('forms.user.usernamePlaceholder')} disabled={busy} invalid={false}
+          <Input data-focus-key="create-user-username" required size="md" value={user.username} onValueChange={(username) => setUser((current) => ({ ...current, username }))} autoComplete="username" placeholder={t('forms.user.usernamePlaceholder')} disabled={busy} invalid={false}
             leadingIcon={undefined} trailingIcon={undefined} leadingAddon={undefined} trailingAddon={undefined} className={`min-w-0 ${focusRing}`} />
         </Field>
         <Field invalid={false} disabled={false} className="min-w-0">
@@ -73,7 +73,7 @@ export function Forms({ roles, busy, onCreateUser, onCreateRole, onCreateGroup }
       <form onSubmit={submitRole} noValidate className="grid min-w-0 gap-4" data-testid="iam-create-role-form">
         <Field invalid={false} disabled={false} className="min-w-0">
           <FieldLabel required>{t('forms.role.name')}</FieldLabel>
-          <Input data-focus-key="create-role-name" size="md" value={roleName} onValueChange={setRoleName} autoComplete="off" placeholder={t('forms.role.namePlaceholder')} disabled={busy} invalid={false}
+          <Input data-focus-key="create-role-name" required size="md" value={roleName} onValueChange={setRoleName} autoComplete="off" placeholder={t('forms.role.namePlaceholder')} disabled={busy} invalid={false}
             leadingIcon={undefined} trailingIcon={undefined} leadingAddon={undefined} trailingAddon={undefined} className={`min-w-0 ${focusRing}`} />
         </Field>
         <div><Submit busy={busy} disabled={busy || !roleName.trim()} label={t('forms.role.submit')} variant="secondary" /></div>
@@ -83,7 +83,7 @@ export function Forms({ roles, busy, onCreateUser, onCreateRole, onCreateGroup }
       <form onSubmit={submitGroup} noValidate className="grid min-w-0 gap-4" data-testid="iam-create-group-form">
         <Field invalid={false} disabled={false} className="min-w-0">
           <FieldLabel required>{t('forms.group.name')}</FieldLabel>
-          <Input data-focus-key="create-group-name" size="md" value={groupName} onValueChange={setGroupName} autoComplete="off" placeholder={t('forms.group.namePlaceholder')} disabled={busy} invalid={false}
+          <Input data-focus-key="create-group-name" required size="md" value={groupName} onValueChange={setGroupName} autoComplete="off" placeholder={t('forms.group.namePlaceholder')} disabled={busy} invalid={false}
             leadingIcon={undefined} trailingIcon={undefined} leadingAddon={undefined} trailingAddon={undefined} className={`min-w-0 ${focusRing}`} />
         </Field>
         <div><Submit busy={busy} disabled={busy || !groupName.trim()} label={t('forms.group.submit')} variant="secondary" /></div>
