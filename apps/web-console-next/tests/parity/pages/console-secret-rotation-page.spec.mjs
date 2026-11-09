@@ -160,7 +160,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(section(parity, 'history').getByRole('heading', { name: c.historyError })).toBeVisible(); const before = consumers(parity).length;
       await section(parity, 'history').getByRole('button', { name: c.retry, exact: true }).click(); await expect(section(parity, 'history').getByText('synthetic-page-two', { exact: true })).toBeVisible(); expect(consumers(parity)).toHaveLength(before);
     });
-    test('error-empty', async ({ parity }) => {
+    test('error-empty', async ({ parity, server }) => {
       const c = copy(parity);
       const loading = parity.open(route, { rotationHistory: 'rotation-delayed', rotationConsumers: 'rotation-delayed' }); await expect(surface(parity).getByRole('status', { name: c.loading })).toHaveCount(2); await loading; await ready(parity);
       await parity.open(route, { rotationHistory: 'rotation-history-empty', rotationConsumers: 'rotation-consumers-empty' }); await expect(section(parity, 'history').getByRole('heading', { name: c.historyEmpty })).toBeVisible(); await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersEmpty })).toBeVisible();
@@ -192,19 +192,33 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await parity.open(`/console/secrets/${invalid}/rotate`); await expect(surface(parity).getByRole('heading', { level: 1, name: c.title })).toBeVisible(); await expect(surface(parity).getByRole('heading', { name: c.notFound })).toBeVisible(); await expect(surface(parity).locator('form')).toHaveCount(0);
         expect(parity.network.requests.filter(({ path }) => path.startsWith(base))).toHaveLength(before);
       }
-      await parity.open(route, { rotationHistory: 'rotation-401' }); await expect(parity.page).toHaveURL(/\/login$/);
+      // A repeated 401 removes the shell; do not wait for its active-context region.
+      const refreshes = parity.network.requests.filter(({ path }) => path.endsWith('/refresh')).length;
+      const historyReads = parity.network.requests.filter(({ path }) => path === `${base}/history?limit=20&offset=0`).length;
+      parity.network.setVariants({ rotationHistory: 'rotation-401' });
+      await parity.page.goto(server.url(route.slice(1))); await expect(parity.page).toHaveURL(/\/login$/);
+      expect(parity.network.requests.filter(({ path }) => path.endsWith('/refresh'))).toHaveLength(refreshes + 1);
+      expect(parity.network.requests.filter(({ path }) => path === `${base}/history?limit=20&offset=0`)).toHaveLength(historyReads + 2);
+      expect(await parity.page.evaluate(() => JSON.parse(sessionStorage.getItem('in-falcone.console-protected-route')))).toBe(new URL(server.url(route.slice(1))).pathname);
     });
     test('accessibility', async ({ parity }) => {
-      const c = copy(parity); await parity.open(route, { rotationHistory: 'rotation-history-page1' }); await ready(parity); await check.assertAccessibility(parity); await assertLocale(parity);
+      const c = copy(parity); await parity.open(route, { rotationHistory: 'rotation-history-page1' }); await ready(parity);
+      await expect(section(parity, 'consumers').getByRole('table', { name: c.consumersTitle })).toBeVisible();
+      await test.step('audit the loaded form and both tables', () => check.assertAccessibility(parity)); await assertLocale(parity);
       const slider = surface(parity).getByRole('slider', { name: c.sliderName }); await slider.focus(); await parity.page.keyboard.press('Home'); await expect(slider).toHaveAttribute('aria-valuenow', '300'); await parity.page.keyboard.press('End'); await expect(slider).toHaveAttribute('aria-valuenow', '86400');
       await parity.page.keyboard.press('Tab'); await expect(surface(parity).getByRole('spinbutton', { name: c.inputName })).toBeFocused();
       await parity.page.keyboard.press('Tab'); await expect(surface(parity).getByRole('textbox', { name: c.justification, exact: true })).toBeFocused();
       await parity.page.keyboard.press('Tab'); await expect(surface(parity).getByLabel(c.newValue, { exact: true })).toBeFocused();
       await parity.page.keyboard.press('Tab'); await expect(button(parity, 'showValue')).toBeFocused(); await parity.page.keyboard.press('Tab'); await expect(button(parity, 'discard')).toBeFocused(); await parity.page.keyboard.press('Tab'); await expect(button(parity, 'submit')).toBeFocused();
-      await parity.page.keyboard.press('Enter'); await expect(dialog(parity).getByRole('textbox', { name: c.typedPath })).toBeFocused(); await expect(dialog(parity)).toHaveAttribute('aria-modal', 'true'); await check.assertAccessibility(parity); await assertLocale(parity);
-      await parity.page.keyboard.press('Escape'); await expect(button(parity, 'submit')).toBeFocused();
+      await parity.page.keyboard.press('Enter'); await expect(dialog(parity).getByRole('textbox', { name: c.typedPath })).toBeFocused(); await expect(dialog(parity)).toHaveAttribute('aria-modal', 'true');
+      // Initial focus precedes the kit's starting-style cleanup. axe must see the
+      // visible modal before classifying its aria-hidden background controls.
+      await expect(dialog(parity)).not.toHaveAttribute('data-starting-style'); await expect(dialog(parity)).toHaveCSS('opacity', '1');
+      await test.step('audit the visible destructive confirmation', () => check.assertAccessibility(parity)); await assertLocale(parity);
+      await parity.page.keyboard.press('Escape'); await expect(dialog(parity)).toHaveCount(0); await expect(button(parity, 'submit')).toBeFocused();
       for (const fixture of ['rotation-rotate-400', 'rotation-rotate-403']) {
-        await parity.open(route, { rotationSubmit: fixture }); await ready(parity); await confirm(parity); await expect(parity.page.getByTestId('validation-summary').getByRole('region')).toBeFocused(); await check.assertAccessibility(parity); await assertLocale(parity);
+        await parity.open(route, { rotationSubmit: fixture }); await ready(parity); await confirm(parity); await expect(dialog(parity)).toHaveCount(0); await expect(parity.page.getByTestId('validation-summary').getByRole('region')).toBeFocused();
+        await test.step(`audit the focused ${fixture} validation summary`, () => check.assertAccessibility(parity)); await assertLocale(parity);
         await parity.page.getByTestId('validation-summary').getByRole('link').click(); await expect(surface(parity).getByLabel(c.justification, { exact: true })).toBeFocused();
       }
     });
