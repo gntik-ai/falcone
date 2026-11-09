@@ -1,0 +1,5 @@
+.rotation-table table { width: 100%; table-layout: fixed; }
+.rotation-table th, .rotation-table td { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .rotation-table table { min-width: 44rem; }
+}
