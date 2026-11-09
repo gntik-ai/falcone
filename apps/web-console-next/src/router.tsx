@@ -106,6 +106,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'workspaces' && route.migrated) return { ...route, element: lazyPage('pages.console-workspaces-page', () => import('./pages/consoleWorkspaces')) }
         if (route.path === 'members' && route.migrated) return { ...route, element: lazyPage('pages.console-members-page', () => import('./pages/consoleMembers')) }
         if (route.path === 'service-accounts' && route.migrated) return { ...route, element: lazyPage('pages.console-service-accounts-page', () => import('./pages/consoleServiceAccounts')) }
+        if (route.path === 'secrets/:encodedSecretPath/rotate') return { ...route, element: lazyPage('pages.console-secret-rotation-page', () => import('./pages/consoleSecretRotation')) }
         if (route.path === 'secrets' && route.migrated) return { ...route, element: lazyPage('pages.console-secrets-page', () => import('./pages/consoleSecrets')) }
         if (route.path === 'auth-config' && route.migrated) return { ...route, element: lazyPage('pages.console-auth-config-page', () => import('./pages/consoleAuthConfig')) }
         if (route.path === 'realtime/changes' && route.migrated) return { ...route, element: lazyPage('pages.console-realtime-changes-page', () => import('./pages/consoleRealtimeChanges')) }
