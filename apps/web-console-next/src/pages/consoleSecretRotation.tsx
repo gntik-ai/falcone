@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Field, FieldLabel, I18nProvider, Input, LiveAnnouncer, Page, PasswordInput, Slider, Textarea, ToastProvider, Toaster, useAnnounce, useToast } from '@gntik-ai/ui'
+import { Field, FieldLabel, I18nProvider, Input, LiveAnnouncer, Page, PasswordInput, Slider, Textarea, ToastProvider, Toaster, useAnnounce, useHasLiveAnnouncer, useToast } from '@gntik-ai/ui'
 import { FormSection, NotFoundEmpty, PageHeader, StickyActionBar, ValidationSummary } from '@gntik-ai/blocks'
 import { initiateSecretRotation, parseRotationSecretPath } from './consoleSecretRotation/api'
 import i18n from '../i18n'
@@ -109,13 +109,14 @@ function LocalizedToaster() {
 export default function ConsoleSecretRotationPage() {
   const { t, i18n: language } = useTranslation('pages.console-secret-rotation-page')
   const { encodedSecretPath = '' } = useParams()
+  const Announcer = useHasLiveAnnouncer() ? Fragment : LiveAnnouncer
   let path = '', valid = false
   try { path = decodeURIComponent(encodedSecretPath); parseRotationSecretPath(path); valid = true } catch { /* Invalid routes never mount the readers or form. */ }
   // resource-form composition avoids the template's fixed project/billing fields and sample data.
-  return <I18nProvider locale={language.language} messages={{ 'actionBar.saving': t('saving'), 'common.cancel': t('cancel'), 'common.close': t('closeToast') }}><LiveAnnouncer><ToastProvider timeout={5000} limit={1} toastManager={undefined}>
+  return <I18nProvider locale={language.language} messages={{ 'actionBar.saving': t('saving'), 'common.cancel': t('cancel'), 'common.close': t('closeToast') }}><Announcer><ToastProvider timeout={5000} limit={1} toastManager={undefined}>
     <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} className="min-w-0 space-y-6 wrap-anywhere" data-testid="console-secret-rotation-page"
       header={<PageHeader as="div" wrapTitle={true} title={t('title')} description={path} breadcrumbs={[]} status="" statuses={{}} meta={[]} tabs={null} actions={[]} labels={{ title: t('title'), description: path, moreActions: t('actions'), sections: t('actions') }} />}>
       {valid ? <RotationContent key={path} path={path} /> : <NotFoundEmpty title={t('notFound')} description={t('invalidPath')} icon={undefined} action={<BackLink />} titleAs="h2" bordered={false} className="min-w-0" />}
     </Page><LocalizedToaster />
-  </ToastProvider></LiveAnnouncer></I18nProvider>
+  </ToastProvider></Announcer></I18nProvider>
 }

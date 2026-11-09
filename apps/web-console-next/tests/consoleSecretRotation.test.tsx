@@ -1,4 +1,5 @@
-import { StrictMode } from 'react'
+import { Fragment, StrictMode } from 'react'
+import { LiveAnnouncer } from '@gntik-ai/ui'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -21,9 +22,10 @@ const calls = () => requests.mock.mock.calls.map(([path, init]) => ({ method: in
 const writes = () => calls().filter(({ method }) => method === 'POST')
 const reads = () => calls().filter(({ path }) => path.endsWith('/consumer-status'))
 const localizedTime = (value: string, locale: string) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-function open(path = route, protect = false) {
+function open(path = route, protect = false, shellAnnouncer = false) {
+  const Announcer = shellAnnouncer ? LiveAnnouncer : Fragment
   const page = <ConsoleSecretRotationPage />
-  return render(<StrictMode><MemoryRouter initialEntries={[path]}><Routes><Route path="/console/secrets/:encodedSecretPath/rotate" element={protect ? <ProtectedRoute>{page}</ProtectedRoute> : page} /><Route path="/login" element={<div data-testid="login" />} /></Routes></MemoryRouter></StrictMode>)
+  return render(<StrictMode><Announcer><MemoryRouter initialEntries={[path]}><Routes><Route path="/console/secrets/:encodedSecretPath/rotate" element={protect ? <ProtectedRoute>{page}</ProtectedRoute> : page} /><Route path="/login" element={<div data-testid="login" />} /></Routes></MemoryRouter></Announcer></StrictMode>)
 }
 const ready = () => screen.findByRole('table', { name: es.historyTitle })
 const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
@@ -72,6 +74,19 @@ test.each(['es', 'en'] as const)('ports legacy submit with exact body, preserved
   expect(document.querySelector('[data-live-announcer="polite"]')).toHaveTextContent(message)
   expect(document.body.textContent).not.toContain(rotationResult.graceExpiresAt)
   expect(document.body.textContent).not.toContain(syntheticValue); expect(screen.getByRole('button', { name: c.submit })).toBeEnabled()
+})
+test.each(['success', 'failure'] as const)('uses the shell announcer once for rotation %s', async (outcome) => {
+  setup(outcome === 'failure' ? { [`POST ${base}/rotate`]: errorResponse(500) } : {})
+  open(route, false, true); await ready()
+  expect(document.querySelectorAll('[data-live-announcer="polite"]')).toHaveLength(1)
+  expect(document.querySelectorAll('[data-live-announcer="assertive"]')).toHaveLength(1)
+  submit(); await confirm()
+  const region = document.querySelector(`[data-live-announcer="${outcome === 'success' ? 'polite' : 'assertive'}"]`)
+  const message = outcome === 'success'
+    ? i18n.t('success', { ns: 'pages.console-secret-rotation-page', version: rotationResult.vaultVersionNew, expiry: localizedTime(rotationResult.graceExpiresAt, 'es') })
+    : es.submitFailure.replace('{message}', 'synthetic-rotation-error')
+  await waitFor(() => expect(region).toHaveTextContent(message))
+  expect(writes()).toHaveLength(1)
 })
 test.each([120, 0, 90000])('sends unclamped %i with an empty required justification and clamps only the slider', async (value) => {
   setup(); open(); await ready(); change(es.inputName, value === 0 ? '' : String(value))

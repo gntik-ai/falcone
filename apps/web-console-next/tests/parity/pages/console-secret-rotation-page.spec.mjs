@@ -31,8 +31,25 @@ async function noLeak(p) {
   expect(await p.page.locator('body').textContent()).not.toContain(syntheticValue);
   expect(p.faults.join('\n')).not.toContain(syntheticValue);
 }
+// Check page-owned copy, as the secrets parity page does. Server event names
+// (for example "completed") and the existing shell breadcrumb are data outside
+// this namespace; comparing them with every page's English catalog rejects valid data.
+async function assertLocale(p) {
+  const c = copy(p), other = bundles[p.locale === 'es' ? 'en' : 'es'];
+  await expect(p.page.locator('html')).toHaveAttribute('lang', p.locale);
+  const flatten = (object) => Object.entries(object).flatMap(([key, value]) => typeof value === 'string' ? [[key, value]] : flatten(value).map(([child, text]) => [`${key}.${child}`, text]));
+  const translated = new Map(flatten(c));
+  const forbidden = new Set(flatten(other).filter(([key, value]) => value !== translated.get(key) && !value.includes('{')).map(([, value]) => value));
+  for (const value of ['Search...', 'Search…', 'No results found.', 'No results found', 'Loading...', 'Loading…', 'Select an option', 'Previous page', 'Next page']) forbidden.add(value);
+  const scopes = [surface(p), dialog(p), p.page.getByRole('region', { name: c.notifications }), ...['polite', 'assertive'].map((mode) => p.page.locator(`[data-live-announcer="${mode}"]`))];
+  for (const scope of scopes) {
+    if (!await scope.count()) continue;
+    const values = await scope.evaluate((root) => [root, ...root.querySelectorAll('*')].flatMap((node) => [node.textContent?.trim(), ...['aria-label', 'title', 'placeholder', 'alt'].map((key) => node.getAttribute(key))]).filter(Boolean));
+    expect(values.filter((value) => forbidden.has(value) || value.includes('pages.console-secret-rotation-page.')), 'locale: translated page copy').toEqual([]);
+  }
+}
 async function capture(p, info, name) {
-  await noLeak(p); await check.assertLocale(p);
+  await noLeak(p); await assertLocale(p);
   const body = await p.page.screenshot({ fullPage: true, animations: 'disabled' });
   await info.attach(`${name}-${p.locale}-sha256-${createHash('sha256').update(body).digest('hex')}`, { body, contentType: 'image/png' });
 }
@@ -72,7 +89,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(section(parity, 'history').getByRole('cell', { name: c.missing, exact: true })).toHaveCount(5);
       for (const value of Object.values(c.states).slice(0, 3)) await expect(section(parity, 'consumers').getByText(value, { exact: true })).toBeVisible();
       await expect(surface(parity).getByRole('slider', { name: c.sliderName })).toHaveAttribute('aria-valuenow', '1800');
-      await expect(surface(parity).getByRole('spinbutton', { name: c.inputName })).toHaveValue('1800'); await check.assertLocale(parity);
+      await expect(surface(parity).getByRole('spinbutton', { name: c.inputName })).toHaveValue('1800'); await assertLocale(parity);
       await parity.page.clock.install();
       for (const fixture of ['rotation-consumers-empty', 'rotation-consumers-pending-then-confirmed', 'rotation-consumers-all-timeout']) {
         await parity.open(route, { rotationConsumers: fixture }); await ready(parity); const before = consumers(parity).length;
@@ -155,16 +172,16 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.open(route, { rotationHistory: 'rotation-401' }); await expect(parity.page).toHaveURL(/\/login$/);
     });
     test('accessibility', async ({ parity }) => {
-      const c = copy(parity); await parity.open(route, { rotationHistory: 'rotation-history-page1' }); await ready(parity); await check.assertAccessibility(parity); await check.assertLocale(parity);
+      const c = copy(parity); await parity.open(route, { rotationHistory: 'rotation-history-page1' }); await ready(parity); await check.assertAccessibility(parity); await assertLocale(parity);
       const slider = surface(parity).getByRole('slider', { name: c.sliderName }); await slider.focus(); await parity.page.keyboard.press('Home'); await expect(slider).toHaveAttribute('aria-valuenow', '300'); await parity.page.keyboard.press('End'); await expect(slider).toHaveAttribute('aria-valuenow', '86400');
       await parity.page.keyboard.press('Tab'); await expect(surface(parity).getByRole('spinbutton', { name: c.inputName })).toBeFocused();
       await parity.page.keyboard.press('Tab'); await expect(surface(parity).getByRole('textbox', { name: c.justification, exact: true })).toBeFocused();
       await parity.page.keyboard.press('Tab'); await expect(surface(parity).getByLabel(c.newValue, { exact: true })).toBeFocused();
       await parity.page.keyboard.press('Tab'); await expect(button(parity, 'showValue')).toBeFocused(); await parity.page.keyboard.press('Tab'); await expect(button(parity, 'discard')).toBeFocused(); await parity.page.keyboard.press('Tab'); await expect(button(parity, 'submit')).toBeFocused();
-      await parity.page.keyboard.press('Enter'); await expect(dialog(parity).getByRole('textbox', { name: c.typedPath })).toBeFocused(); await check.assertAccessibility(parity); await check.assertLocale(parity);
+      await parity.page.keyboard.press('Enter'); await expect(dialog(parity).getByRole('textbox', { name: c.typedPath })).toBeFocused(); await check.assertAccessibility(parity); await assertLocale(parity);
       await parity.page.keyboard.press('Escape'); await expect(button(parity, 'submit')).toBeFocused();
       for (const fixture of ['rotation-rotate-400', 'rotation-rotate-403']) {
-        await parity.open(route, { rotationSubmit: fixture }); await ready(parity); await confirm(parity); await expect(parity.page.getByTestId('validation-summary').getByRole('region')).toBeFocused(); await check.assertAccessibility(parity); await check.assertLocale(parity);
+        await parity.open(route, { rotationSubmit: fixture }); await ready(parity); await confirm(parity); await expect(parity.page.getByTestId('validation-summary').getByRole('region')).toBeFocused(); await check.assertAccessibility(parity); await assertLocale(parity);
         await parity.page.getByTestId('validation-summary').getByRole('link').click(); await expect(surface(parity).getByLabel(c.justification, { exact: true })).toBeFocused();
       }
     });
