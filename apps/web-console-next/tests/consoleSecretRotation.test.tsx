@@ -116,6 +116,24 @@ test('Descartar resets locally and cancel or Escape sends nothing and restores f
   submit(); await screen.findByRole('alertdialog'); fireEvent.keyDown(document.activeElement!, { key: 'Escape', code: 'Escape' })
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull()); expect(screen.getByRole('button', { name: es.submit })).toHaveFocus(); expect(writes()).toEqual([])
 })
+test.each(['es', 'en'] as const)('exposes confirmation as modal with focus inside and translated saving copy in %s', async (locale) => {
+  await i18n.changeLanguage(locale)
+  const c = locale === 'es' ? es : en
+  let release!: () => void
+  setup({ [`POST ${base}/rotate`]: () => new Promise<Response>((resolve) => { release = () => resolve(Response.json(rotationResult)) }) })
+  open(); await screen.findByRole('table', { name: c.historyTitle })
+  const trigger = screen.getByRole('button', { name: c.submit })
+  trigger.focus(); fireEvent.click(trigger)
+  const dialog = await screen.findByRole('alertdialog', { name: c.confirmTitle })
+  expect(dialog).toHaveAttribute('aria-modal', 'true')
+  await waitFor(() => expect(within(dialog).getByRole('textbox', { name: c.typedPath })).toHaveFocus())
+  fireEvent.change(within(dialog).getByRole('textbox', { name: c.typedPath }), { target: { value: secretPath } })
+  fireEvent.click(within(dialog).getByRole('button', { name: c.confirm }))
+  await waitFor(() => expect(writes()).toHaveLength(1))
+  expect(screen.getByText(c.saving, { exact: true })).toBeVisible()
+  expect(trigger).toBeDisabled(); expect(screen.getByRole('button', { name: c.discard })).toBeDisabled()
+  release(); await waitFor(() => expect(trigger).toBeEnabled())
+})
 test.each(['sample-encodedSecretPath', 'platform%2Fpostgresql%2Fapp-password', 'bad%25E0%25A4'])('invalid route %s mounts no form, requests or poller', async (path) => {
   vi.useFakeTimers(); setup(); open(`/console/secrets/${path}/rotate`); await flush(); await advance(60000)
   expect(screen.getByRole('heading', { level: 1, name: es.title })).toBeVisible(); expect(screen.getByRole('heading', { name: es.notFound })).toBeVisible()

@@ -12,7 +12,7 @@ export function ConfirmRotation({ path, trigger, close, confirm }: { path: strin
   const input = useRef<HTMLInputElement>(null)
   const used = useRef(false)
   return <AlertDialog open={open} onOpenChange={(next) => setOpen(next)} onOpenChangeComplete={(next) => { if (!next) close() }}>
-    <AlertDialogContent size="md" container={undefined} initialFocus={() => input.current} finalFocus={() => trigger} className="min-w-0 max-w-full wrap-anywhere">
+    <AlertDialogContent size="md" container={undefined} aria-modal={true} initialFocus={() => input.current} finalFocus={() => trigger} className="min-w-0 max-w-full wrap-anywhere">
       <AlertDialogHeader tone="destructive" icon={undefined}>
         <AlertDialogTitle>{t('confirmTitle')}</AlertDialogTitle>
         <AlertDialogDescription>{t('consequence', { path })}</AlertDialogDescription>

@@ -18,6 +18,7 @@ const localizedTime = (p, value) => p.page.evaluate(({ value, locale }) => new I
 async function confirm(p) {
   await button(p, 'submit').click();
   await expect(dialog(p)).toBeVisible();
+  await expect(dialog(p)).toHaveAttribute('aria-modal', 'true');
   await expect(dialog(p).getByRole('button', { name: copy(p).confirm, exact: true })).toBeDisabled();
   await dialog(p).getByRole('textbox', { name: copy(p).typedPath, exact: true }).fill(secretPath);
   await dialog(p).getByRole('button', { name: copy(p).confirm, exact: true }).click();
@@ -90,37 +91,44 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       for (const value of Object.values(c.states).slice(0, 3)) await expect(section(parity, 'consumers').getByText(value, { exact: true })).toBeVisible();
       await expect(surface(parity).getByRole('slider', { name: c.sliderName })).toHaveAttribute('aria-valuenow', '1800');
       await expect(surface(parity).getByRole('spinbutton', { name: c.inputName })).toHaveValue('1800'); await assertLocale(parity);
-      await parity.page.clock.install();
-      for (const fixture of ['rotation-consumers-empty', 'rotation-consumers-pending-then-confirmed', 'rotation-consumers-all-timeout']) {
-        await parity.open(route, { rotationConsumers: fixture }); await ready(parity);
-        // The timer starts after the consumer response, independently of history.
-        if (fixture === 'rotation-consumers-empty') await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersEmpty })).toBeVisible();
-        else await expect(section(parity, 'consumers').getByText(c.states[fixture === 'rotation-consumers-all-timeout' ? 'timeout' : 'pending'], { exact: true })).toBeVisible();
-        const before = consumers(parity).length;
-        await parity.page.clock.runFor(5000);
-        await expect.poll(() => consumers(parity).length).toBe(before + (fixture === 'rotation-consumers-all-timeout' ? 0 : 1));
-        if (fixture !== 'rotation-consumers-empty') {
-          await expect(section(parity, 'consumers').getByText(c.states[fixture === 'rotation-consumers-all-timeout' ? 'timeout' : 'confirmed'], { exact: true })).toBeVisible();
-          const after = consumers(parity).length; await parity.page.clock.runFor(15000); expect(consumers(parity)).toHaveLength(after);
+      // install() keeps running in real time; pause so 4999 + 1 ms is an exact boundary.
+      await parity.page.clock.install({ time: new Date('2026-06-01T12:00:00Z') });
+      await parity.page.clock.pauseAt(new Date('2026-06-01T12:00:01Z'));
+      try {
+        for (const fixture of ['rotation-consumers-empty', 'rotation-consumers-pending-then-confirmed', 'rotation-consumers-all-timeout']) {
+          await parity.open(route, { rotationConsumers: fixture }); await ready(parity);
+          // The timer starts after the consumer response, independently of history.
+          if (fixture === 'rotation-consumers-empty') await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersEmpty })).toBeVisible();
+          else await expect(section(parity, 'consumers').getByText(c.states[fixture === 'rotation-consumers-all-timeout' ? 'timeout' : 'pending'], { exact: true })).toBeVisible();
+          const before = consumers(parity).length;
+          await parity.page.clock.runFor(5000);
+          await expect.poll(() => consumers(parity).length).toBe(before + (fixture === 'rotation-consumers-all-timeout' ? 0 : 1));
+          if (fixture !== 'rotation-consumers-empty') {
+            await expect(section(parity, 'consumers').getByText(c.states[fixture === 'rotation-consumers-all-timeout' ? 'timeout' : 'confirmed'], { exact: true })).toBeVisible();
+            const after = consumers(parity).length; await parity.page.clock.runFor(15000); expect(consumers(parity)).toHaveLength(after);
+          }
         }
-      }
-      await parity.open(route, { rotationConsumers: 'rotation-consumers-failed-and-unknown' }); await ready(parity);
-      for (const state of [c.states.failed, 'reloading', 'unknown']) await expect(section(parity, 'consumers').getByText(state, { exact: true })).toBeVisible();
-      const nonterminalReads = consumers(parity).length;
-      await parity.page.clock.runFor(5000); await expect.poll(() => consumers(parity).length).toBe(nonterminalReads + 1);
-      for (const fixture of ['rotation-consumers-500-then-ok', 'rotation-consumers-network-then-ok']) {
-        const updatedAt = await parity.page.evaluate(() => new Date().toISOString());
-        await parity.open(route, { rotationConsumers: fixture }); await ready(parity);
-        await expect(section(parity, 'consumers').getByRole('table', { name: c.consumersTitle })).toBeVisible();
-        await parity.page.clock.runFor(5000);
-        await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersError })).toBeVisible();
-        await expect(section(parity, 'consumers').getByRole('table', { name: c.staleTable })).toBeVisible();
-        await expect(section(parity, 'consumers')).toContainText(c.stale.replace('{time}', await localizedTime(parity, updatedAt)));
-        await expect(section(parity, 'consumers')).not.toContainText(updatedAt);
-        const before = consumers(parity).length; await section(parity, 'consumers').getByRole('button', { name: c.retry, exact: true }).click();
-        await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersError })).toHaveCount(0);
-        expect(consumers(parity)).toHaveLength(before + 1); await parity.page.clock.runFor(4999); expect(consumers(parity)).toHaveLength(before + 1);
-        await parity.page.clock.runFor(1); await expect.poll(() => consumers(parity).length).toBe(before + 2);
+        await parity.open(route, { rotationConsumers: 'rotation-consumers-failed-and-unknown' }); await ready(parity);
+        for (const state of [c.states.failed, 'reloading', 'unknown']) await expect(section(parity, 'consumers').getByText(state, { exact: true })).toBeVisible();
+        const nonterminalReads = consumers(parity).length;
+        await parity.page.clock.runFor(5000); await expect.poll(() => consumers(parity).length).toBe(nonterminalReads + 1);
+        for (const fixture of ['rotation-consumers-500-then-ok', 'rotation-consumers-network-then-ok']) {
+          const updatedAt = await parity.page.evaluate(() => new Date().toISOString());
+          await parity.open(route, { rotationConsumers: fixture }); await ready(parity);
+          await expect(section(parity, 'consumers').getByRole('table', { name: c.consumersTitle })).toBeVisible();
+          await parity.page.clock.runFor(5000);
+          await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersError })).toBeVisible();
+          await expect(section(parity, 'consumers').getByRole('table', { name: c.staleTable })).toBeVisible();
+          await expect(section(parity, 'consumers')).toContainText(c.stale.replace('{time}', await localizedTime(parity, updatedAt)));
+          await expect(section(parity, 'consumers')).not.toContainText(updatedAt);
+          const before = consumers(parity).length; await section(parity, 'consumers').getByRole('button', { name: c.retry, exact: true }).click();
+          await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersError })).toHaveCount(0);
+          expect(consumers(parity)).toHaveLength(before + 1); await parity.page.clock.runFor(4999); expect(consumers(parity)).toHaveLength(before + 1);
+          await parity.page.clock.runFor(1); await expect.poll(() => consumers(parity).length).toBe(before + 2);
+        }
+      } finally {
+        // Shared runtime-health drains a real timeout after this journey.
+        await parity.page.clock.resume();
       }
     });
     test('action', async ({ parity }) => {
@@ -193,7 +201,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.page.keyboard.press('Tab'); await expect(surface(parity).getByRole('textbox', { name: c.justification, exact: true })).toBeFocused();
       await parity.page.keyboard.press('Tab'); await expect(surface(parity).getByLabel(c.newValue, { exact: true })).toBeFocused();
       await parity.page.keyboard.press('Tab'); await expect(button(parity, 'showValue')).toBeFocused(); await parity.page.keyboard.press('Tab'); await expect(button(parity, 'discard')).toBeFocused(); await parity.page.keyboard.press('Tab'); await expect(button(parity, 'submit')).toBeFocused();
-      await parity.page.keyboard.press('Enter'); await expect(dialog(parity).getByRole('textbox', { name: c.typedPath })).toBeFocused(); await check.assertAccessibility(parity); await assertLocale(parity);
+      await parity.page.keyboard.press('Enter'); await expect(dialog(parity).getByRole('textbox', { name: c.typedPath })).toBeFocused(); await expect(dialog(parity)).toHaveAttribute('aria-modal', 'true'); await check.assertAccessibility(parity); await assertLocale(parity);
       await parity.page.keyboard.press('Escape'); await expect(button(parity, 'submit')).toBeFocused();
       for (const fixture of ['rotation-rotate-400', 'rotation-rotate-403']) {
         await parity.open(route, { rotationSubmit: fixture }); await ready(parity); await confirm(parity); await expect(parity.page.getByTestId('validation-summary').getByRole('region')).toBeFocused(); await check.assertAccessibility(parity); await assertLocale(parity);
