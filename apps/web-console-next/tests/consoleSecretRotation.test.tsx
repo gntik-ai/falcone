@@ -182,6 +182,45 @@ test.each([400, 403, 404, 500, 503, 'network'] as const)('submit %s focuses summ
   fireEvent.click(within(screen.getByTestId('validation-summary')).getByRole('link')); expect(screen.getByLabelText(es.justification)).toHaveFocus()
   submit(); await confirm(); await waitFor(() => expect(writes()).toHaveLength(2))
 })
+test.each([400, 403, 200])('submit %i retains result focus after the confirmation exit animation', async (status) => {
+  setup(status === 200 ? {} : { [`POST ${base}/rotate`]: errorResponse(status) })
+  open(); await ready(); submit()
+  const dialog = await screen.findByRole('alertdialog')
+  let finishExit!: () => void
+  const finished = new Promise<void>((resolve) => { finishExit = resolve })
+  // jsdom has no CSS animations. Hold the kit's exit completion as a browser does,
+  // so the response renders before the modal's deferred focus restoration runs.
+  const getAnimations = vi.fn(() => [{ finished }])
+  Object.defineProperty(dialog, 'getAnimations', { value: getAnimations })
+  fireEvent.change(within(dialog).getByRole('textbox', { name: es.typedPath }), { target: { value: secretPath } })
+  fireEvent.click(within(dialog).getByRole('button', { name: es.confirm }))
+  await waitFor(() => expect(getAnimations).toHaveBeenCalled())
+  await waitFor(() => expect(screen.getByRole('button', { name: es.submit })).toBeEnabled())
+  if (status !== 200) expect(screen.getByTestId('validation-summary')).toHaveTextContent(es.validationTitle)
+  await act(async () => { finishExit() })
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  await flush()
+  const target = status === 200 ? screen.getByRole('button', { name: es.submit }) : within(screen.getByTestId('validation-summary')).getByRole('region')
+  expect(target).toHaveFocus()
+  if (status !== 200) {
+    // Cancelling a fresh confirmation after an error still restores its trigger.
+    submit(); fireEvent.click(await screen.findByRole('button', { name: es.cancel }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    await flush()
+    expect(screen.getByRole('button', { name: es.submit })).toHaveFocus()
+  }
+  expect(writes()).toHaveLength(1)
+})
+test('submit failure focuses the summary when the response arrives after the dialog closes', async () => {
+  let failRequest!: () => void
+  setup({ [`POST ${base}/rotate`]: () => new Promise<Response>((resolve) => { failRequest = () => resolve(Response.json(failure(403).body, { status: 403 })) }) })
+  open(); await ready(); submit(); await confirm()
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  expect(screen.getByRole('button', { name: es.submit })).toBeDisabled()
+  await act(async () => { failRequest() })
+  await waitFor(() => expect(within(screen.getByTestId('validation-summary')).getByRole('region')).toHaveFocus())
+  expect(writes()).toHaveLength(1)
+})
 test.each(['es', 'en'] as const)('localizes network and non-JSON submit errors on every feedback surface in %s', async (locale) => {
   await i18n.changeLanguage(locale)
   const c = locale === 'es' ? es : en

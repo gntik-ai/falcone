@@ -30,17 +30,23 @@ function RotationContent({ path }: { path: string }) {
   const bar = useRef<HTMLFieldSetElement>(null)
   const summary = useRef<HTMLDivElement>(null)
   const flight = useRef(false)
+  const restoreSubmitFocus = useRef(false)
   const mounted = useRef(false)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   useEffect(() => {
-    if (failure && !dialog) summary.current?.querySelector<HTMLElement>('[role="region"]')?.focus()
-  }, [failure, dialog])
+    if (dialog || saving || !restoreSubmitFocus.current) return
+    restoreSubmitFocus.current = false
+    // The dialog must release its focus trap before the submit result takes focus.
+    const target = failure ? summary.current?.querySelector<HTMLElement>('[role="region"]') : trigger()
+    target?.focus()
+  }, [failure, dialog, saving])
   const dirty = grace !== 1800 || justification !== '' || newValue !== ''
   const trigger = () => bar.current?.querySelectorAll<HTMLButtonElement>('button').item(1) ?? null
   const open = () => { if (!flight.current) setDialog(true) }
   async function send() {
     if (flight.current) return
     flight.current = true
+    restoreSubmitFocus.current = true
     setSaving(true); setFailure(null)
     try {
       const result = await initiateSecretRotation(path, { gracePeriodSeconds: grace, justification, newValue })
