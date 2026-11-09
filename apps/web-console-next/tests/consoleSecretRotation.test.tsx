@@ -166,3 +166,9 @@ test('401 delegates one refresh and the return path to the shell', async () => {
   setup({ [`GET ${historyUrl}`]: errorResponse(401), [`GET ${base}/consumer-status`]: confirmed, 'POST /v1/auth/login-sessions/synthetic-session/refresh': errorResponse(401) })
   open(route, true); await screen.findByTestId('login'); expect(calls().filter(({ path }) => path.includes('/refresh'))).toHaveLength(1); expect(readProtectedRouteIntent()).toBe(route)
 })
+
+test('preserves legacy empty collection fallbacks when response arrays are absent', async () => {
+  setup({ [`GET ${historyUrl}`]: { total: 0 }, [`GET ${base}/consumer-status`]: {} }); open()
+  await screen.findByRole('heading', { name: es.historyEmpty }); await screen.findByRole('heading', { name: es.consumersEmpty })
+  expect(screen.queryByRole('table')).toBeNull(); expect(writes()).toEqual([])
+})

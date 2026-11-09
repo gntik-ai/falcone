@@ -12,7 +12,7 @@ export function useHistory(path: string) {
     setState({})
     void Promise.resolve().then(async () => {
       if (!active) return
-      try { const data = await listSecretRotationHistory(path, { limit: 20, offset }, controller.signal); if (active) setState({ data }) }
+      try { const data = await listSecretRotationHistory(path, { limit: 20, offset }, controller.signal); if (active) setState({ data: { ...data, items: data.items ?? [] } }) }
       catch (cause) { if (active) setState({ failure: failureOf(cause) }) }
     })
     return () => { active = false; controller.abort() }
@@ -29,7 +29,8 @@ export function useConsumers(path: string) {
     const poll = async () => {
       let done = false
       try {
-        const data = await getSecretConsumerStatus(path, controller.signal)
+        const response = await getSecretConsumerStatus(path, controller.signal)
+        const data = { ...response, consumers: response.consumers ?? [] }
         if (!active) return
         setState({ data, updatedAt: new Date().toISOString() })
         done = data.consumers.length > 0 && data.consumers.every((item) => item.state === 'confirmed' || item.state === 'timeout')
