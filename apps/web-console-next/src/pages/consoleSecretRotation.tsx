@@ -81,7 +81,7 @@ function RotationContent({ path }: { path: string }) {
         </div>
       </FormSection>
     </form>
-    <fieldset ref={bar} disabled={saving} aria-busy={saving} aria-label={t('actions')} className="m-0 min-w-0 border-0 p-0">
+    <fieldset ref={bar} disabled={saving} aria-busy={saving} aria-label={t('actions')} className="sticky bottom-0 z-20 order-last m-0 min-w-0 border-0 p-0">
       {/* Rotation may submit unchanged defaults; dirty controls the status copy, not authorization. */}
       <StickyActionBar dirty={!saving} saving={saving} onSave={open} onCancel={() => { if (!flight.current) { setGrace(1800); setJustification(''); setNewValue(''); setFailure(null) } }} dirtyMessage={t(dirty ? 'dirty' : 'clean')} cleanMessage={t('clean')} saveLabel={t('submit')} cancelLabel={t('discard')} hideWhenClean={false} aria-label={t('actions')} className="min-w-0" />
     </fieldset>
