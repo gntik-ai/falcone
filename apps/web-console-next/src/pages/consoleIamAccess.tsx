@@ -6,7 +6,7 @@ import { useCopy } from './consoleIamAccess/copy'
 import { userIdOf } from './consoleIamAccess/api'
 import { ConfirmDialog } from './consoleIamAccess/Confirm'
 import { Detail } from './consoleIamAccess/Detail'
-import { Forms } from './consoleIamAccess/Forms'
+import { Forms, useFormDrafts } from './consoleIamAccess/Forms'
 import { Empty, Failed, Loading, MutationCallout, NoAccess } from './consoleIamAccess/States'
 import { LocalizedToaster } from './consoleIamAccess/Toaster'
 import { Users } from './consoleIamAccess/Users'
@@ -24,6 +24,7 @@ function Surface({ realm, tenantLabel }: { realm: string; tenantLabel: string })
     toast.add({ title: message, tone: 'success', priority: 'low' })
   }, [announce, toast, t])
   const iam = useIamAccess(realm, notify)
+  const drafts = useFormDrafts()
   const { catalog } = iam
   const content = !catalog && iam.loading && !iam.loadFailure
     ? <Loading title={t('loading.title')} description={t('loading.description')} />
@@ -32,7 +33,7 @@ function Surface({ realm, tenantLabel }: { realm: string; tenantLabel: string })
         ? <NoAccess />
         : <Failed title={t('catalogError.title')} failure={iam.loadFailure} retryLabel={t('catalogError.retry')} retry={() => { void iam.reload() }} fallback="catalog" />
       : catalog && <>
-        <Forms roles={catalog.roles} busy={iam.busy} onCreateUser={iam.createUser} onCreateRole={iam.createRole} onCreateGroup={iam.createGroup} />
+        <Forms drafts={drafts} roles={catalog.roles} busy={iam.busy} onCreateUser={iam.createUser} onCreateRole={iam.createRole} onCreateGroup={iam.createGroup} />
         <div className="grid min-w-0 gap-6 xl:grid-cols-3">
           <div className="min-w-0 xl:col-span-2">
             <Users total={catalog.total} loaded={catalog.users.length} loading={iam.loading} busy={iam.busy} search={iam.search} filtered={iam.filteredUsers} paged={iam.pagedUsers} page={iam.currentPage} pageCount={iam.pageCount} selectedUserId={iam.selectedUserId}

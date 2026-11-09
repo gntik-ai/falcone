@@ -114,18 +114,36 @@ test.each([['role', rolesPath, 'roleName', c.forms.role, 'roleCreated'], ['group
 })
 
 test('a continuation failure after a successful create shows the catalogue error panel', async () => {
-  setup({ [`POST ${rolesPath}`]: created({}), [`GET ${firstUsers}`]: sequence(listOf(users23)) }); open(); await table()
-  current().mock.mockImplementation(async (input: RequestInfo | URL, init: RequestInit = {}) => {
-    const key = `${init.method ?? 'GET'} ${String(input)}`
-    if (key === `POST ${rolesPath}`) return Response.json({}, { status: 201 })
-    if (key === `GET ${firstUsers}`) return Response.json({ items: users23, page: { after: 'synthetic-cursor' } })
-    if (key === `GET ${firstUsers}&page%5Bafter%5D=synthetic-cursor`) return Response.json({ code: 'HTTP_502' }, { status: 502 })
-    return Response.json(key.includes('roles') ? listOf(roles4) : listOf(groups3))
-  })
+  // The first users load is a single response; the reload after the create is split and its continuation fails.
+  let usersReads = 0
+  setup({
+    [`POST ${rolesPath}`]: created({}),
+    [`GET ${firstUsers}`]: () => Response.json(usersReads++ === 0 ? listOf(users23) : { items: users23, page: { after: 'synthetic-cursor' } }),
+    [`GET ${firstUsers}&page%5Bafter%5D=synthetic-cursor`]: failure(502),
+  }); open(); await table()
   fireEvent.change(within(screen.getByTestId('iam-create-role-form')).getByRole('textbox', { name: new RegExp(`^${c.forms.role.name}`) }), { target: { value: 'team' } })
   fireEvent.click(within(screen.getByTestId('iam-create-role-form')).getByRole('button', { name: c.forms.role.submit }))
   expect(await screen.findByRole('heading', { name: c.catalogError.title })).toBeVisible()
   expect(screen.queryByRole('table')).toBeNull()
+})
+
+test('unsent create drafts survive an inventory failure and its retry', async () => {
+  let usersReads = 0
+  setup({ [`GET ${firstUsers}`]: () => (usersReads++ === 1 ? failure(500)() : Response.json(listOf(users23))) }); open(); await table()
+  fireEvent.change(usernameField(), { target: { value: 'draft-user' } })
+  fireEvent.change(form().getByLabelText(c.forms.user.password, { selector: 'input' }), { target: { value: secret } })
+  const roleField = () => within(screen.getByTestId('iam-create-role-form')).getByRole('textbox', { name: new RegExp(`^${c.forms.role.name}`) })
+  const groupField = () => within(screen.getByTestId('iam-create-group-form')).getByRole('textbox', { name: new RegExp(`^${c.forms.group.name}`) })
+  fireEvent.change(roleField(), { target: { value: 'draft-role' } })
+  fireEvent.change(groupField(), { target: { value: 'draft-group' } })
+  fireEvent.click(screen.getByRole('button', { name: c.users.reload }))
+  fireEvent.click(await screen.findByRole('button', { name: c.catalogError.retry }))
+  await table()
+  expect(usernameField()).toHaveValue('draft-user')
+  expect(form().getByLabelText(c.forms.user.password, { selector: 'input' })).toHaveValue(secret)
+  expect(roleField()).toHaveValue('draft-role')
+  expect(groupField()).toHaveValue('draft-group')
+  expect(writes()).toEqual([])
 })
 
 test.each([['row'], ['detail']])('suspend from the %s PATCHes enabled false, reloads and returns focus to the status button', async (where) => {

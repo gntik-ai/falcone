@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { AddIcon } from './icons'
 import { Button, Field, FieldDescription, FieldLabel, Input, PasswordInput, SimpleSelect } from '@gntik-ai/ui'
 import { FormSection } from '@gntik-ai/blocks'
@@ -6,7 +6,27 @@ import type { IamCreateUserInput } from '@in-falcone/console-api/iam'
 import { focusRing, useCopy } from './copy'
 import { isDefaultRole, roleNameOf, type IamRole } from './api'
 
+interface UserDraft { username: string; email: string; password: string; role: string }
+export interface FormDrafts {
+  user: UserDraft
+  setUser: Dispatch<SetStateAction<UserDraft>>
+  roleName: string
+  setRoleName: Dispatch<SetStateAction<string>>
+  groupName: string
+  setGroupName: Dispatch<SetStateAction<string>>
+}
+const emptyUser: UserDraft = { username: '', email: '', password: '', role: '' }
+
+// The unsent values live above the catalogue branches, so a failed inventory load and its retry never discard them.
+export function useFormDrafts(): FormDrafts {
+  const [user, setUser] = useState<UserDraft>(emptyUser)
+  const [roleName, setRoleName] = useState('')
+  const [groupName, setGroupName] = useState('')
+  return { user, setUser, roleName, setRoleName, groupName, setGroupName }
+}
+
 interface Props {
+  drafts: FormDrafts
   roles: IamRole[]
   busy: boolean
   onCreateUser: (input: IamCreateUserInput) => Promise<boolean>
@@ -19,30 +39,26 @@ function Submit({ busy, disabled, label, variant }: { busy: boolean; disabled: b
   return <Button type="submit" variant={variant} size="md" loading={false} disabled={disabled} iconOnly={false} icon={AddIcon} trailingIcon={undefined} className={focusRing}>{busy ? t('forms.creating') : label}</Button>
 }
 
-export function Forms({ roles, busy, onCreateUser, onCreateRole, onCreateGroup }: Props) {
+export function Forms({ drafts, roles, busy, onCreateUser, onCreateRole, onCreateGroup }: Props) {
   const { t } = useCopy()
-  const [user, setUser] = useState({ username: '', email: '', password: '', role: '' })
-  const [roleName, setRoleName] = useState('')
-  const [groupName, setGroupName] = useState('')
-  const alive = useRef(true)
-  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const { user, setUser, roleName, setRoleName, groupName, setGroupName } = drafts
   const roleOptions = roles.map(roleNameOf).filter((name) => name && !isDefaultRole(name))
 
   async function submitUser(event: FormEvent) {
     event.preventDefault()
     if (busy || !user.username.trim()) return
     const created = await onCreateUser({ username: user.username, email: user.email, temporaryPassword: user.password, role: user.role })
-    if (created && alive.current) setUser({ username: '', email: '', password: '', role: '' })
+    if (created) setUser(emptyUser)
   }
   async function submitRole(event: FormEvent) {
     event.preventDefault()
     if (busy || !roleName.trim()) return
-    if (await onCreateRole(roleName) && alive.current) setRoleName('')
+    if (await onCreateRole(roleName)) setRoleName('')
   }
   async function submitGroup(event: FormEvent) {
     event.preventDefault()
     if (busy || !groupName.trim()) return
-    if (await onCreateGroup(groupName) && alive.current) setGroupName('')
+    if (await onCreateGroup(groupName)) setGroupName('')
   }
 
   return <section aria-label={t('forms.label')} className="min-w-0 space-y-6">
