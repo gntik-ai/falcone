@@ -1,0 +1,261 @@
+{
+  "title": "Fine-grained access (IAM)",
+  "description": "Manage the users, roles and groups of the active organization's realm: create principals, maintain the catalogue and assign or remove access with confirmation.",
+  "organization": "Organization",
+  "noSelection": "none selected",
+  "realm": "Realm",
+  "actions": "IAM actions",
+  "close": "Close",
+  "closeToast": "Close notification",
+  "notifications": "Notifications",
+  "noTenant": {
+    "title": "Select an organization",
+    "description": "Select an organization in the top bar to manage its IAM."
+  },
+  "loading": {
+    "title": "Loading IAM inventory",
+    "description": "Fetching the users, roles and groups of the active realm."
+  },
+  "catalogError": {
+    "title": "The IAM inventory could not be loaded",
+    "retry": "Retry"
+  },
+  "noAccess": {
+    "title": "You do not have access to this organization's IAM",
+    "description": "Your account is not allowed to view the users, roles and groups of this realm."
+  },
+  "mutationError": {
+    "title": "IAM action not completed"
+  },
+  "errorPanel": {
+    "support": "Contact support",
+    "retrying": "Retrying…",
+    "requestId": "Request ID",
+    "copyRequestId": "Copy request ID",
+    "copied": "Copied",
+    "details": "Details"
+  },
+  "errors": {
+    "status": {
+      "401": "Your session expired or is not valid. Sign in again.",
+      "403": "You do not have permission to view this resource.",
+      "404": "The requested resource was not found.",
+      "409": "The request conflicts with the current state of the resource.",
+      "429": "The request limit was reached; try again in a few moments.",
+      "5xx": "The service is not available right now."
+    },
+    "fallback": {
+      "catalog": "The active organization's IAM could not be loaded.",
+      "detail": "The user detail could not be loaded.",
+      "createUser": "The IAM user could not be created.",
+      "createRole": "The IAM role could not be created.",
+      "createGroup": "The IAM group could not be created.",
+      "status": "The IAM user status could not be updated.",
+      "delete": "The IAM user could not be deleted.",
+      "membership": "The IAM operation could not be completed.",
+      "confirm": "The operation could not be completed."
+    },
+    "codes": {
+      "IAM_ASSIGN_ROLE_FAILED": "IAM access could not be updated. Try again, or contact support if the problem continues.",
+      "IAM_REMOVE_ROLE_FAILED": "IAM access could not be updated. Try again, or contact support if the problem continues.",
+      "IAM_GROUP_ADD_FAILED": "IAM access could not be updated. Try again, or contact support if the problem continues.",
+      "IAM_GROUP_REMOVE_FAILED": "IAM access could not be updated. Try again, or contact support if the problem continues.",
+      "IAM_CREATE_USER_FAILED": "The IAM user could not be created. Check the details and try again.",
+      "SET_USER_STATUS_FAILED": "The IAM user status could not be updated. Try again.",
+      "DELETE_USER_FAILED": "The IAM user could not be deleted. Try again.",
+      "IAM_CREATE_ROLE_FAILED": "The IAM role could not be created. Check the name and try again.",
+      "IAM_CREATE_GROUP_FAILED": "The IAM group could not be created. Check the name and try again.",
+      "IAM_LIST_USERS_FAILED": "The IAM inventory of the active organization could not be loaded.",
+      "IAM_LIST_ROLES_FAILED": "The IAM inventory of the active organization could not be loaded.",
+      "IAM_LIST_GROUPS_FAILED": "The IAM inventory of the active organization could not be loaded.",
+      "IAM_LIST_CLIENTS_FAILED": "The IAM inventory of the active organization could not be loaded.",
+      "IAM_GET_USER_FAILED": "The IAM user detail could not be loaded.",
+      "IAM_GET_ROLE_FAILED": "The IAM role information could not be loaded.",
+      "IAM_LIST_USER_ROLES_FAILED": "The IAM user detail could not be loaded.",
+      "IAM_LIST_USER_GROUPS_FAILED": "The IAM user detail could not be loaded.",
+      "IAM_LIST_GROUP_MEMBERS_FAILED": "The IAM group information could not be loaded.",
+      "UNSUPPORTED_FIELD": "The operation asked for IAM fields that this environment cannot apply yet."
+    }
+  },
+  "forms": {
+    "label": "Create IAM resources",
+    "creating": "Creating…",
+    "user": {
+      "title": "Create user",
+      "description": "Create a principal in the active realm.",
+      "username": "Username",
+      "usernamePlaceholder": "ada",
+      "email": "Email",
+      "emailPlaceholder": "ada@example.test",
+      "help": "Enter a username; the email is optional.",
+      "password": "Temporary password",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "role": "Initial role",
+      "noRole": "No initial role",
+      "submit": "Create user"
+    },
+    "role": {
+      "title": "Create role",
+      "description": "Add an assignable role to the realm catalogue.",
+      "name": "Role name",
+      "namePlaceholder": "tenant_support",
+      "submit": "Create role"
+    },
+    "group": {
+      "title": "Create group",
+      "description": "Add a group to manage memberships.",
+      "name": "Group name",
+      "namePlaceholder": "support",
+      "submit": "Create group"
+    }
+  },
+  "users": {
+    "heading": "Users ({count})",
+    "partial": "{loaded} of {total} loaded.",
+    "hint": "Search and page through the active realm's inventory.",
+    "updating": "Refreshing inventory…",
+    "reload": "Reload",
+    "reloading": "Reloading…",
+    "toolbar": "User search and reload",
+    "searchLabel": "Search users",
+    "searchPlaceholder": "Username, email or id",
+    "pageStatus": "Page {page} of {pages}",
+    "summary": "Showing {from}-{to} of {total}",
+    "tableLabel": "IAM users of the active realm",
+    "pagination": "Users pagination",
+    "previous": "Previous page of users",
+    "next": "Next page of users",
+    "pageNamed": "Users page {page}",
+    "noun": "users",
+    "columns": {
+      "username": "Username",
+      "email": "Email",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "select": "View access for {name}",
+    "noEmail": "no email",
+    "active": "active",
+    "suspended": "suspended",
+    "suspendNamed": "Suspend {name}",
+    "enableNamed": "Enable {name}",
+    "deleteNamed": "Delete {name}",
+    "empty": {
+      "title": "There are no IAM users",
+      "description": "Create the first user of the realm to start assigning roles and groups.",
+      "action": "Create user"
+    },
+    "noResults": {
+      "title": "No results",
+      "description": "No users match the current search.",
+      "action": "Clear search"
+    }
+  },
+  "detail": {
+    "heading": "Access of {name}",
+    "headingEmpty": "Select a user",
+    "empty": {
+      "title": "No user selected",
+      "description": "Choose a user from the list to manage their status, roles and groups."
+    },
+    "loading": {
+      "title": "Loading detail",
+      "description": "Fetching the roles and groups assigned to the selected user."
+    },
+    "error": {
+      "title": "The detail could not be loaded",
+      "retry": "Retry detail"
+    },
+    "notFound": {
+      "title": "The user no longer exists",
+      "description": "Someone else may have deleted it. Go back to the users list to continue.",
+      "action": "Back to the users list"
+    },
+    "suspend": "Suspend user",
+    "enable": "Enable user",
+    "delete": "Delete user",
+    "tabs": "User sections",
+    "tab": {
+      "summary": "Summary",
+      "roles": "Roles",
+      "groups": "Groups"
+    },
+    "summary": {
+      "title": "User details",
+      "username": "Username",
+      "email": "Email",
+      "id": "Id",
+      "status": "Status",
+      "copy": "Copy {label}",
+      "copied": "{label} copied",
+      "copiedToClipboard": "Copied to clipboard",
+      "history": "Status history",
+      "historyEmpty": "No status history",
+      "historyNote": "This realm does not record status changes for the user.",
+      "showFewer": "Show fewer",
+      "showEarlier": "Show {count} earlier",
+      "actor": "By"
+    },
+    "roles": {
+      "heading": "Assigned roles",
+      "none": "No roles.",
+      "removeNamed": "Remove role {name}",
+      "assign": "Role to assign",
+      "placeholder": "Assign role…",
+      "unavailable": "No roles available"
+    },
+    "groups": {
+      "heading": "Groups",
+      "none": "No groups.",
+      "removeNamed": "Remove from group {name}",
+      "assign": "Group to assign",
+      "placeholder": "Add to group…",
+      "unavailable": "No groups available"
+    }
+  },
+  "confirm": {
+    "cancel": "Cancel",
+    "typedName": "Type the exact name of the resource to confirm.",
+    "typedInstruction": "Type {name} to enable deletion.",
+    "nameMismatch": "The text does not match {name}.",
+    "deleteUser": {
+      "title": "Delete IAM user",
+      "description": "You are about to delete {name}. The user is removed from the active realm and its roles and group memberships are withdrawn.",
+      "irreversible": "This operation is irreversible.",
+      "action": "Delete",
+      "busy": "Deleting…"
+    },
+    "removeRole": {
+      "title": "Remove assigned role",
+      "description": "The role {role} will be removed from {user}.",
+      "irreversible": "This operation cannot be undone.",
+      "action": "Confirm",
+      "busy": "Confirming…"
+    },
+    "removeGroup": {
+      "title": "Remove group membership",
+      "description": "{user} will be removed from the group {group}.",
+      "irreversible": "This operation cannot be undone.",
+      "action": "Confirm",
+      "busy": "Confirming…"
+    },
+    "fallbackUser": "this user",
+    "errors": {
+      "401": "Your session has expired. Sign in again.",
+      "404": "The resource no longer exists or has been deleted."
+    }
+  },
+  "success": {
+    "userCreated": "IAM user created.",
+    "roleCreated": "Role {name} created.",
+    "groupCreated": "Group {name} created.",
+    "enabled": "IAM user enabled.",
+    "suspended": "IAM user suspended.",
+    "deleted": "IAM user deleted.",
+    "roleAssigned": "Role {name} assigned.",
+    "roleRemoved": "Role {name} removed.",
+    "groupAdded": "User added to group {name}.",
+    "groupRemoved": "Membership of group {name} removed."
+  }
+}

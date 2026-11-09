@@ -1,0 +1,261 @@
+{
+  "title": "Acceso fino (IAM)",
+  "description": "Gestiona usuarios, roles y grupos del realm de la organización activa: crea principales, administra el catálogo y asigna o retira acceso con confirmación.",
+  "organization": "Organización",
+  "noSelection": "sin selección",
+  "realm": "Realm",
+  "actions": "Acciones IAM",
+  "close": "Cerrar",
+  "closeToast": "Cerrar notificación",
+  "notifications": "Notificaciones",
+  "noTenant": {
+    "title": "Selecciona una organización",
+    "description": "Selecciona una organización en la barra superior para gestionar su IAM."
+  },
+  "loading": {
+    "title": "Cargando inventario IAM",
+    "description": "Consultando usuarios, roles y grupos del realm activo."
+  },
+  "catalogError": {
+    "title": "No se pudo cargar el inventario IAM",
+    "retry": "Reintentar"
+  },
+  "noAccess": {
+    "title": "No tienes acceso al IAM de esta organización",
+    "description": "Tu cuenta no tiene permiso para ver los usuarios, roles y grupos de este realm."
+  },
+  "mutationError": {
+    "title": "Acción IAM no completada"
+  },
+  "errorPanel": {
+    "support": "Contactar con soporte",
+    "retrying": "Reintentando…",
+    "requestId": "ID de solicitud",
+    "copyRequestId": "Copiar ID de solicitud",
+    "copied": "Copiado",
+    "details": "Detalles"
+  },
+  "errors": {
+    "status": {
+      "401": "Tu sesión expiró o no es válida. Vuelve a iniciar sesión.",
+      "403": "No tienes permiso para ver este recurso.",
+      "404": "No se encontró el recurso solicitado.",
+      "409": "La solicitud entra en conflicto con el estado actual del recurso.",
+      "429": "Se alcanzó el límite de solicitudes; inténtalo de nuevo en unos momentos.",
+      "5xx": "El servicio no está disponible en este momento."
+    },
+    "fallback": {
+      "catalog": "No se pudo cargar el IAM de la organización activa.",
+      "detail": "No se pudo cargar el detalle del usuario.",
+      "createUser": "No se pudo crear el usuario IAM.",
+      "createRole": "No se pudo crear el rol IAM.",
+      "createGroup": "No se pudo crear el grupo IAM.",
+      "status": "No se pudo actualizar el estado del usuario IAM.",
+      "delete": "No se pudo eliminar el usuario IAM.",
+      "membership": "La operación de IAM no pudo completarse.",
+      "confirm": "No se pudo completar la operación."
+    },
+    "codes": {
+      "IAM_ASSIGN_ROLE_FAILED": "No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.",
+      "IAM_REMOVE_ROLE_FAILED": "No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.",
+      "IAM_GROUP_ADD_FAILED": "No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.",
+      "IAM_GROUP_REMOVE_FAILED": "No se pudo actualizar el acceso IAM. Inténtalo de nuevo o contacta con soporte si el problema continúa.",
+      "IAM_CREATE_USER_FAILED": "No se pudo crear el usuario IAM. Revisa los datos e inténtalo de nuevo.",
+      "SET_USER_STATUS_FAILED": "No se pudo actualizar el estado del usuario IAM. Inténtalo de nuevo.",
+      "DELETE_USER_FAILED": "No se pudo eliminar el usuario IAM. Inténtalo de nuevo.",
+      "IAM_CREATE_ROLE_FAILED": "No se pudo crear el rol IAM. Revisa el nombre e inténtalo de nuevo.",
+      "IAM_CREATE_GROUP_FAILED": "No se pudo crear el grupo IAM. Revisa el nombre e inténtalo de nuevo.",
+      "IAM_LIST_USERS_FAILED": "No se pudo cargar el inventario IAM de la organización activa.",
+      "IAM_LIST_ROLES_FAILED": "No se pudo cargar el inventario IAM de la organización activa.",
+      "IAM_LIST_GROUPS_FAILED": "No se pudo cargar el inventario IAM de la organización activa.",
+      "IAM_LIST_CLIENTS_FAILED": "No se pudo cargar el inventario IAM de la organización activa.",
+      "IAM_GET_USER_FAILED": "No se pudo cargar el detalle del usuario IAM.",
+      "IAM_GET_ROLE_FAILED": "No se pudo cargar la información de roles IAM.",
+      "IAM_LIST_USER_ROLES_FAILED": "No se pudo cargar el detalle del usuario IAM.",
+      "IAM_LIST_USER_GROUPS_FAILED": "No se pudo cargar el detalle del usuario IAM.",
+      "IAM_LIST_GROUP_MEMBERS_FAILED": "No se pudo cargar la información del grupo IAM.",
+      "UNSUPPORTED_FIELD": "La operación pidió campos IAM que este entorno todavía no puede aplicar."
+    }
+  },
+  "forms": {
+    "label": "Crear recursos IAM",
+    "creating": "Creando…",
+    "user": {
+      "title": "Crear usuario",
+      "description": "Crea un principal en el realm activo.",
+      "username": "Usuario",
+      "usernamePlaceholder": "ada",
+      "email": "Email",
+      "emailPlaceholder": "ada@example.test",
+      "help": "Indica un usuario; el email es opcional.",
+      "password": "Contraseña temporal",
+      "showPassword": "Mostrar contraseña",
+      "hidePassword": "Ocultar contraseña",
+      "role": "Rol inicial",
+      "noRole": "Sin rol inicial",
+      "submit": "Crear usuario"
+    },
+    "role": {
+      "title": "Crear rol",
+      "description": "Añade un rol asignable al catálogo del realm.",
+      "name": "Nombre del rol",
+      "namePlaceholder": "tenant_support",
+      "submit": "Crear rol"
+    },
+    "group": {
+      "title": "Crear grupo",
+      "description": "Añade un grupo para gestionar pertenencias.",
+      "name": "Nombre del grupo",
+      "namePlaceholder": "soporte",
+      "submit": "Crear grupo"
+    }
+  },
+  "users": {
+    "heading": "Usuarios ({count})",
+    "partial": "{loaded} de {total} cargados.",
+    "hint": "Busca y pagina el inventario del realm activo.",
+    "updating": "Actualizando inventario…",
+    "reload": "Recargar",
+    "reloading": "Recargando…",
+    "toolbar": "Búsqueda y recarga de usuarios",
+    "searchLabel": "Buscar usuarios",
+    "searchPlaceholder": "Usuario, email o id",
+    "pageStatus": "Página {page} de {pages}",
+    "summary": "Mostrando {from}-{to} de {total}",
+    "tableLabel": "Usuarios IAM del realm activo",
+    "pagination": "Paginación de usuarios",
+    "previous": "Página anterior de usuarios",
+    "next": "Página siguiente de usuarios",
+    "pageNamed": "Página {page} de usuarios",
+    "noun": "usuarios",
+    "columns": {
+      "username": "Usuario",
+      "email": "Email",
+      "status": "Estado",
+      "actions": "Acciones"
+    },
+    "select": "Ver el acceso de {name}",
+    "noEmail": "sin email",
+    "active": "activo",
+    "suspended": "suspendido",
+    "suspendNamed": "Suspender {name}",
+    "enableNamed": "Habilitar {name}",
+    "deleteNamed": "Eliminar {name}",
+    "empty": {
+      "title": "No hay usuarios IAM",
+      "description": "Crea el primer usuario del realm para empezar a asignar roles y grupos.",
+      "action": "Crear usuario"
+    },
+    "noResults": {
+      "title": "Sin resultados",
+      "description": "No hay usuarios que coincidan con la búsqueda actual.",
+      "action": "Limpiar búsqueda"
+    }
+  },
+  "detail": {
+    "heading": "Acceso de {name}",
+    "headingEmpty": "Selecciona un usuario",
+    "empty": {
+      "title": "Sin usuario seleccionado",
+      "description": "Elige un usuario de la lista para gestionar su estado, roles y grupos."
+    },
+    "loading": {
+      "title": "Cargando detalle",
+      "description": "Consultando roles y grupos asignados al usuario seleccionado."
+    },
+    "error": {
+      "title": "No se pudo cargar el detalle",
+      "retry": "Reintentar detalle"
+    },
+    "notFound": {
+      "title": "El usuario ya no existe",
+      "description": "Es posible que otra persona lo haya eliminado. Vuelve a la lista de usuarios para continuar.",
+      "action": "Volver a la lista de usuarios"
+    },
+    "suspend": "Suspender usuario",
+    "enable": "Habilitar usuario",
+    "delete": "Eliminar usuario",
+    "tabs": "Secciones del usuario",
+    "tab": {
+      "summary": "Resumen",
+      "roles": "Roles",
+      "groups": "Grupos"
+    },
+    "summary": {
+      "title": "Datos del usuario",
+      "username": "Usuario",
+      "email": "Email",
+      "id": "Id",
+      "status": "Estado",
+      "copy": "Copiar {label}",
+      "copied": "{label} copiado",
+      "copiedToClipboard": "Copiado al portapapeles",
+      "history": "Historial de estado",
+      "historyEmpty": "Sin historial de estado",
+      "historyNote": "Este realm no registra cambios de estado para el usuario.",
+      "showFewer": "Mostrar menos",
+      "showEarlier": "Mostrar {count} anteriores",
+      "actor": "Por"
+    },
+    "roles": {
+      "heading": "Roles asignados",
+      "none": "Sin roles.",
+      "removeNamed": "Quitar rol {name}",
+      "assign": "Rol a asignar",
+      "placeholder": "Asignar rol…",
+      "unavailable": "No hay roles disponibles"
+    },
+    "groups": {
+      "heading": "Grupos",
+      "none": "Sin grupos.",
+      "removeNamed": "Quitar de grupo {name}",
+      "assign": "Grupo a asignar",
+      "placeholder": "Añadir a grupo…",
+      "unavailable": "No hay grupos disponibles"
+    }
+  },
+  "confirm": {
+    "cancel": "Cancelar",
+    "typedName": "Escribe exactamente el nombre del recurso para confirmar.",
+    "typedInstruction": "Escribe {name} para habilitar la eliminación.",
+    "nameMismatch": "El texto no coincide con {name}.",
+    "deleteUser": {
+      "title": "Eliminar usuario IAM",
+      "description": "Vas a eliminar {name}. Se eliminará el usuario del realm activo y se retirarán sus roles y pertenencias a grupos.",
+      "irreversible": "Esta operación es irreversible.",
+      "action": "Eliminar",
+      "busy": "Eliminando…"
+    },
+    "removeRole": {
+      "title": "Quitar rol asignado",
+      "description": "Se retirará el rol {role} de {user}.",
+      "irreversible": "Esta operación no se puede deshacer.",
+      "action": "Confirmar",
+      "busy": "Confirmando…"
+    },
+    "removeGroup": {
+      "title": "Quitar pertenencia a grupo",
+      "description": "Se retirará {user} del grupo {group}.",
+      "irreversible": "Esta operación no se puede deshacer.",
+      "action": "Confirmar",
+      "busy": "Confirmando…"
+    },
+    "fallbackUser": "este usuario",
+    "errors": {
+      "401": "Tu sesión ha expirado. Vuelve a iniciar sesión.",
+      "404": "El recurso ya no existe o ha sido eliminado."
+    }
+  },
+  "success": {
+    "userCreated": "Usuario IAM creado.",
+    "roleCreated": "Rol {name} creado.",
+    "groupCreated": "Grupo {name} creado.",
+    "enabled": "Usuario IAM habilitado.",
+    "suspended": "Usuario IAM suspendido.",
+    "deleted": "Usuario IAM eliminado.",
+    "roleAssigned": "Rol {name} asignado.",
+    "roleRemoved": "Rol {name} retirado.",
+    "groupAdded": "Usuario añadido al grupo {name}.",
+    "groupRemoved": "Pertenencia al grupo {name} retirada."
+  }
+}

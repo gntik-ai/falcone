@@ -13,6 +13,7 @@
     "./workspace-secrets-access": "./src/workspace-secrets-access.ts",
     "./loaders": "./src/loaders.ts",
     "./clients": "./src/clients.ts",
+    "./iam": "./src/iam.ts",
     "./auth-config": "./src/auth-config.ts",
     "./fixtures": "./src/fixtures.ts"
   },
