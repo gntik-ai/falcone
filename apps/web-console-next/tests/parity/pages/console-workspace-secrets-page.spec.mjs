@@ -378,7 +378,11 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
       await check.kitConformance(manifest);
       const read = (path) => statSync(path).isDirectory() ? readdirSync(path).map((entry) => read(`${path}/${entry}`)).join('\n') : readFileSync(path, 'utf8');
       const source = manifest.sources.map((path) => read(new URL(`../../../${path}`, import.meta.url).pathname)).join('\n');
-      expect(source).not.toMatch(/\bdark:|style=\{\{[^}]*(color|background)|\bbg-white\b|\btext-black\b|bg-\[|text-\[#|(max|min)-[wh]-\[|wrap-anywhere|break-all/);
+      // The request id chip is the one element allowed to break anywhere, so its page-owned rule is set aside before the identifier check.
+      const requestIdRule = /\[data-secret-failure\] code \{[^}]*\}/g;
+      expect(source.match(requestIdRule)?.length ?? 0, 'one request id wrapping rule').toBe(1);
+      const rest = source.replace(requestIdRule, '');
+      expect(rest).not.toMatch(/\bdark:|style=\{\{[^}]*(color|background)|\bbg-white\b|\btext-black\b|bg-\[|text-\[#|(max|min)-[wh]-\[|wrap-anywhere|break-all/);
       await open(parity, 'workspace-secrets.create.403'); await ready(parity);
       await expect(page(parity).getByRole('searchbox')).toHaveCount(0);
       await expect(page(parity).getByRole('button', { name: /columns|density|views|columnas|densidad|vistas/i })).toHaveCount(0);
