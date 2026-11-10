@@ -48,7 +48,9 @@ function TypedConfirm({ open, kind, name, title, description, pending, failure, 
     if (wasPending.current && !pending && failureClass === 'inline' && !document.activeElement?.closest('[role="alertdialog"]')) (input.current ?? cancel.current)?.focus()
     wasPending.current = pending
   }, [pending, failureClass])
-  const submit = (event: FormEvent) => { event.preventDefault(); if (matches && !pending) onConfirm() }
+  // Confirm and Reintentar share one guard: a failed write is never re-sent unless the typed name still matches.
+  const send = () => { if (matches && !pending) onConfirm() }
+  const submit = (event: FormEvent) => { event.preventDefault(); send() }
   return <AlertDialog open={open} onOpenChange={(next, event) => { if (next) return; if (pending) { event.cancel(); return } onCancel() }}>
     <AlertDialogContent size="md" aria-modal="true" container={undefined} initialFocus={() => input.current ?? true} finalFocus={finalFocus} className="min-w-0" data-testid={`workspace-secrets-confirm-${kind}`}>
       <AlertDialogHeader tone="destructive" icon={undefined}>
@@ -63,7 +65,7 @@ function TypedConfirm({ open, kind, name, title, description, pending, failure, 
             leadingIcon={undefined} trailingIcon={undefined} leadingAddon={undefined} trailingAddon={undefined} className={`w-full min-w-0 ${focusRing}`} onChange={(event) => setTyped(event.target.value)} />
         </Field>
         {failure && (failureClass === 'retry'
-          ? <WriteFailure kind={kind} failure={failure} retry={onConfirm} retrying={pending} target="confirm" />
+          ? <WriteFailure kind={kind} failure={failure} retry={send} retrying={pending} target="confirm" />
           : <div data-testid="workspace-secrets-confirm-error"><Alert tone="destructive" role={undefined} title={undefined} description={describeWrite(t, kind, failure)} actions={undefined} icon={undefined} onDismiss={undefined} dismissLabel="" /></div>)}
         <AlertDialogFooter className="mt-5 flex-wrap gap-2">
           <AlertDialogCancel ref={cancel} disabled={pending} className={focusRing}>{t('confirm.cancel')}</AlertDialogCancel>

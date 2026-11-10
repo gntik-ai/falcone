@@ -134,6 +134,8 @@ test('workspace Reintentar sends exactly one list request with the real context'
   await screen.findByText('db_password', {}, routeWait)
   expect(loads).toBe(2)
   expect(calls().filter(([url]) => url === secretsPath)).toHaveLength(1)
+  // Reintentar reloads the workspaces only: the tenant list is read exactly once, at bootstrap.
+  expect(calls().filter(([url]) => String(url).split('?')[0] === String(tenantUrl).split('?')[0])).toHaveLength(1)
 })
 
 test('the active-workspace shell loading state shows no secrets request', async () => {

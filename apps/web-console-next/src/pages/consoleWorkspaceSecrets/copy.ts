@@ -24,7 +24,9 @@ export function classify(failure: Failure): FailureClass {
 
 // Legacy ConsoleWorkspaceSecretsPage.tsx:53-81 (describeSecretError). The raw server message is never
 // part of this text; it only appears in the error panel's technical details.
-export function describeSecretError(t: TFunction, failure: Failure, context: 'list' | 'mutate'): string {
+// Only replace and delete (context mutate) can say the secret is gone; list and create 404s stay non-leaking.
+export type ErrorContext = 'list' | 'create' | 'mutate'
+export function describeSecretError(t: TFunction, failure: Failure, context: ErrorContext): string {
   if (failure.status === undefined) return t('errors.network')
   const corr = failure.correlationId ? t('errors.correlation', { id: failure.correlationId }) : ''
   switch (failure.status) {
@@ -51,6 +53,6 @@ export function describeDeleteError(t: TFunction, failure: Failure): string {
 }
 
 export const describeWrite = (t: TFunction, kind: WriteKind, failure: Failure) =>
-  kind === 'delete' ? describeDeleteError(t, failure) : describeSecretError(t, failure, 'mutate')
+  kind === 'delete' ? describeDeleteError(t, failure) : describeSecretError(t, failure, kind === 'create' ? 'create' : 'mutate')
 
 export const requestIdOf = (failure: Failure) => failure.requestId ?? failure.correlationId ?? ''

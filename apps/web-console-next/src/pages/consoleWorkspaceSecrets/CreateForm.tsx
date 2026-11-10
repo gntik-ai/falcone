@@ -42,7 +42,7 @@ export function CreateForm({ draft, validation, pending, failure, success, onFie
             placeholder={t('create.namePlaceholder')} autoComplete="off" spellCheck={false} leadingIcon={undefined} trailingIcon={undefined} leadingAddon={undefined} trailingAddon={undefined} className={`w-full min-w-0 ${focusRing}`}
             onChange={(event) => onField('name', event.target.value)} />
           <Text as="span" variant="supporting" tone="muted" id={`${id}-name-help`} className="break-words">
-            {draft.name ? <>{t('create.envVar')} <code className="rounded bg-muted px-1 py-0.5 font-mono text-foreground break-all">{secretEnvVarName(draft.name)}</code></> : t('create.nameHelp')}
+            {draft.name ? <>{t('create.envVar')} <code className="rounded bg-muted px-1 py-0.5 font-mono text-foreground break-words">{secretEnvVarName(draft.name)}</code></> : t('create.nameHelp')}
           </Text>
           {nameError && <Text as="p" variant="body" tone="destructive" id={`${id}-name-error`} role="alert" data-secret-error="name">{nameError}</Text>}
         </Field>

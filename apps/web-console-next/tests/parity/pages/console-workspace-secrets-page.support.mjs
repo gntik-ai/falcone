@@ -1,4 +1,4 @@
-import { canary, createScenario, redacted, scenarios, secretsPath } from './console-workspace-secrets-page.manifest.ts';
+import { canary, createScenario, otherListBody, otherSecretsPath, redacted, scenarios, secretsPath } from './console-workspace-secrets-page.manifest.ts';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
 
 // Secret values are asserted in memory inside the route handler and replaced by a fixed mask before any request
@@ -29,7 +29,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // manifest scenario, the workspace list from the shell fixture, and everything else falls through.
 export function createSecretsHarness(parity) {
   const injected = [];
-  const state = { id: null, scenario: createScenario('workspace-secrets.list.success'), matched: [], workspaceReads: 0, shell: {}, refresh: null };
+  const state = { id: null, scenario: createScenario('workspace-secrets.list.success'), matched: [], workspaceReads: 0, otherReads: 0, shell: {}, refresh: null };
   const redact = (body) => {
     if (!body || typeof body !== 'object' || !('secretValue' in body)) return body;
     // The comparison happens here, in memory; only the boolean and the mask leave this function.
@@ -37,7 +37,7 @@ export function createSecretsHarness(parity) {
     return { ...body, secretValue: redacted };
   };
   const record = (request, url, body) => parity.network.requests.push({ method: request.method(), path: url.pathname + url.search, body: redact(body) });
-  parity.page.route((url) => url.pathname.startsWith(secretsPath) || url.pathname === '/v1/workspaces' || /\/v1\/auth\/login-sessions\/[^/]+\/refresh$/.test(url.pathname), async (route) => {
+  parity.page.route((url) => url.pathname.startsWith(secretsPath) || url.pathname === otherSecretsPath || url.pathname === '/v1/workspaces' || /\/v1\/auth\/login-sessions\/[^/]+\/refresh$/.test(url.pathname), async (route) => {
     const request = route.request(), url = new URL(request.url());
     if (url.pathname === '/v1/workspaces') {
       if (request.method() !== 'GET' || !state.id || !Object.keys(state.shell).some((key) => ['environment', 'workspaces'].includes(key))) { await route.fallback(); return; }
@@ -48,6 +48,13 @@ export function createSecretsHarness(parity) {
         await route.fulfill({ status: 500, json: { status: 500, code: 'HTTP_500', message: 'synthetic-backend-reason' } }); return;
       }
       await route.fulfill({ status: 200, json: { items: workspacesFor(state.shell), page: { after: null } } }); return;
+    }
+    if (url.pathname === otherSecretsPath) {
+      // The second workspace of the switch scenarios answers its own list; it is never a write target.
+      if (request.method() !== 'GET') { parity.faults.push(`Unexpected ${request.method()} ${url.pathname}`); await route.abort(); return; }
+      state.otherReads++;
+      parity.network.requests.push({ method: 'GET', path: url.pathname + url.search, body: undefined });
+      await route.fulfill({ status: 200, json: otherListBody }); return;
     }
     if (url.pathname !== secretsPath && !url.pathname.startsWith(`${secretsPath}/`)) {
       // Refresh: only the rejected fixture overrides it, with the 400 whose resource diagnostic is consumed below.
@@ -76,7 +83,9 @@ export function createSecretsHarness(parity) {
     state,
     use(id) {
       if (!Object.hasOwn(scenarios, id)) throw new Error(`Unknown fixture ${id}`);
-      Object.assign(state, { id, scenario: createScenario(id), matched: [], workspaceReads: 0, shell: scenarios[id].shell ?? {}, refresh: id.endsWith('401-refresh-rejected') ? 'rejected' : null });
+      // Each scenario owns its request history, so one page open never inherits the calls of the previous one.
+      parity.network.requests.length = 0;
+      Object.assign(state, { id, scenario: createScenario(id), matched: [], workspaceReads: 0, otherReads: 0, shell: scenarios[id].shell ?? {}, refresh: id.endsWith('401-refresh-rejected') ? 'rejected' : null });
     },
     calls: () => parity.network.requests.filter(({ path }) => path.startsWith(secretsPath)),
     writes: () => parity.network.requests.filter(({ path, method }) => path.startsWith(secretsPath) && method !== 'GET'),

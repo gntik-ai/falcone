@@ -81,7 +81,7 @@ function Surface({ workspace, shown }: { workspace: string; shown: Shown }) {
   const onNew = () => { if (s.create.terminal) s.restoreForm(); else focus.request({ kind: 'name' }) }
 
   if (list.status === 'failed' && list.failure?.status === 501) {
-    return <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} className="console-workspace-secrets min-w-0 space-y-6 wrap-anywhere" data-testid="workspace-secrets-backend-disabled"
+    return <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} className="console-workspace-secrets min-w-0 space-y-6 break-words" data-testid="workspace-secrets-backend-disabled"
       header={<Header shown={shown} />}>
       <EmptyState icon={undefined} title={t('blocked.title')} description={t('blocked.description')} titleAs="h2" bordered={false} size="md" secondaryAction={null} primaryAction={null} className="min-w-0" />
     </Page>
@@ -90,8 +90,8 @@ function Surface({ workspace, shown }: { workspace: string; shown: Shown }) {
   const terminalAction = (label: string, onClick: () => void) => <RecoveryButton onClick={onClick}>{label}</RecoveryButton>
   const createArea = s.create.terminal
     ? s.create.terminal.kind === 'no-access'
-      ? <NoAccess target="create" title={t('noAccess.create')} failure={s.create.terminal.failure} action={terminalAction(t('noAccess.backToForm'), s.restoreForm)} />
-      : <NotFound target="create" title={t('notFound.create')} failure={s.create.terminal.failure} action={terminalAction(t('noAccess.backToForm'), s.restoreForm)} />
+      ? <NoAccess target="create" context="create" title={t('noAccess.create')} failure={s.create.terminal.failure} action={terminalAction(t('noAccess.backToForm'), s.restoreForm)} />
+      : <NotFound target="create" context="create" title={t('notFound.create')} failure={s.create.terminal.failure} action={terminalAction(t('noAccess.backToForm'), s.restoreForm)} />
     : <CreateForm draft={s.draft} validation={s.validation} pending={s.create.pending} failure={s.create.failure} success={s.feedback?.placement === 'create' ? t('create.created', { name: s.feedback.name }) : null} onField={s.setField} onSubmit={() => { void s.submitCreate() }} />
   const tableTitle = s.table && t(`${s.table.kind === 'no-access' ? 'noAccess' : 'notFound'}.${s.table.op}`)
   const tableArea = s.table && (s.table.kind === 'no-access'
@@ -113,7 +113,7 @@ function Surface({ workspace, shown }: { workspace: string; shown: Shown }) {
   } else listArea = <SecretsTable list={list} workspaceLabel={shown.label} environment={shown.environment} locale={language.language} onReplace={s.openReplace} onDelete={s.openDelete} onLoadMore={s.loadMore} onRetryNext={s.retryNext} />
 
   return <>
-    <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} className="console-workspace-secrets min-w-0 space-y-6 wrap-anywhere" data-testid="workspace-secrets-page" header={<Header shown={shown} />}>
+    <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} className="console-workspace-secrets min-w-0 space-y-6 break-words" data-testid="workspace-secrets-page" header={<Header shown={shown} />}>
       <Toolbar variant="plain" aria-label={t('toolbar.label')} className="flex min-w-0 flex-wrap justify-end gap-2">
         <ToolbarEnd><ToolbarButton variant="primary" size="md" icon={undefined} className={focusRing} onClick={onNew}>{t('toolbar.new')}</ToolbarButton></ToolbarEnd>
       </Toolbar>
@@ -132,11 +132,10 @@ function WorkspaceGate() {
   const { t } = useCopy()
   const context = useConsoleContext()
   const { can } = usePermissions()
-  const retried = useRef<typeof context.error>(null)
   if (context.loading) return <section role="status" aria-label={t('workspace.loading')}><Text as="p" variant="body" tone="default">{t('workspace.loading')}</Text><TableSkeleton rows={2} columns={1} label={t('workspace.loadingDescription')} className="min-w-0" /></section>
-  if (context.error && context.error !== retried.current) {
+  if (context.error) {
     return <ErrorPanel title={t('workspace.error')} message={t('workspace.errorDescription')} code={context.error.status ?? null} requestId="" details="" secondaryAction={null} titleAs="h2" announce={true} retryLabel={t('errorPanel.retry')} retrying={false} className="min-w-0"
-      onRetry={async () => { retried.current = context.error; await context.reloadTenants?.() }}
+      onRetry={async () => { await context.reloadWorkspaces?.() }}
       labels={{ title: t('workspace.error'), message: t('workspace.errorDescription'), support: t('errorPanel.support'), retry: t('errorPanel.retry'), retrying: t('errorPanel.retrying'), retryingStatus: t('errorPanel.retrying'), requestId: t('errorPanel.requestId'), copyRequestId: t('errorPanel.copyRequestId'), copied: t('errorPanel.copied'), requestIdCopied: t('errorPanel.copied'), details: t('errorPanel.details') }} />
   }
   const action = context.workspaces.length
@@ -160,7 +159,7 @@ export default function ConsoleWorkspaceSecretsPage() {
   return <I18nProvider locale={language.language} messages={{ 'common.close': t('close'), 'common.cancel': t('confirm.cancel'), 'breadcrumbs.label': t('breadcrumbs.nav') }}><LiveAnnouncer><ToastProvider timeout={5000} limit={3} toastManager={undefined}>
     {shown
       ? <Surface key={shown.workspaceId} workspace={shown.workspaceId} shown={shown} />
-      : <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} className="console-workspace-secrets min-w-0 space-y-6 wrap-anywhere" data-testid="workspace-secrets-page" header={<Header shown={null} />}><WorkspaceGate /></Page>}
+      : <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} className="console-workspace-secrets min-w-0 space-y-6 break-words" data-testid="workspace-secrets-page" header={<Header shown={null} />}><WorkspaceGate /></Page>}
     <LocalizedToaster />
   </ToastProvider></LiveAnnouncer></I18nProvider>
 }

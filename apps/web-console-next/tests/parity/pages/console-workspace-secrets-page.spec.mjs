@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
-import manifest, { canary, cursorPath, fixtureIds, redacted, secretPath, secretsPath, typed } from './console-workspace-secrets-page.manifest.ts';
+import manifest, { canary, cursorPath, fixtureIds, otherSecretsPath, redacted, scenarios, secretPath, secretsPath, typed } from './console-workspace-secrets-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { blank, createSecretsHarness, expectBlank, sanitize, typeSecret } from './console-workspace-secrets-page.support.mjs';
@@ -38,7 +38,10 @@ async function scan(parity) {
 }
 async function open(parity, id, { route = manifest.route, variants = {}, principal, active } = {}) {
   harness(parity).use(id);
-  if (principal) await parity.page.addInitScript(seedSecretsPrincipal, principal);
+  // The shell session admits only the workspaces in its principal, so the two-workspace fixtures list both.
+  const shell = scenarios[id].shell ?? {};
+  const members = ['two', 'none'].includes(shell.workspaces) ? { workspaceIds: ['synthetic-workspace', 'synthetic-other'] } : undefined;
+  if (principal ?? members) await parity.page.addInitScript(seedSecretsPrincipal, principal ?? members);
   if (active) await parity.page.addInitScript(seedActiveWorkspace, active);
   await parity.open(route, variants);
 }
@@ -70,7 +73,7 @@ async function screenshot(parity, info, name) {
 }
 const live = (parity, variants) => parity.network.setVariants(variants);
 
-for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
+for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
   test.describe(`Workspace secrets ${locale} ${width}`, () => {
     // Traces, screenshots and video embed input values; this page disables them, and verify-artifacts scans the rest.
     test.use({ role: 'superadmin', locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints, trace: 'off', screenshot: 'off', video: 'off' });
@@ -171,6 +174,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       // No workspace: the picker renders and no secrets request is sent.
       await open(parity, 'shell.no-active-workspace'); await expect(heading(parity, 'workspace.title')).toBeVisible();
       expect(harness(parity).calls()).toEqual([]);
+      expect(harness(parity).state.otherReads, 'no workspace is active, so no list is read').toBe(0);
       await open(parity, 'shell.non-member', { principal: { platformRoles: ['tenant_viewer'], workspaceIds: [] } });
       await expect(parity.page.getByRole('heading', { name: text(parity, 'guardDenied'), exact: true })).toBeVisible();
       expect(harness(parity).calls()).toEqual([]);
@@ -273,6 +277,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.page.getByRole('button', { name: /Synthetic Workspace/ }).first().click();
       await parity.page.getByRole('menuitemradio', { name: 'Other Workspace', exact: true }).click();
       await expect(heading(parity, 'title')).toBeVisible();
+      await expect(parity.page.getByRole('rowheader', { name: 'other_secret', exact: true })).toBeVisible();
+      expect(harness(parity).state.otherReads, 'the second workspace list is read once').toBe(1);
+      expect(parity.network.requests.some(({ path }) => path === otherSecretsPath)).toBe(true);
       await expectBlank(expect, nameInput(parity), 'name'); await expectBlank(expect, valueInput(parity), 'value');
       await check.assertRuntimeHealth(parity);
     });
@@ -286,16 +293,30 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await check.assertResponsive(parity, width);
         if (id.endsWith('.500')) { const box = await confirmDialog(parity).boundingBox(); expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(width); }
       }
-      // Eliminar is never clipped against the table scroll region, even with 29- and 63-character names.
+      // Eliminar is never clipped against the table scroll region at 768 and wider, even with 29- and 63-character
+      // names. At 375 the region scrolls by design and only the page itself must not overflow (asserted above).
       await open(parity, 'workspace-secrets.list.long-names'); await ready(parity, 'a'.repeat(29));
       const region = page(parity).getByRole('table').locator('xpath=ancestor::*[contains(@class, "overflow-x-auto") or contains(@class, "overflow-auto")][1]');
-      for (const name of ['a'.repeat(29), 'b'.repeat(63)]) {
-        const box = await rowAction(parity, 'delete', name).boundingBox(); const frame = await region.boundingBox();
-        expect(box.x, `Eliminar ${name.length} clipped on the left`).toBeGreaterThanOrEqual(frame.x - 1);
-        expect(box.x + box.width, `Eliminar ${name.length} clipped on the right`).toBeLessThanOrEqual(frame.x + frame.width + 1);
+      if (width >= 768) {
+        for (const name of ['a'.repeat(29), 'b'.repeat(63)]) {
+          const box = await rowAction(parity, 'delete', name).boundingBox(); const frame = await region.boundingBox();
+          expect(box.x, `Eliminar ${name.length} clipped on the left`).toBeGreaterThanOrEqual(frame.x - 1);
+          expect(box.x + box.width, `Eliminar ${name.length} clipped on the right`).toBeLessThanOrEqual(frame.x + frame.width + 1);
+        }
+        const scrolls = await region.evaluate((element) => element.scrollWidth - element.clientWidth);
+        expect(scrolls, 'the table scroll region does not need to scroll for its actions').toBeLessThanOrEqual(1);
       }
-      const scrolls = await region.evaluate((element) => element.scrollWidth - element.clientWidth);
-      expect(scrolls, 'the table scroll region does not need to scroll for its actions').toBeLessThanOrEqual(1);
+      // Identifiers wrap with break-words (overflow-wrap: break-word), never overflow-wrap: anywhere.
+      const wrap = await page(parity).getByRole('rowheader').first().evaluate((cell) => getComputedStyle(cell.firstElementChild ?? cell).overflowWrap);
+      expect(wrap, 'identifier wrapping').toBe('break-word');
+      if (width >= 1024) {
+        // A regular name stays on one line: no mid-word break at 1024 px and wider.
+        await open(parity, 'workspace-secrets.list.success'); await ready(parity);
+        const lines = await parity.page.getByRole('rowheader', { name: 'db_password', exact: true }).evaluate((cell) => {
+          const range = document.createRange(); range.selectNodeContents(cell); return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+        });
+        expect(lines, 'db_password does not wrap at this width').toBe(1);
+      }
     });
     test('visual-review', async ({ parity }, info) => {
       test.slow();
@@ -319,7 +340,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await check.kitConformance(manifest);
       const read = (path) => statSync(path).isDirectory() ? readdirSync(path).map((entry) => read(`${path}/${entry}`)).join('\n') : readFileSync(path, 'utf8');
       const source = manifest.sources.map((path) => read(new URL(`../../../${path}`, import.meta.url).pathname)).join('\n');
-      expect(source).not.toMatch(/\bdark:|style=\{\{[^}]*(color|background)|\bbg-white\b|\btext-black\b|bg-\[|text-\[#/);
+      expect(source).not.toMatch(/\bdark:|style=\{\{[^}]*(color|background)|\bbg-white\b|\btext-black\b|bg-\[|text-\[#|(max|min)-[wh]-\[|wrap-anywhere|break-all/);
       await open(parity, 'workspace-secrets.create.403'); await ready(parity);
       await expect(page(parity).getByRole('searchbox')).toHaveCount(0);
       await expect(page(parity).getByRole('button', { name: /columns|density|views|columnas|densidad|vistas/i })).toHaveCount(0);

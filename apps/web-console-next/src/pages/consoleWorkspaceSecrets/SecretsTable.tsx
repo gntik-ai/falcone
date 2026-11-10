@@ -21,9 +21,12 @@ interface Props {
 const hideBelowMd = 'hidden md:table-cell'
 const hideBelowLg = 'hidden lg:table-cell'
 const hideBelowXl = 'hidden xl:table-cell'
-// Identifiers wrap on word boundaries; names too long for their column break anywhere so the actions
-// column is never pushed out of the table scroll region.
-const identifier = (value: string) => `max-w-[18rem] whitespace-normal break-words ${value.length > 40 ? 'break-all' : ''}`
+// Identifiers wrap with break-words, never overflow-wrap:anywhere. The max-width sits on a block wrapper, not on
+// the cell or an inline span, so the column's min-content stays bounded and the actions column is never pushed
+// out of the table scroll region by a long name.
+const nameBox = 'max-w-56 whitespace-normal break-words'
+const envBox = 'max-w-48 whitespace-normal break-words'
+const descriptionBox = 'max-w-48 whitespace-normal break-words'
 
 export function SecretsTable({ list, workspaceLabel, environment, locale, onReplace, onDelete, onLoadMore, onRetryNext }: Props) {
   const { t } = useCopy()
@@ -43,12 +46,12 @@ export function SecretsTable({ list, workspaceLabel, environment, locale, onRepl
     return Number.isNaN(parsed) ? value : <Timestamp value={parsed} format="absolute" locale={locale} dateOptions={{ dateStyle: 'medium', timeStyle: 'short' }} tooltip={false} live={false} />
   }
   const columns: DataTableColumn<WorkspaceSecret>[] = [
-    { id: 'name', header: t('list.name'), sortable: false, hideable: false, className: 'max-w-[18rem] whitespace-normal break-words font-medium text-foreground', headClassName: 'whitespace-nowrap', cell: (row) => <span className={identifier(readSecretName(row))}>{readSecretName(row)}</span> },
-    { id: 'envVar', header: t('list.envVar'), sortable: false, className: 'whitespace-normal', cell: (row) => <code className="inline-block max-w-[16rem] break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{secretEnvVarName(readSecretName(row))}</code> },
+    { id: 'name', header: t('list.name'), sortable: false, hideable: false, className: 'font-medium text-foreground', headClassName: 'whitespace-nowrap', cell: (row) => <div className={nameBox}>{readSecretName(row)}</div> },
+    { id: 'envVar', header: t('list.envVar'), sortable: false, cell: (row) => <div className={envBox}><code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{secretEnvVarName(readSecretName(row))}</code></div> },
     { id: 'functions', header: t('list.functions'), sortable: false, variant: 'numeric', align: 'left', accessor: (row) => row.resolvedRefCount ?? 0 },
     { id: 'created', header: t('list.created'), sortable: false, className: `${hideBelowLg} text-muted-foreground`, headClassName: hideBelowLg, cell: (row) => date(row.timestamps?.createdAt) },
     { id: 'updated', header: t('list.updated'), sortable: false, className: `${hideBelowXl} text-muted-foreground`, headClassName: hideBelowXl, cell: (row) => date(row.timestamps?.updatedAt) },
-    { id: 'description', header: t('list.description'), sortable: false, className: `${hideBelowMd} max-w-[16rem] whitespace-normal break-words text-muted-foreground`, headClassName: hideBelowMd, cell: (row) => row.description || t('list.none') },
+    { id: 'description', header: t('list.description'), sortable: false, className: `${hideBelowMd} text-muted-foreground`, headClassName: hideBelowMd, cell: (row) => <div className={descriptionBox}>{row.description || t('list.none')}</div> },
     { id: 'actions', header: t('list.actions'), sortable: false, align: 'right', cell: (row) => <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:justify-end">
       <Button type="button" variant="secondary" size="sm" loading={false} disabled={false} iconOnly={false} icon={undefined} trailingIcon={undefined} className={focusRing} data-secret-action="replace" data-secret-name={readSecretName(row)} aria-label={t('list.replaceAria', { name: readSecretName(row) })} onClick={() => onReplace(row)}>{t('list.replace')}</Button>
       <Button type="button" variant="destructive" size="sm" loading={false} disabled={false} iconOnly={false} icon={undefined} trailingIcon={undefined} className={focusRing} data-secret-action="delete" data-secret-name={readSecretName(row)} aria-label={t('list.deleteAria', { name: readSecretName(row) })} onClick={() => onDelete(row)}>{t('list.delete')}</Button>

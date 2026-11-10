@@ -312,14 +312,16 @@ test('no workspace sends no request and renders the legacy workspace-required st
 })
 
 test.each([['loading', 'Cargando áreas de trabajo'], ['error', 'No se pudieron cargar las áreas de trabajo']])('workspace %s state', async (state, title) => {
-  workspaceContext('dev', { activeWorkspaceId: null, workspaces: [], loading: state === 'loading', error: state === 'error' ? { status: 500 } : null })
+  workspaceContext('dev', { activeWorkspaceId: null, workspaces: [], loading: state === 'loading', error: state === 'error' ? { status: 500 } : null, reloadWorkspaces: vi.fn() })
   server = serve(state === 'loading' ? 'shell.workspace-loading' : 'shell.workspace-error')
   open()
   expect(await screen.findAllByText(title)).not.toHaveLength(0)
   expect(server.requests()).toEqual([])
   if (state === 'error') {
     click('Reintentar')
-    await waitFor(() => expect((currentContext() as { reloadTenants: ReturnType<typeof vi.fn> }).reloadTenants).toHaveBeenCalledTimes(1))
+    // The workspace list is reloaded; the tenant list is not requested again.
+    await waitFor(() => expect((currentContext() as { reloadWorkspaces: ReturnType<typeof vi.fn> }).reloadWorkspaces).toHaveBeenCalledTimes(1))
+    expect((currentContext() as { reloadTenants: ReturnType<typeof vi.fn> }).reloadTenants).not.toHaveBeenCalled()
   }
 })
 

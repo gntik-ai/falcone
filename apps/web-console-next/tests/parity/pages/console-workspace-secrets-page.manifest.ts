@@ -5,6 +5,8 @@ import type { EndpointResponse, PageEndpoint, ParityManifest } from '../manifest
 export const workspaceId = 'synthetic-workspace'
 export const secretsPath = `/v1/functions/workspaces/${workspaceId}/secrets`
 export const secretPath = (name: string) => `${secretsPath}/${encodeURIComponent(name)}`
+export const otherWorkspaceId = 'synthetic-other'
+export const otherSecretsPath = `/v1/functions/workspaces/${otherWorkspaceId}/secrets`
 export const cursorPath = `${secretsPath}?page%5Bafter%5D=cursor-2`
 export const canary = 'synthetic-canary-value-7f3a91c2'
 export const redacted = '[redacted-secret-value]'
@@ -24,6 +26,7 @@ export const listBody = {
 }
 export const pagedFirst = { items: Array.from({ length: 25 }, (_, index) => secret(`secret_${String(index + 1).padStart(2, '0')}`)), page: { size: 25, nextCursor: 'cursor-2' } }
 export const pagedSecond = { items: ['secret_26', 'secret_27', 'secret_28'].map((name) => secret(name)), page: { size: 25 } }
+export const otherListBody = { items: [secret('other_secret', { workspaceId: otherWorkspaceId })], page: { size: 25 } }
 export const emptyBody = { items: [], page: { size: 25 } }
 export const longNames = { items: ['a'.repeat(29), 'b'.repeat(63)].map((name) => secret(name, { description: 'Synthetic long identifier' })), page: { size: 25 } }
 export const oneRow = { items: [secret('only_secret')], page: { size: 25 } }

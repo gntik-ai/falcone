@@ -3,7 +3,7 @@ import { Lock } from 'lucide-react'
 import { Button, EmptyState, Text } from '@gntik-ai/ui'
 import { ErrorPanel, NotFoundEmpty, TableSkeleton } from '@gntik-ai/blocks'
 import type { Failure } from './api'
-import { describeSecretError, describeWrite, focusRing, requestIdOf, useCopy, type WriteKind } from './copy'
+import { describeSecretError, describeWrite, focusRing, requestIdOf, useCopy, type ErrorContext, type WriteKind } from './copy'
 
 type EmptyIcon = ComponentProps<typeof EmptyState>['icon']
 // The kit icon slot types come from another lucide build than the installed one.
@@ -22,14 +22,14 @@ export function RecoveryButton({ children, onClick }: { children: string; onClic
 }
 
 // The in-page no-access state: legacy permission message and correlation id, no request-access action.
-export function NoAccess({ target, title, failure, action, context = 'mutate' }: { target: 'list' | 'create' | 'table'; title: string; failure: Failure; action?: JSX.Element; context?: 'list' | 'mutate' }) {
+export function NoAccess({ target, title, failure, action, context = 'mutate' }: { target: 'list' | 'create' | 'table'; title: string; failure: Failure; action?: JSX.Element; context?: ErrorContext }) {
   const { t } = useCopy()
   return <div role="alert" data-secret-state={target} className="min-w-0" data-testid={`workspace-secrets-no-access-${target}`}>
     <EmptyState icon={lockIcon} title={title} description={describeSecretError(t, failure, context)} titleAs="h2" bordered={false} size="md" secondaryAction={null} primaryAction={action ?? null} className="min-w-0" />
   </div>
 }
 
-export function NotFound({ target, title, failure, action, context = 'mutate' }: { target: 'list' | 'create' | 'table'; title: string; failure: Failure; action?: JSX.Element; context?: 'list' | 'mutate' }) {
+export function NotFound({ target, title, failure, action, context = 'mutate' }: { target: 'list' | 'create' | 'table'; title: string; failure: Failure; action?: JSX.Element; context?: ErrorContext }) {
   const { t } = useCopy()
   return <div role="alert" data-secret-state={target} className="min-w-0" data-testid={`workspace-secrets-not-found-${target}`}>
     <NotFoundEmpty icon={undefined} title={title} description={describeSecretError(t, failure, context)} action={action} titleAs="h2" bordered={false} className="min-w-0" />
@@ -38,12 +38,17 @@ export function NotFound({ target, title, failure, action, context = 'mutate' }:
 
 // 5xx and network failures keep the entered values and offer Reintentar. The raw server message is shown
 // only in the technical details, and the request id and the correlation id both stay visible.
-export function FailurePanel({ target, title, message, failure, retry, retrying }: { target: 'list' | 'next' | 'create' | 'confirm'; title: string; message: string; failure: Failure; retry: () => void; retrying: boolean }) {
+export function FailurePanel({ target, title, message, failure, retry, retrying, showCorrelation = false }: { target: 'list' | 'next' | 'create' | 'confirm'; title: string; message: string; failure: Failure; retry: () => void; retrying: boolean; showCorrelation?: boolean }) {
   const { t } = useCopy()
-  return <div data-secret-failure={target} className="min-w-0 max-w-full" data-testid={`workspace-secrets-failure-${target}`}>
+  // The panel's id chip shows the request id when there is one. A message that does not carry the correlation id
+  // itself (the delete text) gets it as its own line, so both identifiers stay visible.
+  const correlation = showCorrelation && failure.status && failure.requestId && failure.correlationId ? t('errors.correlation', { id: failure.correlationId }).trim() : ''
+  // The kit panel has no live region for its message, so the wrapper announces 5xx and network failures assertively.
+  return <div role="alert" data-secret-failure={target} className="min-w-0 max-w-full space-y-2" data-testid={`workspace-secrets-failure-${target}`}>
     <ErrorPanel title={title} message={message} code={failure.status ?? null} requestId={failure.status ? requestIdOf(failure) : ''} details={failure.status ? failure.message ?? '' : ''} secondaryAction={null} titleAs="h2" announce={true}
       retryLabel={t('errorPanel.retry')} retrying={retrying} onRetry={retry} className="min-w-0 max-w-full"
       labels={{ title, message, support: t('errorPanel.support'), retry: t('errorPanel.retry'), retrying: t('errorPanel.retrying'), retryingStatus: t('errorPanel.retrying'), requestId: t('errorPanel.requestId'), copyRequestId: t('errorPanel.copyRequestId'), copied: t('errorPanel.copied'), requestIdCopied: t('errorPanel.copied'), details: t('errorPanel.details') }} />
+    {correlation && <Text as="p" variant="supporting" tone="muted" className="break-words" data-testid="workspace-secrets-failure-correlation">{correlation}</Text>}
   </div>
 }
 
@@ -51,5 +56,5 @@ export const writeTitleKey = (kind: WriteKind) => `errors.writeTitle${kind === '
 
 export function WriteFailure({ kind, failure, retry, retrying, target }: { kind: WriteKind; failure: Failure; retry: () => void; retrying: boolean; target: 'create' | 'confirm' }) {
   const { t } = useCopy()
-  return <FailurePanel target={target} title={t(writeTitleKey(kind))} message={describeWrite(t, kind, failure)} failure={failure} retry={retry} retrying={retrying} />
+  return <FailurePanel target={target} title={t(writeTitleKey(kind))} message={describeWrite(t, kind, failure)} failure={failure} retry={retry} retrying={retrying} showCorrelation={kind === 'delete'} />
 }

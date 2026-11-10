@@ -567,3 +567,75 @@ test('list.page-2.500-then-network-then-success (dotted id) serves the same sequ
   click('Cargar más secretos')
   expect(await screen.findByRole('heading', { name: 'No se pudo cargar la siguiente página de secretos' })).toBeVisible()
 })
+
+// ---- checker findings of the second attempt ----
+test.each([
+  ['delete', 'workspace-secrets.delete.500-then-network-then-success'],
+  ['replace', 'workspace-secrets.replace.500-then-network-then-success'],
+] as const)('%s: Reintentar after a 500 or a network failure never re-sends while the typed name is a mismatch', async (kind, fixture) => {
+  server = serve(fixture)
+  open(); await ready()
+  if (kind === 'delete') openRow('Eliminar', 'db_password')
+  else {
+    openRow('Reemplazar', 'db_password')
+    const dialog = await screen.findByRole('dialog', { name: 'Reemplazar secreto' })
+    set(within(dialog).getByLabelText('Nuevo valor del secreto'), canary)
+    click('Reemplazar', dialog)
+  }
+  const confirm = await screen.findByRole('alertdialog')
+  const action = kind === 'delete' ? 'Eliminar' : 'Reemplazar'
+  set(typedField(), 'db_password'); click(action, confirm)
+  // 500: edit the typed name to a mismatch; the disabled Confirm and Reintentar agree.
+  await within(confirm).findByTestId('workspace-secrets-failure-confirm')
+  set(typedField(), 'db_passwor')
+  expect(within(confirm).getByRole('button', { name: action })).toBeDisabled()
+  click('Reintentar', confirm); await settle()
+  expect(writes()).toHaveLength(1)
+  // Matching again: the retry is sent and the network failure follows.
+  set(typedField(), 'db_password'); click('Reintentar', confirm)
+  await waitFor(() => expect(writes()).toHaveLength(2))
+  await waitFor(() => expect(within(screen.getByRole('alertdialog')).getByTestId('workspace-secrets-failure-confirm')).toBeVisible())
+  set(typedField(), 'other'); click('Reintentar', screen.getByRole('alertdialog')); await settle()
+  expect(writes()).toHaveLength(2)
+})
+
+test('a create 404 carrying SECRET_NOT_FOUND still renders the generic non-leaking message', async () => {
+  server = serve('workspace-secrets.create.404')
+  failWith('POST', 404, 'SECRET_NOT_FOUND')
+  open(); await ready()
+  set(nameField(), 'new_secret'); set(valueField(), canary)
+  click('Crear secreto')
+  await screen.findByRole('heading', { name: 'No se pudo crear el secreto' })
+  expect(screen.getByText(`El recurso no está disponible para este contexto. (correlación ${typed.correlationId})`)).toBeVisible()
+  expect(screen.queryByText(/El secreto ya no existe/)).toBeNull()
+})
+
+test('a delete 500 shows the request id and the correlation id with the destructive-operation message', async () => {
+  server = serve('workspace-secrets.delete.500')
+  open(); await ready()
+  openRow('Eliminar', 'db_password')
+  const confirm = await screen.findByRole('alertdialog')
+  set(typedField(), 'db_password'); click('Eliminar', confirm)
+  const panel = await within(confirm).findByTestId('workspace-secrets-failure-confirm')
+  expect(within(panel).getByText(typed.requestId)).toBeVisible()
+  expect(within(panel).getByText(`(correlación ${typed.correlationId})`)).toBeVisible()
+  expect(within(panel).getByText('El servicio no está disponible en este momento.')).toBeVisible()
+})
+
+test.each([
+  ['create', 'workspace-secrets.create.500-then-network-then-success'],
+  ['delete', 'workspace-secrets.delete.500-then-network-then-success'],
+] as const)('%s 500 and network failure panels are assertive alerts', async (kind, fixture) => {
+  server = serve(fixture)
+  open(); await ready()
+  if (kind === 'create') {
+    set(nameField(), 'new_secret'); set(valueField(), canary); click('Crear secreto')
+  } else {
+    openRow('Eliminar', 'db_password')
+    set(typedField(), 'db_password'); click('Eliminar', screen.getByRole('alertdialog'))
+  }
+  const panel = await screen.findByTestId(`workspace-secrets-failure-${kind === 'create' ? 'create' : 'confirm'}`)
+  expect(panel).toHaveAttribute('role', 'alert')
+  expect(panel.textContent).toContain(kind === 'create' ? 'No se pudo crear el secreto' : 'No se pudo eliminar el secreto')
+  await waitFor(() => expect(within(panel).getByRole('button', { name: 'Reintentar' })).toHaveFocus())
+})
