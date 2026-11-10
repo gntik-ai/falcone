@@ -5,7 +5,6 @@ import manifest, { canary, cursorPath, fixtureIds, otherSecretsPath, redacted, s
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { blank, createSecretsHarness, expectBlank, sanitize, typeSecret } from './console-workspace-secrets-page.support.mjs';
-import { seedActiveWorkspace, seedSecretsPrincipal } from './console-workspace-secrets-page.session.mjs';
 
 // The failure snapshot (error-context.md) would otherwise persist the entered input values.
 process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1';
@@ -36,14 +35,22 @@ async function scan(parity) {
   const bad = result.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact));
   expect(bad.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`), 'accessibility: serious/critical axe violations').toEqual([]);
 }
-async function open(parity, id, { route = manifest.route, variants = {}, principal, active } = {}) {
+// Selects the fixture and the overrides of the next navigation. Overrides never outlive it: each call rewrites them.
+async function prepare(parity, id, { principal, active } = {}) {
   harness(parity).use(id);
   // The shell session admits only the workspaces in its principal, so the two-workspace fixtures list both.
   const shell = scenarios[id].shell ?? {};
   const members = ['two', 'none'].includes(shell.workspaces) ? { workspaceIds: ['synthetic-workspace', 'synthetic-other'] } : undefined;
-  if (principal ?? members) await parity.page.addInitScript(seedSecretsPrincipal, principal ?? members);
-  if (active) await parity.page.addInitScript(seedActiveWorkspace, active);
+  await harness(parity).setOverrides({ principal: principal ?? members, active });
+}
+async function open(parity, id, { route = manifest.route, variants = {}, ...overrides } = {}) {
+  await prepare(parity, id, overrides);
   await parity.open(route, variants);
+}
+// Navigation without the harness readiness checks, for pages whose landmarks differ (pending list, guard denial).
+async function visit(parity, server, id, overrides) {
+  await prepare(parity, id, overrides);
+  await parity.page.goto(server.url('console/workspace-secrets'));
 }
 async function ready(parity, name = 'db_password') { await expect(parity.page.getByRole('rowheader', { name, exact: true })).toBeVisible(); }
 async function create(parity, { name = 'new_secret', description = '' } = {}) {
@@ -77,8 +84,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
   test.describe(`Workspace secrets ${locale} ${width}`, () => {
     // Traces, screenshots and video embed input values; this page disables them, and verify-artifacts scans the rest.
     test.use({ role: 'superadmin', locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints, trace: 'off', screenshot: 'off', video: 'off' });
-    test.beforeEach(async ({ parity }) => { harnesses.set(parity, createSecretsHarness(parity)); });
-    test.afterEach(async ({ parity }) => { expect(harness(parity).state.matched.every(Boolean), 'every written value matched the synthetic canary in memory').toBe(true); });
+    test.beforeEach(async ({ parity, server }) => { harnesses.set(parity, createSecretsHarness(parity)); await harness(parity).install(server); });
+    test.afterEach(async ({ parity }) => {
+      expect(harness(parity).state.matched.every(Boolean), 'every written value matched the synthetic canary in memory').toBe(true);
+      // Every expected diagnostic was consumed by its own fixture, so anything left is a real fault.
+      expect(parity.faults, 'unexpected console, page, CSP or rejection faults').toEqual([]);
+    });
 
     test.describe(`console-workspace-secrets-page | superadmin | ${locale} | ${width}`, () => {
     test('data', async ({ parity }) => {
@@ -167,18 +178,18 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
         if (id.endsWith('501')) { await expect(valueInput(parity)).toHaveCount(0); await expect(button(parity, 'toolbar.new')).toHaveCount(0); }
         await check.assertLocale(parity);
       }
-      harness(parity).use('workspace-secrets.list.delayed');
-      await parity.page.goto(server.url('console/workspace-secrets'));
+      await visit(parity, server, 'workspace-secrets.list.delayed');
       await expect(page(parity).getByRole('status', { name: text(parity, 'loading.title'), exact: true })).toBeVisible();
       await ready(parity);
       // No workspace: the picker renders and no secrets request is sent.
       await open(parity, 'shell.no-active-workspace'); await expect(heading(parity, 'workspace.title')).toBeVisible();
       expect(harness(parity).calls()).toEqual([]);
       expect(harness(parity).state.otherReads, 'no workspace is active, so no list is read').toBe(0);
-      await open(parity, 'shell.non-member', { principal: { platformRoles: ['tenant_viewer'], workspaceIds: [] } });
-      await expect(parity.page.getByRole('heading', { name: text(parity, 'guardDenied'), exact: true })).toBeVisible();
+      // The guard denial renders its own status layout beside the shell's main, so the singular-main helper does not apply.
+      await visit(parity, server, 'shell.non-member', { principal: { platformRoles: ['tenant_viewer'], workspaceIds: [] } });
+      await expect(parity.page.locator('#route-status').getByRole('heading', { name: text(parity, 'guardDenied'), exact: true })).toBeVisible();
       expect(harness(parity).calls()).toEqual([]);
-      harness(parity).use('shell.workspace-error'); await parity.page.goto(server.url('console/workspace-secrets'));
+      await visit(parity, server, 'shell.workspace-error');
       await expect(heading(parity, 'workspace.error')).toBeVisible();
       const reads = harness(parity).state.workspaceReads; await button(parity, 'errorPanel.retry').click();
       await expect.poll(() => harness(parity).state.workspaceReads).toBe(reads + 1);
@@ -230,7 +241,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
       await scan(parity); await check.assertLocale(parity);
       await expect(page(parity).getByRole('table').locator('caption, [aria-label]').first()).toBeAttached();
       // Tab reaches Nuevo secreto, the only stop of the toolbar.
-      await parity.page.locator('main').evaluate((main) => main.querySelector('h1')?.focus());
+      // The page title is not focusable, so start from the focusable control just before the button and verify the start.
+      const started = await parity.page.locator('main').evaluate((main, label) => {
+        const target = [...main.querySelectorAll('button')].find((candidate) => candidate.textContent.trim() === label);
+        const before = [...main.querySelectorAll('a[href], button, input, select, textarea, [tabindex="0"]')].filter((element) => element.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING).at(-1);
+        before?.focus();
+        return Boolean(before) && document.activeElement === before;
+      }, text(parity, 'toolbar.new'));
+      expect(started, 'focus starts on the control before Nuevo secreto').toBe(true);
       await parity.page.keyboard.press('Tab');
       await expect(button(parity, 'toolbar.new')).toBeFocused();
       await open(parity, 'workspace-secrets.list.paged');
@@ -262,7 +280,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
       test.slow();
       // Direct load, then a NavLink arrival from another migrated page.
       await open(parity, 'workspace-secrets.list.success'); await ready(parity);
-      harness(parity).use('workspace-secrets.list.success');
+      await prepare(parity, 'workspace-secrets.list.success');
       await parity.open('/console/profile');
       await parity.page.getByRole('link', { name: text(parity, 'title'), exact: true }).first().click();
       await ready(parity); expect(parity.page.url()).toBe(server.url('console/workspace-secrets'));
@@ -357,7 +375,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
         window.secretsInvalidations = 0;
         window.addEventListener('in-falcone:console-session-invalidated', () => window.secretsInvalidations++);
       });
-      harness(parity).use(`workspace-secrets.list.${variant}`);
+      await prepare(parity, `workspace-secrets.list.${variant}`);
       if (variant === '401-refresh-ok') {
         await parity.open(manifest.route);
         await ready(parity); expect(new URL(parity.page.url()).pathname).toBe(new URL(server.url('console/workspace-secrets')).pathname);

@@ -1,5 +1,17 @@
 import { canary, createScenario, otherListBody, otherSecretsPath, redacted, scenarios, secretsPath } from './console-workspace-secrets-page.manifest.ts';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
+import { seedSecretsOverrides } from './console-workspace-secrets-page.session.mjs';
+
+const OVERRIDES_COOKIE = 'secrets-parity-overrides';
+// The shared helper leaves some statuses (501, 502, ...) as faults. This page injects them itself, so it consumes
+// exactly the diagnostics of its own injected failures: same URL and same status, one diagnostic per failure.
+const consumeInjected = (text, url, injected) => {
+  const status = /^Failed to load resource: the server responded with a status of (\d{3})(?: \([^\n]*\))?$/.exec(text)?.[1];
+  const index = status ? injected.findIndex((failure) => failure.url === url && failure.kind === status) : -1;
+  if (index < 0) return false;
+  injected.splice(index, 1);
+  return true;
+};
 
 // Secret values are asserted in memory inside the route handler and replaced by a fixed mask before any request
 // log, report line or persisted artifact. Nothing here ever prints the value.
@@ -75,12 +87,22 @@ export function createSecretsHarness(parity) {
     else await route.fulfill({ status: response.status, json: response.body });
   });
   parity.page.on('console', (message) => {
-    if (message.type() !== 'error' || !consumeResourceDiagnostic(message.text(), message.location().url, injected)) return;
+    if (message.type() !== 'error' || !(consumeInjected(message.text(), message.location().url, injected) || consumeResourceDiagnostic(message.text(), message.location().url, injected))) return;
     const index = parity.faults.indexOf(`console.error: ${message.text()}`);
     if (index >= 0) parity.faults.splice(index, 1);
   });
   return {
     state,
+    injected,
+    // Installs the single override script of this page; setOverrides then decides what each navigation sees.
+    async install(server) {
+      state.origin = server.origin;
+      await parity.page.addInitScript(seedSecretsOverrides, OVERRIDES_COOKIE);
+    },
+    // Replaces the overrides of the next navigation. An empty call resets them, so nothing leaks between fixtures.
+    async setOverrides({ principal, active } = {}) {
+      await parity.page.context().addCookies([{ name: OVERRIDES_COOKIE, value: encodeURIComponent(JSON.stringify({ principal, active })), url: `${state.origin}/` }]);
+    },
     use(id) {
       if (!Object.hasOwn(scenarios, id)) throw new Error(`Unknown fixture ${id}`);
       // Each scenario owns its request history, so one page open never inherits the calls of the previous one.
