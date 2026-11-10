@@ -129,7 +129,7 @@ export function useWorkspaceSecrets(workspaceId: string, { notify, focus }: Hook
       setDraft(emptyDraft)
       setCreate({ pending: false, failure: null, terminal: null })
       afterWrite('created', name)
-      focus({ kind: 'name' })
+      focus({ kind: 'created' })
     } catch (cause) {
       if (!alive.current) return
       const failure = failureOf(cause)

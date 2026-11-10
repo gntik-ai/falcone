@@ -699,6 +699,27 @@ test('delete success followed by a 501 reload focuses the blocked heading', asyn
   await waitFor(() => expect(blocked).toHaveFocus())
 })
 
+test('create success followed by a 501 reload focuses the blocked heading', async () => {
+  server = serve('workspace-secrets.create.success')
+  open(); await ready()
+  const original = server.mock.getMockImplementation()!
+  server.mock.mockImplementation(async (input, init) => (init?.method ?? 'GET') === 'GET'
+    ? (server.scenario.calls.push({ method: 'GET', path: String(input), body: undefined }), Response.json({ status: 501, code: 'HTTP_501', message: 'synthetic-backend-reason', ...typed }, { status: 501 }))
+    : original(input, init))
+  set(nameField(), 'new_secret'); set(valueField(), canary); click('Crear secreto')
+  const blocked = await screen.findByRole('heading', { name: 'Servicio de secretos no disponible' })
+  await waitFor(() => expect(blocked).toHaveFocus())
+})
+
+test('create success followed by a failed reload keeps focus on the cleared name field', async () => {
+  server = serve('workspace-secrets.create.success')
+  open(); await ready()
+  failReloads()
+  set(nameField(), 'new_secret'); set(valueField(), canary); click('Crear secreto')
+  await waitFor(() => expect(screen.getByTestId('workspace-secrets-failure-list')).toBeVisible())
+  await waitFor(() => expect(nameField()).toHaveFocus())
+})
+
 test('replace success followed by a failed reload focuses the list failure heading', async () => {
   server = serve('workspace-secrets.replace.success')
   open(); await ready()

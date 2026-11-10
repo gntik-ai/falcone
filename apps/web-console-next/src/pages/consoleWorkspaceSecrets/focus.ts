@@ -6,6 +6,7 @@ import { readSecretName } from './api'
 export const SECTION_TITLE_ID = 'workspace-secrets-section-title'
 export type Intent =
   | { kind: 'name' }
+  | { kind: 'created' }
   | { kind: 'row'; action: 'replace' | 'delete'; name: string }
   | { kind: 'replace-success'; name: string }
   | { kind: 'section' }
@@ -15,7 +16,7 @@ export type Intent =
   | { kind: 'replace-submit' }
 
 // Intents that need the reloaded list to settle before they can be resolved.
-export const needsList = (intent: Intent) => ['replace-success', 'section', 'first-new-row'].includes(intent.kind)
+export const needsList = (intent: Intent) => ['replace-success', 'section', 'first-new-row', 'created'].includes(intent.kind)
 
 const query = (selector: string) => document.querySelector<HTMLElement>(selector)
 const headingOf = (root: HTMLElement | null) => {
@@ -39,6 +40,8 @@ const rowAction = (action: string, name: string) =>
 export function resolveIntent(intent: Intent, rows: readonly WorkspaceSecret[]): HTMLElement | null {
   switch (intent.kind) {
     case 'name': return query('[data-secret-field="name"]')
+    // After a create the cleared name field takes focus; when the reload removes the form, the list failure heading does.
+    case 'created': return query('[data-secret-field="name"]') ?? listFailure()
     case 'row': return rowAction(intent.action, intent.name)
     case 'replace-success':
       return rows.some((row) => readSecretName(row) === intent.name) ? rowAction('replace', intent.name) : section() ?? headingOf(query('[data-secret-state="empty"]')) ?? listFailure()
