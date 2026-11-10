@@ -62,6 +62,16 @@ test('create user with a malformed email is blocked by native validation and sen
   expect(writes()).toEqual([])
 })
 
+test('create user keeps an initial role named like the no-role item and sends it as realmRoles', async () => {
+  const odd = { id: 'role-odd', name: '__no-initial-role__', roleName: '__no-initial-role__', description: null }
+  setup({ [`GET ${rolesPath}`]: listOf([...roles4, odd]), [`POST ${usersPath}`]: created({}) }); open(); await table()
+  fireEvent.change(usernameField(), { target: { value: 'grace' } })
+  await choose(c.forms.user.role, '__no-initial-role__')
+  submitUser()
+  await waitFor(() => expect(writes()).toHaveLength(1))
+  expect(writes()[0]).toEqual({ method: 'POST', path: usersPath, body: { enabled: true, emailVerified: true, username: 'grace', realmRoles: ['__no-initial-role__'] } })
+})
+
 test('create user without an id in the response focuses the username field', async () => {
   setup({ [`POST ${usersPath}`]: created({}) }); open(); await table()
   fireEvent.change(usernameField(), { target: { value: 'grace' } }); submitUser()

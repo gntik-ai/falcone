@@ -17,7 +17,9 @@ export interface FormDrafts {
 }
 const emptyUser: UserDraft = { username: '', email: '', password: '', role: '' }
 // The select has no clear button (its built-in one is under the 24px target); this item stands for no initial role.
-const NO_ROLE = '__no-initial-role__'
+// Role items are prefixed so no realm role name can collide with it.
+const NO_ROLE = 'none'
+const ROLE_PREFIX = 'role:'
 
 // The unsent values live above the catalogue branches, so a failed inventory load and its retry never discard them.
 export function useFormDrafts(): FormDrafts {
@@ -82,8 +84,8 @@ export function Forms({ drafts, roles, busy, onCreateUser, onCreateRole, onCreat
           <PasswordInput size="md" value={user.password} onValueChange={(password) => setUser((current) => ({ ...current, password }))} autoComplete="new-password" disabled={busy} defaultVisible={false} onVisibleChange={undefined}
             showStrength={false} strength={undefined} showLabel={t('forms.user.showPassword')} hideLabel={t('forms.user.hidePassword')} className={`min-w-0 ${focusRing}`} />
         </Field>
-        <SimpleSelect value={user.role || NO_ROLE} onValueChange={(role) => setUser((current) => ({ ...current, role: !role || role === NO_ROLE ? '' : role }))} label={t('forms.user.role')} placeholder={t('forms.user.noRole')} size="md" disabled={busy || roleOptions.length === 0}
-          clearable={false} clearLabel={t('forms.user.noRole')} onClear={undefined} loadOptions={undefined} className={`w-full min-w-0 ${focusRing}`} items={[{ value: NO_ROLE, label: t('forms.user.noRole') }, ...roleOptions.map((value) => ({ value, label: value }))]} />
+        <SimpleSelect value={user.role ? ROLE_PREFIX + user.role : NO_ROLE} onValueChange={(value) => setUser((current) => ({ ...current, role: value?.startsWith(ROLE_PREFIX) ? value.slice(ROLE_PREFIX.length) : '' }))} label={t('forms.user.role')} placeholder={t('forms.user.noRole')} size="md" disabled={busy || roleOptions.length === 0}
+          clearable={false} clearLabel={t('forms.user.noRole')} onClear={undefined} loadOptions={undefined} className={`w-full min-w-0 ${focusRing}`} items={[{ value: NO_ROLE, label: t('forms.user.noRole') }, ...roleOptions.map((name) => ({ value: ROLE_PREFIX + name, label: name }))]} />
         <div><Submit busy={busy} disabled={busy || !user.username.trim()} label={t('forms.user.submit')} variant="primary" /></div>
       </form>
     </FormSection>
