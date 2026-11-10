@@ -51,6 +51,6 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'workspaces/:workspaceId/docs', migrated: true },
   { path: 'secrets', migrated: true },
   { path: 'secrets/:encodedSecretPath/rotate' },
-  { path: 'workspace-secrets', guard: 'secrets' },
+  { path: 'workspace-secrets', migrated: true, guard: 'secrets' },
   { path: 'profile', migrated: true },
 ]

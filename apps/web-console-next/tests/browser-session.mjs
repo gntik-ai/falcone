@@ -1,5 +1,6 @@
 import { ready as realtimeReady, capabilityFixtures, capabilitiesPath } from './parity/pages/console-realtime-page.manifest.ts';
 import { workspaceConsumptionEndpoints } from './parity/pages/console-workspace-dashboard-page.manifest.ts';
+import { workspaceSecretsEndpoints } from './parity/pages/console-workspace-secrets-page.manifest.ts';
 import { tenantMetricsEndpoints } from './parity/pages/consoleTenants.manifest.ts';
 import { catalogEndpoints, catalogResponse, isPlansQuery } from './parity/pages/console-plan-catalog-page.manifest.ts';
 import { allocationEndpoints } from './parity/pages/console-tenant-allocation-summary-page.manifest.ts';
@@ -17,6 +18,7 @@ export async function installSession(page, roles = ['superadmin'], capabilityVar
   const endpoints = createEndpointRegistry({}, () => ({}), {
     ...(typeof tenantMetricsEndpoints === 'undefined' ? {} : tenantMetricsEndpoints), ...operationEndpoints, ...runtimeEndpoints, ...pendingEndpoints, ...(typeof catalogEndpoints === 'undefined' ? {} : catalogEndpoints), ...(typeof allocationEndpoints === 'undefined' ? {} : allocationEndpoints), ...(typeof buildTenantPlanEndpoints === 'undefined' ? {} : buildTenantPlanEndpoints(cspTenantId)),
     ...(typeof workspaceConsumptionEndpoints === 'undefined' ? {} : workspaceConsumptionEndpoints),
+    ...(typeof workspaceSecretsEndpoints === 'undefined' ? {} : workspaceSecretsEndpoints),
     ...(typeof buildPlanDetailReads === 'undefined' ? {} : buildPlanDetailReads('sample-planId')),
     signupPolicy: { method: 'GET', path: '/v1/auth/signups/policy', fixtures: {
       success: { status: 200, body: buildConsoleSignupPolicyFixture() },

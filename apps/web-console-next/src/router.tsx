@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { RouteState, ShellErrorBoundary } from './shell/RouteState'
 import { SignupFeedbackLayout } from './pages/signupFeedback'
 import { pendingConsoleRoutes } from './shell/routes'
+import { SecretsGuard } from './pages/consoleWorkspaceSecrets/guard'
 
 declare const __SHELL_TEST_FIXTURES__: boolean
 const AdminLayout = lazy(() => import('./shell/AdminLayout'))
@@ -109,6 +110,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'service-accounts' && route.migrated) return { ...route, element: lazyPage('pages.console-service-accounts-page', () => import('./pages/consoleServiceAccounts')) }
         if (route.path === 'secrets/:encodedSecretPath/rotate') return { ...route, element: lazyPage('pages.console-secret-rotation-page', () => import('./pages/consoleSecretRotation')) }
         if (route.path === 'secrets' && route.migrated) return { ...route, element: lazyPage('pages.console-secrets-page', () => import('./pages/consoleSecrets')) }
+        if (route.path === 'workspace-secrets' && route.migrated) return { ...route, element: <SecretsGuard>{lazyPage('pages.console-workspace-secrets-page', () => import('./pages/consoleWorkspaceSecrets'))}</SecretsGuard> }
         if (route.path === 'auth-config' && route.migrated) return { ...route, element: lazyPage('pages.console-auth-config-page', () => import('./pages/consoleAuthConfig')) }
         if (route.path === 'realtime/changes' && route.migrated) return { ...route, element: lazyPage('pages.console-realtime-changes-page', () => import('./pages/consoleRealtimeChanges')) }
         if (route.path === 'flows' && route.migrated) return { ...route, element: lazyPage('pages.console-flows-page', () => import('./pages/consoleFlows')) }

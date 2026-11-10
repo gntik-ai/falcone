@@ -616,6 +616,13 @@ jobs:
       - name: Verify seeded parity faults
         run: pnpm --filter @in-falcone/web-console-next exec node tests/parity/verify-negatives.mjs
 
+      # Forced failing probe with value-bearing POST and PUT writes, then an on-disk scan of every persisted
+      # artifact for the synthetic secret value. Nothing from this step is uploaded.
+      - name: Verify no secret value reaches persisted artifacts
+        env:
+          PLAYWRIGHT_NO_COPY_PROMPT: '1'
+        run: pnpm --filter @in-falcone/web-console-next exec node tests/parity/verify-artifacts.mjs
+
       - name: Upload seeded-fault reports and traces
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

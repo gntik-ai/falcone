@@ -1,0 +1,9 @@
+/* The page has no search, filters or saved views: its toolbar holds only Nuevo secreto. */
+.console-workspace-secrets table {
+  table-layout: auto;
+  width: 100%;
+}
+.console-workspace-secrets table th,
+.console-workspace-secrets table td {
+  vertical-align: top;
+}
