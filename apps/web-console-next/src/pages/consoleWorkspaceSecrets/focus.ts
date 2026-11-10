@@ -30,6 +30,8 @@ const section = () => {
   if (title) title.tabIndex = -1
   return title
 }
+// After a write whose reload failed, neither the table nor the empty state exists: the failure panel's heading is the landmark.
+const listFailure = () => headingOf(query('[data-secret-failure="list"]')) ?? headingOf(query('[data-secret-state="list"]'))
 const rowAction = (action: string, name: string) =>
   Array.from(document.querySelectorAll<HTMLElement>(`[data-secret-action="${action}"]`)).find((element) => element.dataset.secretName === name) ?? null
 
@@ -38,8 +40,8 @@ export function resolveIntent(intent: Intent, rows: readonly WorkspaceSecret[]):
     case 'name': return query('[data-secret-field="name"]')
     case 'row': return rowAction(intent.action, intent.name)
     case 'replace-success':
-      return rows.some((row) => readSecretName(row) === intent.name) ? rowAction('replace', intent.name) : section() ?? headingOf(query('[data-secret-state="empty"]'))
-    case 'section': return section() ?? headingOf(query('[data-secret-state="empty"]')) ?? headingOf(query('[data-secret-state="list"]'))
+      return rows.some((row) => readSecretName(row) === intent.name) ? rowAction('replace', intent.name) : section() ?? headingOf(query('[data-secret-state="empty"]')) ?? listFailure()
+    case 'section': return section() ?? headingOf(query('[data-secret-state="empty"]')) ?? listFailure()
     case 'first-new-row': {
       const cell = Array.from(document.querySelectorAll<HTMLElement>('[data-secret-row-header]')).find((element) => element.dataset.secretRowHeader === intent.name) ?? null
       if (cell) cell.tabIndex = -1

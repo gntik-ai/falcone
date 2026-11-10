@@ -284,7 +284,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
       await open(parity, 'workspace-secrets.list.success'); await ready(parity);
       await prepare(parity, 'workspace-secrets.list.success');
       await parity.open('/console/profile');
-      await parity.page.getByRole('link', { name: text(parity, 'title'), exact: true }).first().click();
+      // Below lg the sidebar is a drawer that starts closed.
+      if (width < 1024) await parity.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
+      const navigation = width < 1024 ? parity.page.getByRole('dialog') : parity.page.locator('aside');
+      await navigation.getByRole('link', { name: text(parity, 'title'), exact: true }).click();
       await ready(parity); expect(parity.page.url()).toBe(server.url('console/workspace-secrets'));
       for (const [id, run] of [['workspace-secrets.create.success', create], ['workspace-secrets.replace.success', replace], ['workspace-secrets.delete.success', remove], ['workspace-secrets.delete.500-then-network-then-success', remove], ['workspace-secrets.delete.404-secret-not-found', remove]]) {
         await open(parity, id); await ready(parity); await run(parity);

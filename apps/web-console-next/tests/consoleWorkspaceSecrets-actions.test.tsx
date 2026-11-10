@@ -639,3 +639,39 @@ test.each([
   expect(panel.textContent).toContain(kind === 'create' ? 'No se pudo crear el secreto' : 'No se pudo eliminar el secreto')
   await waitFor(() => expect(within(panel).getByRole('button', { name: 'Reintentar' })).toHaveFocus())
 })
+
+// A successful write whose first-page reload fails leaves neither the table nor the empty state, so focus moves
+// to the failure panel's heading instead of being dropped.
+function failReloads() {
+  const original = server.mock.getMockImplementation()!
+  server.mock.mockImplementation(async (input, init) => (init?.method ?? 'GET') === 'GET'
+    ? (server.scenario.calls.push({ method: 'GET', path: String(input), body: undefined }), Response.json({ status: 500, code: 'HTTP_500', message: 'synthetic-backend-reason', ...typed }, { status: 500 }))
+    : original(input, init))
+}
+
+test('delete success followed by a failed reload focuses the list failure heading', async () => {
+  server = serve('workspace-secrets.delete.success')
+  open(); await ready()
+  failReloads()
+  openRow('Eliminar', 'db_password')
+  const confirm = await screen.findByRole('alertdialog')
+  set(typedField(), 'db_password')
+  click('Eliminar', confirm)
+  await waitFor(() => expect(screen.getByTestId('workspace-secrets-failure-list')).toBeVisible())
+  await waitFor(() => expect(within(screen.getByTestId('workspace-secrets-failure-list')).getByRole('heading', { name: 'No se pudieron cargar los secretos' })).toHaveFocus())
+})
+
+test('replace success followed by a failed reload focuses the list failure heading', async () => {
+  server = serve('workspace-secrets.replace.success')
+  open(); await ready()
+  failReloads()
+  openRow('Reemplazar', 'db_password')
+  const dialog = await screen.findByRole('dialog', { name: 'Reemplazar secreto' })
+  set(within(dialog).getByLabelText('Nuevo valor del secreto'), canary)
+  fireEvent.submit(dialog.querySelector('form')!)
+  const confirm = await screen.findByRole('alertdialog')
+  set(typedField(), 'db_password')
+  click('Reemplazar', confirm)
+  await waitFor(() => expect(screen.getByTestId('workspace-secrets-failure-list')).toBeVisible())
+  await waitFor(() => expect(within(screen.getByTestId('workspace-secrets-failure-list')).getByRole('heading', { name: 'No se pudieron cargar los secretos' })).toHaveFocus())
+})
