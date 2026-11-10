@@ -1,0 +1,116 @@
+import { canary, createScenario, otherListBody, otherSecretsPath, redacted, scenarios, secretsPath } from './console-workspace-secrets-page.manifest.ts';
+import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
+import { seedSecretsOverrides } from './console-workspace-secrets-page.session.mjs';
+
+const OVERRIDES_COOKIE = 'secrets-parity-overrides';
+// The shared helper leaves some statuses (501, 502, ...) as faults. This page injects them itself, so it consumes
+// exactly the diagnostics of its own injected failures: same URL and same status, one diagnostic per failure.
+const consumeInjected = (text, url, injected) => {
+  const status = /^Failed to load resource: the server responded with a status of (\d{3})(?: \([^\n]*\))?$/.exec(text)?.[1];
+  const index = status ? injected.findIndex((failure) => failure.url === url && failure.kind === status) : -1;
+  if (index < 0) return false;
+  injected.splice(index, 1);
+  return true;
+};
+
+// Secret values are asserted in memory inside the route handler and replaced by a fixed mask before any request
+// log, report line or persisted artifact. Nothing here ever prints the value.
+export const sanitize = (text) => String(text ?? '').split(canary).join(redacted);
+export async function typeSecret(locator, value) {
+  try {
+    // A native value setter plus an input event reaches React without the value appearing in a call log.
+    await locator.evaluate((element, secret) => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(element, secret);
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    }, value);
+  } catch (error) { throw new Error(`typeSecret: ${sanitize(error.message)}`); }
+}
+// Clearing is asserted as a boolean so a failure message can never carry the value.
+export const blank = (locator) => locator.evaluate((element) => element.value === '');
+export async function expectBlank(expect, locator, what) { expect(await blank(locator), `${what} must be cleared`).toBe(true); }
+
+const workspace = (id, name, environment) => ({ workspaceId: id, tenantId: 'synthetic-tenant', displayName: name, slug: id, environment, state: 'active' });
+export function workspacesFor(shell) {
+  const environment = shell.environment ?? 'dev';
+  if (shell.workspaces === 'two' || shell.workspaces === 'none') return [workspace('synthetic-workspace', 'Synthetic Workspace', environment), workspace('synthetic-other', 'Other Workspace', 'dev')];
+  return [workspace('synthetic-workspace', 'Synthetic Workspace', environment)];
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Installs the page's own handlers in front of the harness registry: secrets requests are served from the
+// manifest scenario, the workspace list from the shell fixture, and everything else falls through.
+export function createSecretsHarness(parity) {
+  const injected = [];
+  const state = { id: null, scenario: createScenario('workspace-secrets.list.success'), matched: [], workspaceReads: 0, workspaceRecovered: false, otherReads: 0, shell: {}, refresh: null };
+  const redact = (body) => {
+    if (!body || typeof body !== 'object' || !('secretValue' in body)) return body;
+    // The comparison happens here, in memory; only the boolean and the mask leave this function.
+    state.matched.push(body.secretValue === canary);
+    return { ...body, secretValue: redacted };
+  };
+  const record = (request, url, body) => parity.network.requests.push({ method: request.method(), path: url.pathname + url.search, body: redact(body) });
+  parity.page.route((url) => url.pathname.startsWith(secretsPath) || url.pathname === otherSecretsPath || url.pathname === '/v1/workspaces' || /\/v1\/auth\/login-sessions\/[^/]+\/refresh$/.test(url.pathname), async (route) => {
+    const request = route.request(), url = new URL(request.url());
+    if (url.pathname === '/v1/workspaces') {
+      if (request.method() !== 'GET' || !state.id || !Object.keys(state.shell).some((key) => ['environment', 'workspaces'].includes(key))) { await route.fallback(); return; }
+      state.workspaceReads++;
+      if (state.shell.workspaces === 'loading') await sleep(1500);
+      // The shell may resolve the list more than once while it settles, so every read fails until the test recovers it.
+      if (state.shell.workspaces === 'error' && !state.workspaceRecovered) {
+        injected.push({ url: request.url(), kind: '500' });
+        await route.fulfill({ status: 500, json: { status: 500, code: 'HTTP_500', message: 'synthetic-backend-reason' } }); return;
+      }
+      await route.fulfill({ status: 200, json: { items: workspacesFor(state.shell), page: { after: null } } }); return;
+    }
+    if (url.pathname === otherSecretsPath) {
+      // The second workspace of the switch scenarios answers its own list; it is never a write target.
+      if (request.method() !== 'GET') { parity.faults.push(`Unexpected ${request.method()} ${url.pathname}`); await route.abort(); return; }
+      state.otherReads++;
+      parity.network.requests.push({ method: 'GET', path: url.pathname + url.search, body: undefined });
+      await route.fulfill({ status: 200, json: otherListBody }); return;
+    }
+    if (url.pathname !== secretsPath && !url.pathname.startsWith(`${secretsPath}/`)) {
+      // Refresh: only the rejected fixture overrides it, with the 400 whose resource diagnostic is consumed below.
+      if (state.refresh !== 'rejected') { await route.fallback(); return; }
+      parity.network.requests.push({ method: request.method(), path: url.pathname, body: undefined });
+      injected.push({ url: request.url(), kind: '400' });
+      await route.fulfill({ status: 400, json: { status: 400, code: 'REFRESH_REJECTED', message: 'synthetic-backend-reason' } }); return;
+    }
+    let body;
+    try { body = request.postDataJSON() ?? undefined; } catch { body = undefined; }
+    record(request, url, body);
+    const response = state.scenario.handle(request.method(), url.pathname + url.search, body);
+    if (!response) { parity.faults.push(`Unmatched secrets request ${request.method()} ${url.pathname}${url.search}`); await route.abort(); return; }
+    if (response.delayMs) await sleep(response.delayMs);
+    if (response.network || response.status >= 400) injected.push({ url: request.url(), kind: response.network ? 'network' : String(response.status) });
+    if (response.network) await route.abort('failed');
+    else if (response.status === 204) await route.fulfill({ status: 204 });
+    else await route.fulfill({ status: response.status, json: response.body });
+  });
+  parity.page.on('console', (message) => {
+    if (message.type() !== 'error' || !(consumeInjected(message.text(), message.location().url, injected) || consumeResourceDiagnostic(message.text(), message.location().url, injected))) return;
+    const index = parity.faults.indexOf(`console.error: ${message.text()}`);
+    if (index >= 0) parity.faults.splice(index, 1);
+  });
+  return {
+    state,
+    injected,
+    // Installs the single override script of this page; setOverrides then decides what each navigation sees.
+    async install(server) {
+      state.origin = server.origin;
+      await parity.page.addInitScript(seedSecretsOverrides, OVERRIDES_COOKIE);
+    },
+    // Replaces the overrides of the next navigation. An empty call resets them, so nothing leaks between fixtures.
+    async setOverrides({ principal, active } = {}) {
+      await parity.page.context().addCookies([{ name: OVERRIDES_COOKIE, value: encodeURIComponent(JSON.stringify({ principal, active })), url: `${state.origin}/` }]);
+    },
+    use(id) {
+      if (!Object.hasOwn(scenarios, id)) throw new Error(`Unknown fixture ${id}`);
+      // Each scenario owns its request history, so one page open never inherits the calls of the previous one.
+      parity.network.requests.length = 0;
+      Object.assign(state, { id, scenario: createScenario(id), matched: [], workspaceReads: 0, workspaceRecovered: false, otherReads: 0, shell: scenarios[id].shell ?? {}, refresh: id.endsWith('401-refresh-rejected') ? 'rejected' : null });
+    },
+    calls: () => parity.network.requests.filter(({ path }) => path.startsWith(secretsPath)),
+    writes: () => parity.network.requests.filter(({ path, method }) => path.startsWith(secretsPath) && method !== 'GET'),
+  };
+}

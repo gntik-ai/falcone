@@ -85,7 +85,7 @@ test.each(['superadmin', 'platform_admin', 'platform_operator', 'platform_audito
   runtime.unmount()
   const allowed = canManageWorkspaceSecrets(readConsoleShellSession(), null)
   open('/console/workspace-secrets')
-  expect(await screen.findByRole('heading', { name: allowed ? 'Página pendiente' : 'Acceso denegado' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: allowed ? 'Secretos del área de trabajo' : 'Sin acceso a los secretos del área de trabajo' })).toBeVisible()
 })
 
 test.each(['superadmin', 'platform_admin', 'platform_operator', 'platform_auditor', 'tenant_owner'].flatMap((role) =>
@@ -96,12 +96,13 @@ test.each(['superadmin', 'platform_admin', 'platform_operator', 'platform_audito
   requests = strictFetch({
     [`GET ${tenantUrl}`]: { items: [{ tenantId: 't1', displayName: 'Tenant One' }] },
     'GET /v1/tenants/t1': { tenantId: 't1', displayName: 'Tenant One' },
-    [`GET ${workspaceUrl('t1')}`]: { items: [{ workspaceId: 'w1', tenantId: 't1', displayName: 'Workspace One' }] }
+    [`GET ${workspaceUrl('t1')}`]: { items: [{ workspaceId: 'w1', tenantId: 't1', displayName: 'Workspace One' }] },
+    'GET /v1/functions/workspaces/w1/secrets': { items: [], page: { size: 25 } }
   })
   open('/console/workspace-secrets')
   await screen.findByRole('button', { name: /Workspace One/ })
   const allowed = canManageWorkspaceSecrets(session, 'w1')
-  expect(await screen.findByRole('heading', { name: allowed ? 'Página pendiente' : 'Acceso denegado' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: allowed ? 'Secretos del área de trabajo' : 'Sin acceso a los secretos del área de trabajo' })).toBeVisible()
 })
 
 

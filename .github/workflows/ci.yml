@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '029cf85c18c09c0015210a56e77d596c63f51175'
+  FALCONE_CHARTS_REF: '59d7ae124e7c5a7e9d35d68b89bef80105bf1264'
 
 jobs:
   quality:
@@ -615,6 +615,13 @@ jobs:
 
       - name: Verify seeded parity faults
         run: pnpm --filter @in-falcone/web-console-next exec node tests/parity/verify-negatives.mjs
+
+      # Forced failing probe with value-bearing POST and PUT writes, then an on-disk scan of every persisted
+      # artifact for the synthetic secret value. Nothing from this step is uploaded.
+      - name: Verify no secret value reaches persisted artifacts
+        env:
+          PLAYWRIGHT_NO_COPY_PROMPT: '1'
+        run: pnpm --filter @in-falcone/web-console-next exec node tests/parity/verify-artifacts.mjs
 
       - name: Upload seeded-fault reports and traces
         if: always()
