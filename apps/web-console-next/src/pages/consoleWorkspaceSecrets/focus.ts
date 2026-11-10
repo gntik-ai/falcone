@@ -10,7 +10,7 @@ export type Intent =
   | { kind: 'replace-success'; name: string }
   | { kind: 'section' }
   | { kind: 'first-new-row'; name: string }
-  | { kind: 'state'; target: 'list' | 'create' | 'table' }
+  | { kind: 'state'; target: 'list' | 'create' | 'table' | 'blocked' }
   | { kind: 'retry'; target: 'list' | 'next' | 'create' | 'confirm' }
   | { kind: 'replace-submit' }
 

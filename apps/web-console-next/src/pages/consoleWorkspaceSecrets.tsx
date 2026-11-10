@@ -71,7 +71,8 @@ function Surface({ workspace, shown }: { workspace: string; shown: Shown }) {
     if (!list.userStarted) return
     if (list.status === 'failed' && list.failure) {
       const kind = classify(list.failure)
-      focus.request(kind === 'no-access' || kind === 'not-found' ? { kind: 'state', target: 'list' } : { kind: 'retry', target: 'list' })
+      // The 501 blocked state replaces the page body and has no retry button, so its own heading takes focus.
+      focus.request(list.failure.status === 501 ? { kind: 'state', target: 'blocked' } : kind === 'no-access' || kind === 'not-found' ? { kind: 'state', target: 'list' } : { kind: 'retry', target: 'list' })
     }
   }, [list.status, list.failure, list.userStarted])
   useEffect(() => {
@@ -83,7 +84,9 @@ function Surface({ workspace, shown }: { workspace: string; shown: Shown }) {
   if (list.status === 'failed' && list.failure?.status === 501) {
     return <Page width="wide" title={null} description={null} actions={null} actionBar={null} actionBarLabel={t('actions')} className="console-workspace-secrets min-w-0 space-y-6 break-words" data-testid="workspace-secrets-backend-disabled"
       header={<Header shown={shown} />}>
-      <EmptyState icon={undefined} title={t('blocked.title')} description={t('blocked.description')} titleAs="h2" bordered={false} size="md" secondaryAction={null} primaryAction={null} className="min-w-0" />
+      <div data-secret-state="blocked" className="min-w-0">
+        <EmptyState icon={undefined} title={t('blocked.title')} description={t('blocked.description')} titleAs="h2" bordered={false} size="md" secondaryAction={null} primaryAction={null} className="min-w-0" />
+      </div>
     </Page>
   }
 

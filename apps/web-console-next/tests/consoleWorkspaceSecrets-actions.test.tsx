@@ -152,6 +152,29 @@ test('an initial list 500 followed by a create 404 returns focus to the name fie
   await waitFor(() => expect(nameField()).toHaveFocus())
 })
 
+test('a list retry that returns 501 moves focus to the blocked heading, not the body', async () => {
+  server = serve('workspace-secrets.list.501')
+  const original = server.mock.getMockImplementation()!
+  let first = true
+  server.mock.mockImplementation(async (input, init) => (init?.method ?? 'GET') === 'GET' && first
+    ? ((first = false), Response.json({ status: 500, code: 'HTTP_500', message: 'synthetic-backend-reason', requestId: typed.requestId }, { status: 500 }))
+    : original(input, init))
+  open()
+  await screen.findByRole('heading', { name: 'No se pudieron cargar los secretos' })
+  expect(document.body).toHaveFocus()
+  click('Reintentar')
+  const blocked = await screen.findByRole('heading', { name: 'Servicio de secretos no disponible' })
+  await waitFor(() => expect(blocked).toHaveFocus())
+})
+
+test('a first-load list 501 never moves focus', async () => {
+  server = serve('workspace-secrets.list.501')
+  open()
+  await screen.findByRole('heading', { name: 'Servicio de secretos no disponible' })
+  await settle()
+  expect(document.body).toHaveFocus()
+})
+
 // ---- replace ----
 test('replace opens a dialog named Reemplazar secreto, validates the value and prefills only the description', async () => {
   server = serve('workspace-secrets.replace.success')
