@@ -7,3 +7,15 @@
 .console-workspace-secrets table td {
   vertical-align: top;
 }
+/* The kit panel lays the request id out in a non-wrapping flex row. The panel also renders inside portalled
+   confirmations, so the rule hangs on the page-owned failure wrapper rather than the page root. */
+[data-secret-failure] div:has(> code) {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+[data-secret-failure] code {
+  min-width: 0;
+  max-width: 100%;
+  word-break: break-all;
+}

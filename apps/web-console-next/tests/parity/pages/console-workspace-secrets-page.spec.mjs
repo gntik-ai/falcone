@@ -322,7 +322,13 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
         await open(parity, id); await ready(parity); await run(parity);
         await expect(button(parity, key).or(button(parity, key, confirmDialog(parity))).first()).toBeVisible();
         await check.assertResponsive(parity, width);
-        if (id.endsWith('.500')) { const box = await confirmDialog(parity).boundingBox(); expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(width); }
+        if (id.endsWith('.500')) { const box = await confirmDialog(parity).boundingBox(); expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(width);
+          // The request-id chip wraps inside its panel instead of overflowing the narrow confirmation.
+          const panelBox = await confirmDialog(parity).getByTestId('workspace-secrets-failure-confirm').boundingBox();
+          const chip = await confirmDialog(parity).getByTestId('workspace-secrets-failure-confirm').locator('code').first().boundingBox();
+          expect(chip.x, 'request id chip left edge').toBeGreaterThanOrEqual(panelBox.x - 1);
+          expect(chip.x + chip.width, 'request id chip right edge').toBeLessThanOrEqual(panelBox.x + panelBox.width + 1);
+        }
       }
       // Eliminar is never clipped against the table scroll region at 768 and wider, even with 29- and 63-character
       // names. At 375 the region scrolls by design and only the page itself must not overflow (asserted above).

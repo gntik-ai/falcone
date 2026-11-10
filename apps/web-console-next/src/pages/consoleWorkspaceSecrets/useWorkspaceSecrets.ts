@@ -51,8 +51,9 @@ export function useWorkspaceSecrets(workspaceId: string, { notify, focus }: Hook
   const [del, setDel] = useState<DeleteState | null>(null)
   const [table, setTable] = useState<(Terminal & { op: 'replace' | 'delete' }) | null>(null)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
-  // Writes are single flight: a second click while one is pending cannot send a second request.
-  const writing = useRef(false)
+  // Each write is single flight on its own: a second click of the same operation cannot send a second request,
+  // while a pending create never suppresses a replace or delete (legacy keeps independent busy states).
+  const writing = useRef({ create: false, replace: false, delete: false })
 
   const loadFirst = useCallback((options: { quiet?: boolean; user?: boolean } = {}) => {
     const mine = ++epoch.current
@@ -114,13 +115,13 @@ export function useWorkspaceSecrets(workspaceId: string, { notify, focus }: Hook
   }, [])
 
   const submitCreate = useCallback(async () => {
-    if (writing.current) return
+    if (writing.current.create) return
     setFeedback(null)
     const next: Validation = { name: validateName(draft.name), value: validateValue(draft.value) }
     setValidation(next)
     setCreate((current) => ({ ...current, failure: null }))
     if (next.name || next.value) return
-    writing.current = true
+    writing.current.create = true
     const name = draft.name
     setCreate({ pending: true, failure: null, terminal: null })
     try {
@@ -137,7 +138,7 @@ export function useWorkspaceSecrets(workspaceId: string, { notify, focus }: Hook
       if (kind === 'no-access') { setDraft(emptyDraft); setCreate({ pending: false, failure: null, terminal: { kind, failure } }); focus({ kind: 'state', target: 'create' }) }
       else if (kind === 'not-found') { setDraft((current) => ({ ...current, value: '' })); setCreate({ pending: false, failure: null, terminal: { kind, failure } }); focus({ kind: 'state', target: 'create' }) }
       else { setCreate({ pending: false, failure, terminal: null }); if (kind === 'retry') focus({ kind: 'retry', target: 'create' }) }
-    } finally { writing.current = false }
+    } finally { writing.current.create = false }
   }, [draft, workspaceId, afterWrite, focus])
 
   // Volver al formulario and Nuevo secreto: a create 403 restores an empty form, a 404 keeps name and description.
@@ -171,8 +172,8 @@ export function useWorkspaceSecrets(workspaceId: string, { notify, focus }: Hook
     focus({ kind: 'replace-submit' })
   }, [replace, focus])
   const confirmReplace = useCallback(async () => {
-    if (!replace || writing.current) return
-    writing.current = true
+    if (!replace || writing.current.replace) return
+    writing.current.replace = true
     const { name } = replace
     setReplace((current) => current && { ...current, pending: true, failure: null })
     try {
@@ -187,7 +188,7 @@ export function useWorkspaceSecrets(workspaceId: string, { notify, focus }: Hook
       const kind = classify(failure)
       if (kind === 'no-access' || kind === 'not-found') { setReplace(null); setTable({ kind, failure, op: 'replace' }); focus({ kind: 'state', target: 'table' }) }
       else { setReplace((current) => current && { ...current, pending: false, failure }); if (kind === 'retry') focus({ kind: 'retry', target: 'confirm' }) }
-    } finally { writing.current = false }
+    } finally { writing.current.replace = false }
   }, [replace, workspaceId, afterWrite, focus])
 
   // ---- delete ----
@@ -202,8 +203,8 @@ export function useWorkspaceSecrets(workspaceId: string, { notify, focus }: Hook
     focus({ kind: 'row', action: 'delete', name: del.name })
   }, [del, focus])
   const confirmDelete = useCallback(async () => {
-    if (!del || writing.current) return
-    writing.current = true
+    if (!del || writing.current.delete) return
+    writing.current.delete = true
     const { name } = del
     setDel((current) => current && { ...current, pending: true, failure: null })
     try {
@@ -218,7 +219,7 @@ export function useWorkspaceSecrets(workspaceId: string, { notify, focus }: Hook
       const kind = classify(failure)
       if (kind === 'no-access' || kind === 'not-found') { setDel(null); setTable({ kind, failure, op: 'delete' }); focus({ kind: 'state', target: 'table' }) }
       else { setDel((current) => current && { ...current, pending: false, failure }); if (kind === 'retry') focus({ kind: 'retry', target: 'confirm' }) }
-    } finally { writing.current = false }
+    } finally { writing.current.delete = false }
   }, [del, workspaceId, afterWrite, focus])
 
   // Volver a la lista reloads the first page.
