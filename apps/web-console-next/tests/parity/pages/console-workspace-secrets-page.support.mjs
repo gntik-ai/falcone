@@ -41,7 +41,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // manifest scenario, the workspace list from the shell fixture, and everything else falls through.
 export function createSecretsHarness(parity) {
   const injected = [];
-  const state = { id: null, scenario: createScenario('workspace-secrets.list.success'), matched: [], workspaceReads: 0, otherReads: 0, shell: {}, refresh: null };
+  const state = { id: null, scenario: createScenario('workspace-secrets.list.success'), matched: [], workspaceReads: 0, workspaceRecovered: false, otherReads: 0, shell: {}, refresh: null };
   const redact = (body) => {
     if (!body || typeof body !== 'object' || !('secretValue' in body)) return body;
     // The comparison happens here, in memory; only the boolean and the mask leave this function.
@@ -53,9 +53,10 @@ export function createSecretsHarness(parity) {
     const request = route.request(), url = new URL(request.url());
     if (url.pathname === '/v1/workspaces') {
       if (request.method() !== 'GET' || !state.id || !Object.keys(state.shell).some((key) => ['environment', 'workspaces'].includes(key))) { await route.fallback(); return; }
-      const read = state.workspaceReads++;
+      state.workspaceReads++;
       if (state.shell.workspaces === 'loading') await sleep(1500);
-      if (state.shell.workspaces === 'error' && read === 0) {
+      // The shell may resolve the list more than once while it settles, so every read fails until the test recovers it.
+      if (state.shell.workspaces === 'error' && !state.workspaceRecovered) {
         injected.push({ url: request.url(), kind: '500' });
         await route.fulfill({ status: 500, json: { status: 500, code: 'HTTP_500', message: 'synthetic-backend-reason' } }); return;
       }
@@ -107,7 +108,7 @@ export function createSecretsHarness(parity) {
       if (!Object.hasOwn(scenarios, id)) throw new Error(`Unknown fixture ${id}`);
       // Each scenario owns its request history, so one page open never inherits the calls of the previous one.
       parity.network.requests.length = 0;
-      Object.assign(state, { id, scenario: createScenario(id), matched: [], workspaceReads: 0, otherReads: 0, shell: scenarios[id].shell ?? {}, refresh: id.endsWith('401-refresh-rejected') ? 'rejected' : null });
+      Object.assign(state, { id, scenario: createScenario(id), matched: [], workspaceReads: 0, workspaceRecovered: false, otherReads: 0, shell: scenarios[id].shell ?? {}, refresh: id.endsWith('401-refresh-rejected') ? 'rejected' : null });
     },
     calls: () => parity.network.requests.filter(({ path }) => path.startsWith(secretsPath)),
     writes: () => parity.network.requests.filter(({ path, method }) => path.startsWith(secretsPath) && method !== 'GET'),

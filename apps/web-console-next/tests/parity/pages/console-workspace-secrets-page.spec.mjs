@@ -193,7 +193,11 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
       expect(harness(parity).calls()).toEqual([]);
       await visit(parity, server, 'shell.workspace-error');
       await expect(heading(parity, 'workspace.error')).toBeVisible();
-      const reads = harness(parity).state.workspaceReads; await button(parity, 'errorPanel.retry').click();
+      // The shell resolves the workspace list again while it settles; wait until no read is in flight before counting.
+      let settled = -1;
+      await expect.poll(async () => { const now = harness(parity).state.workspaceReads; const quiet = now === settled; settled = now; if (!quiet) await parity.page.waitForTimeout(600); return quiet; }, { timeout: 10_000 }).toBe(true);
+      await expect(heading(parity, 'workspace.error')).toBeVisible();
+      const reads = harness(parity).state.workspaceReads; harness(parity).state.workspaceRecovered = true; await button(parity, 'errorPanel.retry').click();
       await expect.poll(() => harness(parity).state.workspaceReads).toBe(reads + 1);
       await expect(heading(parity, 'workspace.error')).toHaveCount(0);
       // Write failures: 403 and 404 for create, replace and delete, each with its recovery action.
@@ -205,6 +209,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
         await open(parity, id); await ready(parity); await run(parity);
         await expect(heading(parity, key)).toBeVisible(); await expect(button(parity, back)).toBeVisible();
         await expect(page(parity).getByText(typed.correlationId)).toBeVisible();
+        // The dialogs fade out when the write closes them; scan only once they are gone, not mid-transition.
+        await expect(replaceDialog(parity)).toHaveCount(0); await expect(confirmDialog(parity)).toHaveCount(0);
         await scan(parity); await check.assertLocale(parity);
         if (key === 'noAccess.create') { await button(parity, back).click(); await expectBlank(expect, nameInput(parity), 'name'); }
       }
@@ -273,7 +279,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
       await expect(button(parity, 'errorPanel.retry', confirmDialog(parity))).toBeFocused(); await scan(parity);
       for (const [id, run, key] of [['workspace-secrets.replace.403', replace, 'noAccess.replace'], ['workspace-secrets.replace.404-secret-not-found', replace, 'notFound.replace'], ['workspace-secrets.create.404', create, 'notFound.create']]) {
         await open(parity, id); await ready(parity); await run(parity);
-        await expect(heading(parity, key)).toBeFocused(); await scan(parity);
+        await expect(heading(parity, key)).toBeFocused();
+        // Scan once the closing dialogs are gone, not mid-fade.
+        await expect(replaceDialog(parity)).toHaveCount(0); await expect(confirmDialog(parity)).toHaveCount(0); await scan(parity);
       }
       await button(parity, 'noAccess.backToForm').click(); await expect(nameInput(parity)).toBeFocused();
       await check.assertLocale(parity);
@@ -336,7 +344,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
         // A regular name stays on one line: no mid-word break at 1024 px and wider.
         await open(parity, 'workspace-secrets.list.success'); await ready(parity);
         const lines = await parity.page.getByRole('rowheader', { name: 'db_password', exact: true }).evaluate((cell) => {
-          const range = document.createRange(); range.selectNodeContents(cell); return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+          // Measure the text inside the name wrapper: the wrapper's own box would add a second client rect at another top.
+          const range = document.createRange(); range.selectNodeContents(cell.firstElementChild ?? cell); return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
         });
         expect(lines, 'db_password does not wrap at this width').toBe(1);
       }

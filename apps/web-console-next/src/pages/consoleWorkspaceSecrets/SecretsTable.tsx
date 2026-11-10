@@ -23,9 +23,11 @@ const hideBelowLg = 'hidden lg:table-cell'
 const hideBelowXl = 'hidden xl:table-cell'
 // Identifiers wrap with break-words, never overflow-wrap:anywhere. The max-width sits on a block wrapper, not on
 // the cell or an inline span, so the column's min-content stays bounded and the actions column is never pushed
-// out of the table scroll region by a long name.
-const nameBox = 'max-w-56 whitespace-normal break-words'
-const envBox = 'max-w-48 whitespace-normal break-words'
+// out of the table scroll region by a long name. Dates wrap at their spaces for the same reason.
+// Cells use compact padding: with the sidebar open the table region is about 670 px at 1024 and 930 px at 1280.
+const tight = 'px-2'
+const nameBox = 'max-w-28 whitespace-normal break-words'
+const envBox = 'max-w-28 whitespace-normal break-words'
 const descriptionBox = 'max-w-48 whitespace-normal break-words'
 
 export function SecretsTable({ list, workspaceLabel, environment, locale, onReplace, onDelete, onLoadMore, onRetryNext }: Props) {
@@ -43,16 +45,16 @@ export function SecretsTable({ list, workspaceLabel, environment, locale, onRepl
   const date = (value: string | null | undefined) => {
     if (!value) return t('list.none')
     const parsed = Date.parse(value)
-    return Number.isNaN(parsed) ? value : <Timestamp value={parsed} format="absolute" locale={locale} dateOptions={{ dateStyle: 'medium', timeStyle: 'short' }} tooltip={false} live={false} />
+    return <div className="whitespace-normal">{Number.isNaN(parsed) ? value : <Timestamp value={parsed} format="absolute" locale={locale} dateOptions={{ dateStyle: 'medium', timeStyle: 'short' }} tooltip={false} live={false} />}</div>
   }
   const columns: DataTableColumn<WorkspaceSecret>[] = [
-    { id: 'name', header: t('list.name'), sortable: false, hideable: false, className: 'font-medium text-foreground', headClassName: 'whitespace-nowrap', cell: (row) => <div className={nameBox}>{readSecretName(row)}</div> },
-    { id: 'envVar', header: t('list.envVar'), sortable: false, cell: (row) => <div className={envBox}><code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{secretEnvVarName(readSecretName(row))}</code></div> },
-    { id: 'functions', header: t('list.functions'), sortable: false, variant: 'numeric', align: 'left', accessor: (row) => row.resolvedRefCount ?? 0 },
-    { id: 'created', header: t('list.created'), sortable: false, className: `${hideBelowLg} text-muted-foreground`, headClassName: hideBelowLg, cell: (row) => date(row.timestamps?.createdAt) },
-    { id: 'updated', header: t('list.updated'), sortable: false, className: `${hideBelowXl} text-muted-foreground`, headClassName: hideBelowXl, cell: (row) => date(row.timestamps?.updatedAt) },
-    { id: 'description', header: t('list.description'), sortable: false, className: `${hideBelowMd} text-muted-foreground`, headClassName: hideBelowMd, cell: (row) => <div className={descriptionBox}>{row.description || t('list.none')}</div> },
-    { id: 'actions', header: t('list.actions'), sortable: false, align: 'right', cell: (row) => <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:justify-end">
+    { id: 'name', header: t('list.name'), sortable: false, hideable: false, className: `${tight} font-medium text-foreground`, headClassName: `${tight} whitespace-nowrap`, cell: (row) => <div className={nameBox}>{readSecretName(row)}</div> },
+    { id: 'envVar', header: t('list.envVar'), sortable: false, className: tight, headClassName: `${tight} whitespace-normal`, cell: (row) => <div className={envBox}><code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{secretEnvVarName(readSecretName(row))}</code></div> },
+    { id: 'functions', header: t('list.functions'), sortable: false, variant: 'numeric', align: 'left', className: tight, headClassName: `${tight} whitespace-normal`, accessor: (row) => row.resolvedRefCount ?? 0 },
+    { id: 'created', header: t('list.created'), sortable: false, className: `${hideBelowLg} ${tight} text-muted-foreground`, headClassName: `${hideBelowLg} ${tight}`, cell: (row) => date(row.timestamps?.createdAt) },
+    { id: 'updated', header: t('list.updated'), sortable: false, className: `${hideBelowXl} ${tight} text-muted-foreground`, headClassName: `${hideBelowXl} ${tight}`, cell: (row) => date(row.timestamps?.updatedAt) },
+    { id: 'description', header: t('list.description'), sortable: false, className: `${hideBelowMd} ${tight} text-muted-foreground`, headClassName: `${hideBelowMd} ${tight}`, cell: (row) => <div className={descriptionBox}>{row.description || t('list.none')}</div> },
+    { id: 'actions', header: t('list.actions'), sortable: false, align: 'right', className: tight, headClassName: tight, cell: (row) => <div className="flex flex-col items-stretch gap-2 xl:flex-row xl:justify-end">
       <Button type="button" variant="secondary" size="sm" loading={false} disabled={false} iconOnly={false} icon={undefined} trailingIcon={undefined} className={focusRing} data-secret-action="replace" data-secret-name={readSecretName(row)} aria-label={t('list.replaceAria', { name: readSecretName(row) })} onClick={() => onReplace(row)}>{t('list.replace')}</Button>
       <Button type="button" variant="destructive" size="sm" loading={false} disabled={false} iconOnly={false} icon={undefined} trailingIcon={undefined} className={focusRing} data-secret-action="delete" data-secret-name={readSecretName(row)} aria-label={t('list.deleteAria', { name: readSecretName(row) })} onClick={() => onDelete(row)}>{t('list.delete')}</Button>
     </div> },
