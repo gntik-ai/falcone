@@ -79,11 +79,13 @@ async function screenshot(parity, info, name) {
   await info.attach(`${name}-${parity.locale}-sha256-${createHash('sha256').update(body).digest('hex')}`, { body, contentType: 'image/png' });
 }
 const live = (parity, variants) => parity.network.setVariants(variants);
+// Traces, screenshots and video embed input values; this page disables them, and verify-artifacts scans the rest.
+// These options are worker-scoped, so Playwright only accepts them at the top level of the file.
+test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 
 for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
   test.describe(`Workspace secrets ${locale} ${width}`, () => {
-    // Traces, screenshots and video embed input values; this page disables them, and verify-artifacts scans the rest.
-    test.use({ role: 'superadmin', locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints, trace: 'off', screenshot: 'off', video: 'off' });
+    test.use({ role: 'superadmin', locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
     test.beforeEach(async ({ parity, server }) => { harnesses.set(parity, createSecretsHarness(parity)); await harness(parity).install(server); });
     test.afterEach(async ({ parity }) => {
       expect(harness(parity).state.matched.every(Boolean), 'every written value matched the synthetic canary in memory').toBe(true);
