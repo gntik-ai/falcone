@@ -99,10 +99,31 @@ test.each([['dev', 'El área de trabajo "Synthetic Workspace" (dev) todavía no 
   await waitFor(() => expect(nameField()).toHaveFocus())
 })
 
-test('renders a non-array items response as an empty list', async () => {
-  server = serve('workspace-secrets.list.empty')
+test.each([[null], [{ unexpected: 'object' }], ['not-an-array']])('renders a malformed first-page items response (%j) as an empty list', async (items) => {
+  server = serve('workspace-secrets.list.success')
+  const original = server.mock.getMockImplementation()!
+  server.mock.mockImplementation(async (input, init) => String(input) === secretsPath && (init?.method ?? 'GET') === 'GET'
+    ? Response.json({ items, page: { size: 25 } })
+    : original(input, init))
   open()
-  await screen.findByRole('heading', { name: 'No hay secretos en esta área de trabajo' })
+  expect(await screen.findByRole('heading', { name: 'No hay secretos en esta área de trabajo' })).toBeVisible()
+  expect(screen.queryByRole('table')).toBeNull()
+  expect(screen.queryByRole('heading', { name: 'No se pudieron cargar los secretos' })).toBeNull()
+})
+
+test.each([[null], [{ unexpected: 'object' }], ['not-an-array']])('treats a malformed next-page items response (%j) as no further rows and keeps the loaded ones', async (items) => {
+  server = serve('workspace-secrets.list.paged')
+  const original = server.mock.getMockImplementation()!
+  server.mock.mockImplementation(async (input, init) => String(input) === cursorPath
+    ? Response.json({ items, page: { size: 25 } })
+    : original(input, init))
+  open()
+  await screen.findByText('secret_25')
+  click('Cargar más secretos')
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Cargar más secretos' })).toBeNull())
+  expect(screen.getAllByRole('rowheader')).toHaveLength(25)
+  expect(screen.queryByRole('heading', { name: /No se pudo/ })).toBeNull()
+  expect(document.body.textContent).not.toContain('undefined')
 })
 
 test('a 501 renders only the blocked state with the header and breadcrumbs', async () => {
@@ -279,6 +300,47 @@ test('a next page that settles after a first-page reload is discarded in both or
     await settle()
     expect(screen.queryByText('stale_row')).toBeNull()
     expect(screen.queryByText('first_row')).toBeNull()
+    expect(requests.filter((request) => request === `GET ${cursorPath}`)).toHaveLength(1)
+    view.unmount()
+  }
+})
+
+test.each([['server error', 'http-500'], ['network failure', 'network']])('a superseded next page that fails (%s) after a first-page reload is discarded in both orders', async (_label, failure) => {
+  for (const order of ['next-first', 'reload-first'] as const) {
+    const gates = { next: gate(), reload: gate() }
+    let reads = 0
+    const requests: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const method = init.method ?? 'GET', path = String(input)
+      requests.push(`${method} ${path}`)
+      if (method === 'GET' && path === secretsPath) {
+        if (reads++ === 0) return Response.json({ items: [{ secretName: 'first_row', resolvedRefCount: 0 }], page: { size: 25, nextCursor: 'cursor-2' } })
+        await gates.reload.promise
+        return Response.json({ items: [{ secretName: 'created_row', resolvedRefCount: 0 }], page: { size: 25 } })
+      }
+      if (method === 'GET' && path === cursorPath) {
+        await gates.next.promise
+        if (failure === 'network') throw new TypeError('Failed to fetch')
+        return Response.json({ status: 500, code: 'HTTP_500', message: 'synthetic-backend-reason', requestId: typed.requestId }, { status: 500 })
+      }
+      if (method === 'POST' && path === secretsPath) return Response.json({ secretName: 'created_row' })
+      throw new Error(`Unmatched request: ${method} ${path}`)
+    }))
+    const view = open()
+    await screen.findByText('first_row')
+    click('Cargar más secretos')
+    await waitFor(() => expect(requests).toContain(`GET ${cursorPath}`))
+    set(nameField(), 'created_row'); set(valueField(), canary)
+    click('Crear secreto')
+    await waitFor(() => expect(requests.filter((request) => request === `GET ${secretsPath}`)).toHaveLength(2))
+    if (order === 'next-first') { gates.next.release(); await settle(); gates.reload.release() } else { gates.reload.release(); await settle(); gates.next.release() }
+    await screen.findByText('created_row')
+    await settle()
+    // The stale failure neither replaces the fresh list nor raises a next-page error panel.
+    expect(screen.getByText('created_row')).toBeVisible()
+    expect(screen.queryByText('first_row')).toBeNull()
+    expect(screen.queryByRole('heading', { name: /No se pudo/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).toBeNull()
     expect(requests.filter((request) => request === `GET ${cursorPath}`)).toHaveLength(1)
     view.unmount()
   }
