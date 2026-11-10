@@ -684,6 +684,21 @@ test('delete success followed by a failed reload focuses the list failure headin
   await waitFor(() => expect(within(screen.getByTestId('workspace-secrets-failure-list')).getByRole('heading', { name: 'No se pudieron cargar los secretos' })).toHaveFocus())
 })
 
+test('delete success followed by a 501 reload focuses the blocked heading', async () => {
+  server = serve('workspace-secrets.delete.success')
+  open(); await ready()
+  const original = server.mock.getMockImplementation()!
+  server.mock.mockImplementation(async (input, init) => (init?.method ?? 'GET') === 'GET'
+    ? (server.scenario.calls.push({ method: 'GET', path: String(input), body: undefined }), Response.json({ status: 501, code: 'HTTP_501', message: 'synthetic-backend-reason', ...typed }, { status: 501 }))
+    : original(input, init))
+  openRow('Eliminar', 'db_password')
+  const confirm = await screen.findByRole('alertdialog')
+  set(typedField(), 'db_password')
+  click('Eliminar', confirm)
+  const blocked = await screen.findByRole('heading', { name: 'Servicio de secretos no disponible' })
+  await waitFor(() => expect(blocked).toHaveFocus())
+})
+
 test('replace success followed by a failed reload focuses the list failure heading', async () => {
   server = serve('workspace-secrets.replace.success')
   open(); await ready()

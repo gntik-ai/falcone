@@ -30,8 +30,9 @@ const section = () => {
   if (title) title.tabIndex = -1
   return title
 }
-// After a write whose reload failed, neither the table nor the empty state exists: the failure panel's heading is the landmark.
-const listFailure = () => headingOf(query('[data-secret-failure="list"]')) ?? headingOf(query('[data-secret-state="list"]'))
+// After a write whose reload failed, neither the table nor the empty state exists: the failure panel's heading is the landmark,
+// or the blocked state's heading when the reload returned 501.
+const listFailure = () => headingOf(query('[data-secret-failure="list"]')) ?? headingOf(query('[data-secret-state="list"]')) ?? headingOf(query('[data-secret-state="blocked"]'))
 const rowAction = (action: string, name: string) =>
   Array.from(document.querySelectorAll<HTMLElement>(`[data-secret-action="${action}"]`)).find((element) => element.dataset.secretName === name) ?? null
 
