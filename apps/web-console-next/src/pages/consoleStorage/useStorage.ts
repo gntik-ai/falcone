@@ -79,6 +79,7 @@ export function useStorage(workspace: string) {
     busy.current.add('objects')
     const task = begin('objects')
     setAppendCursor(after)
+    if (!after) setAppended(0)
     setObjects((old) => ({ data: after ? old.data : null, busy: true, failure: old.failure }))
     try {
       const data = await api.listObjects(selected.resourceId, after, task.signal)
