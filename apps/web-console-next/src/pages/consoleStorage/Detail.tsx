@@ -10,7 +10,7 @@ export function Detail({ state: s }: { state: StorageState }) {
   const { t, i18n } = useCopy()
   const uploadRef = useRef<HTMLInputElement>(null)
   const announce = useAnnounce()
-  useEffect(() => { if (s.appended > 0) announce(t('appended', { count: s.appended }), 'polite') }, [s.appended, announce, t])
+  useEffect(() => { if (s.appended > 0) announce(t('appended', { count: s.appended }), 'polite') }, [s.appended, s.objects.data?.items.length, announce, t])
   useEffect(() => { if (s.showUpload) uploadRef.current?.focus() }, [s.showUpload])
   const bucket = s.bucket
   if (!bucket) return <Empty title={t('detail')} description={t('selectBucket')} />
