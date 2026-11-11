@@ -226,17 +226,17 @@ importers:
         specifier: 5.2.5
         version: 5.2.5
       '@gntik-ai/blocks':
-        specifier: 0.11.0
-        version: 0.11.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)
+        specifier: 0.12.0
+        version: 0.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)
       '@gntik-ai/templates':
-        specifier: 0.11.0
-        version: 0.11.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)
+        specifier: 0.12.0
+        version: 0.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)
       '@gntik-ai/tokens':
-        specifier: 0.3.0
-        version: 0.3.0
+        specifier: 0.4.0
+        version: 0.4.0
       '@gntik-ai/ui':
-        specifier: 0.11.0
-        version: 0.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
+        specifier: 0.12.0
+        version: 0.12.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
       '@in-falcone/console-api':
         specifier: workspace:*
         version: link:../../packages/console-api
@@ -1256,32 +1256,36 @@ packages:
   '@formatjs/intl-localematcher@0.6.1':
     resolution: {integrity: sha512-ePEgLgVCqi2BBFnTMWPfIghu6FkbZnnBVhO2sSxvLfrdFw7wCHAHiDoM2h4NRgjbaY7+B7HgOLZGkK187pZTZg==}
 
-  '@gntik-ai/blocks@0.11.0':
-    resolution: {integrity: sha512-qYYZFIkOSLhlI+BP3/WTbF0eCpRcKgDJXmhsNAeyjYJ+GxYhqYNo8H8YgffuTWhf2Y1qNzjBuCDevyTFZl1oVg==}
+  '@gntik-ai/blocks@0.12.0':
+    resolution: {integrity: sha512-Lkzz/3xbiT6ocnJmD8U1c7R/g9yZzkCj33US1ahTly9uC0VftilmEJllP3ZdDm1Ak/Bep/8q6wopuqt4Cyn2yw==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
 
-  '@gntik-ai/charts@0.11.0':
-    resolution: {integrity: sha512-0aURnLtaG2zYqJrwdIKnvJorhcnZzHPSEqP8RFe+LK118AFrmFLXgfrsJ2w+oDTJYxS73GK7Eg7UO6dLcxLCyA==}
+  '@gntik-ai/charts@0.12.0':
+    resolution: {integrity: sha512-KJGToPs1xqI94ihfBv2eV/OiJApejl5qdksITVl/1kdxq9OUWVNfDYt+FL+SxDg4r6Cwf0wWy4Jb2UrZ6hT9ig==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
 
-  '@gntik-ai/chat@0.11.0':
-    resolution: {integrity: sha512-r0zDkY9l3iyqndZTk8B5EPFsWmDn1ESZ11McxW0hHwKGgAgeA01xZVH+8XpSOymDx4kBqFgDWxLaKVEPN4EpZg==}
+  '@gntik-ai/chat@0.12.0':
+    resolution: {integrity: sha512-YbsWKkkKJ0QKQO94ytoZx6Xj/19v8aDN3LKrJ6iD8ZgKYEnpBaM4ZZmIcAVXRYHx/FGGn5W+NTuYMdKRkM5jYQ==}
+    peerDependencies:
+      mermaid: 12.2.0
+      react: ^19.0.0
+      react-dom: ^19.0.0
+    peerDependenciesMeta:
+      mermaid:
+        optional: true
+
+  '@gntik-ai/editor@0.12.0':
+    resolution: {integrity: sha512-0+MN4OVAFxSOBp+f/jr5Xx3aelQRRoggQErZAWDzoy70rYaHTm0JQ80eCkJNcNZxgB5gfvY5uIViqrh6SfQzcQ==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
 
-  '@gntik-ai/editor@0.11.0':
-    resolution: {integrity: sha512-ugtUNXWg58Y6Bq4FdGrWKarKHb/r0hkjHyI1uUJ0t5R3S51rOaq4O3UBeCM0X7ciPMiA7JM4XI833Xz/v3KxGg==}
-    peerDependencies:
-      react: ^19.0.0
-      react-dom: ^19.0.0
-
-  '@gntik-ai/flow@0.11.0':
-    resolution: {integrity: sha512-Ac4uVsMfi+SKv1A4dhjxD2P/Ppm2ibYFSaAkCD8kKOqflTmzwd/FJnaVah0sBsBS8T5dx89cUtJLtBp4MNS0SQ==}
+  '@gntik-ai/flow@0.12.0':
+    resolution: {integrity: sha512-h5h/FxZbDQkIyiNTevKzAo5zse7s+uF0r/EftUDUNM/a2wrxa+Z60MqTL9J+naf+hhCMfDNkpz62APB6JQW5zA==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -1291,24 +1295,27 @@ packages:
     peerDependencies:
       react: ^19.0.0
 
-  '@gntik-ai/templates@0.11.0':
-    resolution: {integrity: sha512-HztqVXSATdM5ndlDaUrdY3efUcOBy7IXBhKv8hidyo/DUXTt+tHutPmsLh+2o77H6CeljFBBP9OyP6LbEBm0ug==}
+  '@gntik-ai/templates@0.12.0':
+    resolution: {integrity: sha512-T4QFHYZNBrUuAbveWDOfaXXFCofiyJv+dEwYMXAK9jclQY0N5uVuWQtXrHR5XikUGb5dLhzJ+PF/oFngsrUbzA==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
 
-  '@gntik-ai/tokens@0.3.0':
-    resolution: {integrity: sha512-LJRHMkDeU0GPVtEhD5HHYgBSwKlm1lZ8zWn90fbPMCSse4b30lCbxKikunMQTb6pLeAti/QW9et4D1XgkqNjeQ==}
+  '@gntik-ai/tokens@0.4.0':
+    resolution: {integrity: sha512-bNK/2QPyAiivvKyUqjfI9WOD94TH2fyZNQxPuKwiT2knFX/hmgM1n0ixPhVHxjwEYygTZCqtmEjQob5r7PR16A==}
 
-  '@gntik-ai/ui@0.11.0':
-    resolution: {integrity: sha512-AM9zPmga29JTmEmrbVJwM6tu+XmecY0q0GbRU1UiBkUBzcaI523WyD0tr6S83EMDMbK9aI4kMfzC8oN56HeKYQ==}
+  '@gntik-ai/ui@0.12.0':
+    resolution: {integrity: sha512-uYrlLkNGUVpS0V7efq9LKlpJQEr55HxgIavTDZfgqp+jsG2rEMiwF4irouDaD03RHj6rGEuwSD4WOOFo/UR6ow==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
       react-hook-form: ^7.55.0
+      shiki: ^3.0.0
       zod: ^3.25.0 || ^4.0.0
     peerDependenciesMeta:
       react-hook-form:
+        optional: true
+      shiki:
         optional: true
       zod:
         optional: true
@@ -3023,6 +3030,10 @@ packages:
     resolution: {integrity: sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==}
     engines: {node: '>=0.12'}
 
+  entities@9.0.0:
+    resolution: {integrity: sha512-oJFNDJg3kTPwAD1cNn2+WmUq4wFoo09npc3Ydf1D7ED4smRiWrsKnaLxykrTWgyGEcusc87P5dxlAleol9kpkg==}
+    engines: {node: '>=20.19.0'}
+
   es-define-property@1.0.1:
     resolution: {integrity: sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g==}
     engines: {node: '>= 0.4'}
@@ -3249,14 +3260,32 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
+  hast-util-from-parse5@8.0.4:
+    resolution: {integrity: sha512-Yq7XlXor0Cpb71sI2E0zpv8QxQ5a6rfhDEETk4bcgrFX2SvJAY2PHocWwFtL6U9qyfiyByW3wZ6sZEfP2kW81g==}
+
+  hast-util-parse-selector@4.0.0:
+    resolution: {integrity: sha512-wkQCkSYoOGCRKERFWcxMVMOcYE2K1AaNLU8DXS9arxnLOUEWbOXKXiJUNzEpqZ3JOKpnha3jkFrumEjVliDe7A==}
+
+  hast-util-raw@9.2.0:
+    resolution: {integrity: sha512-1zVq3M9AlZiBZ4mlMPnLtkK2rdd+I8VhmFLNLb//XJm6xA2AVH2tz19EHy25RgRWut6z6FpTARAs7P8rnmRJUQ==}
+
+  hast-util-sanitize@5.0.2:
+    resolution: {integrity: sha512-3yTWghByc50aGS7JlGhk61SPenfE/p1oaFeNwkOOyrscaOkMGrcW9+Cy/QAIOBpZxP1yqDIzFMR0+Np0i0+usg==}
+
   hast-util-to-html@9.0.5:
     resolution: {integrity: sha512-OguPdidb+fbHQSU4Q4ZiLKnzWo8Wwsf5bZfbvu7//a9oTYoqD/fWpe96NuHkoS9h0ccGOTe0C4NGXdtS0iObOw==}
 
   hast-util-to-jsx-runtime@2.3.6:
     resolution: {integrity: sha512-zl6s8LwNyo1P9uw+XJGvZtdFF1GdAkOg8ujOw+4Pyb76874fLps4ueHXDhXWdk6YHQ6OgUtinliG7RsYvCbbBg==}
 
+  hast-util-to-parse5@8.0.1:
+    resolution: {integrity: sha512-MlWT6Pjt4CG9lFCjiz4BH7l9wmrMkfkJYCxFwKQic8+RTZgWPuWxwAfjJElsXkex7DJjfSJsQIt931ilUgmwdA==}
+
   hast-util-whitespace@3.0.0:
     resolution: {integrity: sha512-88JUN06ipLwsnv+dVn+OIYOvAuvBMy/Qoi6O7mQHxdPXpjy+Cd6xRkWwux7DKO+4sYILtLBRIKgsdpS2gQc7qw==}
+
+  hastscript@9.0.3:
+    resolution: {integrity: sha512-1ALZXSmCGmW3h8AMz4R4+QKSKFi7sNgXLVwmwB8FYVtl1CwQ3WDkSAEY/d5tp1g/vbQgq2s1WlHgfO3jbw1TsA==}
 
   heap-js@2.7.1:
     resolution: {integrity: sha512-EQfezRg0NCZGNlhlDR3Evrw1FVL2G3LhU7EgPoxufQKruNBSYA8MiRPHeWbU+36o+Fhel0wMwM+sLEiBAlNLJA==}
@@ -4008,6 +4037,9 @@ packages:
   parse5@7.3.0:
     resolution: {integrity: sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==}
 
+  parse5@8.1.1:
+    resolution: {integrity: sha512-EcR/6WDcU7b2N3vQSxKALCk9lXGtUMQxXio008OEMBE0kavu/7JLfBEeFPzi43nMqVDSbEn3QCK+BMCc9zO//w==}
+
   path-browserify@1.0.1:
     resolution: {integrity: sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g==}
 
@@ -4327,6 +4359,12 @@ packages:
 
   regex@6.1.0:
     resolution: {integrity: sha512-6VwtthbV4o/7+OaAF9I5L5V3llLEsoPyq9P1JVXkedTP33c7MfCG0/5NOPcSJn0TzXcG9YUrR0gQSWioew3LDg==}
+
+  rehype-raw@7.0.0:
+    resolution: {integrity: sha512-/aE8hCfKlQeA8LmyeyQvQF3eBiLRGNlfBJEvWH7ivp9sBqs7TNqBL5X3v157rM4IFETqDnIOO+z5M/biZbo9Ww==}
+
+  rehype-sanitize@6.0.0:
+    resolution: {integrity: sha512-CsnhKNsyI8Tub6L4sm5ZFsme4puGfc6pYylvXo1AeqaGbjOYyzNv3qZPwvs0oMJ39eryyeOdmxwUIo94IpEhqg==}
 
   remark-gfm@4.0.1:
     resolution: {integrity: sha512-1quofZ2RQ9EWdeN34S79+KExV1764+wCUGop5CPL1WGdD0ocPpu91lzPGbwWMECpEpd42kJGQwzRfyov9j4yNg==}
@@ -4809,6 +4847,9 @@ packages:
   v8-compile-cache-lib@3.0.1:
     resolution: {integrity: sha512-wa7YjyUGfNZngI/vtK0UHAN+lgDCxBPCylVXGp0zu59Fz5aiGtNXaq3DhIov063MorB+VfufLh3JlF2KdTK3xg==}
 
+  vfile-location@5.0.4:
+    resolution: {integrity: sha512-vEvxatYZCIpNvzGk2UD+u4I/sZkSKoOsdRCbkOIsN73QpJbriJ1qvvBAL1PeI0y55Leoqf7pORbaSPpG/smmOg==}
+
   vfile-message@4.0.3:
     resolution: {integrity: sha512-QTHzsGd1EhbZs4AsQ20JX1rC3cOlt/IWJruk893DfLRr57lcnOeMaWG4K0JrRta4mIJZKth2Au3mM3u03/JWKw==}
 
@@ -4940,6 +4981,9 @@ packages:
   watchpack@2.5.2:
     resolution: {integrity: sha512-6i/00NBjP4yGPs+caKSyRfpTF/8Torsu0MOW3mMzIbhgISFder8i7xbqgHlLMwJrdiN8ndBV3UA1/AfzPSr+jg==}
     engines: {node: '>=10.13.0'}
+
+  web-namespaces@2.0.1:
+    resolution: {integrity: sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ==}
 
   webidl-conversions@7.0.0:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
@@ -6037,14 +6081,14 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@gntik-ai/blocks@0.11.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)':
+  '@gntik-ai/blocks@0.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)':
     dependencies:
-      '@gntik-ai/charts': 0.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)
-      '@gntik-ai/editor': 0.11.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@gntik-ai/flow': 0.11.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@gntik-ai/charts': 0.12.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)
+      '@gntik-ai/editor': 0.12.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@gntik-ai/flow': 0.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@gntik-ai/icons': 0.5.0(@types/react@19.3.0)(react@19.3.0)
-      '@gntik-ai/tokens': 0.3.0
-      '@gntik-ai/ui': 0.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
+      '@gntik-ai/tokens': 0.4.0
+      '@gntik-ai/ui': 0.12.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
       lucide-react: 1.56.0(@types/react@19.3.0)(react@19.3.0)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
@@ -6057,12 +6101,13 @@ snapshots:
       - react-hook-form
       - react-is
       - redux
+      - shiki
       - tailwindcss
       - zod
 
-  '@gntik-ai/charts@0.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)':
+  '@gntik-ai/charts@0.12.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)':
     dependencies:
-      '@gntik-ai/tokens': 0.3.0
+      '@gntik-ai/tokens': 0.4.0
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
       recharts: 3.10.1(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)
@@ -6071,34 +6116,37 @@ snapshots:
       - react-is
       - redux
 
-  '@gntik-ai/chat@0.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)':
+  '@gntik-ai/chat@0.12.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)':
     dependencies:
-      '@gntik-ai/tokens': 0.3.0
-      '@gntik-ai/ui': 0.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
+      '@gntik-ai/tokens': 0.4.0
+      '@gntik-ai/ui': 0.12.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
       lucide-react: 1.56.0(@types/react@19.3.0)(react@19.3.0)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
       react-markdown: 10.1.0(@types/react@19.3.0)(react@19.3.0)
+      rehype-raw: 7.0.0
+      rehype-sanitize: 6.0.0
       remark-gfm: 4.0.1
     transitivePeerDependencies:
       - '@date-fns/tz'
       - '@types/react'
       - date-fns
       - react-hook-form
+      - shiki
       - supports-color
       - tailwindcss
       - zod
 
-  '@gntik-ai/editor@0.11.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@gntik-ai/editor@0.12.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@gntik-ai/tokens': 0.3.0
+      '@gntik-ai/tokens': 0.4.0
       monaco-editor: 0.57.0
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  '@gntik-ai/flow@0.11.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@gntik-ai/flow@0.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@gntik-ai/tokens': 0.3.0
+      '@gntik-ai/tokens': 0.4.0
       '@xyflow/react': 12.11.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
@@ -6114,16 +6162,16 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
 
-  '@gntik-ai/templates@0.11.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)':
+  '@gntik-ai/templates@0.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)':
     dependencies:
-      '@gntik-ai/blocks': 0.11.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)
-      '@gntik-ai/charts': 0.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)
-      '@gntik-ai/chat': 0.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
-      '@gntik-ai/editor': 0.11.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@gntik-ai/flow': 0.11.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@gntik-ai/blocks': 0.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)(tailwindcss@4.3.3)
+      '@gntik-ai/charts': 0.12.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react-is@17.0.2)(react@19.3.0)(redux@5.0.1)
+      '@gntik-ai/chat': 0.12.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
+      '@gntik-ai/editor': 0.12.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@gntik-ai/flow': 0.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@gntik-ai/icons': 0.5.0(@types/react@19.3.0)(react@19.3.0)
-      '@gntik-ai/tokens': 0.3.0
-      '@gntik-ai/ui': 0.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
+      '@gntik-ai/tokens': 0.4.0
+      '@gntik-ai/ui': 0.12.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
       lucide-react: 1.56.0(@types/react@19.3.0)(react@19.3.0)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
@@ -6133,19 +6181,21 @@ snapshots:
       - '@types/react-dom'
       - date-fns
       - immer
+      - mermaid
       - react-hook-form
       - react-is
       - redux
+      - shiki
       - supports-color
       - tailwindcss
       - zod
 
-  '@gntik-ai/tokens@0.3.0': {}
+  '@gntik-ai/tokens@0.4.0': {}
 
-  '@gntik-ai/ui@0.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)':
+  '@gntik-ai/ui@0.12.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)':
     dependencies:
       '@base-ui/react': 1.9.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@gntik-ai/tokens': 0.3.0
+      '@gntik-ai/tokens': 0.4.0
       clsx: 2.1.1
       lucide-react: 1.56.0(@types/react@19.3.0)(react@19.3.0)
       react: 19.3.0
@@ -8071,6 +8121,8 @@ snapshots:
 
   entities@7.0.1: {}
 
+  entities@9.0.0: {}
+
   es-define-property@1.0.1: {}
 
   es-errors@1.3.0: {}
@@ -8302,6 +8354,43 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
+  hast-util-from-parse5@8.0.4:
+    dependencies:
+      '@types/hast': 3.0.4
+      '@types/unist': 3.0.3
+      devlop: 1.1.0
+      hastscript: 9.0.3
+      property-information: 7.1.0
+      vfile: 6.0.3
+      vfile-location: 5.0.4
+      web-namespaces: 2.0.1
+
+  hast-util-parse-selector@4.0.0:
+    dependencies:
+      '@types/hast': 3.0.4
+
+  hast-util-raw@9.2.0:
+    dependencies:
+      '@types/hast': 3.0.4
+      '@types/unist': 3.0.3
+      '@ungap/structured-clone': 1.3.0
+      hast-util-from-parse5: 8.0.4
+      hast-util-to-parse5: 8.0.1
+      html-void-elements: 3.0.0
+      mdast-util-to-hast: 13.2.1
+      parse5: 8.1.1
+      unist-util-position: 5.0.0
+      unist-util-visit: 5.1.0
+      vfile: 6.0.3
+      web-namespaces: 2.0.1
+      zwitch: 2.0.4
+
+  hast-util-sanitize@5.0.2:
+    dependencies:
+      '@types/hast': 3.0.4
+      '@ungap/structured-clone': 1.3.0
+      unist-util-position: 5.0.0
+
   hast-util-to-html@9.0.5:
     dependencies:
       '@types/hast': 3.0.4
@@ -8336,9 +8425,27 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  hast-util-to-parse5@8.0.1:
+    dependencies:
+      '@types/hast': 3.0.4
+      comma-separated-tokens: 2.0.3
+      devlop: 1.1.0
+      property-information: 7.1.0
+      space-separated-tokens: 2.0.2
+      web-namespaces: 2.0.1
+      zwitch: 2.0.4
+
   hast-util-whitespace@3.0.0:
     dependencies:
       '@types/hast': 3.0.4
+
+  hastscript@9.0.3:
+    dependencies:
+      '@types/hast': 3.0.4
+      comma-separated-tokens: 2.0.3
+      hast-util-parse-selector: 4.0.0
+      property-information: 7.1.0
+      space-separated-tokens: 2.0.2
 
   heap-js@2.7.1: {}
 
@@ -9301,6 +9408,10 @@ snapshots:
     dependencies:
       entities: 6.0.1
 
+  parse5@8.1.1:
+    dependencies:
+      entities: 9.0.0
+
   path-browserify@1.0.1: {}
 
   path-expression-matcher@1.5.0: {}
@@ -9625,6 +9736,17 @@ snapshots:
   regex@6.1.0:
     dependencies:
       regex-utilities: 2.3.0
+
+  rehype-raw@7.0.0:
+    dependencies:
+      '@types/hast': 3.0.4
+      hast-util-raw: 9.2.0
+      vfile: 6.0.3
+
+  rehype-sanitize@6.0.0:
+    dependencies:
+      '@types/hast': 3.0.4
+      hast-util-sanitize: 5.0.2
 
   remark-gfm@4.0.1:
     dependencies:
@@ -10111,6 +10233,11 @@ snapshots:
 
   v8-compile-cache-lib@3.0.1: {}
 
+  vfile-location@5.0.4:
+    dependencies:
+      '@types/unist': 3.0.3
+      vfile: 6.0.3
+
   vfile-message@4.0.3:
     dependencies:
       '@types/unist': 3.0.3
@@ -10398,6 +10525,8 @@ snapshots:
   watchpack@2.5.2:
     dependencies:
       graceful-fs: 4.2.11
+
+  web-namespaces@2.0.1: {}
 
   webidl-conversions@7.0.0: {}
 
