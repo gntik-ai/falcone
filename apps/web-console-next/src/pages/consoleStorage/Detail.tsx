@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Field, FieldLabel, Input, Tabs, TabsList, TabsPanel, TabsTab, Text, Timestamp } from '@gntik-ai/ui'
+import { Field, FieldLabel, Input, Tabs, TabsList, TabsPanel, TabsTab, Text, Timestamp, useAnnounce } from '@gntik-ai/ui'
 import { StatusTimeline } from '@gntik-ai/blocks'
 import type { StorageState } from './useStorage'
 import { bytes, focus, focusRing, useCopy } from './copy'
@@ -9,6 +9,8 @@ import { Snippets } from './Snippets'
 export function Detail({ state: s }: { state: StorageState }) {
   const { t, i18n } = useCopy()
   const uploadRef = useRef<HTMLInputElement>(null)
+  const announce = useAnnounce()
+  useEffect(() => { if (s.appended > 0) announce(t('appended', { count: s.appended }), 'polite') }, [s.appended, announce, t])
   useEffect(() => { if (s.showUpload) uploadRef.current?.focus() }, [s.showUpload])
   const bucket = s.bucket
   if (!bucket) return <Empty title={t('detail')} description={t('selectBucket')} />
@@ -61,7 +63,6 @@ export function Detail({ state: s }: { state: StorageState }) {
             { id: 'etag', header: t('etag'), sortable: false, cell: (row) => value(row.etag) },
           ]} /> : <Empty title={t('noObjects')} description={t('noObjectsDescription')} action={<Action onClick={() => s.setShowUpload(true)}>{t('uploadFirst')}</Action>} />}
           {cursor && <Action busy={s.objects.busy} onClick={() => { void s.loadObjects(bucket, cursor) }}>{t(s.objects.busy ? 'loading' : 'next')}</Action>}
-          <div role="status" className="sr-only">{s.appended > 0 && t('appended', { count: s.appended })}</div>
         </>}
         {s.objectKey && <section className="min-w-0 space-y-4" aria-label={t('metadata')}>
           <Heading title={t('metadata')} description={t('metadataDescription')} level="h3" />
