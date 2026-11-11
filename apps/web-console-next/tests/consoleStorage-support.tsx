@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { configure, render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 import ConsoleStoragePage from '../src/pages/consoleStorage'
@@ -7,6 +7,7 @@ import { bucket, bucketsPath, createPath, deletePath, endpoints, exportPath, man
 
 // A failed DOM query must not print the rendered presigned result.
 process.env.DEBUG_PRINT_LIMIT = '0'
+configure({ asyncUtilTimeout: 5000 })
 const context = vi.hoisted(() => ({ value: {} as Record<string, unknown> }))
 vi.mock('../src/shell/context', () => ({ useConsoleContext: () => context.value }))
 export const setContext = (patch: Record<string, unknown> = {}) => { context.value = { activeTenantId: 'synthetic-tenant', activeWorkspaceId: 'synthetic-workspace', tenants: [], workspaces: [], selectWorkspace: vi.fn(), loading: false, error: null, ...patch } }
