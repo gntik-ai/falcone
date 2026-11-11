@@ -22,7 +22,11 @@ function open(path = '/console/operations/op_1') {
     <Route path="/console/operations" element={<p>Operations destination</p>} />
   </Routes></MemoryRouter>)
 }
-afterEach(() => vi.useRealTimers())
+const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+afterEach(() => {
+  vi.useRealTimers()
+  if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor); else Reflect.deleteProperty(navigator, 'clipboard')
+})
 async function settleRetries() { await act(async () => { await vi.advanceTimersByTimeAsync(4000) }) }
 
 test('F17/F18/F19: metadata, status, 20 wrapped logs, timeline and result use the shared transport', async () => {
@@ -143,8 +147,8 @@ test('missing optional ids use dashes; copying announces feedback and keeps focu
   expect(screen.getAllByText('—')).toHaveLength(2)
   const button = screen.getByRole('button', { name: 'Copiar ID de correlación' }); button.focus(); fireEvent.click(button)
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(operation.correlationId))
-  expect(button).toHaveFocus()
-  expect(screen.getByText('Copiado')).toBeInTheDocument()
+  expect(await screen.findByText('Copiado')).toBeInTheDocument()
+  await waitFor(() => expect(button).toHaveFocus())
 })
 
 test.each(['success', 'failure', 'pending'])('result %s and empty logs have explicit content', async (kind) => {
