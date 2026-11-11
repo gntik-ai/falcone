@@ -1,6 +1,6 @@
-import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react'
+import { useEffect, useRef, type ComponentProps } from 'react'
 import { Button, EmptyState, Field, FieldLabel, Input, Text } from '@gntik-ai/ui'
-import { DataTable, DescriptionListCard, ErrorPanel, InlineCallout, NoAccessEmpty, NotFoundEmpty, SectionHeader, TableSkeleton, type DataTableColumn } from '@gntik-ai/blocks'
+import { DataTable, DescriptionListCard, ErrorPanel, InlineCallout, NoAccessEmpty, NotFoundEmpty, SectionHeader, TableSkeleton, type DataTableColumn, type DescriptionItem } from '@gntik-ai/blocks'
 import type { Failure } from './api'
 import { focusRing, useCopy } from './copy'
 
@@ -11,10 +11,10 @@ export function Heading({ title, description = '', id, level = 'h2' }: { title: 
   return <SectionHeader title={title} description={description} count={undefined} actions={[]} as={level} bordered={false} headingId={id} className="min-w-0" />
 }
 export function Loading({ label }: { label: string }) { return <TableSkeleton rows={3} columns={2} label={label} className="min-w-0" /> }
-export function Empty({ title, description = '', action = null }: { title: string; description?: string; action?: ReactNode }) {
+export function Empty({ title, description = '', action = null }: { title: string; description?: string; action?: ComponentProps<typeof EmptyState>['primaryAction'] }) {
   return <EmptyState icon={undefined} title={title} description={description} titleAs="h3" bordered={false} size="md" primaryAction={action} secondaryAction={null} className="min-w-0" />
 }
-export function Notice({ children, tone = 'success' }: { children: ReactNode; tone?: 'success' | 'warning' | 'info' }) {
+export function Notice({ children, tone = 'success' }: { children: ComponentProps<typeof InlineCallout>['description']; tone?: 'success' | 'warning' | 'info' }) {
   const { t } = useCopy()
   return <InlineCallout tone={tone} title={null} description={children} actions={[]} icon={null} dismissible={false} open={true} onDismiss={undefined} className="min-w-0" labels={{ title: '', description: '', upgrade: t('actions'), viewUsage: t('usage') }} />
 }
@@ -40,7 +40,7 @@ export function TextField({ id, label, help, placeholder, value, onChange, busy 
     {help && <Text id={`${id}-help`} as="p" variant="supporting" tone="muted">{help}</Text>}
   </Field>
 }
-export function Details({ title, description = '', items }: { title: string; description?: string; items: { id: string; label: string; value: string; render?: ReactNode }[] }) {
+export function Details({ title, description = '', items }: { title: string; description?: string; items: { id: string; label: string; value: string; render?: DescriptionItem['render'] }[] }) {
   const { t } = useCopy()
   return <DescriptionListCard title={title} description={description} items={items.map((item) => ({ ...item, mono: false, copyable: false, copyValue: undefined, status: undefined }))} wrap={true} columns={1} onEdit={undefined} editLabel="" onCopy={undefined} titleAs="h3" className="min-w-0"
     labels={{ title, description, edit: '', copy: () => t('copy'), copied: () => t('copied'), copiedToClipboard: t('snippetCopied') }} />
