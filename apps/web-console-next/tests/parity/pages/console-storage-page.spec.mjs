@@ -71,7 +71,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
       await harness.open({ [section]: 'delayed' }); await activate(parity, section);
       const pendingLabel = ['create', 'upload', 'delete'].includes(section) ? c(parity)[section === 'create' ? 'creating' : section === 'upload' ? 'uploading' : 'deleting'] : section === 'presign' ? c(parity).generating : section === 'export' ? c(parity).exporting : c(parity).loading;
       if (['create', 'upload', 'delete', 'presign'].includes(section)) await expect(parity.page.getByRole('button', { name: pendingLabel, exact: true })).toBeVisible();
-      else await expect(parity.page.getByRole('status', { name: pendingLabel }).first()).toBeVisible();
+      else {
+        // The pinned kit announces the label as status content, without an accessible name.
+        const pending = parity.page.getByRole('status').filter({ hasText: pendingLabel }).first();
+        await expect(pending).toBeVisible();
+        await expect(pending).toHaveAttribute('aria-busy', 'true');
+      }
       await expect.poll(() => harness.calls.filter(({ name }) => name === section).length).toBe(1);
       await parity.page.waitForTimeout(1550);
     }
@@ -111,8 +116,15 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
       await expect.poll(() => harness.calls.filter(({ name }) => name === action).length).toBe(1);
       harness.set({ buckets: 'otherContext' });
       // Programmatic shell activation simulates an external context change while a modal holds focus.
-      await parity.page.locator('button').filter({ hasText: kind === 'tenant' ? 'Synthetic Tenant' : 'Synthetic Workspace' }).first().evaluate((node) => node.click());
-      await parity.page.locator('[role="menuitemradio"]').filter({ hasText: kind === 'tenant' ? 'Other Tenant' : 'Other Workspace' }).evaluate((node) => node.click());
+      if (kind === 'tenant') {
+        await parity.page.locator('main select').filter({ has: parity.page.locator('option[value="synthetic-other-tenant"]') }).evaluate((select) => {
+          Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'synthetic-other-tenant');
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      } else {
+        await parity.page.locator('button').filter({ hasText: 'Synthetic Workspace' }).first().evaluate((node) => node.click());
+        await parity.page.locator('[role="menuitemradio"]').filter({ hasText: 'Other Workspace' }).evaluate((node) => node.click());
+      }
       await expect(parity.page.getByRole('button', { name: 'other-context', exact: true })).toBeVisible(); await expect(parity.page.getByRole('alertdialog')).toHaveCount(0); await expect(parity.page.getByTestId('storage-presigned-result')).toHaveCount(0); await expect(parity.page.getByRole('heading', { level: 1 })).toBeFocused();
       await parity.page.waitForTimeout(1300); expect(harness.calls.filter(({ name }) => name === action)).toHaveLength(1); expect(harness.calls.filter(({ name }) => name === 'buckets')).toHaveLength(2);
     }

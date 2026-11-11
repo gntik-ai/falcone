@@ -61,3 +61,13 @@ parity, axe, CSP and viewport runs are SKIPPED in the maker sandbox because Chro
 is unavailable; PR CI runs them. The independent checker and operator assess the
 masked es/en captures and approve visual baselines. validate_page is NOT_RUN because
 no MCP server was supplied; the Hermes snapshot is the pinned offline reference.
+
+## CI parity repair
+
+The delayed-section assertions match the pinned kit's status content instead of
+requiring an accessible name that TableSkeleton does not supply. They retain the
+visible loading-label check and also require `aria-busy=true`.
+Tenant-switch scenarios dispatch the native select's change event, including while
+the delete dialog holds focus; workspace scenarios retain the kit menu interaction.
+Both keep the late-response, cleared-surface, heading-focus and request-count checks
+at every locale and viewport. No product behavior or existing foundation test changes.
