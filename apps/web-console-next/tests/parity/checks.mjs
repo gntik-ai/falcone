@@ -30,7 +30,7 @@ export async function errorEmpty(parity, manifest) {
 }
 // Dialogs fade in and out. axe reads computed colours, so a scan taken halfway through a transition
 // measures blended colours and reports contrast failures that do not exist at rest.
-async function awaitTransitions(page) {
+export async function awaitTransitions(page) {
   await page.evaluate(async () => {
     const frame = () => new Promise((done) => requestAnimationFrame(() => done()));
     // A transition starts one frame after the node mounts, so a single empty reading proves nothing: require

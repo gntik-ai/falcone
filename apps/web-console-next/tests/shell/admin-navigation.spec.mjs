@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { startServer } from '../csp/server.mjs';
 import { installSession } from '../browser-session.mjs';
-import { assertAccessibility, assertResponsive } from '../parity/checks.mjs';
+import { assertAccessibility, assertResponsive, awaitTransitions } from '../parity/checks.mjs';
 
 let server;
 test.beforeAll(async () => { server = await startServer(); });
@@ -106,6 +106,8 @@ for (const locale of ['en', 'es']) {
     const baselinePage = await context.newPage();
     const baselineRequests = await setup(baselinePage, locale, ['tenant_owner']);
     await baselinePage.getByRole('button', { name: text.trigger }).click();
+    await expect(baselinePage.getByRole('menu')).toBeVisible();
+    await awaitTransitions(baselinePage);
     const baseline = await new AxeBuilder({ page: baselinePage }).analyze();
     const baselineIds = new Set(baseline.violations.map((violation) => violation.id));
     expect(baselineRequests).toEqual([]);
@@ -119,6 +121,7 @@ for (const locale of ['en', 'es']) {
       await assertAccessibility({ page });
       await page.getByRole('button', { name: text.trigger }).click();
       await expect(page.getByRole('menuitem', { name: label, exact: true })).toBeVisible();
+      await awaitTransitions(page);
       const result = await new AxeBuilder({ page }).analyze();
       expect(result.violations.map((violation) => violation.id).filter((id) => !baselineIds.has(id))).toEqual([]);
       for (const violation of result.violations) {
