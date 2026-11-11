@@ -1,0 +1,8 @@
+.console-storage .storage-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2rem; }
+.console-storage [data-slot="table-scroll-region"] { max-width: 100%; }
+.console-storage td, .console-storage th { white-space: normal; }
+.console-storage td button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.console-storage pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (min-width: 1280px) {
+  .console-storage .storage-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
+}
