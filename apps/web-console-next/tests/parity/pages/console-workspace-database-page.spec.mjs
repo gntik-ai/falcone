@@ -167,7 +167,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await expect(parity.page.getByTestId('database-password')).toHaveCount(0);
     await expect(button(parity, 'provision')).toBeVisible();
     expect(harness(parity).calls().filter(({ path }) => path === '/v1/workspaces/synthetic-other/database')).toHaveLength(1);
-    await harness(parity).use('workspace-database.get.success', server); await parity.page.goto(server.url('console/postgres'));
+    await harness(parity).use('workspace-database.get.success', server); await parity.open('/console/postgres');
+    if (width < 1024) await parity.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
     await parity.page.getByRole('link', { name: locale === 'es' ? 'DB del área de trabajo' : 'Workspace database', exact: true }).click(); await ready(parity);
     expect(harness(parity).calls()).toEqual([{ method: 'GET', path: databasePath, body: undefined }]);
     for (const id of ['shell.workspaces-loading', 'shell.workspaces-error', 'shell.no-active-workspace', 'shell.no-workspaces-owner', 'shell.no-workspaces-viewer']) {

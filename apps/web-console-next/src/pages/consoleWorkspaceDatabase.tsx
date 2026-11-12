@@ -109,7 +109,7 @@ function Surface({ id, workspace }: { id: string; workspace: string }) {
       {loading ? <section aria-busy="true" aria-label={t('loading')} className="min-w-0 space-y-4"><TableSkeleton rows={4} columns={2} label={t('loading')} className="min-w-0" /></section>
         : failure?.operation === 'load' ? <FailureView failure={failure} retry={retry} />
           : record ? <Tabs value={tab} defaultValue="summary" onValueChange={(value) => setTab(String(value))}>
-            <TabsList aria-label={t('tabs')} className="max-w-full flex-wrap"><TabsTab value="summary" className={focusRing}>{t('summary')}</TabsTab><TabsTab value="history" className={focusRing}>{t('history')}</TabsTab></TabsList>
+            <TabsList activateOnFocus={true} aria-label={t('tabs')} className="max-w-full flex-wrap"><TabsTab value="summary" className={focusRing}>{t('summary')}</TabsTab><TabsTab value="history" className={focusRing}>{t('history')}</TabsTab></TabsList>
             <TabsPanel value="summary" keepMounted={false} className="min-w-0 space-y-4">
               <DescriptionListCard title={t('recordTitle')} description="" titleAs="h2" wrap={true} columns={2} onEdit={undefined} editLabel="" onCopy={undefined} className="min-w-0" labels={{ title: t('recordTitle'), description: '', edit: '', copy: () => t('copy'), copied: () => t('copied'), copiedToClipboard: t('copied'), copyFailed: t('copyFailed') }}
                 items={(['database', 'host', 'port', 'user', 'engine', 'mode', 'status'] as const).map((key) => {

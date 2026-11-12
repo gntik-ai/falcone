@@ -50,6 +50,23 @@ for (const locale of ['es', 'en']) describe(locale, () => {
     expect(screen.queryByRole('button', { name: copy().rotate })).not.toBeInTheDocument()
     await act(async () => { release() }); await ready(); expect(server.scenario.calls).toHaveLength(1)
   })
+  test('arrow keys focus and activate the history and summary tabs', async () => {
+    server = serve('workspace-database.get.success'); open(); await ready()
+    const summary = screen.getByRole('tab', { name: copy().summary })
+    const history = screen.getByRole('tab', { name: copy().history })
+    act(() => summary.focus())
+    fireEvent.keyDown(summary, { key: 'ArrowRight' })
+    await waitFor(() => expect(history).toHaveFocus())
+    expect(history).toHaveAttribute('aria-selected', 'true')
+    expect(summary).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('list', { name: copy().history })).toBeVisible()
+    fireEvent.keyDown(history, { key: 'ArrowLeft' })
+    await waitFor(() => expect(summary).toHaveFocus())
+    expect(summary).toHaveAttribute('aria-selected', 'true')
+    expect(history).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByText(record.database_name, { selector: 'dd *' })).toBeVisible()
+    expect(server.scenario.calls).toEqual([{ method: 'GET', path: databasePath, body: undefined }])
+  })
   test('first run provisions once under double click and focuses the masked reveal', async () => {
     let release!: () => void
     server = serve('workspace-database.provision.dedicated', { method: 'POST', release: new Promise((resolve) => { release = resolve }) })
