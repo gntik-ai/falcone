@@ -6,7 +6,8 @@
 - [x] Observe the old-pin CLI regression fail, then update the gate and fixture versions while preserving negative cases and the tarball-host check.
 - [x] Run the pin suite and gate, console typecheck, colour/i18n checks, translation/dist validation fixtures and parity structure tooling.
 - [x] Document each named release change and keep the single kit stylesheet import.
-- [ ] Finish the normal console unit suite and release builds; record final results in the implementation output.
+- [x] Run the normal console unit suite; record its final result in the implementation output. Preserve every scenario and assert exact status tones after the kit's token-backed badge markup change.
+- [x] Build the next console at `/` and `/next/`, validate dist and translation chunks, check release fixture exclusion and asset base paths, and build the legacy release SPA.
 - [ ] Clean-room frozen install and per-package npm integrity comparison: require network and Docker outside this sandbox.
 - [ ] Chromium parity shards, negative probes, axe, viewport, shell and CSP checks: PR CI runs them.
 - [ ] Review changed parity screenshots and obtain operator visual approval; list any regenerated screenshots individually with reasons in the PR.
