@@ -8,6 +8,8 @@
 - [x] Document each named release change and keep the single kit stylesheet import.
 - [x] Run the normal console unit suite; record its final result in the implementation output. Preserve every scenario and assert exact status tones after the kit's token-backed badge markup change.
 - [x] Build the next console at `/` and `/next/`, validate dist and translation chunks, check release fixture exclusion and asset base paths, and build the legacy release SPA.
+- [x] Reproduce the CI runtime background failure through the rendered page before fixing its StatusTag call site; retain all existing browser assertions and add six regression cases.
+- [ ] Rerun shard 4's startup timeout and obtain the omitted shard 7 equality diagnostic if either recurs; Chromium is unavailable in the maker sandbox.
 - [ ] Clean-room frozen install and per-package npm integrity comparison: require network and Docker outside this sandbox.
 - [ ] Chromium parity shards, negative probes, axe, viewport, shell and CSP checks: PR CI runs them.
 - [ ] Review changed parity screenshots and obtain operator visual approval; list any regenerated screenshots individually with reasons in the PR.
