@@ -9,7 +9,7 @@
 - [x] Run the normal console unit suite; record its final result in the implementation output. Preserve every scenario and assert exact status tones after the kit's token-backed badge markup change.
 - [x] Build the next console at `/` and `/next/`, validate dist and translation chunks, check release fixture exclusion and asset base paths, and build the legacy release SPA.
 - [x] Use the supplied CI runtime background-class failures as red evidence; remove the unnecessary StatusTag background override and assert exact semantic tones in parity and all six added regression cases.
-- [ ] Rerun shard 4's startup timeout and obtain the omitted shard 7 equality diagnostic if either recurs; Chromium is unavailable in the maker sandbox.
+- [x] Use shard 7's six overview responsive CI failures as red evidence; preserve the four-column desktop inventory layout and strip dividers at the KpiRow call site, leaving all parity tests unchanged.
 - [ ] Clean-room frozen install and per-package npm integrity comparison: require network and Docker outside this sandbox.
 - [ ] Chromium parity shards, negative probes, axe, viewport, shell and CSP checks: PR CI runs them.
 - [ ] Review changed parity screenshots and obtain operator visual approval; list any regenerated screenshots individually with reasons in the PR.

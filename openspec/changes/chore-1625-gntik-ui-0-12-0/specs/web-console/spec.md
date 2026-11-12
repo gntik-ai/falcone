@@ -26,6 +26,12 @@ The next console SHALL pin `@gntik-ai/ui`, `@gntik-ai/blocks` and `@gntik-ai/tem
 
 The update SHALL adopt no new kit features, retain `@gntik-ai/templates/styles.css` as the only kit stylesheet import, and preserve all existing test gates. Required compatibility fixes SHALL be made at call sites without wrappers hiding kit behavior.
 
+#### Scenario: Overview inventory responsiveness
+
+- **WHEN** an overview with inventory summaries is viewed at 375px, 768px or 1280px
+- **THEN** the inventory list retains one, two or four columns respectively
+- **AND** the desktop strip has dividers between adjacent cells.
+
 #### Scenario: Release validation
 
 - **WHEN** the dependency update is validated

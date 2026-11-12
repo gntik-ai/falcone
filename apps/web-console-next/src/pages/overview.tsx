@@ -84,7 +84,7 @@ function OverviewContent() {
             <SectionHeader title={t('inventory.title')} description={t('inventory.description')} as="h2" headingId="overview-inventory" count={undefined} actions={[]} bordered={false} />
             {inventory ? <>
               <KpiRow items={counts.map((key) => ({ id: key, label: t(`inventory.${key}`), value: count(inventory[key]), delta: undefined, trend: undefined, trendTone: undefined }))}
-                variant="strip" showTrends={false} label={t('inventory.title')} className="min-w-0 [&_dt]:whitespace-normal [&_dt]:overflow-visible" />
+                variant="strip" showTrends={false} label={t('inventory.title')} className="min-w-0 lg:grid-cols-4! lg:[&>div:not(:last-child)]:border-e [&_dt]:whitespace-normal [&_dt]:overflow-visible" />
               {inventory.workspaces.length > 0 && <Collapsible variant="subtle" open={inventoryOpen} onOpenChange={setInventoryOpen} disabled={false}>
                 <CollapsibleTrigger showChevron={true} className="whitespace-normal text-start">{t('inventory.disclosure')}</CollapsibleTrigger>
                 <CollapsiblePanel className="space-y-4 pt-4">{inventory.workspaces.map((workspace) => <div key={workspace.workspaceId} className="min-w-0">
