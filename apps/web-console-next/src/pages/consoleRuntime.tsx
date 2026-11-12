@@ -61,8 +61,6 @@ function Runtime() {
 
   if (error?.status === 401) return null // Shared session transport and shell own refresh and redirect.
   const tone = data?.state === 'ready' ? 'success' : ['degraded', 'unavailable'].includes(data?.state ?? '') ? 'warning' : 'neutral'
-  // Preserve the runtime's semantic surfaces across the kit's generic bg-tone change.
-  const statusBackground = tone === 'success' ? 'bg-success/15' : tone === 'warning' ? 'bg-warning/16' : 'bg-muted'
   const state = data ? label(data.state) : ''
   const statuses = data ? { [data.state]: { label: state, tone } } as const : {}
   const back = <Link href="/console/overview" underline="always">{t('back')}</Link>
@@ -70,7 +68,7 @@ function Runtime() {
     breadcrumbs={null} status="" statuses={{}} meta={[]} actions={[]} tabs={null}
     labels={{ title: t('title'), description: t('description'), moreActions: t('sections'), sections: t('sections') }} />
   return <Page width="default" header={header} actions={null} actionBar={null} className="console-runtime min-w-0 wrap-anywhere">
-    {data && <StatusTag status={data.state} statuses={statuses} label={state} aria-label={t('statusName', { state })} uppercase={false} className={statusBackground} />}
+    {data && <StatusTag status={data.state} statuses={statuses} label={state} aria-label={t('statusName', { state })} uppercase={false} />}
     {error?.status === 403 ? <EmptyState title={t('noAccess')} description={t('noAccessDescription')} titleAs="h2" bordered={false} primaryAction={back} secondaryAction={null} />
       : error?.status === 404 ? <NotFoundEmpty title={t('notFound')} description={t('notFoundDescription')} action={back} titleAs="h2" bordered={false} />
       : error ? <div ref={panel}><ErrorPanel title={t('errorTitle')} message={t('errorMessage')} code={error.status ?? null} requestId={error.requestId ?? ''} details="" secondaryAction={null}
