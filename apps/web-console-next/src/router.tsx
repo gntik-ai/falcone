@@ -92,6 +92,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'iam-access' && route.migrated) return { ...route, element: <Guard kind="superadmin">{lazyPage('pages.console-iam-access-page', () => import('./pages/consoleIamAccess'))}</Guard> }
         if (route.path === 'auth' && route.migrated) return { ...route, element: <Guard kind="superadmin">{lazyPage('pages.console-auth-page', () => import('./pages/consoleAuth'))}</Guard> }
         if (route.path === 'plans/new') return { ...route, element: lazyPage('pages.console-plan-create-page', () => import('./pages/consolePlanCreate')) }
+        if (route.path === 'database' && route.migrated) return { ...route, element: lazyPage('pages.console-workspace-database-page', () => import('./pages/consoleWorkspaceDatabase')) }
         if (route.path === 'quotas') return { ...route, element: lazyPage('pages.console-quotas-page', () => import('./pages/consoleQuotas')) }
         if (route.path === 'workspaces/:workspaceId/realtime' && route.migrated) return { ...route, element: lazyPage('pages.console-realtime-page', () => import('./pages/consoleRealtime')) }
         if (route.path === 'observability' && route.migrated) return { ...route, element: lazyPage('pages.console-observability-page', () => import('./pages/consoleObservability')) }

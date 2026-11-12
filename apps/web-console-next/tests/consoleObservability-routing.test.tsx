@@ -41,7 +41,7 @@ test.each(['direct', 'landing'])('rollback of the branch and flag leaves %s pend
   const page = children.find((route) => route.path === 'observability')!
   const flag = pendingConsoleRoutes.find((route) => route.path === 'observability')!
   const element = page.element, migrated = flag.migrated
-  page.element = children.find((route) => route.path === 'database')!.element
+  page.element = children.find((route) => route.path === 'postgres')!.element
   flag.migrated = false
   try {
     open(method === 'direct' ? '/next/console/observability' : '/next/console')
