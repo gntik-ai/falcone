@@ -171,6 +171,8 @@ for (const locale of ['es', 'en']) describe(locale, () => {
     server = serve('shell.workspaces-loading'); workspaceContext({ activeWorkspaceId: null, loading: true })
     const view = open(); expect(screen.getByRole('status', { name: copy().workspace.loading })).toHaveTextContent(copy().workspace.loading); expect(server.mock).not.toHaveBeenCalled()
     const reloadWorkspaces = vi.fn(); patchContext({ loading: false, error: { status: 500 }, reloadWorkspaces }); view.rerender(element())
+    expect(screen.getByRole('alert')).toHaveTextContent(copy().workspace.error)
+    expect(within(screen.getByRole('alert')).getByRole('button', { name: copy().retry })).toBeVisible()
     click(copy().retry); expect(reloadWorkspaces).toHaveBeenCalledTimes(1); expect(server.mock).not.toHaveBeenCalled()
   })
   test('workspace picker uses the shell setter and selects exactly once', async () => {

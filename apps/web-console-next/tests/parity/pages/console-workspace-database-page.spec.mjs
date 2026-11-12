@@ -145,7 +145,11 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await summary.focus(); await parity.page.keyboard.press('ArrowRight');
     await expect(parity.page.getByRole('tab', { name: copy(parity).history, exact: true })).toHaveAttribute('aria-selected', 'true');
     await button(parity, 'rotate').click(); await expect(typed(parity)).toBeFocused(); await scan(parity);
-    for (let index = 0; index < 8; index++) { await parity.page.keyboard.press('Tab'); expect(await dialog(parity).evaluate((node) => node.contains(document.activeElement))).toBe(true); }
+    // The kit's focus guards return focus on the next animation frame at either boundary.
+    for (const key of ['Tab', 'Shift+Tab']) for (let index = 0; index < 8; index++) {
+      await parity.page.keyboard.press(key);
+      await expect.poll(() => dialog(parity).evaluate((node) => node.contains(document.activeElement))).toBe(true);
+    }
     await parity.page.keyboard.press('Escape'); await expect(button(parity, 'rotate')).toBeFocused();
     await open(parity, server, 'workspace-database.provision.dedicated'); await button(parity, 'provision').focus(); await parity.page.keyboard.press('Enter'); await expect(result(parity)).toBeFocused();
     await masked(parity); await scan(parity);
