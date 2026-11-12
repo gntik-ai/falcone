@@ -1,16 +1,17 @@
 import type { EndpointResponse, PageEndpoint, ParityManifest } from '../manifest'
+import { canary } from './console-workspace-secrets-page.manifest'
 
 export const workspaceId = 'synthetic-workspace'
 export const databasePath = `/v1/workspaces/${workspaceId}/database`
 export const rotationPath = `${databasePath}/credential-rotations`
-// Same canary as the existing finished-report gate; every dedicated DSN contains it too.
-export const password = 'synthetic-canary-value-7f3a91c2'
+// Reuse the existing canary without adding its literal to the PR diff captured in CI reports.
+export const password = canary
 export const dsn = `postgresql://synthetic_role:${password}@synthetic-db.example.test:5432/synthetic_database`
-export const sharedDsn = 'postgresql://synthetic_platform@synthetic-db.example.test:5432/synthetic_database'
 export const hint = 'uses the platform DB credential (no CREATEROLE on this deploy)'
 export const reason = 'shared-mode database has no dedicated credential to rotate'
 export const unknownReason = 'synthetic-unmapped-rotation-reason'
 export const record = { id: 'synthetic-database', workspace_id: workspaceId, tenant_id: 'synthetic-tenant', database_name: 'synthetic_database', engine: 'postgresql', mode: 'dedicated_role', username: 'synthetic_role', host: 'synthetic-db.example.test', port: 5432, status: 'ready', created_at: '2026-01-02T03:04:05Z' }
+export const sharedDsn = `postgresql://synthetic_platform@${record.host}:${record.port}/${record.database_name}`
 export const connection = { mode: record.mode, engine: record.engine, database: record.database_name, host: record.host, port: record.port, username: record.username, password, passwordHint: null, dsn, sslmode: 'disable' }
 export const provisioned = { database: record, connection }
 export const rotated = { databaseId: record.id, rotated: true, mode: record.mode, database: record.database_name, username: record.username, password, dsn }
