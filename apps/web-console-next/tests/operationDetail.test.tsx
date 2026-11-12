@@ -167,14 +167,14 @@ test('detail, result and log requests include the exact default pagination', asy
   }
 })
 
-test.each(['es', 'en'].flatMap((locale) => Object.keys(statusTones).map((status) => [locale, status])))('renders status %s/%s with the correct tone and translated label', async (locale, status) => {
+const expectedStatusTones = { pending: 'neutral', running: 'info', completed: 'success', failed: 'destructive', timed_out: 'warning', cancelled: 'neutral' } as const
+test.each(['es', 'en'].flatMap((locale) => Object.keys(expectedStatusTones).map((status) => [locale, status])))('renders status %s/%s with the correct tone and translated label', async (locale, status) => {
   await i18n.changeLanguage(locale)
   mockTransport({ detail: { ...operation, status } }); open()
   await screen.findByText('synthetic-workspace-create')
   const tag = document.querySelector(`[data-status="${status}"]`)!
   expect(tag).toHaveTextContent(i18n.t(`status.${status}`, { ns: 'operationDetail' }))
-  const tone = statusTones[status as keyof typeof statusTones]
-  expect(tag.className).toContain(`bg-${tone === 'neutral' ? 'muted-foreground' : tone}`)
+  expect(tag).toHaveAttribute('data-tone', expectedStatusTones[status as keyof typeof expectedStatusTones])
 })
 
 test('result failure retries independently and preserves the result request shape', async () => {

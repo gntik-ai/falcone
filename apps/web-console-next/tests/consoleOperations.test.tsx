@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
 import * as transport from '@in-falcone/console-api/session'
-import ConsoleOperationsPage, { OperationStatusBadge, statusTones } from '../src/pages/consoleOperations'
+import ConsoleOperationsPage, { OperationStatusBadge } from '../src/pages/consoleOperations'
 import { I18nProvider } from '@gntik-ai/ui'
 import { OperationStatusBanner, summarizeDelta } from '../src/pages/consoleOperations/banner'
 import { listOperations, normalizeFilters } from '../src/pages/consoleOperations/query'
@@ -294,13 +294,14 @@ test('reconciliation pages by items received until total and refetches only on a
   expect(reconcileOperations(new Map([[running.operationId, running]]), [completed]).terminal).toEqual([completed])
 })
 
+const statusTones = { pending: 'neutral', running: 'info', completed: 'success', failed: 'destructive', timed_out: 'warning', cancelled: 'neutral' } as const
 test.each(['es', 'en'].flatMap((locale) => Object.keys(statusTones).map((status) => [locale, status])))('status badge %s/%s has kit tone and an independent translated label', async (locale, status) => {
   await i18n.changeLanguage(locale)
   const labels = locale === 'es' ? ['Pendiente', 'En curso', 'Completada', 'Fallida', 'Expirada', 'Cancelada'] : ['Pending', 'Running', 'Completed', 'Failed', 'Timed out', 'Cancelled']
   render(<I18nProvider locale={locale}><OperationStatusBadge status={status as keyof typeof statusTones} /></I18nProvider>)
   const tag = screen.getByText(labels[Object.keys(statusTones).indexOf(status)])
   expect(tag).toHaveAttribute('data-status', status)
-  expect(tag.className).toContain(`bg-${statusTones[status as keyof typeof statusTones] === 'neutral' ? 'muted-foreground' : statusTones[status as keyof typeof statusTones]}`)
+  expect(tag).toHaveAttribute('data-tone', statusTones[status as keyof typeof statusTones])
 })
 
 test('the list transport sends normalized query and pagination field for field', async () => {
