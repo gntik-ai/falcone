@@ -78,10 +78,10 @@ test.each(['es', 'en'] as const)('all denial roles receive translated shell stat
 describe.each(['es', 'en'] as const)('runtime fixture mapping in %s', (locale) => {
   test.each([
     ['knative-degraded', ['Degradado', 'Degraded'], ['Gestionado por la plataforma', 'Platform managed'], 'warning'],
-    ['knative-unverified', ['Sin verificar', 'Unverified'], ['Gestionado por la plataforma', 'Platform managed'], 'muted'],
-    ['knative-disabled', ['Deshabilitado', 'Disabled'], ['Deshabilitado', 'Disabled'], 'muted'],
+    ['knative-unverified', ['Sin verificar', 'Unverified'], ['Gestionado por la plataforma', 'Platform managed'], 'neutral'],
+    ['knative-disabled', ['Deshabilitado', 'Disabled'], ['Deshabilitado', 'Disabled'], 'neutral'],
     ['knative-unavailable-external', ['No disponible', 'Unavailable'], ['Runtime externo', 'External runtime'], 'warning'],
-    ['knative-unknown-values', ['Estado no disponible', 'Status unavailable'], ['Modo no verificado', 'Unverified mode'], 'muted'],
+    ['knative-unknown-values', ['Estado no disponible', 'Status unavailable'], ['Modo no verificado', 'Unverified mode'], 'neutral'],
   ] as const)('legacy labels, values, notes, dependency state and announcement: %s', async (variant, stateLabels, modeLabels, tone) => {
     await i18n.changeLanguage(locale)
     const copy = locale === 'es' ? es : en
@@ -90,7 +90,7 @@ describe.each(['es', 'en'] as const)('runtime fixture mapping in %s', (locale) =
     const stateLabel = stateLabels[locale === 'es' ? 0 : 1]
     const modeLabel = modeLabels[locale === 'es' ? 0 : 1]
     const tag = await screen.findByLabelText(copy.statusName.replace('{state}', stateLabel))
-    expect(tag.className).toContain(`bg-${tone}`)
+    expect(tag).toHaveAttribute('data-tone', tone)
     expect(screen.getAllByText(modeLabel).length).toBeGreaterThan(0)
     expect(screen.getAllByText(copy.dependencyDescription.replace('{state}', stateLabel))).toHaveLength(2)
     const transition = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(fixture.lastTransitionAt))

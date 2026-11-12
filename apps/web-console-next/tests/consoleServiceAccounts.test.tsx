@@ -45,9 +45,9 @@ test.each(locales)('renders the mixed list with state tags, caption, access labe
 test.each(locales)('client state and credential status use status tags with the legacy tones in %s', async (locale) => {
   const grid = await start(locale)
   const tag = (text: string) => within(grid).getByText(text).closest('span')!
-  expect(tag(copy[locale].credentialStatuses.active).className).toMatch(/success/)
-  expect(tag(copy[locale].credentialStatuses.revoked).className).toMatch(/destructive/)
-  expect(tag(copy[locale].credentialStatuses.rotated).className).not.toBe(tag(copy[locale].credentialStatuses.active).className)
+  expect(tag(copy[locale].credentialStatuses.active)).toHaveAttribute('data-tone', 'success')
+  expect(tag(copy[locale].credentialStatuses.revoked)).toHaveAttribute('data-tone', 'destructive')
+  expect(tag(copy[locale].credentialStatuses.rotated)).toHaveAttribute('data-tone', 'info')
   expect(within(grid).getAllByText(copy[locale].clientStates.enabled).length).toBeGreaterThan(0)
   expect(within(grid).getByText(copy[locale].clientStates.disabled)).toBeVisible()
 })
@@ -57,7 +57,7 @@ test('an unrecognized non-empty credential status shows its raw value with a neu
   const grid = await table()
   expect(within(grid).getByText('suspended-by-policy')).toBeVisible()
   expect(within(grid).getAllByRole('row')[2].querySelector('[data-status="unknown"]')).toHaveTextContent(copy.es.credentialStatuses.unknown)
-  expect(within(grid).getByText('suspended-by-policy').closest('span')!.className).not.toMatch(/success|destructive/)
+  expect(within(grid).getByText('suspended-by-policy').closest('span')).toHaveAttribute('data-tone', 'neutral')
 })
 
 test.each(locales)('shows the loading skeleton, then the empty first-run state in %s', async (locale) => {

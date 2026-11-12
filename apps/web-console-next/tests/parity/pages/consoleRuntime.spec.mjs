@@ -61,8 +61,8 @@ for (const role of observers) for (const locale of ['es', 'en']) for (const widt
       for (const [fixture, state, mode] of stateCases) {
         await parity.open(manifest.route, { runtime: fixture });
         await expect(status(parity, state)).toBeVisible();
-        const tone = state === 'ready' ? 'success' : ['degraded', 'unavailable'].includes(state) ? 'warning' : 'muted';
-        await expect(status(parity, state)).toHaveClass(new RegExp(`bg-${tone}`));
+        const tone = state === 'ready' ? 'success' : ['degraded', 'unavailable'].includes(state) ? 'warning' : 'neutral';
+        await expect(status(parity, state)).toHaveAttribute('data-tone', tone);
         const values = runtimeFixtures[fixture].body;
         await expect(parity.page.locator('dd')).toHaveText([
           copy(parity).mode[mode], values.owner || copy(parity).missingOwner,
