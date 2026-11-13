@@ -57,7 +57,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
       for (const item of items) await parity.page.getByRole('checkbox', { name: item, exact: true }).check();
       await button(parity, 'next').click();
       expect(await parity.page.getByRole('dialog').locator('dd').allTextContents()).toContain(' ventas ');
-      await button(parity, 'confirm').click(); await expect(parity.page.getByRole('link', { name: c(parity).openResource, exact: true })).toHaveAttribute('href', engine === 'postgresql' ? '/next/console/postgres' : '/console/mongo');
+      await button(parity, 'confirm').click(); await expect(parity.page.getByRole('link', { name: c(parity).openResource, exact: true })).toHaveAttribute('href', engine === 'postgresql' ? new URL(parity.page.url()).pathname : '/console/mongo');
       const post = harness.calls.filter((call) => call.method === 'POST').at(-1); expect(post).toEqual({ method: 'POST', path: harness.createPath, body: { engine, name: ' ventas ', extensions: engine === 'postgresql' ? items : [], collections: engine === 'mongodb' ? items : [] } });
       // Escape closes the modal and returns focus to its originating toolbar button.
       await parity.page.keyboard.press('Escape'); await expect(button(parity, 'newDatabase')).toBeFocused();

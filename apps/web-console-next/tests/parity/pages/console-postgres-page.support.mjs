@@ -36,7 +36,10 @@ export async function installPostgresHarness(parity) {
     use(overrides = {}) { routes = { ...defaults, ...overrides }; calls.length = 0; },
     cleanFaults() {
       // Only injected, URL-matched resource errors are allowed; application errors remain failures.
-      parity.faults.splice(0, parity.faults.length, ...parity.faults.filter((fault) => !allowedFaults.includes(fault)));
+      for (const fault of allowedFaults.splice(0)) {
+        const index = parity.faults.indexOf(fault);
+        if (index >= 0) parity.faults.splice(index, 1);
+      }
     },
   };
 }
