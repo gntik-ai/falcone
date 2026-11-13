@@ -28,6 +28,8 @@ export function createDatabaseHarness(parity) {
     } else if (url.pathname === '/v1/auth/login-sessions/synthetic-session/refresh' && state.id.includes('.401-')) {
       record(request, url, undefined);
       response = state.id.endsWith('rejected') ? { status: 400, body: { code: 'REFRESH_REJECTED' } } : { status: 200, body: buildConsoleRefreshSessionFixture() };
+    } else if (request.method() === 'GET' && url.pathname === '/v1/postgres/databases' && url.search === '?page%5Bsize%5D=100') {
+      response = { status: 200, body: { items: [], page: { after: null } } };
     } else {
       const allowed = request.method() === 'GET' && ['/v1/tenants', '/v1/tenants/synthetic-tenant', '/v1/workspaces', '/v1/auth/signups/policy'].includes(url.pathname);
       if (!allowed) { parity.faults.push(`Unexpected API request: ${request.method()} ${url.pathname}`); await route.abort(); return; }

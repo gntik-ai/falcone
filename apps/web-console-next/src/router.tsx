@@ -9,7 +9,7 @@ import { AuthLayout, Logo, StatusLayout } from '@gntik-ai/ui'
 import { useTranslation } from 'react-i18next'
 import { RouteState, ShellErrorBoundary } from './shell/RouteState'
 import { SignupFeedbackLayout } from './pages/signupFeedback'
-import { pendingConsoleRoutes } from './shell/routes'
+import { pendingConsoleRoutes, type GuardKind } from './shell/routes'
 import { SecretsGuard } from './pages/consoleWorkspaceSecrets/guard'
 
 declare const __SHELL_TEST_FIXTURES__: boolean
@@ -54,6 +54,11 @@ function lazyPage(_namespace: string, load: () => Promise<{ default: ComponentTy
   return <Page />
 }
 
+export function pendingRouteElement(guard?: GuardKind) {
+  const page = lazyPage('pendingPage', () => import('./pages/pendingPage'))
+  return guard ? <Guard kind={guard}>{page}</Guard> : page
+}
+
 export const appRoutes: RouteObject[] = [
   {
     element: <Outlet />,
@@ -92,6 +97,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'iam-access' && route.migrated) return { ...route, element: <Guard kind="superadmin">{lazyPage('pages.console-iam-access-page', () => import('./pages/consoleIamAccess'))}</Guard> }
         if (route.path === 'auth' && route.migrated) return { ...route, element: <Guard kind="superadmin">{lazyPage('pages.console-auth-page', () => import('./pages/consoleAuth'))}</Guard> }
         if (route.path === 'plans/new') return { ...route, element: lazyPage('pages.console-plan-create-page', () => import('./pages/consolePlanCreate')) }
+        if (route.path === 'postgres' && route.migrated) return { ...route, element: lazyPage('pages.console-postgres-page', () => import('./pages/consolePostgres')) }
         if (route.path === 'database' && route.migrated) return { ...route, element: lazyPage('pages.console-workspace-database-page', () => import('./pages/consoleWorkspaceDatabase')) }
         if (route.path === 'quotas') return { ...route, element: lazyPage('pages.console-quotas-page', () => import('./pages/consoleQuotas')) }
         if (route.path === 'workspaces/:workspaceId/realtime' && route.migrated) return { ...route, element: lazyPage('pages.console-realtime-page', () => import('./pages/consoleRealtime')) }
@@ -118,8 +124,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'flows' && route.migrated) return { ...route, element: lazyPage('pages.console-flows-page', () => import('./pages/consoleFlows')) }
         if (route.path === 'flows/:flowId' && route.migrated) return { ...route, element: lazyPage('pages.console-flow-designer-page', () => import('./pages/consoleFlowDesigner')) }
         if (route.path === 'flows/:flowId/runs' && route.migrated) return { ...route, element: lazyPage('pages.console-flow-history-page', () => import('./pages/consoleFlowHistory')) }
-        const page = lazyPage('pendingPage', () => import('./pages/pendingPage'))
-        return { ...route, element: guard ? <Guard kind={guard}>{page}</Guard> : page }
+        return { ...route, element: pendingRouteElement(guard) }
       }),
       ...(__SHELL_TEST_FIXTURES__ && FixtureRoutes ? [{ path: '__fixture/*', element: <FixtureRoutes /> }] : []),
       { path: 'settings', element: lazyPage('pages.console-settings-page', () => import('./pages/settings')) },

@@ -26,7 +26,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'workspaces/:workspaceId', migrated: true },
   { path: 'auth', migrated: true, guard: 'superadmin' },
   { path: 'auth-config', migrated: true },
-  { path: 'postgres' },
+  { path: 'postgres', migrated: true },
   { path: 'postgres/data' },
   { path: 'mongo' },
   { path: 'mongo/data' },

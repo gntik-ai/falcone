@@ -4,7 +4,7 @@ import { afterEach, expect, test } from 'vitest'
 import { buildConsoleRefreshSessionFixture, buildConsoleSignupPolicyFixture, buildTenantCollectionFixture, buildWorkspaceCollectionFixture } from '@in-falcone/console-api/fixtures'
 import { readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import { App } from '../src/App'
-import { appRoutes } from '../src/router'
+import { appRoutes, pendingRouteElement } from '../src/router'
 import { pendingConsoleRoutes } from '../src/shell/routes'
 import { isMigratedRoute } from '../src/shell/navigation'
 import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
@@ -41,7 +41,7 @@ test.each(['direct', 'landing'])('rollback of the branch and flag leaves %s pend
   const page = children.find((route) => route.path === 'observability')!
   const flag = pendingConsoleRoutes.find((route) => route.path === 'observability')!
   const element = page.element, migrated = flag.migrated
-  page.element = children.find((route) => route.path === 'postgres')!.element
+  page.element = pendingRouteElement()
   flag.migrated = false
   try {
     open(method === 'direct' ? '/next/console/observability' : '/next/console')
