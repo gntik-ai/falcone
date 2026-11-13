@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
-import manifest, { fixtures, paths, pageUrl } from './console-postgres-page.manifest.ts';
+import manifest, { fixtures, paths, pageUrl, ddlPreviewFixture } from './console-postgres-page.manifest.ts';
 import { installPostgresHarness } from './console-postgres-page.support.mjs';
+import { assertPostgresLocale } from './console-postgres-page.locale.mjs';
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-postgres-page.json`, import.meta.url), 'utf8'))]));
 const copy = (p) => bundles[p.locale];
 const button = (p, key, scope = p.page) => scope.getByRole('button', { name: copy(p)[key], exact: true });
@@ -20,7 +21,7 @@ async function activate(p, kind) {
   await p.page.getByRole('button', { name: 'accounts', exact: true }).click(); await tab(p, kind).click();
 }
 async function capture(p, info, name) {
-  await check.assertLocale(p); await p.page.evaluate(() => document.fonts.ready);
+  await assertPostgresLocale(p); await p.page.evaluate(() => document.fonts.ready);
   const body = await p.page.screenshot({ animations: 'disabled', caret: 'hide' });
   await info.attach(`${name}-${p.locale}-sha256-${createHash('sha256').update(body).digest('hex')}`, { body, contentType: 'image/png' });
 }
@@ -31,13 +32,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
   test.afterEach(async ({ parity }) => { expect(h.unmatched).toEqual([]); await check.assertRuntimeHealth(parity); });
   test('data', async ({ parity: p }) => {
     await h.open(); await ready(p);
+    await expect(surface(p).getByRole('table', { name: copy(p).tableLabels.databases, exact: true }).getByRole('cell', { name: copy(p).enums.active, exact: true })).toHaveCount(fixtures.databases.items.length);
     for (const name of ['app_db', 'analytics', 'archive']) await expect(p.page.getByRole('button', { name, exact: true })).toBeVisible();
-    await table(p); for (const value of ['id', 'uuid', 'NOT NULL', 'gen_random_uuid()']) await expect(surface(p).getByText(value, { exact: true })).toBeVisible();
+    await table(p); await expect(surface(p).getByRole('columnheader', { name: copy(p).default, exact: true })).toBeVisible(); for (const value of ['id', 'uuid', 'NOT NULL', 'gen_random_uuid()']) await expect(surface(p).getByText(value, { exact: true })).toBeVisible();
     await tab(p, 'indexes').click(); for (const value of ['accounts_pkey', 'btree', 'email']) await expect(surface(p).getByText(value, { exact: true })).toBeVisible();
     await tab(p, 'policies').click(); for (const value of ['accounts_select_policy', 'Permissive', 'SELECT', 'tenant_user']) await expect(surface(p).getByText(value, { exact: true })).toBeVisible();
     await tab(p, 'security').click(); await expect(surface(p).getByText('Review Required', { exact: true })).toBeVisible();
     await tab(p, 'views').click(); await expect(surface(p).getByText('active_accounts', { exact: true })).toBeVisible();
-    await tab(p, 'matviews').click(); await expect(surface(p).getByText('daily refresh', { exact: true })).toBeVisible(); await check.assertLocale(p);
+    await tab(p, 'matviews').click(); await expect(surface(p).getByText('daily refresh', { exact: true })).toBeVisible(); await assertPostgresLocale(p);
     expect(h.calls.filter(({ method }) => method === 'GET').map(({ path }) => path)).toEqual(Object.entries(paths).map(([kind, path]) => kind === 'security' ? path : pageUrl(path)));
   });
   test('action', async ({ parity: p }) => {
@@ -50,6 +52,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     for (const kind of ['table', 'view', 'matview']) {
       await h.open(); await schema(p); if (kind === 'table') await p.page.getByRole('button', { name: 'accounts', exact: true }).click(); else await tab(p, kind === 'view' ? 'views' : 'matviews').click();
       await button(p, 'preview').click(); await expect(p.page.getByTestId('pg-preview').getByText('Exclusive lock possible', { exact: true })).toBeVisible();
+      for (const category of [copy(p).enums.locks, copy(p).enums.create]) await expect(p.page.getByTestId('pg-preview').getByText(category, { exact: true })).toBeVisible();
+      for (const target of ddlPreviewFixture().ddlPreview.lockTargets) await expect(p.page.getByTestId('pg-preview').getByText(target, { exact: true })).toBeVisible();
       const writes = h.calls.filter(({ method }) => method === 'PUT'); expect(writes).toHaveLength(1); expect(writes[0].body).toMatchObject({ tenantId: 'synthetic-tenant', workspaceId: 'synthetic-workspace', databaseName: 'app_db', schemaName: 'public', dryRun: true, executionMode: 'preview' });
       await button(p, 'close', p.page.getByTestId('pg-preview')).click(); await expect(button(p, 'preview')).toBeFocused();
     }
@@ -105,7 +109,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await h.open(); await table(p); await check.assertAccessibility(p);
     const start = h.calls.length; await tab(p, 'columns').focus(); await p.page.keyboard.press('ArrowRight'); await expect(tab(p, 'indexes')).toBeFocused(); expect(h.calls).toHaveLength(start);
     const crumb = p.page.getByRole('navigation', { name: copy(p).navigation }).getByRole('button', { name: 'app_db', exact: true }); await crumb.focus(); await p.page.keyboard.press('Enter'); await expect(p.page.getByRole('navigation', { name: copy(p).navigation }).locator('[aria-current="page"]')).toBeFocused(); expect(h.calls).toHaveLength(start);
-    await button(p, 'newDatabase').click(); await check.assertAccessibility(p); await p.page.keyboard.press('Escape'); await expect(button(p, 'newDatabase')).toBeFocused(); await check.assertLocale(p);
+    await button(p, 'newDatabase').click(); await check.assertAccessibility(p); await p.page.keyboard.press('Escape'); await expect(button(p, 'newDatabase')).toBeFocused(); await assertPostgresLocale(p);
   });
   test('runtime-health', async ({ parity: p }) => {
     await h.open(); await ready(p); if (width < 1024) await p.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click(); await p.page.getByRole('link', { name: /PostgreSQL/ }).click(); await ready(p);

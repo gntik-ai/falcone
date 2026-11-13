@@ -33,3 +33,30 @@ Small result summaries are recorded above. The following digests identify local 
 - Typecheck: `postgres-typecheck-commit.log`, SHA256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
 - Rollback negative control (six expected failures, three files): `postgres-negative.log`, SHA256 `55a2b5b34990488f8860019cce4f8cc003abec21f1edcd466a9780e51ba90291`.
 - Browser discovery (96 checks, two files): `postgres-browser-discovery-final.log`, SHA256 `1abd8d7ae9b750d19268f23d758cd8a6e7c19f32332e9a1141a18bdb257d28f2`.
+
+## CI repair: PostgreSQL locale assertions
+
+The shard-4 CI failures are the red evidence. The new page spec incorrectly used the shared locale heuristic on legacy data: `formatLabel('active')` produces `Active` in both locales, while `public.accounts` is a SQL lock target, not an untranslated key. A catalog audit also found the same collision for the legacy `Default` column header and the DDL categories `Create` and `Locks`.
+
+The page spec now uses a page-specific scanner, following the existing flow-designer test convention. It retains the whole-document text, accessible-name, tooltip, placeholder, labelled-by and input-value checks. Exceptions match exact fixture/catalog values only in their state cells, default-column header, DDL category badges and lock-target group. Attributes and interactive controls are always checked. The scanner does not mutate the document. Explicit data/action assertions pin the preserved values; eight unit regressions exercise the exceptions and prove that English controls, accessible labels and missing keys remain detectable, including inside the data fields.
+
+Only tests added by this ChangeSet and this evidence document change in this repair. Production code, Spanish copy, API calls, kit versions, shared checks, pre-existing tests and CI gates are unchanged. The strict-log arrival audit still finds exactly the two previously authorized fixtures: `tests/consoleWorkspaceDatabase-routing.test.tsx` and `tests/parity/pages/console-workspace-database-page.support.mjs`. The realtime tests only assert links or stub navigation and require no additional fixture.
+
+Final repair checks:
+
+- PASS: `cd apps/web-console-next && node node_modules/vitest/vitest.mjs run --maxWorkers=1 tests/consolePostgres-locale.test.tsx tests/consolePostgres.test.tsx tests/consolePostgres-routing.test.tsx tests/overview-shell.test.tsx tests/consoleObservability-routing.test.tsx tests/consoleQuotas-routing.test.tsx tests/consoleWorkspaceDatabase-routing.test.tsx` (135 tests, seven files).
+- PASS: `cd apps/web-console-next && node node_modules/typescript/bin/tsc --noEmit`.
+- PASS: `cd apps/web-console-next && node node_modules/vite/bin/vite.js build`.
+- PASS: colour lint, page-scoped i18n literal lint, matching i18n resources, parity structure validation and fixture scan.
+- PASS: Playwright discovery of the PostgreSQL and workspace-database specs (96 checks, two files).
+- PASS: lockfile/manifest audit: exactly one version per kit package; manifests, lockfile, legacy page and browser-session.mjs remain unchanged against the delivery base.
+- SKIPPED: PostgreSQL browser parity, axe, screenshots and viewport checks, workspace-database runtime-health in all six locale/viewport cases, and CSP assets: Chromium unavailable; PR CI runs them. Screenshot assessment and visual approval remain pending with the checker and operator.
+- NOT_RUN: kit validate_page; no gntik_ui MCP server was supplied. The offline Hermes snapshot and installed pinned kit were used; colour lint passed.
+
+Repair log digests:
+
+- `postgres-repair-focused.log`: SHA256 `f9ea2d8479504ffdd3945b29cce60858cd10b66369c4b97675c95563be248b3a`.
+- `postgres-repair-build.log`: SHA256 `b1122fe4062fc5bb20ea39d63c771923bc7d01edaeac836ca37aa7f37b4228fb`.
+- `postgres-repair-discovery.log`: SHA256 `8c40c1310f8a1bab1591b7fda91b1e174d296ebaf679638939f7374b03533cad`.
+
+- SKIPPED: `cd apps/web-console-next && timeout 600 node node_modules/vitest/vitest.mjs run --maxWorkers=1` reached the 600-second environment bound (exit 124), with SHELL_TEST_FIXTURES unset. It emitted no final report or identified failing file, so there was no failed-file subset to rerun. The focused 135-test run passed; PR CI must complete the normal full suite.
