@@ -4,7 +4,7 @@ import { afterEach, expect, test } from 'vitest'
 import { buildConsoleRefreshSessionFixture, buildConsoleSignupPolicyFixture, buildTenantCollectionFixture, buildWorkspaceCollectionFixture } from '@in-falcone/console-api/fixtures'
 import { readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import { App } from '../src/App'
-import { appRoutes } from '../src/router'
+import { appRoutes, pendingRouteElement } from '../src/router'
 import FixtureRoutes from '../src/shell/fixtures/FixtureRoutes'
 import { pendingConsoleRoutes } from '../src/shell/routes'
 import { isMigratedRoute } from '../src/shell/navigation'
@@ -70,8 +70,8 @@ test.each(['direct', 'link', 'navigate'])('rollback of the branch and flag leave
   const quotas = children.find((route) => route.path === 'quotas')!
   const flag = pendingConsoleRoutes.find((route) => route.path === 'quotas')!
   const element = quotas.element, migrated = flag.migrated
-  // Removing the quotas branch yields the same unguarded pending element as postgres.
-  quotas.element = children.find((route) => route.path === 'postgres')!.element
+  // Removing the quotas branch yields the shared unguarded pending element.
+  quotas.element = pendingRouteElement()
   flag.migrated = false
   children.push(fixture)
   try {

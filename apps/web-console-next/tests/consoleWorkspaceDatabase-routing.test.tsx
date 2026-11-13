@@ -4,7 +4,7 @@ import { afterEach, expect, test } from 'vitest'
 import { buildConsoleRefreshSessionFixture, buildConsoleSignupPolicyFixture, buildTenantCollectionFixture, buildWorkspaceCollectionFixture } from '@in-falcone/console-api/fixtures'
 import { readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import { App } from '../src/App'
-import { appRoutes } from '../src/router'
+import { appRoutes, pendingRouteElement } from '../src/router'
 import { pendingConsoleRoutes } from '../src/shell/routes'
 import { isMigratedRoute } from '../src/shell/navigation'
 import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
@@ -24,7 +24,7 @@ test.each(['tenant_viewer', 'tenant_owner', 'superadmin'])('authenticated %s rea
   expect(dbCalls()).toEqual([{ method: 'GET', path: databasePath, body: undefined }]); expect(isMigratedRoute('/console/database')).toBe(true)
 })
 test('sidebar arrival stays in-app and sends one read', async () => {
-  login(); requests = strictFetch({ ...shell(), [`GET ${databasePath}`]: { database: record } }); open('/console/postgres')
+  login(); requests = strictFetch({ ...shell(), 'GET /v1/postgres/databases?page%5Bsize%5D=100': { items: [], page: {} }, [`GET ${databasePath}`]: { database: record } }); open('/console/postgres')
   const link = await screen.findByRole('link', { name: 'DB del área de trabajo' }, { timeout: 10000 })
   expect(link.getAttribute('href')).toBe('/console/database'); fireEvent.click(link)
   await screen.findByText(record.database_name); expect(screen.getByLabelText('Current location')).toHaveTextContent('/console/database'); expect(dbCalls()).toHaveLength(1)
@@ -70,7 +70,7 @@ test('rolling back the route flag makes navigation pending and sends no database
   const children = appRoutes.find(({ path }) => path === '/console')!.children!
   const page = children.find(({ path }) => path === 'database')!, flag = pendingConsoleRoutes.find(({ path }) => path === 'database')!
   const element = page.element, migrated = flag.migrated
-  page.element = children.find(({ path }) => path === 'postgres')!.element; flag.migrated = false
+  page.element = pendingRouteElement(); flag.migrated = false
   try { open(); await screen.findByRole('heading', { name: 'Página pendiente' }, { timeout: 10000 }); expect(dbCalls()).toEqual([]); expect(isMigratedRoute('/console/database')).toBe(false) }
   finally { page.element = element; flag.migrated = migrated }
 })
