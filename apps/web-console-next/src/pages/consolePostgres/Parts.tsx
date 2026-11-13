@@ -17,10 +17,10 @@ export function Empty({ title }: { title: string }) {
 export function Loading({ label }: { label: string }) {
   return <div role="status" aria-label={label} aria-busy={true}><TableSkeleton rows={3} columns={3} label={label} className="min-w-0" /></div>
 }
-export function FailureView({ failure, message, retry }: { failure: Failure; message: string; retry: () => void }) {
+export function FailureView({ failure, message, retry, retryAllStatuses = false }: { failure: Failure; message: string; retry: () => void; retryAllStatuses?: boolean }) {
   const { t } = useCopy()
-  if (failure.status === 403) return <NoAccessEmpty resource="" owner="" onRequestAccess={undefined} showRequestAccess={false} action={undefined} defaultRequested={false} titleAs="h3" bordered={false} className="min-w-0" labels={{ title: () => t('noAccess'), description: () => t('noAccessDescription'), request: '', requested: '', sent: '' }} />
-  if (failure.status === 404) return <NotFoundEmpty icon={undefined} title={t('notFound')} description={t('notFoundDescription')} action={null} titleAs="h3" bordered={false} className="min-w-0" />
+  if (!retryAllStatuses && failure.status === 403) return <NoAccessEmpty resource="" owner="" onRequestAccess={undefined} showRequestAccess={false} action={undefined} defaultRequested={false} titleAs="h3" bordered={false} className="min-w-0" labels={{ title: () => t('noAccess'), description: () => t('noAccessDescription'), request: '', requested: '', sent: '' }} />
+  if (!retryAllStatuses && failure.status === 404) return <NotFoundEmpty icon={undefined} title={t('notFound')} description={t('notFoundDescription')} action={null} titleAs="h3" bordered={false} className="min-w-0" />
   return <ErrorPanel title={message} message={t(failure.status == null ? 'networkError' : 'serverError')} code={failure.status ?? null} requestId={failure.requestId ?? ''} details="" secondaryAction={null} titleAs="h3" announce={true} retryLabel={t('retry')} retrying={false} onRetry={retry} className="min-w-0"
     labels={{ title: message, message: t('serverError'), support: t('support'), retry: t('retry'), retrying: t('retrying'), retryingStatus: t('retrying'), requestId: t('requestId'), copyRequestId: t('copyRequestId'), copied: t('copied'), requestIdCopied: t('copied'), details: t('details') }} />
 }

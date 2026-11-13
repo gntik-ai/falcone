@@ -122,8 +122,8 @@ test('workspace required: loading sends no schemas GET', async () => {
   expect(screen.getByRole('status', { name: es.workspaceLoading })).toBeVisible()
   expect(server.mock.mock.calls.map(([path]) => path)).toEqual([pg.base + pg.query])
 })
-test('workspace required: error retry calls reloadWorkspaces and sends one shell workspace GET', async () => {
-  context.value = { ...context.value, activeWorkspaceId: null, error: { status: 500 }, reloadWorkspaces: vi.fn(async () => { await fetch(workspaceUrl('t-1'), { method: 'GET' }) }) }
+test.each([403, 404, 500])('workspace required: %s retry calls reloadWorkspaces and sends one shell workspace GET', async (status) => {
+  context.value = { ...context.value, activeWorkspaceId: null, error: { status }, reloadWorkspaces: vi.fn(async () => { await fetch(workspaceUrl('t-1'), { method: 'GET' }) }) }
   serve({ [`GET ${workspaceUrl('t-1')}`]: { items: [] } }); open(); await selectDatabase()
   click(es.retry)
   await waitFor(() => expect(context.value.reloadWorkspaces).toHaveBeenCalledTimes(1))
