@@ -1,5 +1,5 @@
-import { lazy, Suspense, type ComponentType } from 'react'
-import { Outlet, type RouteObject, useRoutes } from 'react-router-dom'
+import { lazy, Suspense, type ComponentType, type ReactNode } from 'react'
+import { Outlet, type RouteObject, useLocation, useRoutes } from 'react-router-dom'
 import { StatusPage } from './StatusPage'
 import { ProtectedRoute } from './shell/session'
 import { Shell } from './shell/Shell'
@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { RouteState, ShellErrorBoundary } from './shell/RouteState'
 import { SignupFeedbackLayout } from './pages/signupFeedback'
 import { pendingConsoleRoutes } from './shell/routes'
+import { isMigratedRoute } from './shell/navigation'
 import { SecretsGuard } from './pages/consoleWorkspaceSecrets/guard'
 
 declare const __SHELL_TEST_FIXTURES__: boolean
@@ -54,6 +55,14 @@ function lazyPage(_namespace: string, load: () => Promise<{ default: ComponentTy
   return <Page />
 }
 
+const postgresRollbackPage = lazyPage('pendingPage', () => import('./pages/pendingPage'))
+
+// A cached route element must still honor the active route's migration kill switch.
+function PostgresMigrationBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+  return isMigratedRoute(pathname) ? children : postgresRollbackPage
+}
+
 export const appRoutes: RouteObject[] = [
   {
     element: <Outlet />,
@@ -83,7 +92,7 @@ export const appRoutes: RouteObject[] = [
       { index: true, element: <ConsoleIndexRedirect /> },
       { path: 'operations/:operationId', element: lazyPage('operationDetail', () => import('./pages/operationDetail')) },
       ...pendingConsoleRoutes.map(({ guard, ...route }) => {
-        if (route.path === 'postgres' && route.migrated) return { ...route, element: lazyPage('pages.console-postgres-page', () => import('./pages/consolePostgres')) }
+        if (route.path === 'postgres' && route.migrated) return { ...route, element: <PostgresMigrationBoundary>{lazyPage('pages.console-postgres-page', () => import('./pages/consolePostgres'))}</PostgresMigrationBoundary> }
         if (route.path === 'operations') return { ...route, element: lazyPage('pages.console-operations-page', () => import('./pages/consoleOperations')) }
         if (route.path === 'tenants') return { ...route, element: lazyPage('pages.console-tenants-page', () => import('./pages/consoleTenants')) }
         if (route.path === 'overview') return { ...route, element: lazyPage('pages.console-overview-page', () => import('./pages/overview')) }
