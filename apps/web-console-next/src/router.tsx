@@ -83,6 +83,7 @@ export const appRoutes: RouteObject[] = [
       { index: true, element: <ConsoleIndexRedirect /> },
       { path: 'operations/:operationId', element: lazyPage('operationDetail', () => import('./pages/operationDetail')) },
       ...pendingConsoleRoutes.map(({ guard, ...route }) => {
+        if (route.path === 'postgres' && route.migrated) return { ...route, element: lazyPage('pages.console-postgres-page', () => import('./pages/consolePostgres')) }
         if (route.path === 'operations') return { ...route, element: lazyPage('pages.console-operations-page', () => import('./pages/consoleOperations')) }
         if (route.path === 'tenants') return { ...route, element: lazyPage('pages.console-tenants-page', () => import('./pages/consoleTenants')) }
         if (route.path === 'overview') return { ...route, element: lazyPage('pages.console-overview-page', () => import('./pages/overview')) }
