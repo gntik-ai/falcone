@@ -136,3 +136,57 @@ export function getWorkspaceConsumption(workspaceId: string, signal?: AbortSigna
   return requestConsoleSessionJson<WorkspaceConsumptionResponse>(
     `/v1/workspaces/${encodeURIComponent(workspaceId)}/consumption`, { method: 'GET', signal })
 }
+
+// Workspace database: identical to the legacy page requests, including empty mutation bodies.
+export interface WorkspaceDatabaseRecord {
+  id: string
+  workspace_id: string
+  tenant_id: string
+  database_name: string
+  engine: string
+  mode: string
+  username: string
+  host: string
+  port: number
+  status: string
+  created_at: string
+}
+
+export interface DatabaseConnection {
+  mode: string
+  engine: string
+  database: string
+  host: string
+  port: number
+  username: string
+  password: string | null
+  passwordHint: string | null
+  dsn: string
+  sslmode: string
+}
+
+export interface ProvisionResponse {
+  database: WorkspaceDatabaseRecord
+  connection: DatabaseConnection
+  sagaId?: string
+}
+
+export interface GetResponse {
+  database: WorkspaceDatabaseRecord
+}
+
+export interface RotateResponse {
+  databaseId: string
+  rotated: boolean
+  reason?: string
+  mode?: string
+  database?: string
+  username?: string
+  password?: string
+  dsn?: string
+}
+
+const workspaceDatabasePath = (workspaceId: string) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/database`
+export const getWorkspaceDatabase = (workspaceId: string) => requestConsoleSessionJson<GetResponse>(workspaceDatabasePath(workspaceId))
+export const provisionWorkspaceDatabase = (workspaceId: string) => requestConsoleSessionJson<ProvisionResponse>(workspaceDatabasePath(workspaceId), { method: 'POST', body: {} })
+export const rotateWorkspaceDatabaseCredential = (workspaceId: string) => requestConsoleSessionJson<RotateResponse>(`${workspaceDatabasePath(workspaceId)}/credential-rotations`, { method: 'POST', body: {} })

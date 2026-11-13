@@ -13,7 +13,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'overview', migrated: true },
   { path: 'tenants' },
   { path: 'workspaces', migrated: true },
-  { path: 'database' },
+  { path: 'database', migrated: true },
   { path: 'functions-registry', migrated: true },
   { path: 'iam-access', migrated: true, guard: 'superadmin' },
   { path: 'members', migrated: true },

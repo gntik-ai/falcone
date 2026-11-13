@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { loginSession, recordFetch, withSession } from './support.mjs'
 
 export const clientCases = [
-  ['all exported clients use exactly the auth, shell, IAM membership and quota METHOD+path contracts', () => withSession(async () => {
+  ['all exported clients use exactly the auth, shell, IAM membership, database and quota METHOD+path contracts', () => withSession(async () => {
     const clients = await import('@in-falcone/console-api/clients')
     const { persistConsoleShellSession } = await import('@in-falcone/console-api/session')
     persistConsoleShellSession(loginSession())
@@ -16,6 +16,7 @@ export const clientCases = [
       createConsolePasswordRecoveryRequest: [{ usernameOrEmail: 'synthetic@example.test' }],
       getConsoleAccountStatusView: ['active'],
       getWorkspaceConsumption: ['synthetic-workspace'],
+      getWorkspaceDatabase: ['synthetic-workspace'], provisionWorkspaceDatabase: ['synthetic-workspace'], rotateWorkspaceDatabaseCredential: ['synthetic-workspace'],
       listTenants: [], getTenant: ['synthetic-tenant'], listWorkspaces: ['synthetic-tenant'],
       assignIamUserRoles: ['synthetic-realm', 'synthetic-user', ['synthetic-reader']],
       removeIamUserRoles: ['synthetic-realm', 'synthetic-user', ['synthetic-reader']],
@@ -27,7 +28,7 @@ export const clientCases = [
     }
     assert.deepEqual(Object.keys(clients).sort(), Object.keys(calls).sort())
     for (const [name, args] of Object.entries(calls)) await clients[name](...args)
-    assert.equal(requests.length, 21)
+    assert.equal(requests.length, 24)
     for (const { url } of requests) {
       assert.ok(url.startsWith('/v1/'), url)
       assert.equal(url.includes('://'), false, url)
@@ -37,6 +38,8 @@ export const clientCases = [
       'POST /v1/auth/login-sessions/synthetic-session/refresh', 'DELETE /v1/auth/login-sessions/synthetic-session',
       'POST /v1/auth/signups', 'POST /v1/auth/password-recovery-requests', 'GET /v1/auth/status-views/active',
       'GET /v1/workspaces/synthetic-workspace/consumption',
+      'GET /v1/workspaces/synthetic-workspace/database', 'POST /v1/workspaces/synthetic-workspace/database',
+      'POST /v1/workspaces/synthetic-workspace/database/credential-rotations',
       'GET /v1/tenants', 'GET /v1/tenants/synthetic-tenant', 'GET /v1/workspaces',
       'POST /v1/iam/realms/synthetic-realm/users/synthetic-user/role-assignments',
       'DELETE /v1/iam/realms/synthetic-realm/users/synthetic-user/role-assignments',
@@ -46,6 +49,12 @@ export const clientCases = [
       'GET /v1/metrics/workspaces/synthetic-workspace/quotas', 'GET /v1/metrics/workspaces/synthetic-workspace/overview',
       'GET /v1/tenants/synthetic-tenant/plan', 'PUT /v1/plans/synthetic-plan/limits/max_workspaces'
     ].sort())
+    const databaseCalls = requests.filter(({ url }) => url.includes('/database'))
+    assert.deepEqual(databaseCalls.map(({ method, url, body }) => ({ method, url, body })), [
+      { method: 'GET', url: '/v1/workspaces/synthetic-workspace/database', body: undefined },
+      { method: 'POST', url: '/v1/workspaces/synthetic-workspace/database', body: '{}' },
+      { method: 'POST', url: '/v1/workspaces/synthetic-workspace/database/credential-rotations', body: '{}' }
+    ])
     const quotaReads = requests.slice(-6, -1)
     assert.equal(quotaReads.length, 5)
     for (const request of quotaReads) {

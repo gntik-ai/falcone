@@ -70,8 +70,8 @@ test.each(['direct', 'link', 'navigate'])('rollback of the branch and flag leave
   const quotas = children.find((route) => route.path === 'quotas')!
   const flag = pendingConsoleRoutes.find((route) => route.path === 'quotas')!
   const element = quotas.element, migrated = flag.migrated
-  // Removing the quotas branch yields the same unguarded pending element as database.
-  quotas.element = children.find((route) => route.path === 'database')!.element
+  // Removing the quotas branch yields the same unguarded pending element as postgres.
+  quotas.element = children.find((route) => route.path === 'postgres')!.element
   flag.migrated = false
   children.push(fixture)
   try {
