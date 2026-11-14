@@ -48,6 +48,16 @@ export const fixtures = {
 
 export default {
   route: '/console/postgres/data', roles: ['tenant_owner', 'tenant_viewer'],
-  fixtures: ['pg-rows-page1', 'pg-rows-page2', 'pg-rows-empty', 'pg-rows-filtered', 'pg-rows-after-insert', 'pg-rows-after-patch', 'pg-rows-after-delete', 'pg-rows-preview-apikey', 'pg-row-insert-ok', 'pg-row-patch-ok', 'pg-row-delete-ok', 'pg-api-keys', 'pg-api-keys-empty', 'pg-api-keys-after-revoke', 'pg-api-key-revoke-ok', 'pg-api-key-issue-anon', 'pg-api-key-issue-service', 'pg-rows-delayed', 'pg-api-keys-delayed', 'pg-rows-401', 'pg-rows-403', 'pg-api-keys-403', 'pg-rows-404', 'pg-rows-500', 'pg-rows-network', 'pg-rows-500-then-ok', 'pg-api-keys-500-then-ok', 'pg-row-insert-500', 'pg-row-insert-slow', 'pg-row-patch-slow', 'pg-rows-preview-slow'],
+  fixtures: [
+    'pg-rows-page1', 'pg-rows-page2', 'pg-rows-empty', 'pg-rows-filtered',
+    'pg-rows-after-insert', 'pg-rows-after-patch', 'pg-rows-after-delete', 'pg-rows-preview-apikey',
+    'pg-row-insert-ok', 'pg-row-patch-ok', 'pg-row-delete-ok', 'pg-rows-delayed',
+    'pg-rows-401', 'pg-rows-403', 'pg-rows-404', 'pg-rows-500',
+    'pg-rows-network', 'pg-rows-500-then-ok', 'pg-row-insert-500', 'pg-row-insert-slow',
+    'pg-row-patch-slow', 'pg-rows-preview-slow',
+    'pg-api-keys', 'pg-api-keys-empty', 'pg-api-keys-after-revoke', 'pg-api-key-revoke-ok',
+    'pg-api-key-issue-anon', 'pg-api-key-issue-service', 'pg-api-keys-delayed', 'pg-api-keys-403',
+    'pg-api-keys-500-then-ok',
+  ],
   sources: ['src/pages/consolePostgresData.tsx', 'src/pages/consolePostgresData'], data: [{ name: 'rows', locator: '[data-testid="postgres-data-page"] table' }], actions: [], states: [], endpoints: {},
 } satisfies import('../manifest').ParityManifest
