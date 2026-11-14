@@ -1,0 +1,185 @@
+{
+  "title": "Editor de datos",
+  "description": "Consulta y edita filas de tablas, y emite claves API para tus aplicaciones.",
+  "category": "Datos PostgreSQL",
+  "targetLabel": "Tabla de destino",
+  "editorLabel": "Editor de datos Postgres",
+  "fields": {
+    "database": "Base de datos",
+    "schema": "Esquema",
+    "table": "Tabla"
+  },
+  "placeholders": {
+    "database": "app_db",
+    "schema": "public",
+    "table": "accounts"
+  },
+  "prompt": "Introduce una base de datos y una tabla para comenzar.",
+  "workspace": {
+    "required": "Selecciona un área de trabajo",
+    "description": "Selecciona un área de trabajo para editar datos.",
+    "loading": "Cargando áreas de trabajo",
+    "loadingDescription": "Consultando las áreas de trabajo accesibles de la organización activa.",
+    "picker": "Seleccionar área de trabajo",
+    "placeholder": "Selecciona un área de trabajo…",
+    "create": "Crear área de trabajo",
+    "denied": "Esta organización todavía no tiene áreas de trabajo. Pide a un propietario o administrador de la organización (o del área de trabajo) que cree la primera."
+  },
+  "filters": {
+    "title": "Filtros",
+    "active": "Filtros activos",
+    "column": "Columna",
+    "operator": "Operador",
+    "value": "Valor",
+    "valueList": "Valor (separado por comas)",
+    "add": "Añadir filtro",
+    "remove": "Quitar filtro {filter}"
+  },
+  "operators": {
+    "eq": "eq",
+    "neq": "neq",
+    "gt": "gt",
+    "gte": "gte",
+    "lt": "lt",
+    "lte": "lte",
+    "like": "like",
+    "ilike": "ilike",
+    "in": "in"
+  },
+  "rows": {
+    "title": "Filas",
+    "titleCount": "Filas ({total})",
+    "loading": "Cargando filas…",
+    "empty": "Todavía no hay filas.",
+    "emptyDescription": "Inserta la primera fila con el formulario de abajo.",
+    "tableLabel": "Filas de la tabla",
+    "editAria": "Editar fila {id}",
+    "deleteAria": "Eliminar fila {id}"
+  },
+  "pager": {
+    "label": "Paginación",
+    "size": "Tamaño de página",
+    "previous": "Anterior",
+    "next": "Siguiente"
+  },
+  "insert": {
+    "title": "Insertar fila",
+    "description": "Crea una fila nueva a partir de un objeto JSON.",
+    "label": "Fila nueva (JSON)",
+    "submit": "Insertar"
+  },
+  "edit": "Editar",
+  "deleteConfirm": {
+    "title": "Eliminar fila",
+    "description": "Se eliminará de forma permanente la fila {id}.",
+    "consequence1": "La fila desaparece de la tabla.",
+    "consequence2": "No hay ninguna acción para recuperarla.",
+    "confirm": "Eliminar fila"
+  },
+  "confirm": {
+    "typeLabel": "Escribe {text} para confirmar",
+    "instruction": "El botón se activa cuando el texto coincide exactamente.",
+    "mismatch": "El texto no coincide.",
+    "irreversible": "Esta acción no se puede deshacer."
+  },
+  "keys": {
+    "title": "Claves API",
+    "description": "Emite claves anónimas o de servicio para tus aplicaciones y revócalas cuando ya no se usen.",
+    "issueAnon": "Emitir clave anónima",
+    "issueService": "Emitir clave de servicio",
+    "loading": "Cargando claves API…",
+    "empty": "Todavía no hay claves API.",
+    "emptyDescription": "Emite una clave anónima o de servicio con los botones de arriba.",
+    "tableLabel": "Claves API del área de trabajo",
+    "prefix": "Prefijo",
+    "type": "Tipo",
+    "status": "Estado",
+    "types": {
+      "anon": "Anónima",
+      "service": "Servicio"
+    },
+    "statuses": {
+      "active": "Activa",
+      "revoked": "Revocada"
+    },
+    "revoke": "Revocar",
+    "revokeAria": "Revocar clave {prefix}",
+    "revokeTitle": "Revocar clave API",
+    "revokeDescription": "Se revocará de forma permanente la clave {prefix}.",
+    "revokeConsequence1": "Las aplicaciones que la usen dejarán de funcionar.",
+    "revokeConsequence2": "Una clave revocada no se puede restaurar.",
+    "revokeConfirm": "Revocar clave",
+    "revoked": "Clave revocada",
+    "issuedAnnounce": "Clave emitida. Cópiala ahora.",
+    "revealTitle": "Clave {type} emitida",
+    "revealDescription": "Usa esta clave en tus aplicaciones con la cabecera apikey.",
+    "onceTitle": "Se muestra una sola vez",
+    "once": "Copia esta clave ahora; no volverá a mostrarse.",
+    "keyLabel": "Clave emitida",
+    "show": "Mostrar clave",
+    "hide": "Ocultar clave",
+    "copy": "Copiar clave",
+    "copiedButton": "Copiada",
+    "copied": "Clave copiada",
+    "integration": "Integración con la clave emitida",
+    "fetchSnippet": "Fragmento fetch",
+    "curlSnippet": "Fragmento curl",
+    "preview": "Ejecutar vista previa de solo lectura",
+    "previewRegion": "Vista previa de embed",
+    "previewCount": "Vista previa con esta clave: {count, plural, one {# fila} other {# filas}}.",
+    "previewTable": "Vista previa de filas con la clave emitida",
+    "previewEmpty": "La vista previa no devolvió filas."
+  },
+  "resources": {
+    "rows": "las filas",
+    "keys": "las claves API",
+    "workspace": "las áreas de trabajo"
+  },
+  "noAccess": "No tienes acceso",
+  "noAccessDescription": {
+    "rows": "No tienes permiso para ver las filas de esta tabla.",
+    "keys": "No tienes permiso para ver las claves API de esta área de trabajo.",
+    "workspace": "No tienes permiso para ver las áreas de trabajo."
+  },
+  "notFound": "No se encontró la tabla",
+  "notFoundDescription": "La base de datos, el esquema o la tabla indicados no existen en esta área de trabajo.",
+  "back": "Volver",
+  "errors": {
+    "rows": "No se pudieron cargar las filas",
+    "keys": "No se pudieron cargar las claves API",
+    "workspace": "No se pudieron cargar las áreas de trabajo"
+  },
+  "serverError": "El servidor no pudo completar la solicitud. Inténtalo de nuevo.",
+  "networkError": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.",
+  "retry": "Reintentar",
+  "retrying": "Reintentando…",
+  "support": "Contactar con soporte",
+  "requestId": "ID de solicitud",
+  "copyRequestId": "Copiar ID de solicitud",
+  "details": "Detalles técnicos",
+  "errorTitle": "No se pudo completar la acción",
+  "requestFailed": "La solicitud falló",
+  "jsonInvalid": "JSON no válido",
+  "jsonObjectExpected": "Se esperaba un objeto JSON",
+  "newRowError": "Fila nueva: {reason}",
+  "editRowError": "Fila editada: {reason}",
+  "missingKeyEdit": "La fila no tiene clave primaria \"id\" para editarla",
+  "missingKeyDelete": "La fila no tiene clave primaria \"id\" para eliminarla",
+  "inserted": "Fila insertada",
+  "updated": "Fila actualizada",
+  "deleted": "Fila eliminada",
+  "actions": "Acciones",
+  "delete": "Eliminar",
+  "save": "Guardar",
+  "cancel": "Cancelar",
+  "close": "Cerrar",
+  "copyFailed": "No se pudo copiar",
+  "notifications": "Notificaciones",
+  "closeToast": "Cerrar notificación",
+  "editDrawer": {
+    "title": "Editar fila {id}",
+    "description": "Modifica los campos de la fila. La clave primaria id no se envía.",
+    "label": "Fila (JSON)"
+  },
+  "copied": "Copiado"
+}

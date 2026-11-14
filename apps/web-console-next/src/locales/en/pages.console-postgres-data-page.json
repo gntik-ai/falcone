@@ -1,0 +1,185 @@
+{
+  "title": "Data editor",
+  "description": "Browse and edit table rows, and issue API keys for your applications.",
+  "category": "PostgreSQL data",
+  "targetLabel": "Target table",
+  "editorLabel": "Postgres data editor",
+  "fields": {
+    "database": "Database",
+    "schema": "Schema",
+    "table": "Table"
+  },
+  "placeholders": {
+    "database": "app_db",
+    "schema": "public",
+    "table": "accounts"
+  },
+  "prompt": "Enter a database and a table to get started.",
+  "workspace": {
+    "required": "Select a workspace",
+    "description": "Select a workspace to edit data.",
+    "loading": "Loading workspaces",
+    "loadingDescription": "Fetching the workspaces available to the active organization.",
+    "picker": "Select workspace",
+    "placeholder": "Select a workspace…",
+    "create": "Create workspace",
+    "denied": "This organization has no workspaces yet. Ask an organization or workspace owner or administrator to create the first one."
+  },
+  "filters": {
+    "title": "Filters",
+    "active": "Active filters",
+    "column": "Column",
+    "operator": "Operator",
+    "value": "Value",
+    "valueList": "Value (comma separated)",
+    "add": "Add filter",
+    "remove": "Remove filter {filter}"
+  },
+  "operators": {
+    "eq": "eq",
+    "neq": "neq",
+    "gt": "gt",
+    "gte": "gte",
+    "lt": "lt",
+    "lte": "lte",
+    "like": "like",
+    "ilike": "ilike",
+    "in": "in"
+  },
+  "rows": {
+    "title": "Rows",
+    "titleCount": "Rows ({total})",
+    "loading": "Loading rows…",
+    "empty": "There are no rows yet.",
+    "emptyDescription": "Insert the first row with the form below.",
+    "tableLabel": "Table rows",
+    "editAria": "Edit row {id}",
+    "deleteAria": "Delete row {id}"
+  },
+  "pager": {
+    "label": "Pagination",
+    "size": "Page size",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "insert": {
+    "title": "Insert row",
+    "description": "Create a new row from a JSON object.",
+    "label": "New row (JSON)",
+    "submit": "Insert"
+  },
+  "edit": "Edit",
+  "deleteConfirm": {
+    "title": "Delete row",
+    "description": "Row {id} will be deleted permanently.",
+    "consequence1": "The row disappears from the table.",
+    "consequence2": "There is no action to recover it.",
+    "confirm": "Delete row"
+  },
+  "confirm": {
+    "typeLabel": "Type {text} to confirm",
+    "instruction": "The button unlocks when the text matches exactly.",
+    "mismatch": "The text does not match.",
+    "irreversible": "This action cannot be undone."
+  },
+  "keys": {
+    "title": "API keys",
+    "description": "Issue anon or service keys for your applications and revoke them when they are no longer used.",
+    "issueAnon": "Issue anon key",
+    "issueService": "Issue service key",
+    "loading": "Loading API keys…",
+    "empty": "There are no API keys yet.",
+    "emptyDescription": "Issue an anon or service key with the buttons above.",
+    "tableLabel": "Workspace API keys",
+    "prefix": "Prefix",
+    "type": "Type",
+    "status": "Status",
+    "types": {
+      "anon": "Anon",
+      "service": "Service"
+    },
+    "statuses": {
+      "active": "Active",
+      "revoked": "Revoked"
+    },
+    "revoke": "Revoke",
+    "revokeAria": "Revoke key {prefix}",
+    "revokeTitle": "Revoke API key",
+    "revokeDescription": "Key {prefix} will be revoked permanently.",
+    "revokeConsequence1": "Applications that use it stop working.",
+    "revokeConsequence2": "A revoked key cannot be restored.",
+    "revokeConfirm": "Revoke key",
+    "revoked": "Key revoked",
+    "issuedAnnounce": "Key issued. Copy it now.",
+    "revealTitle": "{type} key issued",
+    "revealDescription": "Use this key in your applications with the apikey header.",
+    "onceTitle": "Shown only once",
+    "once": "Copy this key now; it will not be shown again.",
+    "keyLabel": "Issued key",
+    "show": "Show key",
+    "hide": "Hide key",
+    "copy": "Copy key",
+    "copiedButton": "Copied",
+    "copied": "Key copied",
+    "integration": "Integration with the issued key",
+    "fetchSnippet": "fetch snippet",
+    "curlSnippet": "curl snippet",
+    "preview": "Run read-only preview",
+    "previewRegion": "Embed preview",
+    "previewCount": "Preview with this key: {count, plural, one {# row} other {# rows}}.",
+    "previewTable": "Preview rows with the issued key",
+    "previewEmpty": "The preview returned no rows."
+  },
+  "resources": {
+    "rows": "the rows",
+    "keys": "the API keys",
+    "workspace": "the workspaces"
+  },
+  "noAccess": "You do not have access",
+  "noAccessDescription": {
+    "rows": "You do not have permission to view the rows of this table.",
+    "keys": "You do not have permission to view the API keys of this workspace.",
+    "workspace": "You do not have permission to view the workspaces."
+  },
+  "notFound": "Table not found",
+  "notFoundDescription": "The database, schema or table you entered does not exist in this workspace.",
+  "back": "Back",
+  "errors": {
+    "rows": "Rows could not be loaded",
+    "keys": "API keys could not be loaded",
+    "workspace": "Workspaces could not be loaded"
+  },
+  "serverError": "The server could not complete the request. Try again.",
+  "networkError": "The server could not be reached. Check your connection and try again.",
+  "retry": "Retry",
+  "retrying": "Retrying…",
+  "support": "Contact support",
+  "requestId": "Request ID",
+  "copyRequestId": "Copy request ID",
+  "details": "Technical details",
+  "errorTitle": "The action could not be completed",
+  "requestFailed": "The request failed",
+  "jsonInvalid": "Not valid JSON",
+  "jsonObjectExpected": "Expected a JSON object",
+  "newRowError": "New row: {reason}",
+  "editRowError": "Edited row: {reason}",
+  "missingKeyEdit": "The row has no primary key \"id\" to edit it",
+  "missingKeyDelete": "The row has no primary key \"id\" to delete it",
+  "inserted": "Row inserted",
+  "updated": "Row updated",
+  "deleted": "Row deleted",
+  "actions": "Actions",
+  "delete": "Delete",
+  "save": "Save",
+  "cancel": "Cancel",
+  "close": "Close",
+  "copyFailed": "Copy failed",
+  "notifications": "Notifications",
+  "closeToast": "Close notification",
+  "editDrawer": {
+    "title": "Edit row {id}",
+    "description": "Change the row fields. The id primary key is not sent.",
+    "label": "Row (JSON)"
+  },
+  "copied": "Copied"
+}

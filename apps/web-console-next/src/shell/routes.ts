@@ -27,7 +27,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'auth', migrated: true, guard: 'superadmin' },
   { path: 'auth-config', migrated: true },
   { path: 'postgres', migrated: true },
-  { path: 'postgres/data' },
+  { path: 'postgres/data', migrated: true },
   { path: 'mongo' },
   { path: 'mongo/data' },
   { path: 'kafka' },
