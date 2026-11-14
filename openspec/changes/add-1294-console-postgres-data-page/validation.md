@@ -14,6 +14,14 @@ Local results of the final source, recorded by the maker. Browser journeys canno
 - PASS: `openspec validate add-1294-console-postgres-data-page --strict`.
 - PASS: `package.json` and `pnpm-lock.yaml` are unchanged; `tests/browser-session.mjs` and `tests/csp/assets.spec.mjs` are unchanged.
 
+## Parity harness corrections (checker findings on the first attempt)
+
+- The runtime-health journey reaches `/console/postgres` through the sidebar. Its `GET /v1/postgres/databases?page[size]=100` is answered by a separately recorded navigation mock (`h.navigation`); the data page's own `h.calls` allowlist stays strict and every other request is still unmatched.
+- The rows-with-filters capture now waits for a populated table: the `pg-rows-filtered` fixture answers `id=eq.acc_01` with one row.
+- The locale scan exempts the header and cell text of the rows and preview tables, as well as the schema.table heading, so data such as `customer.name` or `example.com` is not read as a translation key. Interface copy and every accessible name stay checked.
+- `tsc --noEmit` is clean: two kit-typed props (`action`, `back`) use the kit's `primaryAction` prop type.
+- SKIPPED: Chromium parity journeys (Chromium unavailable; PR CI runs them). `playwright test --list console-postgres-data-page` registers 48 checks.
+
 ## Full suite
 
 `cd apps/web-console-next && node_modules/.bin/vitest run` (SHELL_TEST_FIXTURES unset) was run twice. Run one: 2670 passed, 2 failed

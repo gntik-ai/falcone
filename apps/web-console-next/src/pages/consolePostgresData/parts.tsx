@@ -1,4 +1,4 @@
-import { type ComponentProps, type ReactNode, type Ref } from 'react'
+import { type ComponentProps, type Ref } from 'react'
 import { Button, EmptyState, Field, FieldLabel, Input, SimpleSelect, Text } from '@gntik-ai/ui'
 import { DataTable, ErrorPanel, FirstRunEmpty, NoAccessEmpty, NoResultsEmpty, SectionHeader, TableSkeleton, type DataTableColumn } from '@gntik-ai/blocks'
 import type { Failure } from './api'
@@ -39,7 +39,7 @@ export function DataGrid<T extends object>({ rows, columns, id, label, rowLabel,
 
 type Section = 'rows' | 'keys' | 'workspace'
 // Workspace failures always keep Reintentar, 403 included. Rows and key lists show a no-access state on 403.
-export function FailureView({ error, section, retry, back }: { error: Failure; section: Section; retry: () => void; back?: ReactNode }) {
+export function FailureView({ error, section, retry, back }: { error: Failure; section: Section; retry: () => void; back?: ComponentProps<typeof EmptyState>['primaryAction'] }) {
   const { t } = useCopy()
   const noAccess = error.status === 403 && section !== 'workspace', notFound = error.status === 404 && section === 'rows'
   const title = t(noAccess ? 'noAccess' : notFound ? 'notFound' : `errors.${section}`)

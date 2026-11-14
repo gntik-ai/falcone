@@ -1,5 +1,6 @@
 import { buildConsoleRefreshSessionFixture, buildWorkspaceCollectionFixture } from '@in-falcone/console-api/fixtures';
 import { fixtures, rowsUrl } from './console-postgres-data-page.manifest.ts';
+import { fixtures as postgresFixtures, paths as postgresPaths, pageUrl as postgresPageUrl } from './console-postgres-page.manifest.ts';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
 
 export const workspace = 'synthetic-workspace';
@@ -24,7 +25,7 @@ export async function installPostgresDataHarness(parity, server) {
       }
     }, { once: true });
   });
-  const calls = [], unmatched = [], injected = [], attempts = {}, gates = {}, state = initial();
+  const calls = [], navigation = [], unmatched = [], injected = [], attempts = {}, gates = {}, state = initial();
   parity.page.on('console', (message) => {
     if (consumeResourceDiagnostic(message.text(), message.location().url, injected)) {
       const index = parity.faults.indexOf(`console.error: ${message.text()}`);
@@ -40,7 +41,10 @@ export async function installPostgresDataHarness(parity, server) {
     if (state.deleted) return fixtures['pg-rows-after-delete'];
     if (state.patched) return fixtures['pg-rows-after-patch'];
     if (state.inserted) return fixtures['pg-rows-after-insert'];
-    if ([...url.searchParams.keys()].some((key) => !['page[size]', 'page[after]', 'countMode'].includes(key))) return fixtures['pg-rows-empty'];
+    const filters = [...url.searchParams.keys()].filter((key) => !['page[size]', 'page[after]', 'countMode'].includes(key));
+    // A filter on id=eq.acc_01 matches one row; any other filter matches nothing.
+    if (filters.length === 1 && filters[0] === 'id' && url.searchParams.get('id') === 'eq.acc_01') return fixtures['pg-rows-filtered'];
+    if (filters.length) return fixtures['pg-rows-empty'];
     return fixtures['pg-rows-page1'];
   };
   await parity.page.route('**/v1/**', async (route) => {
@@ -81,6 +85,10 @@ export async function installPostgresDataHarness(parity, server) {
       record(); response = { body: fixtures[body.keyType === 'anon' ? 'pg-api-key-issue-anon' : 'pg-api-key-issue-service'] };
     } else if (method === 'DELETE' && path === `${paths.keys}/key-anon-1`) {
       record(); response = { body: fixtures['pg-api-key-revoke-ok'] }; state.revoked = true;
+    } else if (method === 'GET' && path === postgresPageUrl(postgresPaths.databases)) {
+      // Navigation target only: the /console/postgres page lists databases when the journey leaves the data page. It is
+      // recorded apart from `calls`, so the data page's own request assertions stay strict.
+      navigation.push(`${method} ${path}`); response = { body: postgresFixtures.databases };
     } else if (method === 'POST' && path === '/v1/auth/login-sessions/synthetic-session/refresh' && state.refresh) {
       record(); response = state.refresh === 'rejected' ? { status: 400, body: {} } : { body: buildConsoleRefreshSessionFixture() };
     } else if (method === 'GET' && url.pathname === '/v1/workspaces' && state.noWorkspace) {
@@ -95,7 +103,7 @@ export async function installPostgresDataHarness(parity, server) {
     if (response.network || response.status >= 400) injected.push({ url: request.url(), kind: response.network ? 'network' : String(response.status) });
     if (response.network) await route.abort('failed'); else await route.fulfill({ status: response.status ?? 200, json: response.body });
   });
-  return { calls, unmatched, state, urls, paths,
+  return { calls, navigation, unmatched, state, urls, paths,
     // Drop the recorded requests only; fixture state (inserted, patched...) stays so that later reloads show it.
     reset() { calls.length = 0; },
     hold(key) { let release; gates[key] = new Promise((resolve) => { release = resolve; }); return () => { delete gates[key]; release(); }; },

@@ -23,6 +23,7 @@ export const synthetic = { anon: 'synthetic-anon-key', service: 'synthetic-servi
 export const fixtures = {
   'pg-rows-page1': { items: pageRows(1, 25), page: { size: 25, returned: 25, after: 'c1' }, count: 60 },
   'pg-rows-page2': { items: pageRows(26, 25), page: { size: 25, returned: 25 }, count: 60 },
+  'pg-rows-filtered': { items: [accountRow(1)], page: { size: 25, returned: 1 }, count: 1 },
   'pg-rows-empty': { items: [], page: { size: 25, returned: 0 }, count: 0 },
   'pg-rows-after-insert': { items: [...pageRows(1, 24), accountRow(61, { email: 'new@example.test' })], page: { size: 25, returned: 25, after: 'c1' }, count: 61 },
   'pg-rows-after-patch': { items: [accountRow(1, { plan: 'enterprise' }), ...pageRows(2, 24)], page: { size: 25, returned: 25, after: 'c1' }, count: 60 },
@@ -47,6 +48,6 @@ export const fixtures = {
 
 export default {
   route: '/console/postgres/data', roles: ['tenant_owner', 'tenant_viewer'],
-  fixtures: ['pg-rows-page1', 'pg-rows-page2', 'pg-rows-empty', 'pg-rows-after-insert', 'pg-rows-after-patch', 'pg-rows-after-delete', 'pg-rows-preview-apikey', 'pg-row-insert-ok', 'pg-row-patch-ok', 'pg-row-delete-ok', 'pg-api-keys', 'pg-api-keys-empty', 'pg-api-keys-after-revoke', 'pg-api-key-revoke-ok', 'pg-api-key-issue-anon', 'pg-api-key-issue-service', 'pg-rows-delayed', 'pg-api-keys-delayed', 'pg-rows-401', 'pg-rows-403', 'pg-api-keys-403', 'pg-rows-404', 'pg-rows-500', 'pg-rows-network', 'pg-rows-500-then-ok', 'pg-api-keys-500-then-ok', 'pg-row-insert-500', 'pg-row-insert-slow', 'pg-row-patch-slow', 'pg-rows-preview-slow'],
+  fixtures: ['pg-rows-page1', 'pg-rows-page2', 'pg-rows-empty', 'pg-rows-filtered', 'pg-rows-after-insert', 'pg-rows-after-patch', 'pg-rows-after-delete', 'pg-rows-preview-apikey', 'pg-row-insert-ok', 'pg-row-patch-ok', 'pg-row-delete-ok', 'pg-api-keys', 'pg-api-keys-empty', 'pg-api-keys-after-revoke', 'pg-api-key-revoke-ok', 'pg-api-key-issue-anon', 'pg-api-key-issue-service', 'pg-rows-delayed', 'pg-api-keys-delayed', 'pg-rows-401', 'pg-rows-403', 'pg-api-keys-403', 'pg-rows-404', 'pg-rows-500', 'pg-rows-network', 'pg-rows-500-then-ok', 'pg-api-keys-500-then-ok', 'pg-row-insert-500', 'pg-row-insert-slow', 'pg-row-patch-slow', 'pg-rows-preview-slow'],
   sources: ['src/pages/consolePostgresData.tsx', 'src/pages/consolePostgresData'], data: [{ name: 'rows', locator: '[data-testid="postgres-data-page"] table' }], actions: [], states: [], endpoints: {},
 } satisfies import('../manifest').ParityManifest

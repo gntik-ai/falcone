@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import manifest, { fixtures, synthetic } from './console-postgres-data-page.manifest.ts';
+import { pageUrl as postgresPageUrl, paths as postgresPaths } from './console-postgres-page.manifest.ts';
 import { installPostgresDataHarness } from './console-postgres-data-page.support.mjs';
 import { assertPostgresDataLocale } from './console-postgres-data-page.locale.mjs';
 
@@ -196,7 +197,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await h.open(); await expect(p.page.getByRole('heading', { name: text(p, 'title'), exact: true })).toBeVisible();
     // Sidebar NavLink to another page, back through the NavLink, then a deep link.
     if (width < 1024) await p.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
-    await p.page.getByRole('link', { name: /PostgreSQL/ }).first().click(); await expect(p.page).toHaveURL(/\/console\/postgres$/);
+    await p.page.getByRole('link', { name: /PostgreSQL/ }).first().click(); await expect(p.page).toHaveURL(/\/console\/postgres$/); expect(h.navigation).toEqual([`GET ${postgresPageUrl(postgresPaths.databases)}`]);
     if (width < 1024) await p.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
     await p.page.getByRole('link', { name: locale === 'es' ? /Datos: Postgres/ : /Data: Postgres/ }).first().click(); await expect(p.page).toHaveURL(/\/console\/postgres\/data$/);
     await enter(p); await loaded(p);
@@ -217,7 +218,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     test.setTimeout(240000);
     // Settled states, in es and en at all three viewports.
     await h.open(); await expect(p.page.getByText(text(p, 'prompt'), { exact: true })).toBeVisible(); await capture(p, info, 'select-table-prompt');
-    await enter(p); await loaded(p); await field(p, 'filters.column').fill('id'); await field(p, 'filters.value').fill('acc_01'); await button(p, 'filters.add').click(); await expect(p.page.getByText(text(p, 'rows.empty'), { exact: true })).toBeVisible(); await capture(p, info, 'rows-with-filters');
+    await enter(p); await loaded(p); await field(p, 'filters.column').fill('id'); await field(p, 'filters.value').fill('acc_01'); await button(p, 'filters.add').click(); await expect(rowsTable(p).getByText('acc_02', { exact: true })).toHaveCount(0); await expect(rowsTable(p).getByText('acc_01', { exact: true })).toBeVisible(); await capture(p, info, 'rows-with-filters');
     await ready(p, h); const releaseInsert = h.hold('insert'); await button(p, 'insert.submit').click(); await expect(button(p, 'insert.submit')).toBeDisabled(); await capture(p, info, 'pending-mutation'); releaseInsert(); await expect(button(p, 'insert.submit')).toBeEnabled();
     await rowAction(p, 'edit', 'acc_01').click(); await expect(p.page.getByTestId('pgdata-drawer')).toBeVisible(); await capture(p, info, 'edit-drawer'); await p.page.keyboard.press('Escape'); await expect(p.page.getByTestId('pgdata-drawer')).toHaveCount(0);
     await rowAction(p, 'delete', 'acc_01').click(); await expect(p.page.getByTestId('pgdata-confirm')).toBeVisible(); await capture(p, info, 'confirm-delete'); await p.page.keyboard.press('Escape');

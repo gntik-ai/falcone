@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { Badge, Field, FieldLabel, I18nProvider, Link, LiveAnnouncer, Page, SimpleSelect, Text, ToastProvider, useHasLiveAnnouncer } from '@gntik-ai/ui'
+import { Fragment, useCallback, useLayoutEffect, useRef, useState, type ComponentProps } from 'react'
+import { Badge, EmptyState, Field, FieldLabel, I18nProvider, Link, LiveAnnouncer, Page, SimpleSelect, Text, ToastProvider, useHasLiveAnnouncer } from '@gntik-ai/ui'
 import { PageHeader, PageToolbar } from '@gntik-ai/blocks'
 import { useConsoleContext } from '../shell/context'
 import { usePermissions } from '../shell/permissions'
@@ -15,7 +15,7 @@ function WorkspaceGate() {
   const { t } = useCopy(), context = useConsoleContext(), { can } = usePermissions()
   if (context.loading) return <section role="status"><Heading title={t('workspace.loading')} description={t('workspace.loadingDescription')} /><Loading label={t('workspace.loading')} /></section>
   if (context.error) return <FailureView section="workspace" error={context.error} retry={() => void context.reloadWorkspaces?.()} />
-  const action: ReactNode = context.workspaces.length
+  const action: ComponentProps<typeof EmptyState>['primaryAction'] = context.workspaces.length
     ? <Field invalid={false} disabled={false} className="min-w-0"><FieldLabel htmlFor="pgdata-workspace">{t('workspace.picker')}</FieldLabel><SimpleSelect id="pgdata-workspace" value="" defaultValue="" placeholder={t('workspace.placeholder')} clearable={false} size="md" items={context.workspaces.map((workspace) => ({ value: workspace.workspaceId, label: workspace.displayName }))} onValueChange={(id) => { if (id) context.selectWorkspace(id) }} className={`w-full min-w-0 ${focusRing}`} /></Field>
     : can('tenant.workspaces.create') ? <Link href="/console/workspaces" tone="primary" underline="always" external={false} externalLabel="" className={focusRing}>{t('workspace.create')}</Link>
     : <Text as="p" variant="body" tone="muted">{t('workspace.denied')}</Text>
