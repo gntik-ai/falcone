@@ -84,6 +84,14 @@ test('the pager keeps a cursor stack: Siguiente sends page[after], Anterior retu
   click('Siguiente'); await screen.findByText('user26@example.test'); expect(screen.getByRole('button', { name: 'Anterior' })).toBeEnabled()
   click('Anterior'); await screen.findByText('user1@example.test'); expect(count(server, rowsUrl())).toBe(2); expect(count(server, rowsUrl({ after: 'c1' }))).toBe(1)
 })
+test('returning to an earlier target starts from its first page: the stale cursor and previous-page stack are not restored', async () => {
+  server = setup({ [`GET ${rowsUrl({ after: 'c1' })}`]: pg['pg-rows-page2'], [`GET ${rowsUrl({ table: 'orders' })}`]: pg['pg-rows-page1'] }); open(); await enterTarget()
+  click('Siguiente'); await screen.findByText('user26@example.test')
+  type('Tabla', 'orders'); await waitFor(() => expect(count(server, rowsUrl({ table: 'orders' }))).toBe(1))
+  type('Tabla', 'accounts'); await waitFor(() => expect(count(server, rowsUrl())).toBe(2))
+  await screen.findByText('user1@example.test'); expect(count(server, rowsUrl({ after: 'c1' }))).toBe(1)
+  expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled()
+})
 test('every rows read caused by paging or filtering also re-reads the API keys, as legacy', async () => {
   server = setup({ [`GET ${rowsUrl({ after: 'c1' })}`]: pg['pg-rows-page2'], [`GET ${rowsUrl({ filters: [['plan', 'eq.free']] })}`]: pg['pg-rows-empty'] }); open(); await enterTarget()
   expect(count(server, keysPath())).toBe(1)

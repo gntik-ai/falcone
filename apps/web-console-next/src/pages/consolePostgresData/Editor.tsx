@@ -32,7 +32,9 @@ export function Editor({ target, busy, setBusy, onBack, notify }: { target: Targ
   // After a saved edit the reload replaces the Editar trigger, so focus returns to the re-rendered Editar of the same row id.
   const handoff = useRef(false), [restoreFocus, setRestoreFocus] = useState<string | null>(null)
   currentKey.current = key
-  // A target change starts again from the first page without a second request.
+  // A target change starts again from the first page without a second request. The reset is also stored,
+  // so returning to an earlier target never resurrects its old cursor or previous-page stack.
+  if (pager.key !== key) setPager({ key, cursor: undefined, stack: [] })
   const active = pager.key === key ? pager : { key, cursor: undefined, stack: [] }
   const reset = () => setPager({ key, cursor: undefined, stack: [] })
 

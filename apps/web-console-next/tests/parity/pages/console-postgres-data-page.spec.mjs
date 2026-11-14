@@ -60,6 +60,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await button(p, 'removeFilter').first().click(); await button(p, 'removeFilter').first().click();
     await h.open(); await fill(p); await button(p, 'next').click(); await expect(rowsTable(p)).toContainText('user26@example.test'); await button(p, 'previous').click(); await expect(rowsTable(p)).toContainText('user1@example.test');
     expect(h.calls.filter(({ path }) => path.includes('/rows?')).map(({ path }) => path)).toEqual([rowsUrl({ workspace }), rowsUrl({ workspace, after: 'c1' }), rowsUrl({ workspace })]);
+    // Returning to an earlier target starts from its first page: no stale page[after] and no restored previous-page stack.
+    await h.open(); await fill(p); await button(p, 'next').click(); await expect(rowsTable(p)).toContainText('user26@example.test');
+    await fill(p, 'orders'); await fill(p, 'accounts'); await expect(rowsTable(p)).toContainText('user1@example.test'); await expect(button(p, 'previous')).toBeDisabled();
+    expect(rowsGet(h, 'c1')).toHaveLength(1);
     await choose(p, c(p).pageSize, '50'); await expect.poll(() => h.reads((path) => path === rowsUrl({ workspace, size: 50 })).length).toBe(1);
     // Insert: POST rows {values}, then GET rows; the form resets to {} and the new row and count 61 show.
     await h.open(); await fill(p); await field(p, 'insertLabel').fill('{"email":"new@example.test","plan":"free"}'); await button(p, 'insert').click();
