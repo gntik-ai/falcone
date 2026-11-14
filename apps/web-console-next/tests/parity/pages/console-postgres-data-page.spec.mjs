@@ -28,7 +28,9 @@ async function ready(p, h, patch = {}) { await h.open(patch); await enter(p); aw
 const reveal = async (p, key) => { await button(p, key).click(); const dialog = p.page.getByTestId('pgdata-reveal'); await expect(dialog).toBeVisible(); return dialog; };
 // Masks the issued key and both snippets, which contain it; baselines never hold a credential.
 const masks = (p) => [p.page.getByTestId('pgdata-issued-key'), p.page.getByTestId('pgdata-reveal').getByRole('group', { name: text(p, 'keys.integration') })];
-async function capture(p, info, name) {
+// The screenshot is viewport-only, so the state's own element is scrolled into view and asserted to intersect the viewport first.
+async function capture(p, info, name, target) {
+  await target.scrollIntoViewIfNeeded(); await expect(target).toBeInViewport();
   await assertPostgresDataLocale(p); await p.page.evaluate(() => document.fonts.ready);
   const body = await p.page.screenshot({ animations: 'disabled', caret: 'hide', mask: masks(p) });
   await info.attach(`${name}-${p.locale}-sha256-${createHash('sha256').update(body).digest('hex')}`, { body, contentType: 'image/png' });
@@ -217,21 +219,21 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
   test('visual-review', async ({ parity: p }, info) => {
     test.setTimeout(240000);
     // Settled states, in es and en at all three viewports.
-    await h.open(); await expect(p.page.getByText(text(p, 'prompt'), { exact: true })).toBeVisible(); await capture(p, info, 'select-table-prompt');
-    await enter(p); await loaded(p); await field(p, 'filters.column').fill('id'); await field(p, 'filters.value').fill('acc_01'); await button(p, 'filters.add').click(); await expect(rowsTable(p).getByText('acc_02', { exact: true })).toHaveCount(0); await expect(rowsTable(p).getByText('acc_01', { exact: true })).toBeVisible(); await capture(p, info, 'rows-with-filters');
-    await ready(p, h); const releaseInsert = h.hold('insert'); await button(p, 'insert.submit').click(); await expect(button(p, 'insert.submit')).toBeDisabled(); await capture(p, info, 'pending-mutation'); releaseInsert(); await expect(button(p, 'insert.submit')).toBeEnabled();
-    await rowAction(p, 'edit', 'acc_01').click(); await expect(p.page.getByTestId('pgdata-drawer')).toBeVisible(); await capture(p, info, 'edit-drawer'); await p.page.keyboard.press('Escape'); await expect(p.page.getByTestId('pgdata-drawer')).toHaveCount(0);
-    await rowAction(p, 'delete', 'acc_01').click(); await expect(p.page.getByTestId('pgdata-confirm')).toBeVisible(); await capture(p, info, 'confirm-delete'); await p.page.keyboard.press('Escape');
-    const revoke = p.page.getByRole('button', { name: text(p, 'keys.revokeAria').replace('{prefix}', 'syn_anon_01'), exact: true }); await revoke.click(); await expect(p.page.getByTestId('pgdata-confirm')).toBeVisible(); await capture(p, info, 'confirm-revoke'); await p.page.keyboard.press('Escape');
+    await h.open(); await expect(p.page.getByText(text(p, 'prompt'), { exact: true })).toBeVisible(); await capture(p, info, 'select-table-prompt', p.page.getByText(text(p, 'prompt'), { exact: true }));
+    await enter(p); await loaded(p); await field(p, 'filters.column').fill('id'); await field(p, 'filters.value').fill('acc_01'); await button(p, 'filters.add').click(); await expect(rowsTable(p).getByText('acc_02', { exact: true })).toHaveCount(0); await expect(rowsTable(p).getByText('acc_01', { exact: true })).toBeVisible(); await capture(p, info, 'rows-with-filters', rowsTable(p));
+    await ready(p, h); const releaseInsert = h.hold('insert'); await button(p, 'insert.submit').click(); await expect(button(p, 'insert.submit')).toBeDisabled(); await capture(p, info, 'pending-mutation', button(p, 'insert.submit')); releaseInsert(); await expect(button(p, 'insert.submit')).toBeEnabled();
+    await rowAction(p, 'edit', 'acc_01').click(); await expect(p.page.getByTestId('pgdata-drawer')).toBeVisible(); await capture(p, info, 'edit-drawer', p.page.getByTestId('pgdata-drawer')); await p.page.keyboard.press('Escape'); await expect(p.page.getByTestId('pgdata-drawer')).toHaveCount(0);
+    await rowAction(p, 'delete', 'acc_01').click(); await expect(p.page.getByTestId('pgdata-confirm')).toBeVisible(); await capture(p, info, 'confirm-delete', p.page.getByTestId('pgdata-confirm')); await p.page.keyboard.press('Escape');
+    const revoke = p.page.getByRole('button', { name: text(p, 'keys.revokeAria').replace('{prefix}', 'syn_anon_01'), exact: true }); await revoke.click(); await expect(p.page.getByTestId('pgdata-confirm')).toBeVisible(); await capture(p, info, 'confirm-revoke', p.page.getByTestId('pgdata-confirm')); await p.page.keyboard.press('Escape');
     for (const [key, name] of [['keys.issueAnon', 'reveal-anon-preview'], ['keys.issueService', 'reveal-service-preview']]) {
-      const dialog = await reveal(p, key); await button(p, 'keys.preview', dialog).click(); await expect(dialog.getByRole('table', { name: text(p, 'keys.previewTable'), exact: true })).toBeVisible(); await capture(p, info, name); await p.page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0);
+      const dialog = await reveal(p, key); await button(p, 'keys.preview', dialog).click(); await expect(dialog.getByRole('table', { name: text(p, 'keys.previewTable'), exact: true })).toBeVisible(); await capture(p, info, name, dialog); await p.page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0);
     }
     await rowAction(p, 'edit', 'acc_01').waitFor(); await p.page.getByRole('button', { name: text(p, 'keys.revokeAria').replace('{prefix}', 'syn_anon_01'), exact: true }).click(); const typed = p.page.getByTestId('pgdata-confirm'); await typed.getByLabel(text(p, 'confirm.typeLabel').replace('{text}', 'syn_anon_01'), { exact: true }).fill('syn_anon_01'); await button(p, 'keys.revokeConfirm', typed).click();
-    await expect(keysTable(p).getByRole('button', { name: /./ })).toHaveCount(0); await capture(p, info, 'revoked-key');
-    await h.open({ empty: ['keys'] }); await enter(p); await expect(p.page.getByText(text(p, 'keys.empty'), { exact: true })).toBeVisible(); await capture(p, info, 'empty-keys');
-    await h.open({ errors: { keys: 403 } }); await enter(p); await expect(p.page.getByTestId('pgdata-failure-keys')).toBeVisible(); await capture(p, info, 'keys-no-access');
-    await h.open({ errors: { rows: 404 } }); await enter(p, { schema: 'private' }); await expect(p.page.getByTestId('pgdata-failure-rows')).toBeVisible(); await capture(p, info, 'rows-not-found');
-    await h.open({ errors: { rows: 500 } }); await enter(p); await expect(p.page.getByTestId('pgdata-failure-rows')).toBeVisible(); await capture(p, info, 'rows-error');
+    await expect(keysTable(p).getByRole('button', { name: /./ })).toHaveCount(0); await capture(p, info, 'revoked-key', keysTable(p));
+    await h.open({ empty: ['keys'] }); await enter(p); await expect(p.page.getByText(text(p, 'keys.empty'), { exact: true })).toBeVisible(); await capture(p, info, 'empty-keys', p.page.getByText(text(p, 'keys.empty'), { exact: true }));
+    await h.open({ errors: { keys: 403 } }); await enter(p); await expect(p.page.getByTestId('pgdata-failure-keys')).toBeVisible(); await capture(p, info, 'keys-no-access', p.page.getByTestId('pgdata-failure-keys'));
+    await h.open({ errors: { rows: 404 } }); await enter(p, { schema: 'private' }); await expect(p.page.getByTestId('pgdata-failure-rows')).toBeVisible(); await capture(p, info, 'rows-not-found', p.page.getByTestId('pgdata-failure-rows'));
+    await h.open({ errors: { rows: 500 } }); await enter(p); await expect(p.page.getByTestId('pgdata-failure-rows')).toBeVisible(); await capture(p, info, 'rows-error', p.page.getByTestId('pgdata-failure-rows'));
   });
 
   test('kit-conformance', async () => { await check.kitConformance(manifest); });

@@ -1,8 +1,10 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, configure, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test } from 'vitest'
 import { button, calls, click, enterTarget, loaded, open, settle, typeInto, setup } from './consolePostgresData-support'
 import { byKeyPath, fixtures, rowsPath, rowsUrl } from './parity/pages/console-postgres-data-page.manifest'
 
+// These journeys chain several async waits; the default 1 s wait is too short when the suite runs under load.
+configure({ asyncUtilTimeout: 5000 })
 let server: ReturnType<typeof setup>
 afterEach(() => server?.verify())
 const writes = () => calls(server).filter((call) => call.method !== 'GET')
@@ -52,7 +54,7 @@ test('a pending patch keeps the drawer open: Cancelar is disabled and Escape or 
   for (const name of ['Insertar', 'Anterior', 'Siguiente']) expect(screen.getByRole('button', { name, hidden: true })).toBeDisabled()
   await act(async () => slow.slot.release!(Response.json(fixtures['pg-row-patch-ok']))); await waitFor(() => expect(screen.queryByTestId('pgdata-drawer')).toBeNull())
   await screen.findByText('enterprise'); await waitFor(() => expect(document.activeElement).not.toBe(document.body)); expect(button('Insertar')).toBeEnabled()
-})
+}, 30000)
 test('the busy state is shared: a pending insert also keeps the drawer from being saved', async () => {
   const slow = hold()
   server = setup({ [`POST ${rowsPath}`]: slow.route }); open(); await enterTarget(); await loaded(); click('Insertar'); await waitFor(() => expect(slow.slot.release).toBeTypeOf('function'))

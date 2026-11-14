@@ -22,6 +22,11 @@ Local results of the final source, recorded by the maker. Browser journeys canno
 - `tsc --noEmit` is clean: two kit-typed props (`action`, `back`) use the kit's `primaryAction` prop type.
 - SKIPPED: Chromium parity journeys (Chromium unavailable; PR CI runs them). `playwright test --list console-postgres-data-page` registers 48 checks.
 
+## Corrections (checker findings on the second attempt)
+
+- The visual journey's `capture()` takes viewport-only screenshots, so every capture now receives the state's own element (rows table, insert button, drawer, dialogs, key table, key-panel and rows failure panels), scrolls it into view and asserts `toBeInViewport()` before attaching. The empty-key and key-denied captures can no longer omit the key panel that follows the 25-row table and the insert form.
+- `tests/consolePostgresData-busy.test.tsx` chains several async waits; it now sets `asyncUtilTimeout` to 5 s and the drawer test a 30 s timeout so it does not flake under a loaded full-suite run.
+
 ## Full suite
 
 `cd apps/web-console-next && node_modules/.bin/vitest run` (SHELL_TEST_FIXTURES unset) was run twice. Run one: 2670 passed, 2 failed
