@@ -211,11 +211,11 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
 
   test('responsive', async ({ parity: p }) => {
     await ready(p, h); await check.assertResponsive(p, width);
-    // The data table scrolls inside its container.
+    // The data table scrolls inside its container. Dialog widths get 1px of tolerance for sub-pixel layout (the drawer measures 375.00003 at 375).
     const scroller = await p.page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth); expect(scroller).toBe(true);
-    await rowAction(p, 'edit', 'acc_01').click(); await check.assertResponsive(p, width); expect((await p.page.getByTestId('pgdata-drawer').boundingBox()).width).toBeLessThanOrEqual(width); await p.page.keyboard.press('Escape');
-    await rowAction(p, 'delete', 'acc_01').click(); await check.assertResponsive(p, width); expect((await p.page.getByTestId('pgdata-confirm').boundingBox()).width).toBeLessThanOrEqual(width); await p.page.keyboard.press('Escape');
-    await reveal(p, 'keys.issueAnon'); await check.assertResponsive(p, width); expect((await p.page.getByTestId('pgdata-reveal').boundingBox()).width).toBeLessThanOrEqual(width);
+    await rowAction(p, 'edit', 'acc_01').click(); await check.assertResponsive(p, width); expect((await p.page.getByTestId('pgdata-drawer').boundingBox()).width).toBeLessThanOrEqual(width + 1); await p.page.keyboard.press('Escape');
+    await rowAction(p, 'delete', 'acc_01').click(); await check.assertResponsive(p, width); expect((await p.page.getByTestId('pgdata-confirm').boundingBox()).width).toBeLessThanOrEqual(width + 1); await p.page.keyboard.press('Escape');
+    await reveal(p, 'keys.issueAnon'); await check.assertResponsive(p, width); expect((await p.page.getByTestId('pgdata-reveal').boundingBox()).width).toBeLessThanOrEqual(width + 1);
   });
 
   test('visual-review', async ({ parity: p }, info) => {
