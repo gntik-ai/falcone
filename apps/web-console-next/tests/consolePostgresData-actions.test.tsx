@@ -37,6 +37,8 @@ test('Editar opens the drawer; Guardar sends PATCH by-primary-key?id= {changes} 
   expect(JSON.parse((field as HTMLTextAreaElement).value)).toEqual({ id: 'acc-1', email: 'user1@example.test', plan: 'free' })
   fireEvent.change(field, { target: { value: '{"id":"acc-1","email":"edited@example.test"}' } }); fireEvent.click(within(drawer).getByRole('button', { name: 'Guardar' }))
   await screen.findByText('edited@example.test'); await waitFor(() => expect(screen.queryByRole('dialog', { name: /Editar fila/ })).toBeNull())
+  // Focus survives the reload: it lands on the re-rendered Editar control of the saved row, not on the body.
+  await waitFor(() => expect(screen.getAllByRole('button', { name: 'Editar' })[0]).toHaveFocus())
   expect(writes(server)).toEqual([expect.objectContaining({ method: 'PATCH', path: `${byKeyPath()}?id=acc-1`, body: { changes: { email: 'edited@example.test' } } })])
   expect((await screen.findAllByText('Fila actualizada')).length).toBeGreaterThan(0)
 })

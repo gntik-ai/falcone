@@ -29,6 +29,8 @@ export function Editor({ target, busy, setBusy, onBack, notify }: { target: Targ
   const [newRowJson, setNewRowJson] = useState('{}'), [editing, setEditing] = useState<{ id: string; opener: HTMLElement | null } | null>(null), [editJson, setEditJson] = useState('{}')
   const [error, setError] = useState<string | null>(null), [confirmation, setConfirmation] = useState<Confirmation | null>(null)
   const generation = useRef(0), live = useRef(true), currentKey = useRef(key)
+  // After a saved edit the reload replaces the Editar trigger, so focus returns to the re-rendered Editar of the same row id.
+  const handoff = useRef(false), [restoreFocus, setRestoreFocus] = useState<string | null>(null)
   currentKey.current = key
   // A target change starts again from the first page without a second request.
   const active = pager.key === key ? pager : { key, cursor: undefined, stack: [] }
@@ -50,6 +52,12 @@ export function Editor({ target, busy, setBusy, onBack, notify }: { target: Targ
   const latest = useRef(reloadRows)
   latest.current = reloadRows
   useEffect(() => { live.current = true; void reloadRows(); return () => { live.current = false; generation.current++ } }, [reloadRows])
+  useEffect(() => {
+    if (restoreFocus == null || load.busy || editing != null) return
+    const buttons = Array.from(document.querySelectorAll<HTMLElement>('[data-pgdata-edit]'))
+    buttons.find((button) => button.getAttribute('data-pgdata-edit') === restoreFocus)?.focus()
+    handoff.current = false; setRestoreFocus(null)
+  }, [restoreFocus, load.busy, editing, rows])
   const reloadIfCurrent = async (started: string) => { if (live.current && currentKey.current === started) await latest.current() }
   const message = (cause: unknown) => failureOf(cause).message ?? t('mutationFailed')
 
@@ -95,8 +103,10 @@ export function Editor({ target, busy, setBusy, onBack, notify }: { target: Targ
     setError(null); setBusy(true)
     try {
       await updateRow(target, { id: editing.id }, changes)
+      handoff.current = true
       setEditing(null); notify(t('updated'))
       await reloadIfCurrent(started)
+      if (live.current && currentKey.current === started) setRestoreFocus(editing.id); else handoff.current = false
     } catch (cause) { setError(message(cause)) } finally { setBusy(false) }
   }
   function askDelete(row: PgRow, opener: HTMLElement) {
@@ -117,7 +127,7 @@ export function Editor({ target, busy, setBusy, onBack, notify }: { target: Targ
   const callout = error && <div role="alert" data-testid="pgdata-error"><InlineCallout tone="destructive" title={t('mutationErrorTitle')} description={error} actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined} className="min-w-0" labels={{ title: '', description: '', upgrade: '', viewUsage: '' }} /></div>
   const columns = collectColumns(rows).map((column) => ({ id: column, header: column, sortable: false, cell: (row: PgRow) => formatCell(row[column]) }))
   const dataColumns = [...columns, { id: 'pgdata-actions', header: t('columnActions'), sortable: false, cell: (row: PgRow) => <div className="flex flex-wrap gap-2">
-    <Action disabled={busy} onClick={(event) => beginEdit(row, event.currentTarget)}>{t('edit')}</Action>
+    <Action disabled={busy} data-pgdata-edit={String(row.id ?? '')} onClick={(event) => beginEdit(row, event.currentTarget)}>{t('edit')}</Action>
     <Action variant="destructive" disabled={busy} onClick={(event) => askDelete(row, event.currentTarget)}>{t('delete')}</Action>
   </div> }]
   const notFound = load.error?.status === 404
@@ -162,7 +172,7 @@ export function Editor({ target, busy, setBusy, onBack, notify }: { target: Targ
     <KeysPanel target={target} refreshKey={JSON.stringify([databaseName, schemaName, tableName, pageSize, active.cursor ?? null, filters])} report={setError} notify={notify} />
 
     <Drawer open={editing != null} onOpenChange={(next, event) => { if (!next) { if (busy) event.cancel(); else setEditing(null) } }} side="right">
-      <DrawerContent size="md" showClose={false} closeLabel={t('close')} container={undefined} keepMounted={false} finalFocus={() => editing?.opener?.isConnected ? editing.opener : true} className="min-w-0 max-w-full wrap-anywhere" data-testid="pgdata-drawer">
+      <DrawerContent size="md" showClose={false} closeLabel={t('close')} container={undefined} keepMounted={false} finalFocus={() => handoff.current ? false : editing?.opener?.isConnected ? editing.opener : true} className="min-w-0 max-w-full wrap-anywhere" data-testid="pgdata-drawer">
         <DrawerHeader><DrawerTitle>{t('editTitle', { id: editing?.id ?? '' })}</DrawerTitle><DrawerDescription>{t('editDescription')}</DrawerDescription></DrawerHeader>
         <DrawerBody className="min-h-0 flex-1 space-y-4 overflow-y-auto">{callout}<JsonField id="pgdata-edit-row" label={t('editLabel')} value={editJson} onChange={setEditJson} /></DrawerBody>
         <DrawerFooter className="flex-wrap gap-2"><Action variant="primary" disabled={busy} onClick={() => void saveEdit()}>{t('save')}</Action><Action disabled={busy} onClick={() => setEditing(null)}>{t('cancel')}</Action></DrawerFooter>
