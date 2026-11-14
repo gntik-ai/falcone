@@ -159,7 +159,7 @@ export function Editor({ target, busy, setBusy, onBack, notify }: { target: Targ
       <JsonField id="pgdata-new-row" label={t('insertLabel')} value={newRowJson} onChange={setNewRowJson} />
     </FormSection>
 
-    <KeysPanel target={target} report={setError} notify={notify} />
+    <KeysPanel target={target} refreshKey={JSON.stringify([databaseName, schemaName, tableName, pageSize, active.cursor ?? null, filters])} report={setError} notify={notify} />
 
     <Drawer open={editing != null} onOpenChange={(next, event) => { if (!next) { if (busy) event.cancel(); else setEditing(null) } }} side="right">
       <DrawerContent size="md" showClose={false} closeLabel={t('close')} container={undefined} keepMounted={false} finalFocus={() => editing?.opener?.isConnected ? editing.opener : true} className="min-w-0 max-w-full wrap-anywhere" data-testid="pgdata-drawer">

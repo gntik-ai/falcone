@@ -10,7 +10,9 @@ type KeysState = { busy: boolean; items: ApiKeyRecord[]; error: Failure | null }
 
 // The API-key panel: list, issue (anon or service), one-time reveal and revoke. Issued keys stay in
 // this component's state only; a new issue or leaving the page drops the held key.
-export function KeysPanel({ target, report, notify }: { target: Target; report: (message: string | null) => void; notify: (message: string) => void }) {
+// `refreshKey` changes whenever the rows read changes (target, page size, cursor or filters): the legacy
+// editor re-reads the key list on every such change, so the panel does too.
+export function KeysPanel({ target, refreshKey, report, notify }: { target: Target; refreshKey: string; report: (message: string | null) => void; notify: (message: string) => void }) {
   const { t } = useCopy()
   const workspaceId = target.workspaceId
   const [state, setState] = useState<KeysState>({ busy: true, items: [], error: null })
@@ -28,7 +30,7 @@ export function KeysPanel({ target, report, notify }: { target: Target; report: 
       if (live.current && generation.current === token) setState({ busy: false, items: [], error: failureOf(cause) })
     }
   }, [workspaceId])
-  useEffect(() => { live.current = true; void load(); return () => { live.current = false; generation.current++ } }, [load])
+  useEffect(() => { live.current = true; void load(); return () => { live.current = false; generation.current++ } }, [load, refreshKey])
   const message = (cause: unknown) => failureOf(cause).message ?? t('mutationFailed')
   async function issue(keyType: 'anon' | 'service', opener: HTMLElement) {
     report(null)

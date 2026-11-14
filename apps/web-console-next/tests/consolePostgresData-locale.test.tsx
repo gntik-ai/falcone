@@ -20,8 +20,9 @@ test('the es and en catalogs define the same keys and the same placeholders', ()
   }
 })
 test('the schema.table heading and fixture cells are marked as data; labels and buttons stay checked', () => {
-  render(<main><section data-testid="pgdata-rows"><h2 id="pgdata-target-heading">public.accounts</h2><table><tbody><tr><td>cell.value</td><td><button type="button">pages.untranslated</button></td></tr></tbody></table></section><p>pages.untranslated.copy</p></main>)
-  for (const element of document.querySelectorAll('h2, td, td button, p')) Object.defineProperty(element, 'innerText', { value: element.textContent })
+  render(<main><section data-testid="pgdata-rows"><div><div><h2 id="pgdata-target-heading">public.accounts</h2></div></div><table><tbody><tr><td>cell.value</td><td><button type="button">pages.untranslated</button></td></tr></tbody></table></section><p>pages.untranslated.copy</p></main>)
+  // Like a browser, every element reports innerText, so wrappers repeat their descendants' text.
+  for (const element of document.querySelectorAll('main, main *')) Object.defineProperty(element, 'innerText', { value: element.textContent })
   const values = collectPostgresDataLocaleValues()
   expect(values).not.toContain('public.accounts'); expect(values).not.toContain('cell.value')
   expect([...new Set(values.filter(raw))].sort()).toEqual(['pages.untranslated', 'pages.untranslated.copy'])

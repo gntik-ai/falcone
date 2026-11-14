@@ -29,6 +29,7 @@ export async function assertPostgresDataLocale(parity) {
 export function collectPostgresDataLocaleValues() {
   const values = [];
   const interactive = 'button, a, input, select, textarea, [role="button"], [role="combobox"]';
+  const dataSelector = '#pgdata-target-heading, [data-testid="pgdata-rows"] td, [data-testid="pgdata-preview"] td';
   const isData = (element) => {
     if (element.closest('#pgdata-target-heading')) return true;
     const cell = element.closest('[data-testid="pgdata-rows"] td, [data-testid="pgdata-preview"] td');
@@ -43,7 +44,9 @@ export function collectPostgresDataLocaleValues() {
     for (const id of (element.getAttribute('aria-labelledby') ?? '').split(/\s+/)) if (id) values.push(document.getElementById(id)?.textContent ?? '');
     if (!isData(element)) {
       for (const child of element.childNodes) if (child.nodeType === Node.TEXT_NODE) values.push(child.textContent);
-      if (typeof element.innerText === 'string') values.push(element.innerText);
+      // An ancestor's innerText repeats its descendants' text, data included; those descendants are
+      // visited on their own, so only elements that contain no data contribute their innerText.
+      if (typeof element.innerText === 'string' && !element.querySelector(dataSelector)) values.push(element.innerText);
     }
     if (element.matches('input[type="button"], input[type="submit"], input[type="reset"]')) values.push(element.value);
   }

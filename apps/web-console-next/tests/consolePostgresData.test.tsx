@@ -84,6 +84,14 @@ test('the pager keeps a cursor stack: Siguiente sends page[after], Anterior retu
   click('Siguiente'); await screen.findByText('user26@example.test'); expect(screen.getByRole('button', { name: 'Anterior' })).toBeEnabled()
   click('Anterior'); await screen.findByText('user1@example.test'); expect(count(server, rowsUrl())).toBe(2); expect(count(server, rowsUrl({ after: 'c1' }))).toBe(1)
 })
+test('every rows read caused by paging or filtering also re-reads the API keys, as legacy', async () => {
+  server = setup({ [`GET ${rowsUrl({ after: 'c1' })}`]: pg['pg-rows-page2'], [`GET ${rowsUrl({ filters: [['plan', 'eq.free']] })}`]: pg['pg-rows-empty'] }); open(); await enterTarget()
+  expect(count(server, keysPath())).toBe(1)
+  click('Siguiente'); await screen.findByText('user26@example.test'); await waitFor(() => expect(count(server, keysPath())).toBe(2))
+  click('Anterior'); await screen.findByText('user1@example.test'); await waitFor(() => expect(count(server, keysPath())).toBe(3))
+  type('Columna', 'plan'); type('Valor', 'free'); click('Añadir filtro'); await screen.findByText('Todavía no hay filas.'); await waitFor(() => expect(count(server, keysPath())).toBe(4))
+  expect(count(server, rowsUrl())).toBe(2); expect(count(server, rowsUrl({ after: 'c1' }))).toBe(1)
+})
 test('the page size select sends page[size] and starts again from the first page', async () => {
   server = setup({ [`GET ${rowsUrl({ size: 50 })}`]: pg['pg-rows-page1'] }); open(); await enterTarget(); await choose('Tamaño de página', '50')
   await waitFor(() => expect(count(server, rowsUrl({ size: 50 }))).toBe(1))
