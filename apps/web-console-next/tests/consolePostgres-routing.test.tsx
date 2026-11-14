@@ -19,7 +19,7 @@ function open(path = '/console/postgres') { return render(<MemoryRouter initialE
 const pgCalls = () => requests.mock.mock.calls.filter(([path]) => String(path).startsWith('/v1/postgres/') || String(path).endsWith('/refresh')).map(([path, init]) => ({ method: init?.method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined }))
 test.each(['tenant_viewer', 'tenant_owner', 'superadmin'])('authenticated %s reaches PostgreSQL with no guard', async (role) => {
   login([role], ['synthetic-tenant']); requests = strictFetch({ ...shell(), [`GET ${pageUrl(paths.databases)}`]: fixtures.databases }); open()
-  expect(await screen.findByRole('button', { name: 'app_db' }, { timeout: 10000 })).toBeVisible(); expect(isMigratedRoute('/console/postgres')).toBe(true); expect(isMigratedRoute('/console/postgres/data')).toBe(false)
+  expect(await screen.findByRole('button', { name: 'app_db' }, { timeout: 10000 })).toBeVisible(); expect(isMigratedRoute('/console/postgres')).toBe(true); expect(isMigratedRoute('/console/postgres/data')).toBe(true)
   expect(pgCalls()).toEqual([{ method: 'GET', path: pageUrl(paths.databases), body: undefined }])
 })
 test.each([false, true])('401 rejected=%s has one refresh and exactly the permitted replay', async (rejected) => {
