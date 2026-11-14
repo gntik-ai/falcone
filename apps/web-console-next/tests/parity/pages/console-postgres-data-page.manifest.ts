@@ -30,8 +30,8 @@ export const pg = {
   ] },
   'pg-api-keys-empty': { items: [] },
   'pg-api-key-revoke-ok': { id: 'key-1', revoked: true },
-  'pg-api-key-issue-anon': { id: 'key-3', key: 'synthetic-anon-key-0001', prefix: 'fk_anon_ef56', keyType: 'anon', scopes: ['rows:read'] },
-  'pg-api-key-issue-service': { id: 'key-4', key: 'synthetic-service-key-0002', prefix: 'fk_svc_gh78', keyType: 'service', scopes: ['rows:write'] },
+  'pg-api-key-issue-anon': { id: 'key-3', key: 'synthetic-anon-key', prefix: 'fk_anon_ef56', keyType: 'anon', scopes: ['rows:read'] },
+  'pg-api-key-issue-service': { id: 'key-4', key: 'synthetic-service-key', prefix: 'fk_svc_gh78', keyType: 'service', scopes: ['rows:write'] },
   'pg-rows-preview-apikey': { items: [{ id: 'prev-1', title: 'Preview row one' }, { id: 'prev-2', title: 'Preview row two' }], page: { size: 10, returned: 2 } },
 } as const
 export const keysAfterIssue = { items: [...pg['pg-api-keys'].items, { id: 'key-3', key_type: 'anon', key_prefix: 'fk_anon_ef56', scopes: ['rows:read'], status: 'active', created_at: '2026-01-03T00:00:00Z', last_used_at: null }] }
