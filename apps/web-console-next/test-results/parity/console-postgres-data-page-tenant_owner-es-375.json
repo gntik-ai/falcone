@@ -1,0 +1,48 @@
+{
+  "page": "console-postgres-data-page",
+  "role": "tenant_owner",
+  "locale": "es",
+  "viewport": 375,
+  "checks": [
+    {
+      "check": "data",
+      "status": "not-run",
+      "errors": []
+    },
+    {
+      "check": "action",
+      "status": "not-run",
+      "errors": []
+    },
+    {
+      "check": "error-empty",
+      "status": "not-run",
+      "errors": []
+    },
+    {
+      "check": "accessibility",
+      "status": "not-run",
+      "errors": []
+    },
+    {
+      "check": "runtime-health",
+      "status": "not-run",
+      "errors": []
+    },
+    {
+      "check": "responsive",
+      "status": "not-run",
+      "errors": []
+    },
+    {
+      "check": "visual-review",
+      "status": "not-run",
+      "errors": []
+    },
+    {
+      "check": "kit-conformance",
+      "status": "not-run",
+      "errors": []
+    }
+  ]
+}

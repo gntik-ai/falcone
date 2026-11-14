@@ -1,0 +1,1098 @@
+{
+  "config": {
+    "configFile": "/srv/engineering/worktrees/falcone/218e8b98-124d-54f3-abb6-3afb57bc1152/apps/web-console-next/tests/parity/playwright.config.mjs",
+    "rootDir": "/srv/engineering/worktrees/falcone/218e8b98-124d-54f3-abb6-3afb57bc1152/apps/web-console-next/tests/parity",
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/srv/engineering/worktrees/falcone/218e8b98-124d-54f3-abb6-3afb57bc1152/apps/web-console-next/test-results/parity/traces",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "",
+        "name": "",
+        "testDir": "/srv/engineering/worktrees/falcone/218e8b98-124d-54f3-abb6-3afb57bc1152/apps/web-console-next/tests/parity",
+        "testIgnore": [],
+        "testMatch": [
+          "pages/*.spec.mjs",
+          "endpoints.spec.mjs",
+          "harness.spec.mjs"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "/srv/engineering/worktrees/falcone/218e8b98-124d-54f3-abb6-3afb57bc1152/apps/web-console-next/test-results/parity/html",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/srv/engineering/worktrees/falcone/218e8b98-124d-54f3-abb6-3afb57bc1152/apps/web-console-next/test-results/parity/results.json"
+        }
+      ],
+      [
+        "/srv/engineering/worktrees/falcone/218e8b98-124d-54f3-abb6-3afb57bc1152/apps/web-console-next/tests/parity/reporter.mjs",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "none",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "pages/console-postgres-data-page.spec.mjs",
+      "file": "pages/console-postgres-data-page.spec.mjs",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "console-postgres-data-page | tenant_owner | es | 375",
+          "file": "pages/console-postgres-data-page.spec.mjs",
+          "line": 36,
+          "column": 79,
+          "specs": [
+            {
+              "title": "data",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-6b96f03050a0344ab014",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "action",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-730e1646f6ec0a4af79b",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 57,
+              "column": 3
+            },
+            {
+              "title": "error-empty",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-237c1696834e06b77e30",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 107,
+              "column": 3
+            },
+            {
+              "title": "accessibility",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-50d0c12bbdffe72d2fab",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 174,
+              "column": 3
+            },
+            {
+              "title": "runtime-health",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-2090b76c7a6447ab06b1",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 195,
+              "column": 3
+            },
+            {
+              "title": "responsive",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-144c3fcf1f8e533a18ee",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 207,
+              "column": 3
+            },
+            {
+              "title": "visual-review",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-c4914c23f8a6aa63a1d1",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 216,
+              "column": 3
+            },
+            {
+              "title": "kit-conformance",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-76dcdd7307dfd7bec04a",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 236,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "console-postgres-data-page | tenant_owner | es | 768",
+          "file": "pages/console-postgres-data-page.spec.mjs",
+          "line": 36,
+          "column": 79,
+          "specs": [
+            {
+              "title": "data",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-07829d8d4c5f360acb35",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "action",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-14aa6d81e9fe7494bfee",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 57,
+              "column": 3
+            },
+            {
+              "title": "error-empty",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-2d342cae42f2e7fecca2",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 107,
+              "column": 3
+            },
+            {
+              "title": "accessibility",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-b2ddbce26fca4721a5d5",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 174,
+              "column": 3
+            },
+            {
+              "title": "runtime-health",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-996c7304c4b5a9088f80",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 195,
+              "column": 3
+            },
+            {
+              "title": "responsive",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-cba54c1e8a09b6e307cb",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 207,
+              "column": 3
+            },
+            {
+              "title": "visual-review",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-647bdff89c842567cb60",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 216,
+              "column": 3
+            },
+            {
+              "title": "kit-conformance",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-ed76a97010880458283f",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 236,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "console-postgres-data-page | tenant_owner | es | 1280",
+          "file": "pages/console-postgres-data-page.spec.mjs",
+          "line": 36,
+          "column": 79,
+          "specs": [
+            {
+              "title": "data",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-b0ef63529a503669768b",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "action",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-d89f8f0d14a782f4947f",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 57,
+              "column": 3
+            },
+            {
+              "title": "error-empty",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-50ba894a47f68bd55481",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 107,
+              "column": 3
+            },
+            {
+              "title": "accessibility",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-00dedb3ce69f646a7788",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 174,
+              "column": 3
+            },
+            {
+              "title": "runtime-health",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-1e48971debdf9d71d7fd",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 195,
+              "column": 3
+            },
+            {
+              "title": "responsive",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-368f2e24e3b4acf49a61",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 207,
+              "column": 3
+            },
+            {
+              "title": "visual-review",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-861233561ea0f5943b36",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 216,
+              "column": 3
+            },
+            {
+              "title": "kit-conformance",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-470359c6d9ff7a5fddc5",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 236,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "console-postgres-data-page | tenant_owner | en | 375",
+          "file": "pages/console-postgres-data-page.spec.mjs",
+          "line": 36,
+          "column": 79,
+          "specs": [
+            {
+              "title": "data",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-9ae62c2c48cd46e811ec",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "action",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-710534d5009695cd5db5",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 57,
+              "column": 3
+            },
+            {
+              "title": "error-empty",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-30fa70837c45384b18f0",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 107,
+              "column": 3
+            },
+            {
+              "title": "accessibility",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-f70fc6125e2fdade7230",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 174,
+              "column": 3
+            },
+            {
+              "title": "runtime-health",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-811020c2fd74829168cb",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 195,
+              "column": 3
+            },
+            {
+              "title": "responsive",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-1056ea6eb69ea530790a",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 207,
+              "column": 3
+            },
+            {
+              "title": "visual-review",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-a49c8542f9afef1ba0bb",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 216,
+              "column": 3
+            },
+            {
+              "title": "kit-conformance",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-15027163ebe7f2023960",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 236,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "console-postgres-data-page | tenant_owner | en | 768",
+          "file": "pages/console-postgres-data-page.spec.mjs",
+          "line": 36,
+          "column": 79,
+          "specs": [
+            {
+              "title": "data",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-92b121ba3e21b2e92dc8",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "action",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-f9a176b2cd748e6c3aec",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 57,
+              "column": 3
+            },
+            {
+              "title": "error-empty",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-9cccf0fed19ba0f76af3",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 107,
+              "column": 3
+            },
+            {
+              "title": "accessibility",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-b8e2c9ffd3049cd6df8f",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 174,
+              "column": 3
+            },
+            {
+              "title": "runtime-health",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-22fdd3b9efb3a4a37fa3",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 195,
+              "column": 3
+            },
+            {
+              "title": "responsive",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-2341041b14230530e4c7",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 207,
+              "column": 3
+            },
+            {
+              "title": "visual-review",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-571f3cc554f38c9c23ea",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 216,
+              "column": 3
+            },
+            {
+              "title": "kit-conformance",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-aaf2c7b12e3187fb417d",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 236,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "console-postgres-data-page | tenant_owner | en | 1280",
+          "file": "pages/console-postgres-data-page.spec.mjs",
+          "line": 36,
+          "column": 79,
+          "specs": [
+            {
+              "title": "data",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-254fec77f60a1ed5a5a4",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 42,
+              "column": 3
+            },
+            {
+              "title": "action",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-4d305e95b0919dd0c6aa",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 57,
+              "column": 3
+            },
+            {
+              "title": "error-empty",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-13a36f9599e499bfc247",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 107,
+              "column": 3
+            },
+            {
+              "title": "accessibility",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-a5cbba412282045679f4",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 174,
+              "column": 3
+            },
+            {
+              "title": "runtime-health",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-fa4f59ead1c9b49a66c4",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 195,
+              "column": 3
+            },
+            {
+              "title": "responsive",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-d3149d5c577178f7af5b",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 207,
+              "column": 3
+            },
+            {
+              "title": "visual-review",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-84330f1327c3077ab691",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 216,
+              "column": 3
+            },
+            {
+              "title": "kit-conformance",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "e68e7fa1eb3b5dd8db93-e2e48ce06ee899473ad8",
+              "file": "pages/console-postgres-data-page.spec.mjs",
+              "line": 236,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-14T17:55:16.925Z",
+    "duration": 2097.3650000000002,
+    "expected": 0,
+    "skipped": 48,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
