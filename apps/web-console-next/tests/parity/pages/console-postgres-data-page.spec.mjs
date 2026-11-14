@@ -199,7 +199,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await h.open(); await expect(p.page.getByRole('heading', { name: text(p, 'title'), exact: true })).toBeVisible();
     // Sidebar NavLink to another page, back through the NavLink, then a deep link.
     if (width < 1024) await p.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
-    await p.page.getByRole('link', { name: /PostgreSQL/ }).first().click(); await expect(p.page).toHaveURL(/\/console\/postgres$/); expect(h.navigation).toEqual([`GET ${postgresPageUrl(postgresPaths.databases)}`]);
+    await p.page.getByRole('link', { name: /PostgreSQL/ }).first().click(); await expect(p.page).toHaveURL(/\/console\/postgres$/);
+    // The route change precedes the lazy page's databases request, so wait for it instead of reading it at once.
+    await expect.poll(() => h.navigation).toEqual([`GET ${postgresPageUrl(postgresPaths.databases)}`]);
     if (width < 1024) await p.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
     await p.page.getByRole('link', { name: locale === 'es' ? /Datos: Postgres/ : /Data: Postgres/ }).first().click(); await expect(p.page).toHaveURL(/\/console\/postgres\/data$/);
     await enter(p); await loaded(p);
