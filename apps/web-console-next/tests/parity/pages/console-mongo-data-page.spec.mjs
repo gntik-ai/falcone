@@ -16,6 +16,8 @@ const docsTable = (p) => p.page.getByRole('table', { name: text(p, 'documents.ta
 const field = (p, key) => p.page.getByLabel(text(p, key), { exact: true });
 const typedLabel = (p, id) => text(p, 'confirm.typeLabel').replace('{text}', id);
 const cell = (p, id) => docsTable(p).getByText(new RegExp(id)).first();
+// An open modal hides the table from role queries, so the row behind the dialog is found through its region.
+const cellBehind = (p, id) => p.page.getByTestId('mongodata-documents').getByText(new RegExp(id)).first();
 const urlPaths = (h) => h.calls.map(({ method, path }) => `${method} ${path}`);
 async function enter(p, { database = 'catalog', collection = 'orders' } = {}) {
   await field(p, 'fields.database').fill(database); await field(p, 'fields.collection').fill(collection);
@@ -87,7 +89,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await expect(confirm.getByLabel(typedLabel(p, 'ord_01'), { exact: true })).toBeFocused();
     await confirm.getByLabel(typedLabel(p, 'ord_01'), { exact: true }).fill('ord_0'); await expect(button(p, 'deleteConfirm.confirm', confirm)).toBeDisabled();
     await button(p, 'cancel', confirm).click(); await expect(confirm).toHaveCount(0); expect(writes(h)).toEqual([]); await expect(rowAction(p, 'delete', 'ord_01')).toBeFocused();
-    await typeAndDelete(p, 'ord_01'); await expect(docsTable(p).getByText(/ord_01/)).toHaveCount(0);
+    const deleting = await typeAndDelete(p, 'ord_01'); await expect(deleting).toHaveCount(0); await expect(docsTable(p).getByText(/ord_01/)).toHaveCount(0);
     expect(writes(h)).toEqual([expect.objectContaining({ method: 'DELETE', path: h.paths.doc })]); expect(urlPaths(h).at(-1)).toBe(`GET ${h.urls.docs()}`);
     await expect(p.page.getByText(text(p, 'deleted'), { exact: true }).first()).toBeVisible();
     // Issue the anonymous key: POST {keyType:'anon'}, masked reveal once, exact copy, preview with only the apikey header.
@@ -159,7 +161,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     // delete-500: the confirmation stays open with the error and request id, the typed id and the row; confirming again sends one DELETE.
     await ready(p, h, { errors: { delete: 500 }, recoverAfterFailure: ['delete'] }); h.reset(); const failed = await typeAndDelete(p, 'ord_01');
     await expect(failed.getByTestId('mongodata-confirm-error')).toBeVisible(); await expect(failed.getByTestId('mongodata-confirm-error')).toContainText('mongo-browser-request');
-    await expect(failed.getByLabel(typedLabel(p, 'ord_01'), { exact: true })).toHaveValue('ord_01'); await expect(cell(p, 'ord_01')).toBeVisible();
+    await expect(failed.getByLabel(typedLabel(p, 'ord_01'), { exact: true })).toHaveValue('ord_01'); await expect(cellBehind(p, 'ord_01')).toBeVisible();
     h.reset(); await button(p, 'deleteConfirm.confirm', failed).click(); await expect(failed).toHaveCount(0); await expect(docsTable(p).getByText(/ord_01/)).toHaveCount(0); expect(writes(h)).toHaveLength(1);
     // Busy guard: a pending insert disables the write controls; filter, page size and the key button stay enabled.
     await ready(p, h); const releaseInsert = h.hold('insert'); await button(p, 'insert.submit').click(); await expect(button(p, 'insert.submit')).toBeDisabled(); await expect(rowAction(p, 'edit', 'ord_01')).toBeDisabled(); await expect(rowAction(p, 'delete', 'ord_01')).toBeDisabled();
@@ -186,7 +188,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await p.page.keyboard.press('Tab'); await expect(button(p, 'filter.apply')).toBeFocused(); await p.page.keyboard.press('Tab'); await expect(button(p, 'filter.clear')).toBeFocused();
     // delete-500: the dialog stays open, the error is announced assertively, focus stays inside and Tab cycles only within it; Escape returns focus to Eliminar.
     await ready(p, h, { errors: { delete: 500 }, recoverAfterFailure: ['delete'] }); const failed = await typeAndDelete(p, 'ord_01');
-    await expect(failed.getByTestId('mongodata-confirm-error')).toBeVisible(); await expect(p.page.locator('[aria-live="assertive"]').filter({ hasText: text(p, 'deleteConfirm.failedTitle') }).first()).toBeAttached(); expect(await insideConfirm(p)).toBe(true);
+    await expect(failed.getByTestId('mongodata-confirm-error')).toBeVisible(); await expect(p.page.locator('[aria-live="assertive"]').filter({ hasText: text(p, 'deleteConfirm.failedTitle') }).first()).toBeAttached(); await expect.poll(() => insideConfirm(p)).toBe(true);
     for (let step = 0; step < 8; step++) { await p.page.keyboard.press('Tab'); expect(await insideConfirm(p)).toBe(true); }
     for (let step = 0; step < 8; step++) { await p.page.keyboard.press('Shift+Tab'); expect(await insideConfirm(p)).toBe(true); }
     await check.assertAccessibility(p); await p.page.keyboard.press('Escape'); await expect(failed).toHaveCount(0); await expect(rowAction(p, 'delete', 'ord_01')).toBeFocused();

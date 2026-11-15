@@ -39,7 +39,9 @@ export function ConfirmTyped({ title, description, consequences, expected, confi
   // A disabled button drops focus while the request runs; put it back inside the dialog once the error shows.
   useEffect(() => {
     if (!failure) return
-    const frame = requestAnimationFrame(() => { if (!popup.current?.contains(document.activeElement)) confirmButton.current?.focus() })
+    const restore = () => { if (!popup.current?.contains(document.activeElement)) confirmButton.current?.focus() }
+    restore()
+    const frame = requestAnimationFrame(restore)
     return () => cancelAnimationFrame(frame)
   }, [failure])
   return <AlertDialog open={open} onOpenChange={(next, event) => { if (!next && inFlight.current) { event.cancel(); return } setOpen(next) }} onOpenChangeComplete={(next) => { if (!next) onClose() }}>
