@@ -67,6 +67,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
 
   test('error-empty', async ({ parity: p }) => {
     test.setTimeout(180000); const c = copy(p);
+    await h.open('kafka:topic-metadata-empty-partitions'); await select(p); await tab(p, 'metadata');
+    await expect(surface(p).getByRole('heading', { name: c.partitions, level: 3, exact: true })).toBeVisible();
+    const partitions = surface(p).getByRole('table', { name: c.partitions, exact: true });
+    await expect(partitions.getByRole('columnheader')).toHaveCount(5);
+    await expect(partitions.getByRole('cell')).toHaveText(['']);
+    await expect(surface(p).getByText(c.thereAreNoTopicsInThisWorkspace)).toHaveCount(0); await assertKafkaLocale(p);
     await h.open('kafka:legacy-service-empty'); await expect(surface(p).getByText(c.thereAreNoTopicsInThisWorkspace)).toBeVisible();
     await h.open('kafka:legacy-service-error'); await expect(surface(p).getByRole('heading', { name: c.couldNotLoadTheKafkaInventory })).toBeVisible(); await expect(surface(p).getByRole('button', { name: c.retry })).toBeVisible();
     for (const name of ['kafka:inventory-empty', 'kafka:inventory-counts-no-bridge-ids', 'shell:tenant-none', 'shell:workspace-none']) {

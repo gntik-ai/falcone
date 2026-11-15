@@ -82,9 +82,9 @@ export function Metadata({ data }: { data: KafkaMetadata }) {
                           { label: t('lastCompaction'), value: data.compaction?.lastCompactionTimestamp },
                           { label: t('compactionLag'), value: data.compaction?.compactionLag }
                         ]} />
-{data.partitionMetadata && !('available' in data.partitionMetadata) ? <Grid rows={Object.entries(data.partitionMetadata as KafkaPartitionMeta).map(([partition, row]) => ({ partition, ...row }))} id={(row) => row.partition} label={t('partitions')} columns={[
+{data.partitionMetadata && !('available' in data.partitionMetadata) ? <section className="min-w-0 space-y-3"><Heading title={t('partitions')} level="h3" /><Grid rows={Object.entries(data.partitionMetadata as KafkaPartitionMeta).map(([partition, row]) => ({ partition, ...row }))} id={(row) => row.partition} label={t('partitions')} columns={[
  { id: 'partition', header: t('partition'), cell: (row) => row.partition }, { id: 'lag', header: t('lagAmount'), cell: (row) => formatValue(row.lag) }, { id: 'start', header: t('startOffset'), cell: (row) => formatValue(row.logStartOffset) }, { id: 'end', header: t('endOffset'), cell: (row) => formatValue(row.logEndOffset) }, { id: 'sync', header: t('inSync'), cell: (row) => formatValue(row.inSync) }
- ]} /> : null}
+ ]} /></section> : null}
  {data.technicalLimitations?.length ? <section className="space-y-2"><Heading title={t('technicalLimitations')} level="h3" />{data.technicalLimitations.map((limitation, index) => <Notice key={index}>{typeof limitation === 'string' ? limitation : <>{limitation.code ?? t('limitation')}{t('colon')} {limitation.description ?? limitation.affectedField ?? t('noDescription')}</>}</Notice>)}</section> : null}
  </div>
 }

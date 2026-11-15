@@ -16,7 +16,7 @@ export function scenario(name) {
     return { stream: name };
   }
   if (name.startsWith('kafka:inventory-') && name in fixtures) return { inventory: name };
-  if (name === 'kafka:topic-metadata-legacy-fields') return { metadata: name };
+  if (['kafka:topic-metadata-legacy-fields', 'kafka:topic-metadata-empty-partitions'].includes(name)) return { metadata: name };
   const match = /^kafka:(?:topic-)?(inventory|bridge|detail|access|metadata|publish)-(500|403|429|401|network)$/.exec(name);
   if (match) return { errors: { [match[1]]: match[2] === 'network' ? 'network' : Number(match[2]) }, refresh: match[2] === '401' ? 'ok' : null };
   return {};

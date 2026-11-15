@@ -142,6 +142,7 @@ export const fixtures = {
  'kafka:inventory-counts-no-bridge-ids': mockInventory({ items: [{ ...three.items[0], operationalMetadata: { bridgeCount: 2 } }] }),
  'kafka:bridge-1': mockBridge(), 'kafka:topic-detail': mockTopicDetail(), 'kafka:topic-access': mockAccessPolicy(),
  'kafka:topic-metadata': mockMetadata(),
+ 'kafka:topic-metadata-empty-partitions': mockMetadata({ partitionMetadata: {} }),
  'kafka:topic-metadata-legacy-fields': mockMetadata({ lag: { maxMessagesBehind: 44, available: true }, retention: { hours: 48, retentionMs: 1234 }, compaction: { available: true }, partitionMetadata: { available: false } }),
  'kafka:publish-accepted': mockPublishAccepted(),
  'kafka:stream-5-events': streamEvents(5), 'kafka:stream-burst-20': streamEvents(20),

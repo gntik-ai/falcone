@@ -57,6 +57,17 @@ test.each(['es', 'en'])('empty inventory, bridges and selection placeholders are
   for (const key of ['thereAreNoTopicsInThisWorkspace', 'thereAreNoBridgesConfiguredInThisWorkspace', 'selectATopicFromTheInventoryToReviewDetailAccessMetadataPublishEventsOrOpenAnSseStream'] as const) expect(await screen.findByText(copy(locale)[key])).toBeVisible()
   expect(pageCalls()).toHaveLength(1)
 })
+test.each(['es', 'en'].flatMap((locale) => [false, true].map((empty) => ({ locale, empty }))))('partitions keep their heading and table without inventory empty copy (empty=$empty) in $locale', async ({ locale, empty }) => {
+  await i18n.changeLanguage(locale); const c = copy(locale)
+  setup({ [`GET ${paths.metadata}`]: empty ? fixtures['kafka:topic-metadata-empty-partitions'] : fixtures['kafka:topic-metadata'] }); open(); await select(); tab(c.tabs.metadata)
+  expect(await screen.findByRole('heading', { name: c.partitions, level: 3 })).toBeVisible()
+  const table = screen.getByRole('table', { name: c.partitions })
+  for (const name of [c.partition, c.lagAmount, c.startOffset, c.endOffset, c.inSync]) expect(within(table).getByRole('columnheader', { name })).toBeVisible()
+  expect(within(table).queryAllByRole('cell').filter((cell) => cell.textContent?.trim())).toHaveLength(empty ? 0 : 10)
+  expect(screen.queryByText(c.thereAreNoTopicsInThisWorkspace)).toBeNull()
+  expect(screen.getByText('Cg-Orders')).toBeVisible()
+  expect(callsTo(paths.metadata)).toHaveLength(1)
+})
 test.each(['es', 'en'])('legacy metadata fallbacks retain lag, retention and compaction in %s', async (locale) => {
   await i18n.changeLanguage(locale); setup({ [`GET ${paths.metadata}`]: fixtures['kafka:topic-metadata-legacy-fields'] }); open(); await select(); tab(copy(locale).tabs.metadata)
   expect(await screen.findAllByText('44', { exact: true })).toHaveLength(2)
