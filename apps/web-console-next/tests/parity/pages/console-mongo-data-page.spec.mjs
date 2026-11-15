@@ -189,10 +189,11 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await field(p, 'fields.database').focus(); await p.page.keyboard.press('Tab'); await expect(field(p, 'fields.collection')).toBeFocused(); await p.page.keyboard.press('Tab'); await expect(field(p, 'filter.label')).toBeFocused();
     await p.page.keyboard.press('Tab'); await expect(button(p, 'filter.apply')).toBeFocused(); await p.page.keyboard.press('Tab'); await expect(button(p, 'filter.clear')).toBeFocused();
     // delete-500: the dialog stays open, the error is announced assertively, focus stays inside and Tab cycles only within it; Escape returns focus to Eliminar.
+    // The kit's focus trap hands focus from its guard span back into the dialog in an animation frame, so each Tab waits for focus to settle inside.
     await ready(p, h, { errors: { delete: 500 }, recoverAfterFailure: ['delete'] }); const failed = await typeAndDelete(p, 'ord_01');
     await expect(failed.getByTestId('mongodata-confirm-error')).toBeVisible(); await expect(p.page.locator('[aria-live="assertive"]').filter({ hasText: text(p, 'deleteConfirm.failedTitle') }).first()).toBeAttached(); await expect.poll(() => insideConfirm(p)).toBe(true);
-    for (let step = 0; step < 8; step++) { await p.page.keyboard.press('Tab'); expect(await insideConfirm(p)).toBe(true); }
-    for (let step = 0; step < 8; step++) { await p.page.keyboard.press('Shift+Tab'); expect(await insideConfirm(p)).toBe(true); }
+    for (let step = 0; step < 8; step++) { await p.page.keyboard.press('Tab'); await expect.poll(() => insideConfirm(p), { timeout: 2000 }).toBe(true); }
+    for (let step = 0; step < 8; step++) { await p.page.keyboard.press('Shift+Tab'); await expect.poll(() => insideConfirm(p), { timeout: 2000 }).toBe(true); }
     await check.assertAccessibility(p); await p.page.keyboard.press('Escape'); await expect(failed).toHaveCount(0); await expect(rowAction(p, 'delete', 'ord_01')).toBeFocused();
     // Retry after the failure: the failure was consumed above, so reload with a fresh failing scenario. Focus moves to the Eliminar of the row now at that position.
     await ready(p, h, { errors: { delete: 500 }, recoverAfterFailure: ['delete'] }); await typeAndDelete(p, 'ord_01'); await expect(p.page.getByTestId('mongodata-confirm-error')).toBeVisible(); await button(p, 'deleteConfirm.confirm', p.page.getByTestId('mongodata-confirm')).click();
