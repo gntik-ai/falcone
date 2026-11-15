@@ -1,0 +1,162 @@
+{
+  "title": "Editor de datos Mongo",
+  "description": "Consulta y edita documentos en una colección.",
+  "category": "Datos MongoDB",
+  "targetLabel": "Colección de destino",
+  "editorLabel": "Editor de datos Mongo",
+  "fields": {
+    "database": "Base de datos",
+    "collection": "Colección"
+  },
+  "placeholders": {
+    "database": "catalog",
+    "collection": "orders"
+  },
+  "prompt": "Introduce una base de datos y una colección para comenzar.",
+  "workspace": {
+    "required": "Selecciona un área de trabajo",
+    "description": "Selecciona un área de trabajo para editar datos.",
+    "loading": "Cargando áreas de trabajo",
+    "loadingDescription": "Consultando las áreas de trabajo accesibles de la organización activa.",
+    "picker": "Seleccionar área de trabajo",
+    "placeholder": "Selecciona un área de trabajo…",
+    "create": "Crear área de trabajo",
+    "denied": "Esta organización todavía no tiene áreas de trabajo. Pide a un propietario o administrador de la organización (o del área de trabajo) que cree la primera."
+  },
+  "filter": {
+    "title": "Filtro",
+    "label": "Filtro (consulta MongoDB en JSON)",
+    "apply": "Aplicar filtro",
+    "clear": "Limpiar"
+  },
+  "documents": {
+    "title": "Documentos",
+    "titleCount": "Documentos ({count})",
+    "loading": "Cargando documentos…",
+    "empty": "Todavía no hay documentos.",
+    "emptyDescription": "Inserta el primer documento con el formulario de abajo.",
+    "noResults": "Ningún documento coincide con el filtro.",
+    "noResultsDescription": "Cambia el filtro o límpialo para ver todos los documentos.",
+    "tableLabel": "Documentos de la colección",
+    "column": "Documento",
+    "documentLabel": "Documento {id}",
+    "editAria": "Editar documento {id}",
+    "deleteAria": "Eliminar documento {id}"
+  },
+  "pager": {
+    "label": "Paginación",
+    "size": "Tamaño de página",
+    "previous": "Anterior",
+    "next": "Siguiente"
+  },
+  "insert": {
+    "title": "Insertar documento",
+    "description": "Crea un documento nuevo a partir de un objeto JSON.",
+    "label": "Documento nuevo (JSON)",
+    "submit": "Insertar"
+  },
+  "edit": "Editar",
+  "delete": "Eliminar",
+  "editDrawer": {
+    "title": "Editar documento {id}",
+    "description": "Cambia los campos del documento. _id e id no se envían.",
+    "label": "Documento (JSON)"
+  },
+  "deleteConfirm": {
+    "title": "Eliminar documento",
+    "description": "Se eliminará de forma permanente el documento {id}.",
+    "consequence1": "El documento desaparece de la colección.",
+    "consequence2": "No hay ninguna acción para recuperarlo.",
+    "confirm": "Eliminar documento",
+    "failedTitle": "No se pudo eliminar el documento"
+  },
+  "confirm": {
+    "typeLabel": "Escribe {text} para confirmar",
+    "instruction": "El botón se activa cuando el texto coincide exactamente.",
+    "mismatch": "El texto no coincide.",
+    "irreversible": "Esta acción no se puede deshacer."
+  },
+  "keys": {
+    "title": "Embed con clave anónima",
+    "description": "Emite una clave anónima para leer esta colección desde tu aplicación y prueba la integración.",
+    "issueAnon": "Emitir clave anónima",
+    "issuedAnnounce": "Clave emitida. Cópiala ahora.",
+    "revealTitle": "Clave anónima emitida",
+    "revealDescription": "Usa esta clave en tus aplicaciones con la cabecera apikey.",
+    "onceTitle": "Se muestra una sola vez",
+    "once": "Copia esta clave ahora; no volverá a mostrarse.",
+    "keyLabel": "Clave emitida",
+    "show": "Mostrar clave",
+    "hide": "Ocultar clave",
+    "copy": "Copiar clave",
+    "copiedButton": "Copiada",
+    "copied": "Clave copiada",
+    "copyFetch": "Copiar fragmento fetch",
+    "copyCurl": "Copiar fragmento curl",
+    "copySnippet": "Copiar fragmento",
+    "snippetCopied": "Fragmento copiado",
+    "integration": "Integración con la clave emitida",
+    "fetchSnippet": "Fragmento fetch",
+    "curlSnippet": "Fragmento curl",
+    "preview": "Ejecutar vista previa de solo lectura",
+    "previewRegion": "Vista previa de integración",
+    "previewCount": "Vista previa con esta clave: {count, plural, one {# documento} other {# documentos}}.",
+    "previewDocument": "Documento de la vista previa {n}"
+  },
+  "json": {
+    "copyPath": "Copiar ruta",
+    "copyValue": "Copiar valor",
+    "copied": "Copiado",
+    "copyFailed": "No se pudo copiar",
+    "selectHint": "Selecciona un valor para copiarlo",
+    "truncated": "Contenido truncado",
+    "copyFullHint": "Copia el valor completo",
+    "keys": "{count, plural, one {# clave} other {# claves}}",
+    "items": "{count, plural, one {# elemento} other {# elementos}}",
+    "root": "raíz"
+  },
+  "resources": {
+    "documents": "los documentos",
+    "workspace": "las áreas de trabajo"
+  },
+  "noAccess": "No tienes acceso",
+  "noAccessDescription": {
+    "documents": "No tienes permiso para ver los documentos de esta colección.",
+    "workspace": "No tienes permiso para ver las áreas de trabajo."
+  },
+  "notFound": "Colección no encontrada",
+  "notFoundDescription": "La base de datos o la colección que has introducido no existe en esta área de trabajo.",
+  "back": "Volver",
+  "errors": {
+    "documents": "No se pudieron cargar los documentos",
+    "workspace": "No se pudieron cargar las áreas de trabajo"
+  },
+  "serverError": "El servidor no pudo completar la solicitud. Inténtalo de nuevo.",
+  "networkError": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.",
+  "retry": "Reintentar",
+  "retrying": "Reintentando…",
+  "support": "Contactar con soporte",
+  "requestId": "ID de solicitud",
+  "copyRequestId": "Copiar ID de solicitud",
+  "details": "Detalles técnicos",
+  "errorTitle": "No se pudo completar la acción",
+  "requestFailed": "La solicitud falló",
+  "jsonInvalid": "JSON no válido",
+  "jsonObjectExpected": "Se esperaba un objeto JSON",
+  "filterError": "Filtro: {reason}",
+  "newDocError": "Documento nuevo: {reason}",
+  "editDocError": "Documento editado: {reason}",
+  "missingIdEdit": "El documento no tiene _id para editarlo",
+  "missingIdDelete": "El documento no tiene _id para eliminarlo",
+  "inserted": "Documento insertado",
+  "updated": "Documento actualizado",
+  "deleted": "Documento eliminado",
+  "actions": "Acciones",
+  "save": "Guardar",
+  "cancel": "Cancelar",
+  "close": "Cerrar",
+  "copyFailed": "No se pudo copiar",
+  "notifications": "Notificaciones",
+  "closeToast": "Cerrar notificación",
+  "copied": "Copiado"
+}

@@ -1,0 +1,4 @@
+/* The legacy page has no search. The target fields use the page-toolbar filters slot, so hide its search and empty end slot. */
+.mongodata-toolbar div:has(> input[type="search"]) { display: none; }
+.mongodata-toolbar > div:first-child { display: block; min-width: 0; flex-basis: 100%; }
+.mongodata-toolbar > div:last-child { display: none; }
