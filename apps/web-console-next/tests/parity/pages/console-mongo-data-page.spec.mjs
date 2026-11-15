@@ -98,6 +98,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     expect(h.calls).toEqual([expect.objectContaining({ method: 'POST', path: h.paths.keys, body: { keyType: 'anon' } })]);
     await expect(p.page.getByTestId('mongodata-issued-key')).toHaveAttribute('data-masked', 'true'); await expect(dialog.getByText(text(p, 'keys.onceTitle'), { exact: true })).toBeVisible();
     await button(p, 'keys.copy', dialog).click(); expect(await p.page.evaluate(() => window.__mongoDataCopied)).toBe(synthetic.anon);
+    // Each snippet has its own copy control and copies the snippet text, which embeds the synthetic key.
+    for (const kind of ['fetch', 'curl']) { await dialog.getByTestId(`mongodata-copy-${kind}`).click(); await expect(dialog.getByTestId(`mongodata-copy-${kind}`)).toHaveText(text(p, 'keys.snippetCopied')); const snippet = await p.page.evaluate(() => window.__mongoDataCopied); expect(snippet).toContain(synthetic.anon); expect(snippet).toContain('/collections/orders/documents'); }
     h.reset(); await button(p, 'keys.preview', dialog).click(); await expect(dialog.getByTestId('mongodata-preview')).toBeVisible();
     expect(h.calls).toEqual([expect.objectContaining({ method: 'GET', path: h.urls.preview, apikey: synthetic.anon, authorization: undefined })]);
     await button(p, 'close', dialog).click(); await expect(dialog).toHaveCount(0); await expect(button(p, 'keys.issueAnon')).toBeFocused();

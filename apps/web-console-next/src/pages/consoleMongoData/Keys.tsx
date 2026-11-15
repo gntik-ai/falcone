@@ -12,7 +12,7 @@ const idle: Preview = { docs: null, failure: null, busy: false }
 // and it is dropped as soon as the reveal dialog closes or the page unmounts.
 export function KeyPanel({ target, onError }: { target: Target; onError: (message: string | null) => void }) {
   const { t } = useCopy(), announce = useAnnounce()
-  const [issued, setIssued] = useState<IssuedApiKey | null>(null), [open, setOpen] = useState(false), [copied, setCopied] = useState(false), [preview, setPreview] = useState<Preview>(idle), [issuing, setIssuing] = useState(false)
+  const [issued, setIssued] = useState<IssuedApiKey | null>(null), [open, setOpen] = useState(false), [copied, setCopied] = useState(false), [snippetCopied, setSnippetCopied] = useState<'fetch' | 'curl' | null>(null), [preview, setPreview] = useState<Preview>(idle), [issuing, setIssuing] = useState(false)
   const opener = useRef<HTMLElement | null>(null), issuingRef = useRef(false), previewToken = useRef(0), previewing = useRef(false), live = useRef(true)
   useEffect(() => { live.current = true; return () => { live.current = false; previewToken.current++ } }, [])
 
@@ -23,7 +23,7 @@ export function KeyPanel({ target, onError }: { target: Target; onError: (messag
       const key = await issueAnonKey(target.workspaceId)
       if (!live.current) return
       previewToken.current++; previewing.current = false
-      opener.current = button; setIssued(key); setOpen(true); setCopied(false); setPreview(idle)
+      opener.current = button; setIssued(key); setOpen(true); setCopied(false); setSnippetCopied(null); setPreview(idle)
       announce(t('keys.issuedAnnounce'), 'polite')
     } catch (cause) { if (live.current) onError(failureOf(cause).message ?? t('requestFailed')) }
     finally { issuingRef.current = false; if (live.current) setIssuing(false) }
@@ -46,6 +46,11 @@ export function KeyPanel({ target, onError }: { target: Target; onError: (messag
     const ok = await copyToClipboard(issued.key)
     setCopied(ok); announce(t(ok ? 'keys.copied' : 'copyFailed'), 'polite')
   }
+  // The snippets embed the key, so the announcement names the snippet and never repeats its text.
+  async function copySnippet(kind: 'fetch' | 'curl', text: string) {
+    const ok = await copyToClipboard(text)
+    setSnippetCopied(ok ? kind : null); announce(t(ok ? 'keys.snippetCopied' : 'copyFailed'), 'polite')
+  }
   const snippetParams = issued ? { apiKey: issued.key, ...target, origin: typeof window !== 'undefined' ? window.location.origin : undefined } : null
   const viewerLabels = { copyPath: t('json.copyPath'), copyValue: t('json.copyValue'), copied: t('json.copied'), copyFailed: t('json.copyFailed'), selectHint: t('json.selectHint'), truncated: t('json.truncated'), copyFullHint: t('json.copyFullHint'), keys: (count: number) => t('json.keys', { count }), items: (count: number) => t('json.items', { count }), root: t('json.root') }
   return <section aria-label={t('keys.title')} className="min-w-0 space-y-4" data-testid="mongodata-keys">
@@ -53,7 +58,7 @@ export function KeyPanel({ target, onError }: { target: Target; onError: (messag
     <div className="flex flex-wrap gap-2">
       <Button type="button" variant="primary" size="md" loading={false} disabled={issuing} iconOnly={false} icon={undefined} trailingIcon={undefined} className={focusRing} onClick={(event) => void issue(event.currentTarget)}>{t('keys.issueAnon')}</Button>
     </div>
-    <Dialog open={open} modal={true} onOpenChange={(next) => { if (!next) setOpen(false) }} onOpenChangeComplete={(next) => { if (!next) { previewToken.current++; previewing.current = false; setIssued(null); setPreview(idle) } }}>
+    <Dialog open={open} modal={true} onOpenChange={(next) => { if (!next) setOpen(false) }} onOpenChangeComplete={(next) => { if (!next) { previewToken.current++; previewing.current = false; setIssued(null); setSnippetCopied(null); setPreview(idle) } }}>
       <DialogContent aria-modal="true" size="lg" presentation="responsive" showClose={false} closeLabel={t('close')} container={undefined} initialFocus={true} finalFocus={() => opener.current?.isConnected ? opener.current : true} className="min-w-0 max-w-full wrap-anywhere" data-testid="mongodata-reveal">
         <DialogHeader>
           <DialogTitle>{t('keys.revealTitle')}</DialogTitle>
@@ -67,9 +72,15 @@ export function KeyPanel({ target, onError }: { target: Target; onError: (messag
               <SecretField id="mongodata-issued-key" data-testid="mongodata-issued-key" value={issued.key} editable={false} defaultRevealed={false} copyable={false} showLabel={t('keys.show')} hideLabel={t('keys.hide')} aria-label={t('keys.keyLabel')} className={focusRing} />
             </Field>
             <div className="min-w-0 space-y-2" aria-label={t('keys.integration')} role="group">
-              <Heading title={t('keys.fetchSnippet')} level="h3" />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Heading title={t('keys.fetchSnippet')} level="h3" />
+                <Button type="button" variant="secondary" size="sm" loading={false} disabled={false} iconOnly={false} icon={undefined} trailingIcon={undefined} className={focusRing} data-testid="mongodata-copy-fetch" aria-label={t('keys.copyFetch')} onClick={() => void copySnippet('fetch', buildFrontendSnippet(snippetParams))}>{snippetCopied === 'fetch' ? t('keys.snippetCopied') : t('keys.copySnippet')}</Button>
+              </div>
               <CodeBlock code={buildFrontendSnippet(snippetParams)} language="" filename="" showLineNumbers={false} highlightLines={[]} defaultWrap={true} wrapToggle={false} copyable={false} maxHeight={undefined} highlight={(value) => value} label={t('keys.fetchSnippet')} className="min-w-0 max-w-full" />
-              <Heading title={t('keys.curlSnippet')} level="h3" />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Heading title={t('keys.curlSnippet')} level="h3" />
+                <Button type="button" variant="secondary" size="sm" loading={false} disabled={false} iconOnly={false} icon={undefined} trailingIcon={undefined} className={focusRing} data-testid="mongodata-copy-curl" aria-label={t('keys.copyCurl')} onClick={() => void copySnippet('curl', buildCurlSnippet(snippetParams))}>{snippetCopied === 'curl' ? t('keys.snippetCopied') : t('keys.copySnippet')}</Button>
+              </div>
               <CodeBlock code={buildCurlSnippet(snippetParams)} language="" filename="" showLineNumbers={false} highlightLines={[]} defaultWrap={true} wrapToggle={false} copyable={false} maxHeight={undefined} highlight={(value) => value} label={t('keys.curlSnippet')} className="min-w-0 max-w-full" />
             </div>
             <div className="min-w-0 space-y-3">

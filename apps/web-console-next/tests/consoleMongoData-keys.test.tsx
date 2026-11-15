@@ -28,6 +28,14 @@ test('Copiar copies exactly the issued key', async () => {
   server = setup(issueRoute); open(); await enterTarget(); await loaded(); const dialog = await reveal()
   fireEvent.click(within(dialog).getByRole('button', { name: 'Copiar clave' })); await within(dialog).findByRole('button', { name: 'Copiada' }); expect(writeText).toHaveBeenCalledWith(synthetic.anon)
 })
+test.each([['fetch', 'Copiar fragmento fetch', `apikey: '${synthetic.anon}'`], ['curl', 'Copiar fragmento curl', `apikey: ${synthetic.anon}`]])('the %s snippet has its own copy button that copies the snippet and never announces the key', async (_kind, name, embeds) => {
+  const writeText = vi.fn(async () => undefined); vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { clipboard: { writeText } }))
+  server = setup(issueRoute); open(); await enterTarget(); await loaded(); const dialog = await reveal()
+  fireEvent.click(within(dialog).getByRole('button', { name })); await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+  const copied = (writeText.mock.calls[0] as unknown as [string])[0]; expect(copied).toContain(embeds); expect(copied).toContain('/v1/mongo/workspaces/ws-1/data/catalog/collections/orders/documents')
+  expect(await within(dialog).findByRole('button', { name })).toHaveTextContent('Fragmento copiado')
+  for (const region of document.querySelectorAll('[aria-live]')) expect(region.textContent).not.toContain(synthetic.anon)
+})
 test('the preview is a GET with page[size]=10 and only apikey auth, is single-flight and renders each document in a json viewer', async () => {
   let release!: (response: Response) => void
   server = setup({ ...issueRoute, [`GET ${previewUrl}`]: () => new Promise<Response>((resolve) => { release = resolve }) }); open(); await enterTarget(); await loaded(); const dialog = await reveal()
