@@ -46,6 +46,10 @@ export async function installSession(page, roles = ['superadmin'], capabilityVar
       await route.fulfill({ json: { ...realtimeReady, workspaceId: 'sample-workspaceId' } });
     } else if (route.request().method() === 'GET' && url.pathname === '/v1/tenant/plan/effective-entitlements' && url.search === '?include=consumption') {
       await route.fulfill({ json: { tenantId: 'synthetic-tenant', quantitativeLimits: [], capabilities: [] } });
+    } else if (route.request().method() === 'GET' && /^\/v1\/events\/workspaces\/[^/]+\/inventory$/.test(url.pathname) && url.searchParams.get('page[size]') === '100' && [...url.searchParams].length === 1) {
+      await route.fulfill({ json: { workspaceId: decodeURIComponent(url.pathname.split('/')[4]), tenantId: 'synthetic-tenant', items: [], counts: {} } });
+    } else if (route.request().method() === 'GET' && /^\/v1\/events\/workspaces\/[^/]+\/bridges\/[^/]+$/.test(url.pathname) && !url.search) {
+      await route.fulfill({ json: { bridgeId: decodeURIComponent(url.pathname.split('/')[6]), topicRef: 'synthetic-topic', status: 'active' } });
     } else if (route.request().method() === 'GET' && /^\/v1\/workspaces\/[^/]+\/docs$/.test(url.pathname) && !url.search) {
       await route.fulfill({ json: {
         workspaceId: decodeURIComponent(url.pathname.split('/')[3]), tenantId: 'synthetic-tenant',
