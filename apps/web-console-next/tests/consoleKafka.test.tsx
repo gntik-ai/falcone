@@ -155,8 +155,17 @@ test('a dropped stream can reconnect, while topic change and unmount cancel acti
   await select(); tab(es.tabs.stream); stream = streamResponse(''); fireEvent.click(screen.getByRole('button', { name: es.startStream })); await waitFor(() => expect(callsTo(paths.stream)).toHaveLength(3)); view.unmount(); await waitFor(() => expect(stream.cancelled()).toBe(true))
 })
 test('SSE frames split between chunks are buffered and aborting before headers ignores stale responses', async () => {
-  const stream = streamResponse('data: {"pay'); setup({ [`GET ${paths.stream}`]: () => stream.response }); open(); await select(); tab(es.tabs.stream); fireEvent.click(screen.getByRole('button', { name: es.startStream }))
+  const stream = streamResponse('data: {"pay'); let response: Response | Promise<Response> = stream.response
+  setup({ [`GET ${paths.stream}`]: () => response }); open(); await select(); tab(es.tabs.stream); fireEvent.click(screen.getByRole('button', { name: es.startStream }))
   await act(async () => { stream.source.enqueue(new TextEncoder().encode('load":{"split":true}}\n\n')) }); expect(await screen.findByText(/"split":true/)).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: es.stopStream })); await waitFor(() => expect(stream.cancelled()).toBe(true))
+  let release!: (response: Response) => void
+  response = new Promise<Response>((resolve) => { release = resolve })
+  fireEvent.click(screen.getByRole('button', { name: es.startStream })); await waitFor(() => expect(callsTo(paths.stream)).toHaveLength(2))
+  fireEvent.click(screen.getByRole('button', { name: es.stopStream })); const late = streamResponse('data: {"late":true}\n\n')
+  await act(async () => release(late.response)); await waitFor(() => expect(late.cancelled()).toBe(true))
+  expect(screen.getByRole('button', { name: es.startStream })).toBeVisible(); expect(screen.queryByText(/"late":true/)).toBeNull()
+
 })
 
 test('pending inventory and each topic section render localized skeletons without sample values', async () => {
