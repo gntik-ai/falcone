@@ -27,6 +27,14 @@ export async function installKafkaHarness(parity) {
   // fixture response body open, because Playwright route.fulfill otherwise closes finite SSE bodies.
   // Abort, drop and cancellation use ReadableStream, exercising the page's actual reader lifecycle.
   await parity.page.addInitScript(() => {
+    // The mirrored legacy journey uses its original workspace identifier. Keep the
+    // synthetic session's membership aligned with both workspace fixtures.
+    document.addEventListener('readystatechange', () => {
+      if (document.readyState !== 'interactive') return;
+      const key = 'in-falcone.console-shell-session', session = JSON.parse(sessionStorage.getItem(key));
+      session.principal.workspaceIds = ['synthetic-workspace', 'ws_alpha_prod'];
+      sessionStorage.setItem(key, JSON.stringify(session));
+    }, { once: true });
     const original = window.fetch.bind(window);
     window.__kafkaOpenStreams = 0;
     window.fetch = async (input, options) => {
@@ -52,7 +60,15 @@ export async function installKafkaHarness(parity) {
     const path = url.pathname + url.search;
     let body; try { body = request.postDataJSON() ?? undefined; } catch { body = request.postData(); }
     const reject = async () => { unmatched.push(`${method} ${path}`); await route.abort(); };
-    let key = Object.keys(paths).find((key) => key !== 'refresh' && new URL(paths[key], 'http://local').pathname === (state.legacy ? url.pathname.replace('/ws_alpha_prod/', '/synthetic-workspace/').replace('/topic_audit_001', '/res_topic_1') : url.pathname));
+    const inventory = state.legacy ? legacyJourneyFixtures[state.legacyEmpty ? 'empty' : 'inventory'] : fixtures[state.inventory];
+    const topic = inventory.items.find(({ resourceId }) => ['detail', 'access', 'metadata', 'publish', 'stream'].some((key) => url.pathname === new URL(paths[key], 'http://local').pathname.replace('/res_topic_1', `/${resourceId}`)));
+    const key = Object.keys(paths).find((key) => {
+      if (key === 'refresh') return false;
+      const expected = new URL(paths[key], 'http://local').pathname;
+      return url.pathname === (['inventory', 'bridge'].includes(key)
+        ? expected.replace('/synthetic-workspace/', `/${state.legacy ? 'ws_alpha_prod' : 'synthetic-workspace'}/`)
+        : topic ? expected.replace('/res_topic_1', `/${topic.resourceId}`) : null);
+    });
     let response;
     if (key) {
       if (method !== (key === 'publish' ? 'POST' : 'GET')) return reject();
@@ -63,7 +79,10 @@ export async function installKafkaHarness(parity) {
       else if (key === 'stream') {
         await route.fulfill({ status: 200, contentType: 'text/event-stream', body: state.stream === 'kafka:stream-dropped' ? '' : fixtures[state.stream] ?? '' }); return;
       } else if (state.legacy) response = { body: legacyJourneyFixtures[key === 'inventory' && state.legacyEmpty ? 'empty' : key] };
-      else response = { body: fixtures[key === 'inventory' ? state.inventory : key === 'metadata' ? state.metadata : fixtureFor[key]] };
+      else {
+        const fixture = fixtures[key === 'inventory' ? state.inventory : key === 'metadata' ? state.metadata : fixtureFor[key]];
+        response = { body: topic ? { ...fixture, resourceId: topic.resourceId, topicName: topic.topicName } : fixture };
+      }
     } else if (method === 'POST' && path === paths.refresh && state.refresh) {
       calls.push({ method, path, body, authorization: request.headers().authorization });
       response = state.refresh === 'rejected' ? { status: 400, body: {} } : { body: buildConsoleRefreshSessionFixture() };

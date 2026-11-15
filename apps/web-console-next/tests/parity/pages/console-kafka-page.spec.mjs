@@ -139,9 +139,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
   test('visual-review', async ({ parity: p }, info) => {
     await info.attach('allowed-parity-differences', { body: JSON.stringify(parityDifferences), contentType: 'application/json' });
     await h.open(); await select(p); await capture(p, info, 'inventory-kpis-selected-detail');
-    for (const key of ['detail', 'access', 'metadata', 'publish', 'stream']) { await tab(p, key); await capture(p, info, `selected-${key}`, surface(p).getByRole('tabpanel')); }
+    for (const key of ['detail', 'access', 'metadata', 'publish', 'stream']) { await tab(p, key); await capture(p, info, `selected-${key}`, surface(p).getByRole('tabpanel', { name: copy(p).tabs[key], exact: true })); }
     await toggle(p).click(); await expect(surface(p).getByRole('log')).toContainText('key-4'); await capture(p, info, 'frozen-stream-events', surface(p).getByRole('log')); await toggle(p, true).click();
-    for (const status of [500, 403]) { await h.open(`kafka:topic-metadata-${status}`); await select(p); await tab(p, 'metadata'); await expect(surface(p).getByText(copy(p)[status === 500 ? 'couldNotLoadTheTopicOperationalMetadata' : 'youDoNotHaveAccessToTheTopicOperationalMetadata'], { exact: true }).first()).toBeVisible(); await capture(p, info, `metadata-${status}`, surface(p).getByRole('tabpanel')); }
+    for (const status of [500, 403]) { await h.open(`kafka:topic-metadata-${status}`); await select(p); await tab(p, 'metadata'); await expect(surface(p).getByText(copy(p)[status === 500 ? 'couldNotLoadTheTopicOperationalMetadata' : 'youDoNotHaveAccessToTheTopicOperationalMetadata'], { exact: true }).first()).toBeVisible(); await capture(p, info, `metadata-${status}`, surface(p).getByRole('tabpanel', { name: copy(p).tabs.metadata, exact: true })); }
     await h.open('kafka:inventory-500'); await expect(surface(p).getByRole('heading', { name: copy(p).couldNotLoadTheKafkaInventory })).toBeVisible(); await capture(p, info, 'inventory-error');
   });
 });

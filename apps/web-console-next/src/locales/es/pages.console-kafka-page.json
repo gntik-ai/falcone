@@ -217,7 +217,7 @@
   "selectAValue": "Selecciona un valor",
   "truncatedContent": "Contenido truncado",
   "copyFullValue": "Copiar valor completo",
-  "keys": "Claves",
+  "keys": "{count} claves",
   "items": "Elementos",
   "root": "Raíz",
   "close": "Cerrar",

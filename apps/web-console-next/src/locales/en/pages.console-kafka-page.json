@@ -217,7 +217,7 @@
   "selectAValue": "Select a value",
   "truncatedContent": "Truncated content",
   "copyFullValue": "Copy full value",
-  "keys": "Keys",
+  "keys": "{count} keys",
   "items": "Items",
   "root": "Root",
   "close": "Close",
