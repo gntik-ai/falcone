@@ -124,6 +124,14 @@ export function MongoDataEditor({ target, mutations, onBack }: { target: Target;
         succeed(feedback.current.t('updated'))
         await reloadRef.current(true)
       })
+      // The drawer closes while the row's Editar is still disabled by the reload, so the kit cannot focus it. Once the
+      // reload settles and the row is enabled again, put focus there (or on the documents heading if the row is gone),
+      // unless the user has already moved focus somewhere real.
+      refocus(() => {
+        const active = document.activeElement
+        if (active && active !== document.body) return null
+        return Array.from(document.querySelectorAll<HTMLElement>('[data-mongodata-edit]')).find((button) => button.dataset.mongodataEdit === current.id) ?? docsHeading.current
+      }, 30)
     } catch (cause) { if (mounted.current) { fail('edit', message(cause)); refocus(() => saveButton.current) } }
   }
   function beginDelete(doc: MongoDocument, index: number, trigger: HTMLElement) {

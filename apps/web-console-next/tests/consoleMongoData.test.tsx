@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test } from 'vitest'
 import { button, calls, click, enterTarget, failWith, loaded, open, setup, settle, typeInto } from './consoleMongoData-support'
 import { docsPath, docsUrl, fixtures, keysPath, pageDocs } from './parity/pages/console-mongo-data-page.manifest'
@@ -88,6 +88,17 @@ test('Guardar sends PATCH {update} without _id or id, closes the drawer, reloads
   await screen.findByText(/shipped/); await waitFor(() => expect(screen.queryByTestId('mongodata-drawer')).toBeNull())
   expect(writes()).toEqual([expect.objectContaining({ method: 'PATCH', path: idPath('ord_01'), body: { update: { status: 'shipped' } } })])
   expect((await screen.findAllByText('Documento actualizado')).length).toBeGreaterThan(0)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Editar documento ord_01' })).toHaveFocus())
+})
+test('a successful update with a slow reload returns focus to Editar once the reload settles', async () => {
+  let patched = false, release: ((response: Response) => void) | undefined
+  server = setup({ [`PATCH ${idPath('ord_01')}`]: () => { patched = true; return Response.json(fixtures['mongo:update-ok']) }, [`GET ${docsUrl()}`]: () => patched ? new Promise<Response>((resolve) => { release = resolve }) : Response.json(fixtures['mongo:documents-page-1']) })
+  open(); await enterTarget(); await loaded()
+  fireEvent.click(screen.getByRole('button', { name: 'Editar documento ord_01' }))
+  const drawer = await screen.findByRole('dialog'); fireEvent.click(within(drawer).getByRole('button', { name: 'Guardar' }))
+  await waitFor(() => expect(release).toBeTypeOf('function')); await waitFor(() => expect(screen.queryByTestId('mongodata-drawer')).toBeNull())
+  expect(screen.getByRole('button', { name: 'Editar documento ord_01', hidden: true })).toBeDisabled()
+  await act(async () => release!(Response.json(fixtures['mongo:documents-after-update'])))
   await waitFor(() => expect(screen.getByRole('button', { name: 'Editar documento ord_01' })).toHaveFocus())
 })
 test('update-500 keeps the drawer open with the edited JSON and the error, focus stays on Guardar and a retry sends one PATCH', async () => {
