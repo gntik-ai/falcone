@@ -99,6 +99,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'plans/new') return { ...route, element: lazyPage('pages.console-plan-create-page', () => import('./pages/consolePlanCreate')) }
         if (route.path === 'postgres' && route.migrated) return { ...route, element: lazyPage('pages.console-postgres-page', () => import('./pages/consolePostgres')) }
         if (route.path === 'postgres/data' && route.migrated) return { ...route, element: lazyPage('pages.console-postgres-data-page', () => import('./pages/consolePostgresData')) }
+        if (route.path === 'mongo/data' && route.migrated) return { ...route, element: lazyPage('pages.console-mongo-data-page', () => import('./pages/consoleMongoData')) }
         if (route.path === 'database' && route.migrated) return { ...route, element: lazyPage('pages.console-workspace-database-page', () => import('./pages/consoleWorkspaceDatabase')) }
         if (route.path === 'quotas') return { ...route, element: lazyPage('pages.console-quotas-page', () => import('./pages/consoleQuotas')) }
         if (route.path === 'workspaces/:workspaceId/realtime' && route.migrated) return { ...route, element: lazyPage('pages.console-realtime-page', () => import('./pages/consoleRealtime')) }
