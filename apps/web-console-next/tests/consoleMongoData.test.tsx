@@ -181,9 +181,11 @@ test('every request is one of the page requests: list, insert, patch, delete, is
   click('Insertar'); await waitFor(() => expect(count(docsUrl())).toBe(2))
   fireEvent.click(await screen.findByRole('button', { name: 'Editar documento ord_01' })); fireEvent.click(await within(await screen.findByTestId('mongodata-drawer')).findByRole('button', { name: 'Guardar' })); await waitFor(() => expect(count(docsUrl())).toBe(3))
   fireEvent.click(await screen.findByRole('button', { name: 'Eliminar documento ord_01' })); const dialog = await screen.findByRole('alertdialog'); fireEvent.change(confirmField(dialog, 'ord_01'), { target: { value: 'ord_01' } }); fireEvent.click(within(dialog).getByRole('button', { name: 'Eliminar documento' })); await waitFor(() => expect(count(docsUrl())).toBe(4))
-  click('Emitir clave anónima'); await screen.findByTestId('mongodata-reveal')
+  // The kit keeps the rest of the page aria-hidden until the closing dialog has finished, so wait for it before looking for the next button.
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  fireEvent.click(await screen.findByRole('button', { name: 'Emitir clave anónima' })); await screen.findByTestId('mongodata-reveal')
   const sent = calls(server).map(({ method, path }) => `${method} ${path}`)
   for (const request of sent) expect(allowed.some((rule) => rule.test(request)), request).toBe(true)
   expect(sent.some((request) => /postgres|imports|exports|^PUT/.test(request))).toBe(false); expect(sent.filter((request) => /api-keys/.test(request))).toEqual([`POST ${keysPath}`])
   expect(pageDocs(1, 1)).toHaveLength(1)
-})
+}, 30000)

@@ -152,7 +152,7 @@ export function MongoDataEditor({ target, mutations, onBack }: { target: Target;
     </div> } },
   ]
   const filtered = Object.keys(appliedFilter).length > 0
-  const callout = (scope: Scope) => notice?.scope === scope && <div className="min-w-0"><InlineCallout tone="destructive" title={t('errorTitle')} labels={{ title: t('errorTitle') }} description={notice.message} actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined} className="min-w-0" /></div>
+  const callout = (scope: Scope) => notice?.scope === scope && <div className="min-w-0"><InlineCallout tone="destructive" title={t('errorTitle')} labels={{ title: t('errorTitle') }} description={notice.message} actions={[]} icon={undefined} dismissible={false} open={true} onDismiss={undefined} className="min-w-0 [&_[id$=-title]]:text-destructive-chip-text" /></div>
   const shown = edit ?? lastEdit.current
 
   const filterSlot = <section aria-label={t('filter.title')} className="min-w-0 space-y-4">
