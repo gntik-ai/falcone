@@ -190,8 +190,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     for (let step = 0; step < 8; step++) { await p.page.keyboard.press('Tab'); expect(await insideConfirm(p)).toBe(true); }
     for (let step = 0; step < 8; step++) { await p.page.keyboard.press('Shift+Tab'); expect(await insideConfirm(p)).toBe(true); }
     await check.assertAccessibility(p); await p.page.keyboard.press('Escape'); await expect(failed).toHaveCount(0); await expect(rowAction(p, 'delete', 'ord_01')).toBeFocused();
-    // Retry after the failure: focus moves to the Eliminar of the row now at that position.
-    await typeAndDelete(p, 'ord_01'); await expect(p.page.getByTestId('mongodata-confirm-error')).toBeVisible(); await button(p, 'deleteConfirm.confirm', p.page.getByTestId('mongodata-confirm')).click();
+    // Retry after the failure: the failure was consumed above, so reload with a fresh failing scenario. Focus moves to the Eliminar of the row now at that position.
+    await ready(p, h, { errors: { delete: 500 }, recoverAfterFailure: ['delete'] }); await typeAndDelete(p, 'ord_01'); await expect(p.page.getByTestId('mongodata-confirm-error')).toBeVisible(); await button(p, 'deleteConfirm.confirm', p.page.getByTestId('mongodata-confirm')).click();
     await expect(p.page.getByTestId('mongodata-confirm')).toHaveCount(0); await expect(rowAction(p, 'delete', 'ord_02')).toBeFocused();
     // insert-500 keeps focus on Insertar; update-500 keeps it on Guardar.
     await ready(p, h, { errors: { insert: 500, update: 500 } }); await button(p, 'insert.submit').click(); await expect(p.page.getByText('synthetic insert failure', { exact: true }).first()).toBeVisible(); await expect(button(p, 'insert.submit')).toBeFocused();
