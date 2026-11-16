@@ -1,5 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs'
-import { expect, test } from 'vitest'
+import { render } from '@testing-library/react'
+import { expect, test, vi } from 'vitest'
+// @ts-expect-error Browser helpers intentionally use native JavaScript modules.
+import { collectKafkaLocaleValues } from './parity/pages/console-kafka-page.locale.mjs'
 import i18n from '../src/i18n'
 import '../src/pages/consoleKafka/copy'
 import es from '../src/locales/es/pages.console-kafka-page.json'
@@ -19,10 +22,38 @@ test.each(['es', 'en'])('ICU relative time, counts and dynamic section keys reso
   expect(t('keys', { count: 3 })).toBe(locale === 'es' ? '3 claves' : '3 keys')
   for (const key of ['tabs.detail', 'tabs.access', 'tabs.metadata', 'tabs.publish', 'tabs.stream', 'counts.active', 'counts.provisioning', 'counts.degraded']) expect(t(key)).not.toBe(key)
 })
-test('Kafka copy does not flag the existing bilingual Postgres Keys label as untranslated', () => {
+test('Kafka copy does not flag existing bilingual Postgres labels as untranslated', () => {
   const postgres = ['es', 'en'].map((locale) => JSON.parse(readFileSync(`src/locales/${locale}/pages.console-postgres-page.json`, 'utf8')))
   expect(postgres[0].keys).toBe('Keys'); expect(postgres[1].keys).toBe('Keys')
+  expect(postgres[0].policyName).toBe('Policy'); expect(postgres[1].policyName).toBe('Policy')
   const spanish = new Map(flatten(es))
   const forbidden = flatten(en).filter(([key, value]) => value !== spanish.get(key) && !value.includes('{')).map(([, value]) => value)
   expect(forbidden).not.toContain(postgres[0].keys)
+  expect(forbidden).not.toContain(postgres[0].policyName)
+})
+test('only the existing shell empty workspace trigger text is exempt from the Kafka scan', () => {
+  vi.spyOn(Element.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  const labels = { contextLabel: 'Contexto activo', workspaceLabel: 'Área de trabajo activa' }
+  const view = render(<section aria-label={labels.contextLabel}><button aria-label={labels.workspaceLabel}><span><span>Select workspace</span></span></button></section>)
+  // Chromium reports innerText for both the trigger and its nested spans.
+  for (const element of document.querySelectorAll('button, button span')) Object.defineProperty(element, 'innerText', { value: element.textContent })
+  const before = document.body.innerHTML
+  expect(collectKafkaLocaleValues(labels)).not.toContain('Select workspace')
+  expect(collectKafkaLocaleValues(labels)).toContain(labels.workspaceLabel)
+  expect(document.body.innerHTML).toBe(before)
+  view.unmount()
+})
+test('Kafka, portal, attribute and other shell copy are still checked without exemptions', () => {
+  vi.spyOn(Element.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  const labels = { contextLabel: 'Contexto activo', workspaceLabel: 'Área de trabajo activa' }
+  render(<>
+    <section aria-label={labels.contextLabel}><button aria-label={labels.workspaceLabel} title="Select workspace"><span>Select workspace</span><span>Search...</span></button><button>Select workspace</button></section>
+    <section data-testid="console-kafka-page" aria-label={labels.contextLabel}><button aria-label={labels.workspaceLabel}>Select workspace</button><input placeholder="Select workspace" /><span aria-labelledby="missing-key" /></section>
+    <div role="dialog"><span>Select workspace</span><span id="missing-key">pages.untranslated</span></div>
+  </>)
+  const values = collectKafkaLocaleValues(labels)
+  // Tooltip, unrelated shell button, Kafka text, placeholder and portal text.
+  expect(values.filter((value: string) => value === 'Select workspace')).toHaveLength(5)
+  expect(values).toContain('Search...')
+  expect(values).toContain('pages.untranslated')
 })

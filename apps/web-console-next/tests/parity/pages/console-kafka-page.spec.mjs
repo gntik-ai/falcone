@@ -48,7 +48,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     expect(['inventory', 'bridge', 'detail', 'access', 'metadata'].map((key) => h.count(key))).toEqual([1, 1, 1, 1, 1]);
     await h.open('kafka:topic-metadata-legacy-fields'); await select(p); await tab(p, 'metadata');
     for (const value of ['48', '1234', c.providerManaged]) await expect(surface(p).getByText(value, { exact: true })).toBeVisible(); await expect(surface(p).getByText('44', { exact: true })).toHaveCount(2);
-    await h.open('kafka:inventory-120'); await expect(surface(p).getByRole('table', { name: c.kafkaTopics, exact: true }).getByRole('row')).toHaveCount(121); await expect(surface(p).locator('dl').first()).toContainText('120');
+    await h.open('kafka:inventory-120'); await expect(surface(p).getByRole('table', { name: c.kafkaTopics, exact: true }).getByRole('row')).toHaveCount(121);
+    await expect(surface(p).locator('dl').filter({ has: p.page.getByText(c.total, { exact: true }) }).locator('dd').first()).toHaveText('120');
     await expect(surface(p).getByRole('button', { name: /Next page|Siguiente página/ })).toHaveCount(0); await assertKafkaLocale(p);
   });
 

@@ -10,7 +10,7 @@
   "degraded": "Degraded",
   "name": "Name",
   "status": "Status",
-  "policy": "Policy",
+  "policy": "Cleanup policy",
   "partitions": "Partitions",
   "retentionH": "Retention (h)",
   "quota": "Quota",
