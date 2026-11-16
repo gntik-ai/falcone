@@ -419,6 +419,9 @@ jobs:
 
   web-console-next:
     runs-on: ubuntu-24.04
+    env:
+      # The repeated vite builds outgrew the default Node heap (OOM, exit 134) once the u3 pages landed.
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
