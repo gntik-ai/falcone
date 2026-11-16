@@ -69,4 +69,3 @@ test.each(['link', 'navigate'])('%s loads the lazy chunk in-router', async (mode
   await screen.findByRole('table', {}, timeout); expect(screen.getByTestId('location')).toHaveTextContent('/console/events/data')
   expect(screen.getByRole('heading', { name: es.title, level: 1 })).toBeVisible()
 })
-
