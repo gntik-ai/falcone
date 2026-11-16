@@ -124,10 +124,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         expect(calls(parity).at(-1)).toEqual(get(path));
       }
       // Failure after load: the section loaded once, then its second request fails and replaces the loaded data.
+      // The request log accumulates across opens, so this scenario's reads are counted from here.
+      const scenarioStart = calls(parity).length;
       await parity.open(manifest.route, { 'functions-detail': ['success', 'network', 'success'], 'functions-update': 'update-accepted' }); await select(parity); await openTab(parity, 'deploy');
       await surface(parity).getByLabel(c.form.entrypoint, { exact: true }).fill('main2'); await button(parity, c.form.update).click();
       await expect(alertWith(parity, c.errors.detail)).toBeVisible(); await expect(surface(parity).getByTestId('functions-deploy')).toHaveCount(0); await expect(surface(parity).getByTestId('functions-detail')).toHaveCount(0);
-      const versionReads = () => calls(parity).filter((call) => JSON.stringify(call) === JSON.stringify(get(versionsPath))).length;
+      const versionReads = () => calls(parity).slice(scenarioStart).filter((call) => JSON.stringify(call) === JSON.stringify(get(versionsPath))).length;
       await expect.poll(versionReads).toBe(2);
       const detailBefore = calls(parity).length; await alertWith(parity, c.errors.detail).getByRole('button', { name: c.retry, exact: true }).click();
       await expect(surface(parity).getByTestId('functions-deploy')).toBeVisible(); expect(calls(parity).slice(detailBefore)).toEqual([get(detailPath)]);
