@@ -123,7 +123,20 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         const before = calls(parity).length; await alertWith(parity, c.errors['5xx']).getByRole('button', { name: c.retry, exact: true }).click(); await expect.poll(() => calls(parity).length).toBe(before + 1);
         expect(calls(parity).at(-1)).toEqual(get(path));
       }
-      await parity.open(manifest.route, { 'functions-detail': ['success', 'network'] }); await select(parity); await openTab(parity, 'versions');
+      // Failure after load: the section loaded once, then its second request fails and replaces the loaded data.
+      await parity.open(manifest.route, { 'functions-detail': ['success', 'network', 'success'], 'functions-update': 'update-accepted' }); await select(parity); await openTab(parity, 'deploy');
+      await surface(parity).getByLabel(c.form.entrypoint, { exact: true }).fill('main2'); await button(parity, c.form.update).click();
+      await expect(alertWith(parity, c.errors.detail)).toBeVisible(); await expect(surface(parity).getByTestId('functions-deploy')).toHaveCount(0); await expect(surface(parity).getByTestId('functions-detail')).toHaveCount(0);
+      const versionReads = () => calls(parity).filter((call) => JSON.stringify(call) === JSON.stringify(get(versionsPath))).length;
+      await expect.poll(versionReads).toBe(2);
+      const detailBefore = calls(parity).length; await alertWith(parity, c.errors.detail).getByRole('button', { name: c.retry, exact: true }).click();
+      await expect(surface(parity).getByTestId('functions-deploy')).toBeVisible(); expect(calls(parity).slice(detailBefore)).toEqual([get(detailPath)]);
+      await parity.open(manifest.route, { 'functions-activations': ['success', 'network', 'success'], 'functions-invoke': 'invoke-accepted' }); await select(parity); await openTab(parity, 'activations');
+      await expect(surface(parity).getByTestId('functions-activations').getByRole('radio').first()).toBeVisible();
+      await openTab(parity, 'invoke'); await button(parity, c.invoke.action).click(); await expect(surface(parity).getByText(c.invoke.resultTitle, { exact: true })).toBeVisible(); await openTab(parity, 'activations');
+      await expect(alertWith(parity, c.errors.activations)).toBeVisible(); await expect(surface(parity).getByTestId('functions-activations').getByRole('radio')).toHaveCount(0);
+      const listBefore = calls(parity).length; await alertWith(parity, c.errors.activations).getByRole('button', { name: c.retry, exact: true }).click();
+      await expect(surface(parity).getByTestId('functions-activations').getByRole('radio').first()).toBeVisible(); expect(calls(parity).slice(listBefore)).toEqual([get(activationsPath)]);
       await parity.open(manifest.route, { 'functions-detail': 'network' }); await ready(parity); await radio(parity, 'synthetic-hello').check();
       await expect(surface(parity).getByText(c.errors.detail, { exact: true })).toBeVisible(); await expect(surface(parity).getByTestId('functions-detail')).toHaveCount(0);
       await parity.open(manifest.route, { 'functions-invoke': 'invoke-429' }); await select(parity); await openTab(parity, 'invoke'); await button(parity, c.invoke.action).click();

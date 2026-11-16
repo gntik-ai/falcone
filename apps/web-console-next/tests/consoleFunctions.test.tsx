@@ -246,20 +246,30 @@ test('a detail 403 and 404 replace only the detail pane', async () => {
   fireEvent.click(button(es.notFound.back)); expect(document.activeElement).toBe(document.getElementById('functions-inventory-title'))
 })
 
-test('a network failure after load replaces the detail pane with a panel, never stale data, and retry reloads only it', async () => {
-  const retry = sequence('network', Response.json(action(1, 'synthetic-hello')))
-  setup({ [`GET ${detailPath}`]: retry }); open(); await ready(); pick('synthetic-hello')
+test('a network failure after load replaces the loaded detail with a panel, never stale data, and retry reloads only it', async () => {
+  const detailReads = sequence(Response.json(action(1, 'synthetic-hello')), 'network', Response.json(action(1, 'synthetic-hello')))
+  setup({ [`GET ${detailPath}`]: detailReads, [`PATCH ${detailPath}`]: accepted() }); open(); await update()
+  expect(field(es.form.entrypoint)).toHaveValue('main')
+  fireEvent.change(field(es.form.entrypoint), { target: { value: 'main2' } }); fireEvent.click(screen.getByRole('button', { name: es.form.update }))
   const panel = await screen.findByRole('alert'); expect(panel).toHaveTextContent(es.errors.detail)
-  expect(screen.queryByTestId('functions-detail')).toBeNull(); expect(screen.queryByText('synthetic-package')).toBeNull()
+  expect(screen.queryByTestId('functions-deploy')).toBeNull(); expect(screen.queryByLabelText(es.form.entrypoint)).toBeNull(); expect(screen.queryByTestId('functions-detail')).toBeNull()
+  await waitFor(() => expect(calls().filter(({ path }) => path === versionsPath)).toHaveLength(2))
   const before = calls().length; fireEvent.click(within(panel).getByRole('button', { name: es.retry }))
-  await screen.findByTestId('functions-detail'); expect(calls().slice(before)).toEqual([{ method: 'GET', path: detailPath, body: undefined }])
+  await screen.findByTestId('functions-deploy'); expect(calls().slice(before)).toEqual([{ method: 'GET', path: detailPath, body: undefined }])
 })
 
-test('a failed activation list is replaced by its panel and never shown as current', async () => {
-  const retry = sequence(Response.json(activations(3)), 'network')
-  setup({ [`GET ${activationsPath}`]: retry }); open(); await select(); await openTab('Activaciones')
-  await within_('functions-activations').findAllByRole('radio'); await openTab('Detalle'); await openTab('Invocar')
-  expect(retry).toBeTypeOf('function')
+test('a network failure after the activation list loaded replaces it with a panel, never stale data, and retry reloads only it', async () => {
+  const activationReads = sequence(Response.json(activations(3)), 'network', Response.json(activations(3)))
+  setup({ [`GET ${activationsPath}`]: activationReads, [`POST ${detailPath}/invocations`]: invocation }); open(); await select(); await openTab('Activaciones')
+  const list = await within_('functions-activations').findAllByRole('radio'); expect(list.length).toBeGreaterThan(0)
+  await openTab('Invocar'); fireEvent.click(button(es.invoke.action)); await screen.findByText(es.invoke.resultTitle)
+  await openTab('Activaciones')
+  const panel = await within_('functions-activations').findByRole('alert'); expect(panel).toHaveTextContent(es.errors.activations)
+  expect(within_('functions-activations').queryAllByRole('radio')).toHaveLength(0)
+  const before = calls().length; fireEvent.click(within(panel).getByRole('button', { name: es.retry }))
+  await waitFor(() => expect(within_('functions-activations').queryByRole('alert')).toBeNull())
+  expect(calls().slice(before)).toEqual([{ method: 'GET', path: activationsPath, body: undefined }])
+  expect((await within_('functions-activations').findAllByRole('radio')).length).toBeGreaterThan(0)
 })
 
 test('the invoke tab sends the parameters, the response mode and an Idempotency-Key, then opens the activation', async () => {
@@ -289,6 +299,8 @@ test.each([
   if (hint) expect(screen.getByText(es.errors.limitsHint)).toBeVisible(); else expect(screen.queryByText(es.errors.limitsHint)).toBeNull()
 })
 
+// The kit select highlights an option on hover before a click selects it, as a pointer does.
+const chooseOption = async (name: string) => { const option = await screen.findByRole('option', { name }); fireEvent.pointerMove(option); fireEvent.mouseMove(option); fireEvent.click(option) }
 const field = (name: string) => screen.getByLabelText(name) as HTMLInputElement
 const update = async () => { await select(); await openTab('Desplegar'); await screen.findByTestId('functions-deploy') }
 
@@ -323,13 +335,24 @@ test('create posts the legacy body, selects the new function and reloads invento
   fireEvent.click(screen.getByRole('link', { name: es.form.required })); expect(document.activeElement).toBe(document.getElementById('functions-runtime'))
 })
 
+test('the runtime select keeps the localized empty choice so a chosen runtime can be cleared', async () => {
+  setup(); open(); await ready(); fireEvent.click(screen.getAllByRole('button', { name: es.deploy })[0])
+  const runtime = await screen.findByRole('combobox', { name: es.form.runtime }); expect(runtime).toHaveTextContent(es.form.runtimePlaceholder)
+  fireEvent.click(runtime); expect(await screen.findByRole('option', { name: es.form.runtimePlaceholder })).toBeVisible()
+  await chooseOption('nodejs:20'); await waitFor(() => expect(screen.getByRole('combobox', { name: es.form.runtime })).toHaveTextContent('nodejs:20'))
+  fireEvent.click(screen.getByRole('combobox', { name: es.form.runtime })); await chooseOption(es.form.runtimePlaceholder)
+  await waitFor(() => expect(screen.getByRole('combobox', { name: es.form.runtime })).toHaveTextContent(es.form.runtimePlaceholder))
+  fireEvent.change(field(es.form.actionName), { target: { value: 'synthetic-new' } }); fireEvent.change(field(es.form.entrypoint), { target: { value: 'main' } })
+  fireEvent.click(screen.getByRole('button', { name: es.form.create })); expect(await screen.findByText(es.form.validationTitle)).toBeVisible(); expect(writes()).toEqual([])
+})
+
 test('create with a runtime sends POST /v1/functions/actions with the identity and inline source', async () => {
   const created = { ...accepted(), resourceId: 'synthetic-function-4' }
   setup({ [`POST ${createPath}`]: created, [`GET ${actionPath(4)}`]: action(4, 'synthetic-new'), [`GET ${actionPath(4)}/versions${query}`]: { items: [] }, [`GET ${inventoryPath}`]: sequence(Response.json(inventory()), Response.json({ ...inventory(), actions: [...functions3, action(4, 'synthetic-new')] })) })
   open(); await ready(); fireEvent.click(screen.getAllByRole('button', { name: es.deploy })[0])
   fireEvent.change(await screen.findByLabelText(es.form.actionName), { target: { value: 'synthetic-new' } }); fireEvent.change(field(es.form.entrypoint), { target: { value: 'main' } })
   fireEvent.change(field(es.form.inlineCode), { target: { value: 'exports.main = () => 1' } })
-  fireEvent.click(screen.getByRole('combobox', { name: es.form.runtime })); fireEvent.click(await screen.findByRole('option', { name: 'nodejs:20' }))
+  fireEvent.click(screen.getByRole('combobox', { name: es.form.runtime })); await chooseOption('nodejs:20')
   fireEvent.click(screen.getByRole('button', { name: es.form.create }))
   await waitFor(() => expect(writes()).toHaveLength(1))
   expect(writes()[0]).toEqual({ method: 'POST', path: createPath, key: expect.any(String), body: { tenantId: 'synthetic-tenant', workspaceId: 'synthetic-workspace', actionName: 'synthetic-new', activationPolicy: { mode: 'workspace_default' },
@@ -341,7 +364,7 @@ test('create with a runtime sends POST /v1/functions/actions with the identity a
 test('an invalid function name is reported with the pattern message and sends nothing', async () => {
   setup(); open(); await ready(); fireEvent.click(screen.getAllByRole('button', { name: es.deploy })[0])
   fireEvent.change(await screen.findByLabelText(es.form.actionName), { target: { value: 'Bad Name' } }); fireEvent.change(field(es.form.entrypoint), { target: { value: 'main' } })
-  fireEvent.click(screen.getByRole('combobox', { name: es.form.runtime })); fireEvent.click(await screen.findByRole('option', { name: 'nodejs:20' }))
+  fireEvent.click(screen.getByRole('combobox', { name: es.form.runtime })); await chooseOption('nodejs:20')
   fireEvent.click(screen.getByRole('button', { name: es.form.create }))
   expect(await screen.findByRole('link', { name: es.form.pattern })).toBeVisible(); expect(writes()).toEqual([])
 })
@@ -532,7 +555,7 @@ test('a failed detail keeps the inventory trigger associations instead of an emp
 const createDraft = async () => {
   fireEvent.click(screen.getAllByRole('button', { name: es.deploy })[0])
   fireEvent.change(await screen.findByLabelText(es.form.actionName), { target: { value: 'synthetic-new' } }); fireEvent.change(field(es.form.entrypoint), { target: { value: 'main' } })
-  fireEvent.click(screen.getByRole('combobox', { name: es.form.runtime })); fireEvent.click(await screen.findByRole('option', { name: 'nodejs:20' }))
+  fireEvent.click(screen.getByRole('combobox', { name: es.form.runtime })); await chooseOption('nodejs:20')
 }
 const created = () => ({ ...accepted(), resourceId: 'synthetic-function-4' })
 const createReads = { [`GET ${actionPath(4)}`]: action(4, 'synthetic-new'), [`GET ${actionPath(4)}/versions${query}`]: { items: [] } }

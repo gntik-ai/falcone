@@ -7,7 +7,10 @@ import { FailurePanel, FunctionStatus, Loading } from './States'
 import { WRITE_REASON_ID } from './VersionsTab'
 import { FIELD_IDS, type Fn } from './useFunctions'
 
+// The kit select cannot select an empty-string value, so the empty option uses this sentinel and maps to ''.
+const NO_RUNTIME = '__no-runtime__'
 const BASE_RUNTIMES = ['nodejs:20', 'nodejs:18']
+// The leading empty item is the legacy 'Selecciona un entorno' option (:1422-1431), so a chosen runtime can be cleared again.
 // Legacy :468-471: the current runtime stays selectable even when it is not one of the defaults.
 const runtimeOptions = (value: string) => (!value || BASE_RUNTIMES.includes(value) ? BASE_RUNTIMES : [value, ...BASE_RUNTIMES])
 const numberOf = (text: string) => (text.trim() === '' || Number.isNaN(Number(text)) ? null : Number(text))
@@ -41,8 +44,8 @@ export function DeployTab({ s }: { s: Fn }) {
         </Field>
         <Field invalid={invalid(FIELD_IDS.runtime)} disabled={false} className="min-w-0">
           <FieldLabel htmlFor={FIELD_IDS.runtime}>{t('form.runtime')}</FieldLabel>
-          <SimpleSelect id={FIELD_IDS.runtime} value={draft.runtime} defaultValue="" placeholder={t('form.runtimePlaceholder')} clearable={false} size="md" className="w-full min-w-0"
-            items={runtimeOptions(draft.runtime).map((runtime) => ({ value: runtime, label: runtime }))} onValueChange={(value) => set('runtime')(value ?? '')} />
+          <SimpleSelect id={FIELD_IDS.runtime} value={draft.runtime || NO_RUNTIME} placeholder={t('form.runtimePlaceholder')} clearable={false} size="md" className="w-full min-w-0"
+            items={[{ value: NO_RUNTIME, label: t('form.runtimePlaceholder') }, ...runtimeOptions(draft.runtime).map((runtime) => ({ value: runtime, label: runtime }))]} onValueChange={(value) => set('runtime')(!value || value === NO_RUNTIME ? '' : value)} />
         </Field>
         <Field invalid={invalid(FIELD_IDS.entrypoint)} disabled={false} className="min-w-0 md:col-span-2">
           <FieldLabel htmlFor={FIELD_IDS.entrypoint}>{t('form.entrypoint')}</FieldLabel>
