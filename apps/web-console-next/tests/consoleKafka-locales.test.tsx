@@ -30,6 +30,12 @@ test('Kafka copy does not flag existing bilingual Postgres labels as untranslate
   const forbidden = flatten(en).filter(([key, value]) => value !== spanish.get(key) && !value.includes('{')).map(([, value]) => value)
   expect(forbidden).not.toContain(postgres[0].keys)
   expect(forbidden).not.toContain(postgres[0].policyName)
+  // Postgres preserves these legacy risk labels in both languages. Kafka's
+  // translated lag labels must not add them to the whole-app English denylist.
+  for (const level of ['low', 'medium', 'high']) {
+    expect(postgres[0].enums[level]).toBe(postgres[1].enums[level])
+    expect(forbidden, `Postgres risk level: ${level}`).not.toContain(postgres[0].enums[level])
+  }
 })
 test('only the existing shell empty workspace trigger text is exempt from the Kafka scan', () => {
   vi.spyOn(Element.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
