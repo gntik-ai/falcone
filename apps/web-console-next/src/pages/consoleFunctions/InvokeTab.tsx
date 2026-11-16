@@ -34,7 +34,7 @@ export function InvokeTab({ s }: { s: Fn }) {
         aria-describedby={s.writeReason ? WRITE_REASON_ID : undefined} aria-busy={invokeOp.busy} className={focusRing} onClick={() => void s.invoke()}>{invokeOp.busy ? t('invoke.busy') : t('invoke.action')}</Button>
     </div>
     {invokeOp.failure && <div className="min-w-0 space-y-2">
-      <FailurePanel section="invoke" failure={invokeOp.failure} retry={() => void s.invoke()} retrying={invokeOp.busy} />
+      <FailurePanel section="invoke" failure={invokeOp.failure} retry={() => void s.invoke()} retrying={invokeOp.busy} canRetry={!s.writeBlocked} />
       {showLimitsHint(invokeOp.failure) && <Text as="p" variant="body" tone="muted" data-testid="functions-limits-hint">{t('errors.limitsHint')}</Text>}
     </div>}
     {invokeOp.data && <div role="status" data-testid="functions-invoke-result" className="min-w-0 space-y-3">

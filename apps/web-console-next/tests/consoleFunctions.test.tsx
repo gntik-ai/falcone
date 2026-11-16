@@ -456,6 +456,21 @@ test.each(['provisioning', 'degraded', 'suspended', 'unavailable', 'deletion_pen
   expect(writes()).toEqual([])
 })
 
+test.each(['provisioning', 'degraded', 'suspended', 'unavailable', 'deletion_pending'] as const)('a failed invoke cannot be retried once the function turns %s', async (state) => {
+  setup({
+    [`POST ${detailPath}/invocations`]: failure(500),
+    [`POST ${detailPath}/rollback`]: rollbackAccepted,
+    [`GET ${detailPath}`]: sequence(Response.json(action(1, 'synthetic-hello')), Response.json(action(1, 'synthetic-hello', state))),
+  })
+  open(); await select(); await openTab('Invocar')
+  fireEvent.click(button(es.invoke.action)); await waitFor(() => expect(writes()).toHaveLength(1)); await screen.findByRole('alert')
+  await openTab('Versiones'); fireEvent.click(button(es.versions.rollback)); await waitFor(() => expect(writes()).toHaveLength(2))
+  await screen.findByTestId('functions-write-disabled'); await openTab('Invocar')
+  expect(button(es.invoke.action)).toBeDisabled()
+  expect(within(screen.getByTestId('functions-invoke')).queryByRole('button', { name: es.retry })).toBeNull()
+  expect(writes()).toHaveLength(2)
+})
+
 test('the triggers tab lists each association, or the empty copy', async () => {
   setup(); open(); await select(); await openTab('Disparadores')
   const panel = screen.getByTestId('functions-triggers')

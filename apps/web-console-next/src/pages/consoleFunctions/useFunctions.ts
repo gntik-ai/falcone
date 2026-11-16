@@ -189,7 +189,7 @@ export function useFunctions({ tenantId, workspaceId, notify }: Options) {
 
   const invoke = async () => {
     const id = selectedId
-    if (!id || invokeOp.busy) return
+    if (!id || invokeOp.busy || writeBlocked) return
     const parsed = parametersJson.trim() ? parseJsonObject(parametersJson) : { ok: true as const, value: {} }
     if (!parsed.ok) { setInvokeOp({ ...idleOp<InvocationAccepted>(), validation: parsed.error }); return }
     setInvokeOp({ ...idleOp<InvocationAccepted>(), busy: true, validation: null })
