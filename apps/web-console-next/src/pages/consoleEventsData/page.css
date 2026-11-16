@@ -1,0 +1,5 @@
+/* The topic toolbar has no search or view controls in the legacy console. */
+.events-toolbar div:has(> input[type="search"]) { display: none; }
+.events-toolbar > div:first-child { flex-wrap: wrap; min-width: 0; }
+.events-data table { white-space: nowrap; }
+.events-data [role="tree"] { max-width: 100%; overflow-x: auto; }

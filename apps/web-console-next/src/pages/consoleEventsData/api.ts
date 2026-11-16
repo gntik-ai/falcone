@@ -1,0 +1,69 @@
+// Events API parity with the legacy console client.
+// Calls the control-plane executor's event routes exactly: topic list/create, publish, consume.
+import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
+import type { JsonValue } from '@in-falcone/console-api/http'
+
+const enc = encodeURIComponent
+
+export interface TopicRecord {
+  topic: string
+  partitions?: number
+  resourceId?: string
+  topicName?: string
+}
+
+export interface EventMessage {
+  key?: string | null
+  value: JsonValue
+  partition?: number
+  offset?: string | number
+  timestamp?: string
+}
+
+export interface ConsumeMessagesResult {
+  items: EventMessage[]
+  status: 'complete' | 'empty' | 'timeout'
+  reason?: 'assignment' | 'read'
+}
+
+const topicsBase = (workspaceId: string) => `/v1/events/workspaces/${enc(workspaceId)}/topics`
+
+export function listTopics(workspaceId: string): Promise<{ items: TopicRecord[] }> {
+  return requestConsoleSessionJson<{ items: TopicRecord[] }>(topicsBase(workspaceId))
+}
+
+export function createTopic(
+  workspaceId: string,
+  topic: string,
+  options: { partitions?: number } = {}
+): Promise<{ topic: string }> {
+  return requestConsoleSessionJson<{ topic: string }>(topicsBase(workspaceId), {
+    method: 'POST',
+    body: { name: topic, ...options }
+  })
+}
+
+export function publishMessage(
+  workspaceId: string,
+  topic: string,
+  message: JsonValue
+): Promise<{ partition?: number; offset?: string | number }> {
+  return requestConsoleSessionJson<{ partition?: number; offset?: string | number }>(
+    `${topicsBase(workspaceId)}/${enc(topic)}/publish`,
+    { method: 'POST', body: message as unknown as JsonValue }
+  )
+}
+
+export function consumeMessages(
+  workspaceId: string,
+  topic: string,
+  options: { maxMessages?: number; timeoutMs?: number } = {}
+): Promise<ConsumeMessagesResult> {
+  const params = new URLSearchParams()
+  if (options.maxMessages != null) params.set('maxMessages', String(options.maxMessages))
+  if (options.timeoutMs != null) params.set('timeoutMs', String(options.timeoutMs))
+  const qs = params.toString()
+  return requestConsoleSessionJson<ConsumeMessagesResult>(
+    `${topicsBase(workspaceId)}/${enc(topic)}/messages${qs ? `?${qs}` : ''}`
+  )
+}
