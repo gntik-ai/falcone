@@ -40,8 +40,16 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(surface(parity).getByText(copy(parity).beforePoll, { exact: true })).toBeVisible(); await radio(parity).check(); await button(parity, 'consume').click(); await expect(surface(parity).getByText(copy(parity).noMessages, { exact: true })).toBeVisible();
       await button(parity, 'consume').click(); await expect(surface(parity).getByText(copy(parity).timeout, { exact: true })).toBeVisible(); await expect(surface(parity).getByText(copy(parity).noMessages, { exact: true })).toHaveCount(0);
     });
-    test('accessibility', async ({ parity }) => {
-      await parity.open(manifest.route); await ready(parity); await check.assertAccessibility(parity);
+    test('accessibility', async ({ parity, server }) => {
+      let releaseTopics;
+      const pendingTopics = new Promise((resolve) => { releaseTopics = resolve; });
+      await parity.page.route(`**${topicsPath}`, async (route) => { await pendingTopics; await route.fallback(); }, { times: 1 });
+      try {
+        await parity.page.goto(server.url(manifest.route.replace(/^\//, '')));
+        await expect(surface(parity).getByRole('region', { name: copy(parity).loading, exact: true })).toHaveAttribute('aria-busy', 'true');
+        await check.assertAccessibility(parity);
+      } finally { releaseTopics(); }
+      await ready(parity); await check.assertAccessibility(parity);
       await radio(parity).focus(); await parity.page.keyboard.press('Space'); await expect(radio(parity)).toBeChecked();
       await button(parity, 'publish').focus(); await parity.page.keyboard.press('Enter'); await expect(surface(parity).locator('#events-publish-button')).toBeEnabled();
       await button(parity, 'consume').focus(); await parity.page.keyboard.press('Enter'); await expect(surface(parity).getByRole('tree').first()).toBeVisible();

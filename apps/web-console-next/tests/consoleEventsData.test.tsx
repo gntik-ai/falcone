@@ -137,16 +137,18 @@ test('workspace and topic segments are encoded and JSON remains unchanged', asyn
   requests = strictFetch({ [`GET ${base}`]: { items: [{ topic: 'a/b c' }] }, [`POST ${base}/a%2Fb%20c/publish`]: {} })
   open(); await ready(); pick('a/b c'); click(es.publish); await waitFor(() => expect(calls()).toHaveLength(2)); expect(calls()[1].body).toEqual({ value: {} })
 })
-test('loading announces once, shows the skeleton and disables actions until a topic is selected', async () => {
+test.each(['es', 'en'] as const)('loading exposes a named region, announces once and disables actions until selection in %s', async (locale) => {
+  await i18n.changeLanguage(locale); const copy = locale === 'es' ? es : en
   let release!: (response: Response) => void
   setup({ [`GET ${list}`]: () => new Promise<Response>((resolve) => { release = resolve }) }); open()
   await waitFor(() => expect(release).toBeTypeOf('function'))
   expect(screen.queryByRole('table')).toBeNull()
-  expect(screen.getByLabelText(es.loading)).toHaveAttribute('aria-busy', 'true')
-  await waitFor(() => expect(polite()).toContain(es.loading))
+  expect(screen.getByRole('region', { name: copy.loading })).toHaveAttribute('aria-busy', 'true')
+  await waitFor(() => expect(polite()).toContain(copy.loading))
   expect(calls()).toHaveLength(1)
-  await act(async () => release(Response.json(topics))); await ready()
-  expect(screen.getByRole('button', { name: es.publish })).toBeDisabled(); expect(screen.getByRole('button', { name: es.consume })).toBeDisabled()
+  await act(async () => release(Response.json(topics))); await screen.findByRole('table', { name: copy.listLegend })
+  expect(screen.queryByRole('region', { name: copy.loading })).toBeNull()
+  expect(screen.getByRole('button', { name: copy.publish })).toBeDisabled(); expect(screen.getByRole('button', { name: copy.consume })).toBeDisabled()
 })
 test('an operation 500 keeps earlier messages, announces the failure and preserves the typed JSON', async () => {
   setup({ [`GET ${consume}`]: messages, [`POST ${publish}`]: failure(500) }); open(); await ready(); pick(); click(es.consume)
