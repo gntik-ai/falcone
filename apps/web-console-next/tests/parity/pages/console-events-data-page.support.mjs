@@ -8,6 +8,10 @@ export const field = (parity, key) => surface(parity).getByRole('textbox', { nam
 export const radio = (parity, topic = 'synthetic-orders') => surface(parity).getByRole('radio', { name: topic, exact: true });
 export const eventCalls = (parity) => parity.network.requests.filter(({ path }) => path.startsWith('/v1/events/'));
 export const ready = async (parity) => expect(surface(parity).getByRole('table', { name: copy(parity).listLegend, exact: true })).toBeVisible();
+export async function assertSuccess(parity, title) {
+  await expect(parity.page.getByRole('region', { name: copy(parity).notifications, exact: true })).toContainText(title);
+  await expect(parity.page.locator('[data-live-announcer="polite"]')).toContainText(title);
+}
 export async function screenshot(parity, info, name) {
   const body = await parity.page.screenshot({ fullPage: true, animations: 'disabled' });
   await info.attach(`${name}-${parity.locale}-sha256-${createHash('sha256').update(body).digest('hex')}`, { body, contentType: 'image/png' });

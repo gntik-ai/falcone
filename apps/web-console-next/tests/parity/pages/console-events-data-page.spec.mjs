@@ -1,8 +1,8 @@
-import manifest, { topics, topicsPath, publishPath, messagesPath } from './console-events-data-page.manifest.ts';
+import manifest, { topics, messages, topicsPath, publishPath, messagesPath } from './console-events-data-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { copy, assertEventsLocale } from './console-events-data-page.locale.mjs';
-import { button, eventCalls, field, radio, ready, screenshot, surface, trackInjectedErrors } from './console-events-data-page.support.mjs';
+import { assertSuccess, button, eventCalls, field, radio, ready, screenshot, surface, trackInjectedErrors } from './console-events-data-page.support.mjs';
 import { seedHistoryPrincipal } from './console-flow-history-page.session.mjs';
 const messagesQuery = `${messagesPath}?maxMessages=10`;
 for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
@@ -18,7 +18,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       }
       await radio(parity).check(); await button(parity, 'consume').click();
       for (const index of [1, 2]) await expect(surface(parity).getByRole('tree', { name: copy(parity).messageValue.replace('{index}', String(index)), exact: true })).toBeVisible();
-      for (const text of [copy(parity).messageKey.replace('{key}', 'synthetic-key'), copy(parity).messagePartition.replace('{partition}', '0'), copy(parity).messageOffset.replace('{offset}', '42'), '2026-06-01T12:00:00Z']) await expect(surface(parity).getByText(text, { exact: true })).toBeVisible();
+      for (const [index, message] of messages.items.entries()) {
+        const item = surface(parity).getByRole('listitem').filter({ has: parity.page.getByRole('tree', { name: copy(parity).messageValue.replace('{index}', String(index + 1)), exact: true }) });
+        const metadata = [copy(parity).messagePartition.replace('{partition}', String(message.partition)), copy(parity).messageOffset.replace('{offset}', message.offset), message.timestamp];
+        if (message.key != null) metadata.push(copy(parity).messageKey.replace('{key}', message.key));
+        for (const text of metadata) await expect(item.getByText(text, { exact: true })).toBeVisible();
+      }
       expect(eventCalls(parity)).toEqual([{ method: 'GET', path: topicsPath, body: undefined }, { method: 'GET', path: messagesQuery, body: undefined }]);
       await assertEventsLocale(parity);
     });
@@ -27,10 +32,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await radio(parity).check(); await field(parity, 'messageJson').fill('{'); await button(parity, 'publish').click();
       await expect(surface(parity).getByText(copy(parity).invalidJson, { exact: true })).toBeVisible(); await expect(field(parity, 'messageJson')).toHaveAttribute('aria-invalid', 'true'); expect(eventCalls(parity)).toHaveLength(1);
       await field(parity, 'messageJson').fill('{"foo":1}'); await button(parity, 'publish').click();
-      await expect(parity.page.getByText(copy(parity).published.replace('{topic}', 'synthetic-orders'), { exact: true }).first()).toBeAttached();
+      await assertSuccess(parity, copy(parity).published.replace('{topic}', 'synthetic-orders'));
       await button(parity, 'consume').click(); await expect(surface(parity).getByRole('tree').first()).toBeVisible();
       await field(parity, 'newTopic').fill(' synthetic-new '); await button(parity, 'create').click();
-      await expect(radio(parity, 'synthetic-new')).toBeChecked(); await expect(parity.page.getByText(copy(parity).created.replace('{topic}', 'synthetic-new'), { exact: true }).first()).toBeAttached();
+      await expect(radio(parity, 'synthetic-new')).toBeChecked(); await assertSuccess(parity, copy(parity).created.replace('{topic}', 'synthetic-new'));
       expect(eventCalls(parity)).toEqual([{ method: 'GET', path: topicsPath, body: undefined }, { method: 'POST', path: publishPath, body: { foo: 1 } }, { method: 'GET', path: messagesQuery, body: undefined }, { method: 'POST', path: topicsPath, body: { name: 'synthetic-new' } }, { method: 'GET', path: topicsPath, body: undefined }]);
     });
     test('error-empty', { tag: '@legacy-parity' }, async ({ parity }) => {
@@ -123,6 +128,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await expect(surface(parity).locator('#events-publish-button')).toBeDisabled(); await expect(surface(parity).locator('#events-consume-button')).toBeDisabled();
         await expect(surface(parity).locator('#events-consume-button')).toBeEnabled();
         expect(eventCalls(parity).at(-1).path).toBe(op === 'publish' ? publishPath : messagesQuery);
+        await assertSuccess(parity, (op === 'publish' ? copy(parity).published : copy(parity).consumed.replace('{count}', '2')).replace('{topic}', 'synthetic-orders'));
       }
     });
   });

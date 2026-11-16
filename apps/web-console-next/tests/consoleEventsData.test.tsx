@@ -24,6 +24,12 @@ const type = (name: string, value: string) => fireEvent.change(screen.getByRole(
 const jsonLabel = es.messageJson.replace('{example}', '{ "value": { ... } }')
 const failure = (status: number) => () => Response.json({ status, message: 'synthetic-error', requestId: 'req_synthetic_events' }, { status })
 const polite = () => Array.from(document.querySelectorAll('[aria-live="polite"]')).map((node) => node.textContent).join('|')
+async function expectSuccess(title: string, copy = es) {
+  await waitFor(() => {
+    expect(screen.getByRole('region', { name: copy.notifications })).toHaveTextContent(title)
+    expect(document.querySelector('[data-live-announcer="polite"]')).toHaveTextContent(title)
+  })
+}
 beforeEach(async () => {
   await i18n.changeLanguage('es'); login(); context.roles = ['superadmin']
   context.value = { activeTenantId: 't1', activeWorkspaceId: 'ws-1', loading: false, error: null, workspaces: [{ workspaceId: 'ws-1', displayName: 'Workspace one' }], selectWorkspace: vi.fn(), reloadWorkspaces: vi.fn() }
@@ -50,6 +56,7 @@ test.each(['es', 'en'] as const)('renders every topic, partitions and polled JSO
   }
   expect(calls()).toEqual([{ method: 'GET', path: list, body: undefined }, { method: 'GET', path: consume, body: undefined }])
   expect(screen.queryByRole('navigation', { name: /pagin/i })).toBeNull()
+  await expectSuccess(copy.consumed.replace('{count}', '2').replace('{topic}', 'synthetic-orders'), copy)
 })
 test('create trims its name, posts once, reloads, selects and announces the topic', async () => {
   let attempt = 0
@@ -58,14 +65,13 @@ test('create trims its name, posts once, reloads, selects and announces the topi
   type(es.newTopic, ' synthetic-new '); click(es.create)
   await waitFor(() => expect(screen.getByRole('radio', { name: 'synthetic-new' })).toBeChecked())
   expect(calls()).toEqual([{ method: 'GET', path: list, body: undefined }, { method: 'POST', path: list, body: { name: 'synthetic-new' } }, { method: 'GET', path: list, body: undefined }])
-  await waitFor(() => expect(polite()).toContain('Tópico "synthetic-new" creado'))
-  expect(document.querySelector('[role="region"][aria-label="Notificaciones"]')).not.toBeNull()
+  await expectSuccess(es.created.replace('{topic}', 'synthetic-new'))
 })
 test.each(['{"foo":1}', 'null', '5', '[1]', '{"key":"k","value":{}}'])('syntax-only publish sends %s unchanged', async (value) => {
   setup({ [`POST ${publish}`]: { offset: 4 } }); open(); await ready(); pick(); type(jsonLabel, value); click(es.publish)
   await waitFor(() => expect(calls()).toHaveLength(2))
   expect(calls()[1]).toEqual({ method: 'POST', path: publish, body: JSON.parse(value) })
-  await waitFor(() => expect(polite()).toContain('Publicado en "synthetic-orders"'))
+  await expectSuccess(es.published.replace('{topic}', 'synthetic-orders'))
 })
 test('invalid JSON is announced and marked invalid without a request', async () => {
   setup(); open(); await ready(); pick(); type(jsonLabel, '{'); click(es.publish)
@@ -73,21 +79,35 @@ test('invalid JSON is announced and marked invalid without a request', async () 
 })
 test.each(['publish', 'consume', 'create'] as const)('%s locks operations but allows changing the selection', async (op) => {
   let release!: (response: Response) => void
-  setup({ [`${op === 'consume' ? 'GET' : 'POST'} ${op === 'consume' ? consume : op === 'publish' ? publish : list}`]: () => new Promise<Response>((resolve) => { release = resolve }) })
+  let loads = 0
+  setup({ [`GET ${list}`]: () => Response.json(++loads === 1 || op !== 'create' ? topics : createdTopics), [`${op === 'consume' ? 'GET' : 'POST'} ${op === 'consume' ? consume : op === 'publish' ? publish : list}`]: () => new Promise<Response>((resolve) => { release = resolve }) })
   open(); await ready(); pick(); type(es.newTopic, 'synthetic-new'); click(es[op])
   await waitFor(() => expect(release).toBeTypeOf('function'))
   pick('synthetic-audit'); expect(screen.getByRole('radio', { name: 'synthetic-audit' })).toBeChecked()
   expect(document.getElementById('events-selected')).toBeVisible()
   expect(screen.getByRole('textbox', { name: jsonLabel })).toBeDisabled(); expect(screen.getByRole('textbox', { name: es.newTopic })).toBeDisabled()
   for (const button of ['events-create-button', 'events-publish-button', 'events-consume-button']) expect(document.getElementById(button)).toBeDisabled()
+  expect(calls()).toHaveLength(2)
+  expect(calls()[1]).toEqual({ method: op === 'consume' ? 'GET' : 'POST', path: op === 'consume' ? consume : op === 'publish' ? publish : list, body: op === 'consume' ? undefined : op === 'publish' ? { value: {} } : { name: 'synthetic-new' } })
   await act(async () => release(Response.json(op === 'consume' ? messages : op === 'create' ? { topic: 'synthetic-new' } : {})))
-  if (op !== 'create') await waitFor(() => expect(polite()).toContain(`"synthetic-orders"`))
+  await expectSuccess(op === 'create' ? es.created.replace('{topic}', 'synthetic-new') : op === 'publish' ? es.published.replace('{topic}', 'synthetic-orders') : es.consumed.replace('{count}', '2').replace('{topic}', 'synthetic-orders'))
+  expect(screen.getByRole('radio', { name: op === 'create' ? 'synthetic-new' : 'synthetic-audit' })).toBeChecked()
+  expect(calls()).toHaveLength(op === 'create' ? 3 : 2)
 })
-test.each(['workspace_viewer', 'platform_operator', 'platform_team'])('%s sees read-only copy and can consume without write panels', async (role) => {
+test.each(['tenant_developer', 'tenant_viewer', 'workspace_viewer', 'platform_operator', 'platform_team'])('%s sees read-only copy and can consume without write panels', async (role) => {
   login([role]); setup({ [`GET ${consume}`]: { items: [], status: 'empty' } }); open(); await ready()
   expect(screen.getByText(es.readDescription)).toBeVisible(); expect(screen.getAllByText(es.readBadge).length).toBeGreaterThan(0); expect(screen.getByText(es.readNote)).toBeVisible()
   expect(screen.queryByRole('textbox')).toBeNull(); expect(screen.queryByRole('button', { name: es.create })).toBeNull()
   pick(); click(es.consume); await screen.findByText(es.noMessages)
+})
+test.each(['superadmin', 'platform_admin', 'tenant_owner', 'tenant_admin', 'workspace_owner', 'workspace_admin'])('%s sees the legacy structural-write controls', async (role) => {
+  login([role]); setup(); open(); await ready()
+  expect(screen.getByText(es.description)).toBeVisible()
+  expect(screen.getByText(es.writeBadge)).toBeVisible()
+  expect(screen.getByRole('textbox', { name: es.newTopic })).toBeVisible()
+  expect(screen.getByRole('textbox', { name: jsonLabel })).toBeVisible()
+  expect(screen.queryByText(es.readNote)).toBeNull()
+  expect(calls()).toEqual([{ method: 'GET', path: list, body: undefined }])
 })
 test('empty topics, before poll, empty poll and timeout preserve the legacy states', async () => {
   setup({ [`GET ${list}`]: { items: [] } }); const view = open(); await screen.findByText(es.empty); view.unmount()
