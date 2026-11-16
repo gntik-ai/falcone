@@ -55,12 +55,13 @@ export const draftFrom = (action: FunctionAction): DeployDraft => ({
 })
 export const FIELD_IDS = { actionName: 'functions-action-name', runtime: 'functions-runtime', entrypoint: 'functions-entrypoint', timeoutMs: 'functions-timeout-ms', memoryMb: 'functions-memory-mb', inlineCode: 'functions-inline-code' } as const
 
-// Legacy :781-790: required fields first, then the name pattern.
+// Legacy :781-790: required fields, then the name pattern. The summary lists every problem, so all are collected.
 export function validateDraft(draft: DeployDraft): DraftIssue[] {
-  const missing = (['actionName', 'runtime', 'entrypoint'] as const).find((field) => !draft[field].trim())
-  if (missing) return [{ fieldId: FIELD_IDS[missing], message: 'required' }]
-  if (!/^[a-z][a-z0-9-]{1,62}$/.test(draft.actionName.trim())) return [{ fieldId: FIELD_IDS.actionName, message: 'pattern' }]
-  return []
+  const issues: DraftIssue[] = (['actionName', 'runtime', 'entrypoint'] as const)
+    .filter((field) => !draft[field].trim())
+    .map((field) => ({ fieldId: FIELD_IDS[field], message: 'required' }))
+  if (draft.actionName.trim() && !/^[a-z][a-z0-9-]{1,62}$/.test(draft.actionName.trim())) issues.push({ fieldId: FIELD_IDS.actionName, message: 'pattern' })
+  return issues
 }
 
 // Legacy lib/editor-ux.ts:24-35.

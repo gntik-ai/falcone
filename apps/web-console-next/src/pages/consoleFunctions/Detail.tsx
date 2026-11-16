@@ -32,7 +32,7 @@ export function Detail({ s }: { s: Fn }) {
     detail: idle ?? <DetailTab s={s} />,
     versions: idle ?? <VersionsTab s={s} />,
     activations: idle ?? <ActivationsTab s={s} />,
-    triggers: idle ?? <TriggersTab action={s.detail.data} />,
+    triggers: idle ?? <TriggersTab action={s.effective} />,
     invoke: <InvokeTab s={s} />,
     deploy: <DeployTab s={s} />,
   }

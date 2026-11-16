@@ -97,7 +97,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await openTab(parity, 'invoke'); await expect(button(parity, c.invoke.action)).toBeDisabled();
         await openTab(parity, 'deploy'); await surface(parity).getByLabel(c.form.entrypoint, { exact: true }).fill('changed'); await expect(button(parity, c.form.update)).toBeDisabled();
       }
-      await parity.open(manifest.route, { 'functions-inventory': '403' }); await expect(surface(parity).getByText(c.noAccess.inventory, { exact: true })).toBeVisible();
+      await parity.open(manifest.route, { 'functions-inventory': '403', 'functions-actions': '403' }); await expect(surface(parity).getByText(c.noAccess.inventory, { exact: true })).toBeVisible();
       await parity.open(manifest.route, { 'functions-detail': '403' }); await ready(parity); await radio(parity, 'synthetic-hello').check(); await expect(surface(parity).getByText(c.noAccess.detail, { exact: true })).toBeVisible(); await expect(surface(parity).getByRole('table', { name: c.inventory.caption, exact: true })).toBeVisible();
       await parity.open(manifest.route, { 'functions-logs': '403' }); await select(parity); await selectActivation(parity);
       await expect(surface(parity).getByText(c.errors.logsForbidden, { exact: true })).toBeVisible(); await expect(surface(parity).getByTestId('functions-activation-result')).toBeVisible();
@@ -186,11 +186,15 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await expect(alertWith(parity, copy(parity).errors['5xx']).first()).toBeVisible(); expect(functionCalls(parity).some((request) => request.path === path)).toBe(true);
         await check.assertRuntimeHealth(parity);
       }
+      // The harness keeps one request list per test, so each auth scenario counts only the requests made after its own open.
+      const since = (mark) => ({ refreshes: parity.network.requests.slice(mark).filter(({ path }) => path.endsWith('/refresh')), inventory: functionCalls(parity).filter(({ path }) => path === inventoryPath).length - inventoryBefore });
+      let mark = parity.network.requests.length; let inventoryBefore = functionCalls(parity).filter(({ path }) => path === inventoryPath).length;
       await parity.open(manifest.route, { 'functions-inventory': ['401-then-ok'] }); await ready(parity);
-      expect(parity.network.requests.filter(({ path }) => path.endsWith('/refresh'))).toHaveLength(1); expect(functionCalls(parity).filter(({ path }) => path === inventoryPath)).toHaveLength(2);
+      expect(since(mark).refreshes).toHaveLength(1); expect(since(mark).inventory).toBe(2);
+      mark = parity.network.requests.length; inventoryBefore = functionCalls(parity).filter(({ path }) => path === inventoryPath).length;
       await parity.open(manifest.route, { 'functions-inventory': '401', refresh: '401' });
-      expect(parity.network.requests.filter(({ path }) => path.endsWith('/refresh'))).toHaveLength(1); expect(functionCalls(parity).filter(({ path }) => path === inventoryPath)).toHaveLength(1);
       await expect(parity.page.getByRole('heading', { name: locale === 'es' ? 'Accede a In Falcone Console' : 'Sign in to In Falcone Console', exact: true })).toBeVisible();
+      expect(since(mark).refreshes).toHaveLength(1); expect(since(mark).inventory).toBe(1);
     });
 
     test('responsive', async ({ parity }) => {
@@ -234,20 +238,58 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`console-functions-page supplemental ${locale} ${width}`, () => {
     test.use({ role: 'superadmin', locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
 
-    test('write retries resend the failed attempt key and a success rotates it', { tag: '@migration-behavior' }, async ({ parity }) => {
-      const c = copy(parity);
-      for (const variant of ['500-then-ok', 'network-then-ok']) {
-        const keys = trackKeys(parity);
-        await parity.open(manifest.route, { 'functions-invoke': variant, 'functions-rollback': variant, 'functions-update': variant });
-        await select(parity); await openTab(parity, 'invoke'); await button(parity, c.invoke.action).click();
-        await expect(surface(parity).getByTestId('functions-invoke').getByRole('alert')).toBeVisible();
-        await surface(parity).getByTestId('functions-invoke').getByRole('alert').getByRole('button', { name: c.retry, exact: true }).click();
-        await expect(surface(parity).getByTestId('functions-invoke-result')).toBeVisible();
-        const invokes = keys.filter(({ path }) => path.endsWith('/invocations')); expect(invokes).toHaveLength(2); expect(invokes[0].key).toBe(invokes[1].key);
-      }
-    });
+    // Each write: a failed attempt (HTTP 500, then no response) is retried with the same Idempotency-Key, and the next
+    // submit after the success gets a new one.
+    const writes = {
+      invoke: { endpoint: 'functions-invoke', suffix: '/invocations', method: 'POST', alert: (parity) => surface(parity).getByTestId('functions-invoke'), done: async (parity) => { await expect(tab(parity, 'activations')).toHaveAttribute('aria-selected', 'true'); },
+        submit: async (parity, c) => { await openTab(parity, 'invoke'); await button(parity, c.invoke.action).click(); } },
+      rollback: { endpoint: 'functions-rollback', suffix: '/rollback', method: 'POST', alert: (parity) => surface(parity).getByTestId('functions-versions'), done: async (parity) => { await expect(surface(parity).getByTestId('functions-rollback-result')).toBeVisible(); },
+        submit: async (parity, c) => { await openTab(parity, 'versions'); await expect(button(parity, c.versions.rollback)).toBeEnabled(); await button(parity, c.versions.rollback).click(); } },
+      update: { endpoint: 'functions-update', suffix: '', method: 'PATCH', alert: (parity) => surface(parity).getByTestId('functions-deploy'), done: async (parity) => { await expect(surface(parity).getByTestId('functions-deploy-result')).toBeVisible(); },
+        submit: async (parity, c, round) => { await openTab(parity, 'deploy'); await surface(parity).getByLabel(c.form.entrypoint, { exact: true }).fill(`changed-${round}`); await button(parity, c.form.update).click(); } },
+      create: { endpoint: 'functions-create', suffix: '', method: 'POST', alert: (parity) => surface(parity).getByTestId('functions-deploy'), done: async (parity) => { await expect(surface(parity).getByRole('heading', { name: 'synthetic-new', level: 2 })).toBeVisible(); }, create: true,
+        submit: async (parity, c, round) => {
+          await button(parity, c.deploy).click();
+          await surface(parity).getByLabel(c.form.actionName, { exact: true }).fill(`synthetic-new-${round}`);
+          await surface(parity).getByRole('combobox', { name: c.form.runtime }).click(); await parity.page.getByRole('option', { name: 'nodejs:20', exact: true }).click();
+          await surface(parity).getByLabel(c.form.entrypoint, { exact: true }).fill('main'); await button(parity, c.form.create).click();
+        } },
+    };
+    for (const [operation, spec] of Object.entries(writes)) for (const variant of ['500-then-ok', 'network-then-ok']) {
+      test(`${operation} retry after ${variant.split('-')[0]} resends the failed attempt key and a success rotates it`, { tag: '@migration-behavior' }, async ({ parity }) => {
+        const c = copy(parity), keys = trackKeys(parity), mine = () => keys.filter(({ method, path }) => method === spec.method && (spec.suffix ? path.endsWith(spec.suffix) : /^\/v1\/functions\/actions(\/synthetic-function-1)?$/.test(path)));
+        await parity.open(manifest.route, { [spec.endpoint]: variant, 'functions-detail-4': 'success', 'functions-versions-4': 'success' });
+        if (!spec.create) await select(parity); else await ready(parity);
+        await spec.submit(parity, c, 1);
+        const failed = spec.alert(parity).getByRole('alert'); await expect(failed).toBeVisible();
+        await failed.getByRole('button', { name: c.retry, exact: true }).click();
+        await spec.done(parity, c);
+        expect(mine()).toHaveLength(2); expect(mine()[0].key).toBeTruthy(); expect(mine()[1].key).toBe(mine()[0].key);
+        await spec.submit(parity, c, 2);
+        await expect.poll(() => mine().length).toBe(3); expect(mine()[2].key).toBeTruthy(); expect(mine()[2].key).not.toBe(mine()[1].key);
+      });
+    }
 
-    test('delete keys follow the resource', { tag: '@migration-behavior' }, async ({ parity }) => {
+    for (const variant of ['500', 'network']) {
+      test(`delete retry after ${variant} resends the key, a success rotates it and another resource gets a new one`, { tag: '@migration-behavior' }, async ({ parity }) => {
+        const c = copy(parity), keys = trackKeys(parity), dialog = parity.page.getByRole('alertdialog');
+        const confirm = async (name) => { await dialog.getByRole('textbox', { name: c.delete.typed, exact: true }).fill(name); await dialog.getByRole('button', { name: c.delete.confirm, exact: true }).click(); };
+        await parity.open(manifest.route, { 'functions-delete': [variant, 'success'], 'functions-delete-2': 'success', 'functions-detail-2': 'success' });
+        await select(parity); await button(parity, c.delete.aria.replace('{name}', 'synthetic-hello')).click(); await confirm('synthetic-hello');
+        await expect(dialog.getByRole('alert')).toBeVisible(); await dialog.getByRole('alert').getByRole('button', { name: c.retry, exact: true }).click();
+        await expect.poll(() => keys.length).toBe(2); expect(keys[0].key).toBeTruthy(); expect(keys[0].key).toBe(keys[1].key);
+        await expect(dialog).toHaveCount(0);
+        // The same resource deleted again after the success gets a new key.
+        await select(parity); await button(parity, c.delete.aria.replace('{name}', 'synthetic-hello')).click(); await confirm('synthetic-hello');
+        await expect.poll(() => keys.length).toBe(3); expect(keys[2].key).not.toBe(keys[1].key);
+        await expect(dialog).toHaveCount(0);
+        await radio(parity, 'synthetic-billing').check(); await expect(surface(parity).getByRole('heading', { name: 'synthetic-billing', level: 2 })).toBeVisible();
+        await button(parity, c.delete.aria.replace('{name}', 'synthetic-billing')).click(); await confirm('synthetic-billing');
+        await expect.poll(() => keys.length).toBe(4); expect(keys[3].key).not.toBe(keys[2].key);
+      });
+    }
+
+    test('delete key follows the resource across a failed attempt on another one', { tag: '@migration-behavior' }, async ({ parity }) => {
       const c = copy(parity), keys = trackKeys(parity);
       await parity.open(manifest.route, { 'functions-delete': ['500', '500'], 'functions-delete-2': 'success', 'functions-detail-2': 'success' });
       await select(parity); await button(parity, c.delete.aria.replace('{name}', 'synthetic-hello')).click();

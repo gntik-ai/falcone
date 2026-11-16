@@ -500,4 +500,84 @@ test.each(['es', 'en'] as const)('the gate states render their copy in %s and se
   expect(screen.getByText(copy.gate.description)).toBeVisible(); expect(calls()).toEqual([])
 })
 
+test('the validation summary lists every missing required field, each linked to its field', async () => {
+  setup(); open(); await ready(); fireEvent.click(screen.getAllByRole('button', { name: es.deploy })[0])
+  // Save stays disabled on a clean form, so one optional field makes the draft dirty while every required one is empty.
+  fireEvent.change(await screen.findByLabelText(es.form.inlineCode), { target: { value: 'exports.main = () => 1' } }); fireEvent.click(screen.getByRole('button', { name: es.form.create }))
+  const summary = (await screen.findByText(es.form.validationTitle)).closest('section,div[role],[role]') as HTMLElement
+  const links = within(summary).getAllByRole('link'); expect(links).toHaveLength(3)
+  for (const link of links) expect(link).toHaveTextContent(es.form.required)
+  fireEvent.click(links[0]); expect(document.activeElement).toBe(document.getElementById('functions-action-name'))
+  fireEvent.click(links[1]); expect(document.activeElement).toBe(document.getElementById('functions-runtime'))
+  fireEvent.click(links[2]); expect(document.activeElement).toBe(document.getElementById('functions-entrypoint'))
+  expect(writes()).toEqual([])
+})
+
+test('an invalid name with a missing entrypoint reports both the pattern and the required message', async () => {
+  setup(); open(); await ready(); fireEvent.click(screen.getAllByRole('button', { name: es.deploy })[0])
+  fireEvent.change(await screen.findByLabelText(es.form.actionName), { target: { value: 'Bad Name' } }); fireEvent.click(screen.getByRole('button', { name: es.form.create }))
+  const summary = (await screen.findByText(es.form.validationTitle)).closest('section,div[role],[role]') as HTMLElement
+  expect(within(summary).getAllByRole('link').map((link) => link.textContent)).toEqual([es.form.required, es.form.required, es.form.pattern])
+})
+
+test('a failed detail keeps the inventory trigger associations instead of an empty state', async () => {
+  setup({ [`GET ${detailPath}`]: failure(500) }); open(); await ready(); pick('synthetic-hello')
+  await within_('functions-detail-pane').findByRole('alert'); await openTab('Disparadores')
+  const panel = screen.getByTestId('functions-triggers')
+  for (const text of ['synthetic-orders · at least once · active', '*/5 * * * * · UTC · active', 'synthetic-bucket · created, deleted · active']) expect(panel).toHaveTextContent(text)
+  expect(screen.queryByText(es.triggers.empty)).toBeNull()
+})
+
+// Retry matrix for the writes not covered above: the failed attempt's key is resent, a success rotates it.
+const createDraft = async () => {
+  fireEvent.click(screen.getAllByRole('button', { name: es.deploy })[0])
+  fireEvent.change(await screen.findByLabelText(es.form.actionName), { target: { value: 'synthetic-new' } }); fireEvent.change(field(es.form.entrypoint), { target: { value: 'main' } })
+  fireEvent.click(screen.getByRole('combobox', { name: es.form.runtime })); fireEvent.click(await screen.findByRole('option', { name: 'nodejs:20' }))
+}
+const created = () => ({ ...accepted(), resourceId: 'synthetic-function-4' })
+const createReads = { [`GET ${actionPath(4)}`]: action(4, 'synthetic-new'), [`GET ${actionPath(4)}/versions${query}`]: { items: [] } }
+const firstFailures = { http: failure(500), network: 'network' as const }
+
+test.each(['http', 'network'] as const)('create retries after a %s failure with the same key, then mints a new one after the success', async (kind) => {
+  setup({ ...createReads, [`POST ${createPath}`]: sequence(firstFailures[kind], Response.json(created()), Response.json(created())) }); open(); await ready()
+  await createDraft(); fireEvent.click(screen.getByRole('button', { name: es.form.create })); await waitFor(() => expect(writes()).toHaveLength(1))
+  const alert = await screen.findByRole('alert'); fireEvent.click(within(alert).getByRole('button', { name: es.retry })); await waitFor(() => expect(writes()).toHaveLength(2))
+  expect(await screen.findByRole('heading', { name: 'synthetic-new', level: 2 })).toBeVisible()
+  await createDraft(); fireEvent.click(screen.getByRole('button', { name: es.form.create })); await waitFor(() => expect(writes()).toHaveLength(3))
+  expect(keys()[0]).toBeTruthy(); expect(keys()[0]).toBe(keys()[1]); expect(keys()[2]).not.toBe(keys()[1])
+})
+
+test('update retries after a network failure with the same key', async () => {
+  setup({ [`PATCH ${detailPath}`]: sequence('network', Response.json(accepted()), Response.json(accepted())) }); open(); await update()
+  fireEvent.change(field(es.form.entrypoint), { target: { value: 'main2' } }); fireEvent.click(screen.getByRole('button', { name: es.form.update }))
+  const alert = await screen.findByRole('alert'); fireEvent.click(within(alert).getByRole('button', { name: es.retry })); await waitFor(() => expect(writes()).toHaveLength(2))
+  await screen.findByTestId('functions-deploy-result'); await waitFor(() => expect(field(es.form.entrypoint)).toHaveValue('main'))
+  fireEvent.change(field(es.form.entrypoint), { target: { value: 'main3' } }); fireEvent.click(screen.getByRole('button', { name: es.form.update })); await waitFor(() => expect(writes()).toHaveLength(3))
+  expect(keys()[0]).toBe(keys()[1]); expect(keys()[2]).not.toBe(keys()[1])
+})
+
+test('rollback retries after a network failure with the same key and rotates it after the success', async () => {
+  setup({ [`POST ${detailPath}/rollback`]: sequence('network', Response.json(rollbackAccepted), Response.json(rollbackAccepted)) }); open(); await select(); await openTab('Versiones')
+  fireEvent.click(button(es.versions.rollback)); await waitFor(() => expect(writes()).toHaveLength(1)); const alert = await screen.findByRole('alert')
+  fireEvent.click(within(alert).getByRole('button', { name: es.retry })); await waitFor(() => expect(writes()).toHaveLength(2)); await screen.findByTestId('functions-rollback-result')
+  await waitFor(() => expect(button(es.versions.rollback)).toBeEnabled()); fireEvent.click(button(es.versions.rollback)); await waitFor(() => expect(writes()).toHaveLength(3))
+  expect(keys()[0]).toBe(keys()[1]); expect(keys()[2]).not.toBe(keys()[1])
+})
+
+test('invoke mints a new key for the submit that follows a success after a network failure', async () => {
+  setup({ [`POST ${detailPath}/invocations`]: sequence('network', Response.json(invocation), Response.json(invocation)) }); open(); await select(); await openTab('Invocar')
+  fireEvent.click(button(es.invoke.action)); await screen.findByText(es.errors.invoke); fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: es.retry })); await waitFor(() => expect(writes()).toHaveLength(2))
+  await waitFor(() => expect(tab('Activaciones')).toHaveAttribute('aria-selected', 'true')); await openTab('Invocar'); fireEvent.click(button(es.invoke.action)); await waitFor(() => expect(writes()).toHaveLength(3))
+  expect(keys()[0]).toBe(keys()[1]); expect(keys()[2]).not.toBe(keys()[1])
+})
+
+test.each(['http', 'network'] as const)('delete retries after a %s failure with the same key, and the next delete after the success gets a new one', async (kind) => {
+  setup({ [`DELETE ${detailPath}`]: sequence(firstFailures[kind], Response.json(accepted()), Response.json(accepted())) }); open(); await select()
+  let { input, confirm } = await typedDelete(); fireEvent.change(input, { target: { value: 'synthetic-hello' } }); fireEvent.click(confirm)
+  const panel = await within(screen.getByRole('alertdialog')).findByRole('alert'); fireEvent.click(within(panel).getByRole('button', { name: es.retry })); await waitFor(() => expect(writes()).toHaveLength(2))
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull()); await select()
+  ;({ input, confirm } = await typedDelete()); fireEvent.change(input, { target: { value: 'synthetic-hello' } }); fireEvent.click(confirm); await waitFor(() => expect(writes()).toHaveLength(3))
+  expect(keys()[0]).toBeTruthy(); expect(keys()[0]).toBe(keys()[1]); expect(keys()[2]).not.toBe(keys()[1])
+})
+
 test('unused request helpers stay referenced', () => { expect([createPath, accepted(), act]).toHaveLength(3) })
