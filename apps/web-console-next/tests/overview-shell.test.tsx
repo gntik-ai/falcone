@@ -27,6 +27,7 @@ test.each(['superadmin', 'tenant_owner', 'tenant_viewer'])('allows authenticated
   expect(isMigratedRoute('/console/my-plan')).toBe(true)
   expect(isMigratedRoute('/console/my-plan/allocation')).toBe(true)
   expect(isMigratedRoute('/console/overview')).toBe(true)
+  expect(isMigratedRoute('/console/kafka')).toBe(true)
   expect(isMigratedRoute('/console/database')).toBe(true)
   expect(isMigratedRoute('/console/postgres')).toBe(true)
   expect(isMigratedRoute('/console/postgres/data')).toBe(true)
