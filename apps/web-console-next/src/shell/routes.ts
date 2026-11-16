@@ -32,7 +32,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'mongo/data', migrated: true },
   { path: 'kafka', migrated: true },
   { path: 'events/data', migrated: true },
-  { path: 'functions' },
+  { path: 'functions', migrated: true },
   { path: 'functions/data', migrated: true },
   { path: 'realtime/changes', migrated: true },
   { path: 'flows', migrated: true },

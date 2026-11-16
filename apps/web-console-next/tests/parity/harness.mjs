@@ -4,6 +4,7 @@ import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
 import { createEndpointRegistry } from './endpoint-registry.ts';
 import { consumeResourceDiagnostic } from './resource-diagnostics.mjs';
 import { catalogResponse, isPlansQuery } from './pages/console-plan-catalog-page.manifest.ts';
+import { sectionFailureEndpoints } from './pages/console-functions-page.manifest.ts';
 
 export { expect };
 export const test = base.extend({
@@ -17,6 +18,10 @@ export const test = base.extend({
   parity: [async ({ page, server, role, locale, pageEndpoints, preserveLocale }, use) => {
     const requests = [], unmatched = [], faults = [], injectedFailures = [];
     const registry = createEndpointRegistry(endpoints, responseFor, pageEndpoints);
+    // The selected variants decide whether a functions section 500 was injected by the fixture or is a real failure.
+    let selectedVariants = {};
+    const setVariants = (value) => { selectedVariants = value; registry.setVariants(value); };
+    const selectsFailure = (selected) => [selected].flat().some((item) => item === '500' || item?.variant === '500');
     await page.clock.setFixedTime(new Date('2026-06-01T12:00:00Z'));
     await page.exposeBinding('__parityFault', (_, message) => { faults.push(message); });
     page.on('pageerror', (error) => faults.push(`pageerror: ${error.message}`));
@@ -62,17 +67,18 @@ export const test = base.extend({
       if (response.delayMs) await new Promise((done) => setTimeout(done, response.delayMs));
       if ((/^\/v1\/auth\/(?:login-sessions(?:\/[^/]+\/refresh)?|signups\/policy|status-views\/[^/]+)$/.test(path) && (response.network || response.status >= 400)) ||
           (path === '/v1/async-operation-query' && (response.network || response.status === 500)) ||
+          (sectionFailureEndpoints.includes(name) && response.status === 500 && selectsFailure(selectedVariants[name])) ||
           ((path === '/v1/tenant/effective-capabilities' || /^\/v1\/workspaces\/[^/]+\/realtime$/.test(path) || path === '/v1/platform/runtime/knative') && (response.network || [401, 403, 404, 500].includes(response.status)))) {
         injectedFailures.push({ url: request.url(), kind: response.network ? 'network' : String(response.status) });
       }
       if (response.network) await route.abort('failed');
       else await route.fulfill({ status: response.status ?? 200, json: response.body });
     });
-    const network = { requests, setVariants: (value) => registry.setVariants(value) };
+    const network = { requests, setVariants };
     const parity = {
       page, locale, role, network, faults,
       async open(route, variants = {}) {
-        registry.setVariants(variants);
+        setVariants(variants);
         await page.goto(server.url(route.replace(/^\//, '')));
         await expect(page.locator('main')).toBeVisible();
         await expect(page.locator('main h1')).toBeVisible();
