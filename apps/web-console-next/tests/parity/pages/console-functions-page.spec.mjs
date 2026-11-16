@@ -81,7 +81,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.open(manifest.route, { workspaces: 'empty' }); await expect(surface(parity).getByRole('heading', { name: c.gate.title, exact: true })).toBeVisible(); await expect(surface(parity).getByText(c.gate.description, { exact: true })).toBeVisible(); expect(functionCalls(parity)).toHaveLength(0);
       await parity.open(manifest.route, { tenants: 'empty' }); expect(functionCalls(parity)).toHaveLength(0);
       await parity.open(manifest.route, { 'functions-inventory': 'empty' }); await expect(surface(parity).getByText(c.inventory.empty, { exact: true })).toBeVisible(); await expect(surface(parity).getByText(c.detail.empty, { exact: true })).toBeVisible();
-      await parity.open(manifest.route, { 'functions-versions': 'empty', 'functions-activations': 'empty', 'functions-detail': 'success' }); await select(parity);
+      await parity.open(manifest.route, { 'functions-versions': 'empty', 'functions-activations': 'empty', 'functions-detail': 'success' }); await select(parity, 'synthetic-hello', { history: false });
       await openTab(parity, 'versions'); await expect(surface(parity).getByText(c.versions.empty, { exact: true })).toBeVisible();
       await openTab(parity, 'activations'); await expect(surface(parity).getByText(c.activations.empty, { exact: true })).toBeVisible();
       await openTab(parity, 'triggers'); await expect(surface(parity).getByTestId('functions-triggers')).toContainText('synthetic-bucket');

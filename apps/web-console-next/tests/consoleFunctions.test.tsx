@@ -293,7 +293,7 @@ test('an empty invoke payload sends an empty object', async () => {
 test.each([
   ['429', failure(429), es.errors['429'], true], ['QUOTA_EXCEEDED 402', failure(402, { code: 'QUOTA_EXCEEDED' }), es.errors.invoke, true],
   ['500', failure(500), es.errors['5xx'], false], ['400 with quota in the message', failure(400, { message: 'synthetic quota message' }), es.errors.invoke, false],
-] as const)('invoke %s shows %s and the limits hint is %s', async (_name, response, message, hint) => {
+] as const)('invoke %s shows its message and the limits hint follows the status and code', async (_name, response, message, hint) => {
   setup({ [`POST ${detailPath}/invocations`]: response }); open(); await select(); await openTab('Invocar'); fireEvent.click(button(es.invoke.action))
   const panel = await screen.findByTestId('functions-invoke').then(() => screen.findByRole('alert')); expect(panel).toHaveTextContent(message)
   if (hint) expect(screen.getByText(es.errors.limitsHint)).toBeVisible(); else expect(screen.queryByText(es.errors.limitsHint)).toBeNull()

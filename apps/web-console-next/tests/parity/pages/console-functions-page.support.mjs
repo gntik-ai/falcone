@@ -17,11 +17,13 @@ export const tab = (parity, key) => surface(parity).getByRole('tab', { name: cop
 export const radio = (parity, name) => surface(parity).getByRole('radio', { name, exact: true });
 export const ready = async (parity) => expect(surface(parity).getByRole('table', { name: copy(parity).inventory.caption, exact: true })).toBeVisible();
 export const pane = (parity) => surface(parity).getByTestId('functions-detail-pane');
-export async function select(parity, name = 'synthetic-hello') {
+// An empty version history renders its empty label instead of the timeline list, so callers that stub it pass { history: false }.
+export async function select(parity, name = 'synthetic-hello', { history = true } = {}) {
   await ready(parity);
   await radio(parity, name).check();
   await expect(surface(parity).getByTestId('functions-detail')).toBeVisible();
-  await expect(surface(parity).getByRole('list', { name: copy(parity).history.label, exact: true })).toBeVisible();
+  if (history) await expect(surface(parity).getByRole('list', { name: copy(parity).history.label, exact: true })).toBeVisible();
+  else await expect(surface(parity).getByTestId('functions-detail').getByText(copy(parity).history.empty, { exact: true })).toBeVisible();
 }
 export async function openTab(parity, key) {
   await tab(parity, key).click();
