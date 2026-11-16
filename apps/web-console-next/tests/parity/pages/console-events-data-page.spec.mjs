@@ -50,7 +50,9 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     test('runtime-health', async ({ parity }) => {
       await parity.open('/console/overview');
       if (width < 1024) await parity.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
-      const link = parity.page.locator('a[href$="/console/events/data"]').first(); let documents = 0;
+      const link = parity.page.locator('a[href$="/console/events/data"]:visible');
+      await expect(link).toHaveCount(1);
+      let documents = 0;
       parity.page.on('request', (request) => { if (request.isNavigationRequest() && request.frame() === parity.page.mainFrame()) documents++; });
       await link.click(); await ready(parity); expect(documents).toBe(0); await check.assertRuntimeHealth(parity);
       await parity.open(manifest.route); await ready(parity); await check.assertRuntimeHealth(parity);
