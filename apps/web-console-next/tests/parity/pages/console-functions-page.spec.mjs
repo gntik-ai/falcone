@@ -133,9 +133,13 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect.poll(versionReads).toBe(2);
       const detailBefore = calls(parity).length; await alertWith(parity, c.errors.detail).getByRole('button', { name: c.retry, exact: true }).click();
       await expect(surface(parity).getByTestId('functions-deploy')).toBeVisible(); expect(calls(parity).slice(detailBefore)).toEqual([get(detailPath)]);
+      const invokeScenarioStart = calls(parity).length;
       await parity.open(manifest.route, { 'functions-activations': ['success', 'network', 'success'], 'functions-invoke': 'invoke-accepted' }); await select(parity); await openTab(parity, 'activations');
       await expect(surface(parity).getByTestId('functions-activations').getByRole('radio').first()).toBeVisible();
-      await openTab(parity, 'invoke'); await button(parity, c.invoke.action).click(); await expect(surface(parity).getByText(c.invoke.resultTitle, { exact: true })).toBeVisible(); await openTab(parity, 'activations');
+      await openTab(parity, 'invoke'); await button(parity, c.invoke.action).click();
+      // A successful invoke reloads the activations and moves to that tab on its own, so the result alert on the invoke tab is transient; wait for the reload (the second, failing read) instead.
+      const activationReads = () => calls(parity).slice(invokeScenarioStart).filter((call) => JSON.stringify(call) === JSON.stringify(get(activationsPath))).length;
+      await expect.poll(activationReads).toBe(2); await openTab(parity, 'activations');
       await expect(alertWith(parity, c.errors.activations)).toBeVisible(); await expect(surface(parity).getByTestId('functions-activations').getByRole('radio')).toHaveCount(0);
       const listBefore = calls(parity).length; await alertWith(parity, c.errors.activations).getByRole('button', { name: c.retry, exact: true }).click();
       await expect(surface(parity).getByTestId('functions-activations').getByRole('radio').first()).toBeVisible(); expect(calls(parity).slice(listBefore)).toEqual([get(activationsPath)]);
