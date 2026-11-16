@@ -32,7 +32,8 @@ test.each(['es', 'en'])('inventory, independent topic reads and every detail fie
   await i18n.changeLanguage(locale); const c = copy(locale); setup(); open(); await select()
   const kpis = screen.getByLabelText(c.kafkaTopics, { selector: 'dl' })
   expect(kpis).toHaveTextContent(c.total); expect(kpis).toHaveTextContent(c.active); expect(kpis).toHaveTextContent(c.provisioning); expect(kpis).toHaveTextContent(c.degraded)
-  for (const name of ['evt.ten_alpha.orders.created', '/events/orders', 'res_topic_1', '4096', 'Gzip', 'S3', 'Cg.Ten Alpha.']) expect(screen.getAllByText(name, { exact: true }).length).toBeGreaterThan(0)
+  // The heading can render from inventory before the independent detail request finishes.
+  for (const name of ['evt.ten_alpha.orders.created', '/events/orders', 'res_topic_1', '4096', 'Gzip', 'S3', 'Cg.Ten Alpha.']) expect((await screen.findAllByText(name, { exact: true })).length).toBeGreaterThan(0)
   expect(await screen.findByText(c.noStatusHistory)).toBeVisible(); expect(screen.getByRole('meter', { name: c.quotas })).toHaveAttribute('aria-valuenow', '100')
   tab(c.tabs.access); expect(await screen.findByText('svc-orders')).toBeVisible(); expect(screen.getByText('svc-denied')).toBeVisible()
   tab(c.tabs.metadata); expect(await screen.findByText('Cg-Orders')).toBeVisible(); expect(screen.getByText(/Metadata parcial/)).toBeVisible()
