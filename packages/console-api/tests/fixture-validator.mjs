@@ -2,6 +2,8 @@
 export function assertSyntheticFixture(value, key = '', path = '$') {
   if (typeof value === 'string') {
     if (value.startsWith('eyJ')) throw new Error(`JWT-shaped string at ${path}`)
+    if (/flc_[A-Za-z0-9_]{4,}/.test(value)) throw new Error(`API-key-shaped string at ${path}`)
+    if (/apikey=/i.test(value)) throw new Error(`API key query at ${path}`)
     if (key === 'tokenType') {
       if (value !== 'Bearer') throw new Error(`Invalid tokenType at ${path}`)
     } else if (/token|password|secret|credential|apikey/i.test(key)

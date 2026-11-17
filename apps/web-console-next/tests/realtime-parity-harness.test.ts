@@ -23,7 +23,7 @@ async function withHarness(use: (parity: Parity, send: (method: string, path: st
   await fixtures.parity[0]({ page, server: { origin }, role: 'superadmin', locale: 'es', pageEndpoints: realtimeEndpoints }, async (parity: Parity) => {
     await use(parity, async (method, path, body) => {
       const fulfill = vi.fn()
-      await handle({ request: () => ({ method: () => method, url: () => new URL(path, origin).href, postDataJSON: () => body }), fulfill })
+      await handle({ request: () => ({ method: () => method, url: () => new URL(path, origin).href, postDataJSON: () => body, headers: () => ({}) }), fulfill })
       return fulfill
     })
   })

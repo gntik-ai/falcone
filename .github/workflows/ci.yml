@@ -93,6 +93,7 @@ jobs:
         run: |
           node --test tests/blackbox/flow-stream-apikey-logs.test.mjs \
             tests/blackbox/flows-execution-events.test.mjs \
+            tests/blackbox/flows-execution-events-bearer.test.mjs \
             tests/blackbox/executor-5xx-code-redaction.test.mjs
 
       - name: Flow execution-token trust

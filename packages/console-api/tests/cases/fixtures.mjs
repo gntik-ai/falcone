@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync, readdirSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { assertSyntheticFixture } from '../fixture-validator.mjs'
 import { snapshot } from './support.mjs'
 
@@ -21,6 +24,7 @@ export const fixtureCases = [
         // checked in platform-secret-inventory.test.ts; check all other fields here.
         for (const { secretPath, ...metadata } of fixture) {
           assert.equal(typeof secretPath, 'string')
+          assertSyntheticFixture(secretPath)
           assertSyntheticFixture(metadata)
         }
       } else {
@@ -28,6 +32,10 @@ export const fixtureCases = [
       }
     }
     assertSyntheticFixture(snapshot)
+    const dataDirectory = join(dirname(fileURLToPath(import.meta.url)), '../data')
+    for (const file of readdirSync(dataDirectory, { recursive: true })) {
+      if (file.endsWith('.json')) assertSyntheticFixture(JSON.parse(readFileSync(join(dataDirectory, file), 'utf8')))
+    }
     assert.equal(fixtures.buildConsoleLoginSessionFixture().tokenSet.accessToken, 'synthetic-access-token')
     assert.equal(fixtures.buildConsolePasswordRecoveryFixture().credentialPolicy.recoveryTokenTtl, 'PT15M')
     const first = fixtures.buildConsoleLoginSessionFixture()
@@ -42,6 +50,7 @@ export const fixtureCases = [
     }))
   }],
   ...[
+    { ordinary: 'flc_anon_testvalue' }, { nested: ['/x?apikey=y'] }, { ordinary: '/x?APIKEY=y' },
     { refreshToken: 'abc' }, [{ password: 'x' }], { nested: { apiKey: 'abc' } },
     { secret: 'abc' }, { credential: 'abc' }, { accessToken: ['abc'] },
     { ordinary: 'eyJsynthetic' }, { accessTokenExpiresAt: 'eyJsynthetic' }, { tokenType: 'synthetic-bearer' }
