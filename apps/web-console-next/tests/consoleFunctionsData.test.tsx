@@ -237,7 +237,7 @@ test('a failed activations reload keeps the earlier list under Lista anterior un
   setup({ [`GET ${activationsPath}`]: () => ++attempt === 1 ? Response.json(activations3) : attempt === 2 ? failure(500, 'req_act_500')() : Response.json(activationsRefreshed) }); open(); await ready(); pick(1)
   type(es.inputLabel, '{"keep":true}'); type(es.deploySpecLabel, '{"name":"kept"}')
   const activations = await screen.findByRole('button', { name: es.viewActivations }); await waitFor(() => expect(activations).toBeEnabled()); fireEvent.click(activations); await screen.findByRole('table', { name: es.activationsLabel })
-  fireEvent.click(await screen.findByRole('button', { name: es.viewActivations }))
+  await waitFor(() => expect(activations).toBeEnabled()); fireEvent.click(activations)
   expect(await screen.findByRole('heading', { name: es.activationsError })).toBeVisible()
   expect(screen.getByText(es.activationsStale)).toBeVisible(); expect(screen.getByText('synthetic-activation-1')).toBeVisible()
   expect(screen.getByText('req_act_500')).toBeVisible()
