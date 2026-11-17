@@ -12,7 +12,7 @@ import { test as fixtures } from './parity/harness.mjs'
 
 type Handler = (...args: unknown[]) => unknown
 const origin = 'http://localhost'
-const mockRoute = (method: string, path: string) => ({ request: () => ({ method: () => method, url: () => `${origin}${path}`, postDataJSON: () => undefined }), fulfill: vi.fn(), abort: vi.fn() })
+const mockRoute = (method: string, path: string) => ({ request: () => ({ method: () => method, url: () => `${origin}${path}`, postDataJSON: () => undefined, headers: () => ({}) }), fulfill: vi.fn(), abort: vi.fn() })
 const diagnostic = (status: number, url: string) => ({ type: () => 'error', text: () => `Failed to load resource: the server responded with a status of ${status} (Synthetic)`, location: () => ({ url }) })
 const sectionPaths = { 'functions-detail': actionPath(1), 'functions-versions': `${actionPath(1)}/versions`, 'functions-activations': `${actionPath(1)}/activations`, 'functions-activation': activationPath(), 'functions-logs': `${activationPath()}/logs`, 'functions-result': `${activationPath()}/result` }
 

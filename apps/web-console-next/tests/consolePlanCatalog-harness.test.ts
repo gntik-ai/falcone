@@ -12,7 +12,7 @@ vi.mock('./csp/server.mjs', () => ({ startServer: vi.fn() }))
 import { test as fixtures } from './parity/harness.mjs'
 
 type MockRoute = {
-  request: () => { method: () => string; url: () => string; postDataJSON: () => unknown }
+  request: () => { method: () => string; url: () => string; postDataJSON: () => unknown; headers: () => object }
   fulfill: ReturnType<typeof vi.fn>
 }
 
@@ -38,12 +38,12 @@ test('create journeys can return to the catalog while other requests remain unma
   ]
   await fixtures.parity[0]({ page, server: { origin }, role: 'superadmin', locale: 'es', pageEndpoints: planEndpoints }, async (parity: { network: { requests: unknown[] } }) => {
     // Preserve the create endpoint and then follow its Discard destination.
-    const create = { request: () => ({ method: () => 'POST', url: () => `${origin}/v1/plans`, postDataJSON: () => planBody }), fulfill: vi.fn() }
+    const create = { request: () => ({ method: () => 'POST', url: () => `${origin}/v1/plans`, postDataJSON: () => planBody, headers: () => ({}) }), fulfill: vi.fn() }
     await handle(create)
     expect(create.fulfill).toHaveBeenCalledExactlyOnceWith({ status: 200, json: { id: 'p1' } })
     for (const [method, path] of [...accepted, ...rejected]) {
       const url = new URL(path, origin)
-      const route = { request: () => ({ method: () => method, url: () => url.href, postDataJSON: () => undefined }), fulfill: vi.fn() }
+      const route = { request: () => ({ method: () => method, url: () => url.href, postDataJSON: () => undefined, headers: () => ({}) }), fulfill: vi.fn() }
       await handle(route)
       if (accepted.some(([allowedMethod, allowedPath]) => allowedMethod === method && allowedPath === path)) {
         const response = catalogResponse('45-mixed', url)

@@ -17,6 +17,22 @@ export const test = base.extend({
   }, { scope: 'worker' }],
   parity: [async ({ page, server, role, locale, pageEndpoints, preserveLocale }, use) => {
     const requests = [], unmatched = [], faults = [], injectedFailures = [];
+    const guardRequest = async (route) => {
+      if (/apikey/i.test(route.request().url())) {
+        unmatched.push('API key URL forbidden');
+        await route.abort();
+        return false;
+      }
+      const request = route.request();
+      const headers = new Headers(request.headers());
+      if (/^\/v1\/flows\/workspaces\/[^/]+\/executions\/[^/]+\/events$/.test(new URL(request.url()).pathname) &&
+          !/^Bearer\s+\S+$/i.test(headers.get('authorization') ?? '')) {
+        unmatched.push('Flow events bearer required');
+        await route.abort();
+        return false;
+      }
+      return true;
+    };
     const registry = createEndpointRegistry(endpoints, responseFor, pageEndpoints);
     // The selected variants decide whether a functions section 500 was injected by the fixture or is a real failure.
     let selectedVariants = {};
@@ -41,11 +57,13 @@ export const test = base.extend({
     }, { session: sessionFor(role), locale, preserveLocale });
     // No browser request may leave the local test server.
     await page.route('**/*', async (route) => {
+      if (!await guardRequest(route)) return;
       if (new URL(route.request().url()).origin === server.origin) return route.continue();
       unmatched.push(`External request ${route.request().method()} ${new URL(route.request().url()).pathname}`);
       await route.abort();
     });
     await page.route('**/v1/**', async (route) => {
+      if (!await guardRequest(route)) return;
       const request = route.request(), url = new URL(request.url());
       const method = request.method(), path = url.pathname;
       let body;
