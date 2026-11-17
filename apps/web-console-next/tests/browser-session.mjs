@@ -66,6 +66,11 @@ export async function installSession(page, roles = ['superadmin'], capabilityVar
       await route.fulfill({ json: { items: [] } });
     } else if (route.request().method() === 'GET' && /^\/v1\/flows\/workspaces\/[^/]+\/flows\/[^/]+$/.test(url.pathname) && !url.search) {
       await route.fulfill({ json: { flowId: decodeURIComponent(url.pathname.split('/')[6]), name: 'Synthetic flow', status: 'draft', definition: { apiVersion: 'v1.0', name: 'Synthetic flow', nodes: [] } } });
+    } else if (route.request().method() === 'GET' && /^\/v1\/flows\/workspaces\/[^/]+\/flows\/[^/]+\/executions\/sample-executionId$/.test(url.pathname) && !url.search) {
+      // The CSP route sweep opens the run page with its sample identifier. A terminal run: the run page opens no events request for it.
+      await route.fulfill({ json: { executionId: decodeURIComponent(url.pathname.split('/')[8]), workflowId: 'synthetic-workflow', status: 'Completed', nodes: [] } });
+    } else if (route.request().method() === 'GET' && /^\/v1\/flows\/workspaces\/[^/]+\/executions\/sample-executionId\/events$/.test(url.pathname) && !url.search && /^Bearer\s+\S+$/i.test(route.request().headers().authorization ?? '')) {
+      await route.fulfill({ status: 200, contentType: 'text/event-stream', body: 'id: 1\nevent: stream-end\ndata: {}\n\n' });
     } else if (route.request().method() === 'GET' && /^\/v1\/flows\/workspaces\/[^/]+\/task-types$/.test(url.pathname) && !url.search) {
       await route.fulfill({ json: { items: [] } });
     } else if (route.request().method() === 'GET' && /^\/v1\/flows\/workspaces\/[^/]+\/flows\/[^/]+\/executions$/.test(url.pathname) && !url.search) {

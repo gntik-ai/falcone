@@ -36,7 +36,7 @@ test.each(['superadmin', 'tenant_viewer', 'workspace_viewer'])('the history rout
   expect(calls().filter(([url]) => url === historyPath)).toHaveLength(1)
   expect(pendingConsoleRoutes.find(({ path }) => path === 'flows')?.migrated).toBe(true)
   expect(isMigratedRoute('/console/flows/f1/runs')).toBe(true)
-  expect(isMigratedRoute('/console/flows/f1/runs/e1')).toBe(false)
+  expect(isMigratedRoute('/console/flows/f1/runs/e1')).toBe(true)
 })
 
 test.each(['ok', 'rejected', 'repeat'])('401 %s refreshes once with the correct guard behavior', async (variant) => {
