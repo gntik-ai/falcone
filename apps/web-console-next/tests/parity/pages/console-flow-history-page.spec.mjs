@@ -141,12 +141,16 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     test('runtime-health', async ({ parity, server }) => {
       // The pending detail's breadcrumb uses the shell LinkProvider and React Router navigate().
       states.set(parity, { variant: 'page1-with-token', attempt: 0, authorizations: [] });
+      // The run page is migrated: serve its flow and terminal execution reads, which open no events stream.
+      await parity.page.route((url) => url.pathname === '/v1/flows/workspaces/synthetic-workspace/flows/f1', (route) => route.fulfill({ json: { flowId: 'f1', name: 'Synthetic flow', status: 'published', definition: { apiVersion: 'v1.0', name: 'Synthetic flow', nodes: [] } } }));
+      await parity.page.route((url) => url.pathname === `${historyPath}/e1`, (route) => route.fulfill({ json: { executionId: 'e1', workflowId: 'synthetic-workflow', status: 'Completed', nodes: [] } }));
       await parity.open('/console/flows/f1/runs/e1');
       await parity.page.evaluate(() => {
         const push = history.pushState.bind(history);
         history.pushState = (state, title, url) => push(String(url).endsWith('/console/flows/f1/runs') ? { ...state, usr: { flowTrigger: { flowId: 'f1', scheduleId: 'synthetic-schedule' } } } : state, title, url);
       });
-      await parity.page.getByRole('link', { name: locale === 'es' ? 'Ejecuciones' : 'Runs', exact: true }).click();
+      // The shell breadcrumb and the run page header both link to the history.
+      await parity.page.getByRole('link', { name: locale === 'es' ? 'Ejecuciones' : 'Runs', exact: true }).first().click();
       await ready(parity); await expect(parity.page.getByTestId('flow-trigger-success')).toBeVisible();
       expect(parity.page.url()).toBe(server.url('console/flows/f1/runs'));
       states.get(parity).variant = 'network';

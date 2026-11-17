@@ -212,7 +212,7 @@ test('navigation keeps legacy groups, role visibility and same-tab document link
   login(['tenant_owner'])
   requests = strictFetch({})
   open('/console/flows/f1/runs/e1')
-  await screen.findByRole('heading', { name: 'Página pendiente' })
+  await screen.findByRole('heading', { name: 'Ejecución bloqueada' })
   const nav = screen.getByRole('navigation', { name: 'Navegación de consola' })
   const flows = Array.from(nav.querySelectorAll('a')).find((link) => link.textContent?.includes('Flujos / workflows'))!
   expect(flows).toHaveAttribute('href', '/console/flows')

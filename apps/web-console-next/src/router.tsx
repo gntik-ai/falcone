@@ -129,6 +129,7 @@ export const appRoutes: RouteObject[] = [
         if (route.path === 'flows' && route.migrated) return { ...route, element: lazyPage('pages.console-flows-page', () => import('./pages/consoleFlows')) }
         if (route.path === 'flows/:flowId' && route.migrated) return { ...route, element: lazyPage('pages.console-flow-designer-page', () => import('./pages/consoleFlowDesigner')) }
         if (route.path === 'flows/:flowId/runs' && route.migrated) return { ...route, element: lazyPage('pages.console-flow-history-page', () => import('./pages/consoleFlowHistory')) }
+        if (route.path === 'flows/:flowId/runs/:executionId' && route.migrated) return { ...route, element: lazyPage('pages.console-flow-run-page', () => import('./pages/consoleFlowRun')) }
         return { ...route, element: pendingRouteElement(guard) }
       }),
       ...(__SHELL_TEST_FIXTURES__ && FixtureRoutes ? [{ path: '__fixture/*', element: <FixtureRoutes /> }] : []),

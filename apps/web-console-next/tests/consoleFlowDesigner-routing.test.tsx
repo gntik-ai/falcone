@@ -24,7 +24,7 @@ const options = { timeout: 10000 }
 test('designer is the most-specific migrated route and lazy-loads below /next', async () => {
   setup(); open(); await screen.findByRole('heading', { name: 'Synthetic flow' }, options)
   expect(isMigratedRoute('/console/flows/f1')).toBe(true)
-  expect(isMigratedRoute('/console/flows/f1/runs/unknown')).toBe(false)
+  expect(isMigratedRoute('/console/flows/f1/runs/unknown')).toBe(true)
   expect(pendingConsoleRoutes.find(({ path }) => path === 'flows/:flowId')?.migrated).toBe(true)
   expect(screen.getByTestId('console-flow-designer-page')).toBeVisible()
   expect(screen.getByRole('link', { name: 'Ver historial de ejecuciones para Synthetic flow' })).toHaveAttribute('href', '/next/console/flows/f1/runs')
