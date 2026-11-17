@@ -32,7 +32,7 @@
 @media (max-width: 1023px) {
   .console-flow-run { height: auto; min-height: 44rem; }
   .console-flow-run > header { flex-wrap: wrap; }
-  .console-flow-run .run-canvas { height: 24rem; flex: none; }
+  .console-flow-run .run-canvas { height: 24rem; }
   .console-flow-run > header > :last-child { display: flex; }
   .console-flow-run > header + div { flex-direction: column; }
   .console-flow-run > header + div > aside:not([hidden]) { display: block; width: 100%; max-height: 24rem; overflow-y: auto; }

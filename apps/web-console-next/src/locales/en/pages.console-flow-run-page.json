@@ -73,7 +73,7 @@
     "sub-flow": "Sub-flow",
     "sequence": "Sequence"
   },
-  "nodePending": "pending",
+  "nodePending": "Pending",
   "nodeNamed": "{type}: {name}, status {status}",
   "nodeDescription": "Press Enter or Space to open the node detail.",
   "edgeNamed": "Connection from {source} to {target}",
