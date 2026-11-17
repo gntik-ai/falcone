@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { consoleAuthConfig } from '@in-falcone/console-api/config'
 import { useSession, signOut } from './session'
-import { LocaleSwitch } from '../i18n/LocaleSwitch'
+import { LocaleMenu } from '../i18n/LocaleMenu'
 
 declare const __APP_VERSION__: string
 declare const __APP_COMMIT_SHA__: string
@@ -30,7 +30,7 @@ export function AccountMenu({ mode = 'console' }: { mode?: 'console' | 'admin' }
         ...(superadmin ? [{ label: t(mode === 'admin' ? 'shell.backToConsole' : 'shell.adminConsole'), onSelect: () => navigate(mode === 'admin' ? '/console' : '/admin') }] : []),
         { label: t('shell.about'), onSelect: () => setAbout(true) }
       ]}>
-      <div className="p-3"><LocaleSwitch /></div>
+      <LocaleMenu />
     </UserMenu>
     <Dialog open={about} onOpenChange={setAbout}><DialogContent closeLabel={t('shell.close')}>
       <DialogHeader><DialogTitle>{t('shell.about')}</DialogTitle></DialogHeader>
