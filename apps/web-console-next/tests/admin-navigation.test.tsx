@@ -24,8 +24,8 @@ function open(path = '/console/overview') {
   return render(<MemoryRouter basename="/next" initialEntries={[`/next${path}`]}><CurrentLocation /><App /></MemoryRouter>)
 }
 const copy = {
-  en: { admin: 'Admin console', console: 'Console', about: 'About', signOut: 'Sign out', trigger: 'User menu' },
-  es: { admin: 'Consola de administración', console: 'Consola', about: 'Acerca de', signOut: 'Cerrar sesión', trigger: 'Menú de usuario' }
+  en: { admin: 'Admin console', console: 'Console', about: 'About', language: 'Language', signOut: 'Sign out', trigger: 'User menu' },
+  es: { admin: 'Consola de administración', console: 'Consola', about: 'Acerca de', language: 'Idioma', signOut: 'Cerrar sesión', trigger: 'Menú de usuario' }
 } as const
 
 describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) => {
@@ -37,7 +37,7 @@ describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) 
     vi.stubGlobal('window', Object.create(window, { location: { value: { ...window.location, assign } } }))
     open()
     fireEvent.click(await screen.findByRole('button', { name: text.trigger }))
-    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([text.admin, text.about, text.signOut])
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([text.admin, text.about, text.language, text.signOut])
     fireEvent.click(screen.getByRole('menuitem', { name: text.admin }))
     await waitFor(() => expect(visited.at(-1)).toBe('/next/admin'))
     expect(assign).not.toHaveBeenCalled()
@@ -48,7 +48,7 @@ describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) 
     vi.stubGlobal('window', Object.create(window, { location: { value: { ...window.location, assign } } }))
     open('/admin')
     fireEvent.click(await screen.findByRole('button', { name: text.trigger }))
-    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([text.console, text.about, text.signOut])
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([text.console, text.about, text.language, text.signOut])
     expect(screen.queryByRole('menuitem', { name: text.admin })).toBeNull()
     expect(screen.queryByRole('link', { name: text.admin })).toBeNull()
     fireEvent.click(screen.getByRole('menuitem', { name: text.console }))
@@ -80,7 +80,7 @@ describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) 
     expect(screen.queryByRole('link', { name: text.admin })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: text.admin })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: text.console })).toBeNull()
-    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([text.about, text.signOut])
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([text.about, text.language, text.signOut])
   })
 
   test.each([

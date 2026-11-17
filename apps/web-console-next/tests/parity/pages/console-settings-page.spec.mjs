@@ -14,7 +14,8 @@ const retryBundle = (locale) => `**/${build[`src/locales/${locale}/pages.console
 async function choose(page, from, to, control) {
   if (control === 'menu') {
     await page.getByRole('button', { name: copy(from, 'Menú de usuario', 'User menu'), exact: true }).click();
-    await page.getByRole('combobox', { name: copy(from, 'Idioma', 'Language'), exact: true }).selectOption(to);
+    await page.getByRole('menuitem', { name: copy(from, 'Idioma', 'Language'), exact: true }).click();
+    await page.getByRole('menuitemradio', { name: to === 'es' ? copy(from, 'Español', 'Spanish') : copy(from, 'Inglés', 'English'), exact: true }).click();
   } else {
     await select(page, from).click();
     await page.getByRole('listbox').getByRole('option', { name: to === 'es' ? copy(from, 'Español', 'Spanish') : copy(from, 'Inglés', 'English'), exact: true }).click();

@@ -9,8 +9,8 @@ test.beforeAll(async () => { server = await startServer(); });
 test.afterAll(async () => { await server?.close(); });
 
 const copy = {
-  en: { admin: 'Admin console', console: 'Console', about: 'About', signOut: 'Sign out', trigger: 'User menu' },
-  es: { admin: 'Consola de administración', console: 'Consola', about: 'Acerca de', signOut: 'Cerrar sesión', trigger: 'Menú de usuario' },
+  en: { admin: 'Admin console', console: 'Console', about: 'About', language: 'Language', signOut: 'Sign out', trigger: 'User menu' },
+  es: { admin: 'Consola de administración', console: 'Consola', about: 'Acerca de', language: 'Idioma', signOut: 'Cerrar sesión', trigger: 'Menú de usuario' },
 };
 const pathname = (page) => new URL(page.url()).pathname;
 async function setup(page, locale, roles = ['superadmin']) {
@@ -39,11 +39,11 @@ for (const locale of ['en', 'es']) {
     page.on('request', (request) => { if (request.resourceType() === 'document') documents.push(request.url()); });
     const trigger = () => page.getByRole('button', { name: text.trigger });
     await trigger().click();
-    await expect(page.getByRole('menuitem')).toHaveText([text.admin, text.about, text.signOut]);
+    await expect(page.getByRole('menuitem')).toHaveText([text.admin, text.about, text.language, text.signOut]);
     await page.getByRole('menuitem', { name: text.admin, exact: true }).click();
     await expect(page).toHaveURL(server.url('admin'));
     await trigger().click();
-    await expect(page.getByRole('menuitem')).toHaveText([text.console, text.about, text.signOut]);
+    await expect(page.getByRole('menuitem')).toHaveText([text.console, text.about, text.language, text.signOut]);
     await expect(page.getByRole('menuitem', { name: text.admin, exact: true })).toHaveCount(0);
     await expect(page.getByRole('link', { name: text.admin, exact: true })).toHaveCount(0);
     await page.getByRole('menuitem', { name: text.console, exact: true }).click();
@@ -171,7 +171,7 @@ for (const locale of ['en', 'es']) {
         if (entry) {
           await trigger.click();
           if (entry === 'about') {
-            await expect(page.getByRole('menuitem')).toHaveText([text.about, text.signOut]);
+            await expect(page.getByRole('menuitem')).toHaveText([text.about, text.language, text.signOut]);
             await expect(adminItem).toHaveCount(0);
             await expect(page.getByRole('menuitem', { name: text.console, exact: true })).toHaveCount(0);
           } else await expect(page.getByRole('menuitem', { name: label, exact: true })).toHaveAccessibleName(label);

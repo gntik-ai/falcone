@@ -91,7 +91,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       if (locale === 'en') {
         await p.page.addInitScript(() => document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') localStorage.removeItem('falcone-next-locale'); }, { once: true }));
         await open(p); await expect(surface(p).getByRole('heading', { name: bundles.en.title })).toBeVisible(); await expect(p.page.locator('html')).toHaveAttribute('lang', 'en');
-        await p.page.getByRole('button', { name: 'User menu', exact: true }).click(); await p.page.getByRole('combobox', { name: 'Language' }).selectOption('es'); await expect(surface(p).getByRole('heading', { name: bundles.es.title })).toBeVisible(); await expect(p.page.locator('html')).toHaveAttribute('lang', 'es');
+        await p.page.getByRole('button', { name: 'User menu', exact: true }).click(); await p.page.getByRole('menuitem', { name: 'Language', exact: true }).click(); await p.page.getByRole('menuitemradio', { name: 'Spanish', exact: true }).click(); await expect(surface(p).getByRole('heading', { name: bundles.es.title })).toBeVisible(); await expect(p.page.locator('html')).toHaveAttribute('lang', 'es');
       }
     });
     test('action', async ({ parity: p, server }) => {

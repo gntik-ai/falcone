@@ -40,7 +40,7 @@ test.each(['es', 'en'] as const)('the settings breadcrumb is translated in %s wi
   const breadcrumb = screen.getByRole('navigation', { name: locale === 'es' ? 'Ruta de navegación' : 'Breadcrumb' })
   expect(within(breadcrumb).getByText(locale === 'es' ? 'Configuración' : 'Settings')).toHaveAttribute('aria-current', 'page')
   fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Menú de usuario' : 'User menu' }))
-  expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(locale === 'es' ? ['Acerca de', 'Cerrar sesión'] : ['About', 'Sign out'])
+  expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(locale === 'es' ? ['Acerca de', 'Idioma', 'Cerrar sesión'] : ['About', 'Language', 'Sign out'])
   network.verify()
 }, 10_000)
 
@@ -164,9 +164,14 @@ for (const locale of ['es', 'en'] as const) for (const route of ['/console/overv
     function Observer() { const state = useLocaleLoader(); return <output data-testid="loader-result">{String(state.error)}</output> }
     render(<Observer />)
     try {
-      if (route === '/') (screen.getByText(locale === 'es' ? 'Menú de usuario' : 'User menu').closest('details') as HTMLDetailsElement).open = true
-      else fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Menú de usuario' : 'User menu' }))
-      fireEvent.change(screen.getByRole('combobox', { name: locale === 'es' ? 'Idioma' : 'Language' }), { target: { value: locale === 'es' ? 'en' : 'es' } })
+      if (route === '/') {
+        (screen.getByText(locale === 'es' ? 'Menú de usuario' : 'User menu').closest('details') as HTMLDetailsElement).open = true
+        fireEvent.change(screen.getByRole('combobox', { name: locale === 'es' ? 'Idioma' : 'Language' }), { target: { value: locale === 'es' ? 'en' : 'es' } })
+      } else {
+        fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Menú de usuario' : 'User menu' }))
+        fireEvent.click(screen.getByRole('menuitem', { name: locale === 'es' ? 'Idioma' : 'Language' }))
+        fireEvent.click(await screen.findByRole('menuitemradio', { name: locale === 'es' ? 'Inglés' : 'Spanish' }))
+      }
       await waitFor(() => expect(screen.getByTestId('loader-result')).toHaveTextContent('true'))
       expect(document.documentElement.lang).toBe(locale)
       expect(localStorage.getItem('falcone-next-locale')).toBe(locale)
