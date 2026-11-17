@@ -176,3 +176,23 @@ it('a terminal error still rejects done when onError closes the handle', () => w
   await expect(handle.done).rejects.toEqual({ status: 403, code: 'SYNTHETIC_DENIED' })
   expect(onError).toHaveBeenCalledTimes(1)
 }))
+
+it.each(['close', 'abort'] as const)('%s prevents a refresh when a pending connection returns a late 401', (mode) => withSession(async () => {
+  persistConsoleShellSession(loginSession())
+  let respond!: (response: Response) => void
+  const pending = new Promise<Response>((resolve) => { respond = resolve })
+  const requests = recordFetch((_request, index) => index === 1 ? pending : Response.json(loginSession()))
+  const signal = new AbortController()
+  const onFrame = vi.fn(), onError = vi.fn()
+  const handle = streamFlowExecutionEvents({ ...params, signal: signal.signal, onFrame, onError })
+  await vi.waitFor(() => expect(requests).toHaveLength(1))
+  if (mode === 'close') handle.close()
+  else signal.abort()
+  await expect(handle.done).resolves.toBeUndefined()
+  // A response already queued by the transport may arrive after cancellation.
+  respond(new Response(null, { status: 401 }))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(requests.map(({ method }) => method)).toEqual(['GET'])
+  expect(onFrame).not.toHaveBeenCalled()
+  expect(onError).not.toHaveBeenCalled()
+}))

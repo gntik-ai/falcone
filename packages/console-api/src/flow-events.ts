@@ -68,9 +68,14 @@ export function streamFlowExecutionEvents(options: FlowExecutionEventsOptions): 
       let response: Response | undefined
       try { response = await fetch(url, { method: 'GET', headers, signal: controller.signal }) }
       catch { if (closed) return }
+      if (closed) {
+        await response?.body?.cancel().catch(() => {})
+        return
+      }
       if (response?.status === 401 && !refreshedAfterUnauthorized) {
         refreshedAfterUnauthorized = true
         await response.body?.cancel().catch(() => {})
+        if (closed) return
         const refreshed = await refreshConsoleShellSession()
         if (closed) return
         token = refreshed?.tokenSet?.accessToken?.trim()
