@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import manifest, { runtimePath, ready, runtimeFixtures } from './consoleRuntime.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
+import { inventory as functionsInventory, inventoryPath as functionsInventoryPath } from './console-functions-page.manifest.ts';
 import es from '../../../src/locales/es/pages.console-runtime-page.json' with { type: 'json' };
 import en from '../../../src/locales/en/pages.console-runtime-page.json' with { type: 'json' };
 
@@ -40,6 +41,23 @@ async function exitToLegacy(parity, path, linkName) {
   await expect(parity.page).toHaveTitle(copy(parity).consoleTitle);
   await check.assertRuntimeHealth(parity);
   await parity.page.unroute(match);
+}
+
+// A migrated destination is a client-side navigation: no document load, the session is untouched and health stays clean.
+async function clientNavigate(parity, server, path, linkName) {
+  const session = await parity.page.evaluate(() => sessionStorage.getItem('in-falcone.console-shell-session'));
+  // The destination page loads its own inventory; serve it locally so the runtime fixtures stay the only registered endpoints.
+  await parity.page.route(`**${functionsInventoryPath}`, async (route) => route.fulfill({ json: functionsInventory() }));
+  let documents = 0;
+  const onRequest = (request) => { if (request.isNavigationRequest() && request.frame() === parity.page.mainFrame()) documents++; };
+  parity.page.on('request', onRequest);
+  await parity.page.getByRole('link', { name: linkName, exact: true }).click();
+  await expect(parity.page).toHaveURL(server.url(path.replace(/^\//, '')));
+  await expect(parity.page.getByTestId('console-functions-page')).toBeVisible();
+  parity.page.off('request', onRequest);
+  expect(documents).toBe(0);
+  expect(await parity.page.evaluate(() => sessionStorage.getItem('in-falcone.console-shell-session'))).toBe(session);
+  await check.assertRuntimeHealth(parity);
 }
 
 for (const role of observers) for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
@@ -190,6 +208,11 @@ for (const role of observers) for (const locale of ['es', 'en']) for (const widt
         ['knative-403', '/console/overview', 'back'], ['knative-404', '/console/overview', 'back'],
       ]) {
         await parity.open(manifest.route, { runtime: fixture });
+        if (path === '/console/functions') {
+          await expect(parity.page.getByRole('link', { name: copy(parity)[name] })).toHaveAttribute('href', new RegExp(`${path}$`));
+          await clientNavigate(parity, server, path, copy(parity)[name]);
+          continue;
+        }
         await expect(parity.page.getByRole('link', { name: copy(parity)[name] })).toHaveAttribute('href', path);
         await exitToLegacy(parity, path, copy(parity)[name]);
       }

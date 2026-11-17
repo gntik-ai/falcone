@@ -1,0 +1,7 @@
+/* The inventory toolbar is a heading row: the legacy list has no search, so the search field and trailing slot are hidden. */
+.functions-toolbar div:has(> input[type="search"]) { display: none; }
+.functions-toolbar > div:first-child { display: block; min-width: 0; flex-basis: 100%; }
+.functions-toolbar > div:last-child { display: none; }
+/* Tables scroll inside their own region; long identifiers wrap instead of widening the page. */
+.console-functions table { table-layout: auto; width: 100%; }
+.console-functions table th, .console-functions table td { vertical-align: top; }

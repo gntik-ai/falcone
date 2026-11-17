@@ -34,6 +34,7 @@ test.each(['superadmin', 'tenant_owner', 'tenant_viewer'])('allows authenticated
   expect(isMigratedRoute('/console/mongo/data')).toBe(true)
   expect(isMigratedRoute('/console/functions-registry')).toBe(true)
   expect(isMigratedRoute('/console/flows')).toBe(true)
+  expect(isMigratedRoute('/console/functions')).toBe(true)
   expect(isMigratedRoute('/console/functions/data')).toBe(true)
   expect(isMigratedRoute('/console/events/data')).toBe(true)
   expect(isMigratedRoute('/console/realtime/changes')).toBe(true)
