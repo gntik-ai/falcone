@@ -70,6 +70,9 @@ export const sse = {
     frame('2', 'node-status', { nodeId: 'review', status: 'completed', attemptNumber: 1, startedAt: '2026-01-01T00:00:01Z', completedAt: '2026-01-01T00:00:02Z' }),
     frame('3', 'stream-end', { status: 'Completed' }),
   ].join(''),
+  // Held-open streams for the running and waiting-approval states: one frame, no stream-end.
+  runningLive: frame('1', 'node-status', { nodeId: 'review', status: 'started', attemptNumber: 1, startedAt: '2026-01-01T00:00:01Z' }),
+  waitingLive: frame('1', 'node-status', { nodeId: 'review', status: 'waiting-approval', attemptNumber: 1, startedAt: '2026-01-01T00:00:01Z' }),
   // The first connection ends after one frame without stream-end; the resumed one continues from it.
   dropFirst: frame('1', 'node-status', { nodeId: 'review', status: 'started', attemptNumber: 1, startedAt: '2026-01-01T00:00:01Z' }),
   resumed: [

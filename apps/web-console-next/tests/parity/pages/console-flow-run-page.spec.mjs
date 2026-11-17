@@ -3,20 +3,26 @@ import { readFileSync } from 'node:fs';
 import manifest, { cancelPath, eventsPath, executionPath, executionVariants, flowPath, retryPath, signalPath, sse, runRoute } from './console-flow-run-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
-import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
 
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale,
   JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-flow-run-page.json`, import.meta.url), 'utf8')),
+]));
+const historyBundles = Object.fromEntries(['es', 'en'].map((locale) => [locale,
+  JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-flow-history-page.json`, import.meta.url), 'utf8')),
 ]));
 const streams = new WeakMap();
 const copy = (parity) => bundles[parity.locale];
 const surface = (parity) => parity.page.getByTestId('console-flow-run-page');
 const node = (parity, id) => parity.page.locator(`.react-flow__node[data-id="${id}"]`);
 const heading = (parity, key) => parity.page.getByRole('heading', { name: copy(parity)[key], exact: true });
+// The payload section and its code region share an accessible name: scope to the region inside the section.
+const payload = (parity, id, name) => parity.page.getByTestId(`run-node-payload-${id}`).getByRole('region', { name: name ?? copy(parity)[id === 'entrada' ? 'input' : 'output'], exact: true });
 const runCalls = (parity) => parity.network.requests.filter((request) => request.path.startsWith('/v1/flows/workspaces/synthetic-workspace/'));
 const eventCalls = (parity) => parity.network.requests.filter((request) => request.path.startsWith(eventsPath));
 // The events stream is served by this page journey: it needs the session bearer and no query string.
-async function open(parity, execution = 'completed', { stream = 'frames', variants = {} } = {}) {
+// Stream modes: 'live' and 'waiting' hold the connection open after one frame (a stable running or
+// waiting-approval view); 'frames' ends the run; 'drop' drops once then resumes; 'error' answers 403.
+async function open(parity, execution = 'completed', { stream = execution === 'waiting-approval' ? 'waiting' : 'live', variants = {} } = {}) {
   let release;
   streams.set(parity, { mode: stream, connections: 0, lastEventIds: [], authorizations: [], release: new Promise((resolve) => { release = resolve; }), resume: release });
   await parity.open(manifest.route, { 'flows.run.execution': execution, ...variants });
@@ -32,39 +38,56 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   test.describe(`Flow run ${locale} ${width}`, () => {
     test.use({ role: 'superadmin', locale, viewport: { width, height: 900 }, pageEndpoints: manifest.endpoints });
     test.beforeEach(async ({ parity }) => {
-      const injected = [];
       // The retry journey lands on the new execution, a terminal run served here.
       await parity.page.route((url) => url.pathname === executionPath.replace('/e1', '/e2'), async (route) => {
         parity.network.requests.push({ method: 'GET', path: new URL(route.request().url()).pathname, body: undefined });
         await route.fulfill({ json: { ...executionVariants.completed, executionId: 'e2' } });
       });
-      await parity.page.route((url) => url.pathname === eventsPath, async (route) => {
-        const request = route.request(), url = new URL(request.url());
-        parity.network.requests.push({ method: request.method(), path: url.pathname + url.search, body: undefined });
-        const state = streams.get(parity) ?? { mode: 'frames', connections: 0, lastEventIds: [], authorizations: [], release: Promise.resolve() };
-        const headers = request.headers();
+      // The Runs breadcrumb opens the history page: serve its list here so no request goes unmatched.
+      await parity.page.route((url) => url.pathname === `${flowPath}/executions`, async (route) => {
+        parity.network.requests.push({ method: 'GET', path: new URL(route.request().url()).pathname, body: undefined });
+        await route.fulfill({ json: { items: [] } });
+      });
+      // The events stream is served in the page so a connection can stay open (route.fulfill always ends
+      // the body). This side checks the request, the page side streams the frames this returns.
+      await parity.page.exposeFunction('__runEvents', async ({ method, search, href, headers }) => {
+        parity.network.requests.push({ method, path: eventsPath + search, body: undefined });
+        const state = streams.get(parity) ?? { mode: 'live', connections: 0, lastEventIds: [], authorizations: [], release: Promise.resolve() };
         state.authorizations.push(headers.authorization); state.lastEventIds.push(headers['last-event-id']);
         const attempt = state.connections++;
-        if (request.method() !== 'GET' || url.search || /apikey/i.test(url.href) || !/^Bearer\s+\S+$/i.test(headers.authorization ?? '')) {
-          parity.faults.push(`Unmatched events request ${request.method()} ${url.pathname}${url.search}`);
-          await route.abort(); return;
+        if (method !== 'GET' || search || /apikey/i.test(href) || !/^Bearer\s+\S+$/i.test(headers.authorization ?? '')) {
+          parity.faults.push(`Unmatched events request ${method} ${eventsPath}${search}`);
+          return { abort: true };
         }
-        if (state.mode === 'error') {
-          injected.push({ url: request.url(), kind: '403' });
-          await route.fulfill({ status: 403, json: { code: 'FORBIDDEN' } }); return;
-        }
-        let body = sse.nodeStatusFrames;
-        if (state.mode === 'drop') {
-          if (attempt === 0) body = sse.dropFirst;
-          else { await state.release; body = sse.resumed; }
-        }
-        await route.fulfill({ status: 200, contentType: 'text/event-stream', body });
+        if (state.mode === 'error') return { status: 403 };
+        if (state.mode === 'frames') return { status: 200, frames: sse.nodeStatusFrames };
+        if (state.mode === 'live') return { status: 200, frames: sse.runningLive, hold: true };
+        if (state.mode === 'waiting') return { status: 200, frames: sse.waitingLive, hold: true };
+        if (attempt === 0) return { status: 200, frames: sse.dropFirst };
+        await state.release;
+        return { status: 200, frames: sse.resumed };
       });
-      parity.page.on('console', (message) => {
-        if (message.type() !== 'error' || !consumeResourceDiagnostic(message.text(), message.location().url, injected)) return;
-        const index = parity.faults.indexOf(`console.error: ${message.text()}`);
-        if (index >= 0) parity.faults.splice(index, 1);
-      });
+      await parity.page.addInitScript((path) => {
+        const original = window.fetch.bind(window);
+        window.fetch = async (input, init) => {
+          const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
+          if (url.pathname !== path) return original(input, init);
+          const headers = {};
+          new Headers(init?.headers).forEach((value, key) => { headers[key] = value; });
+          const plan = await window.__runEvents({ method: init?.method ?? 'GET', search: url.search, href: url.href, headers });
+          if (init?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+          if (plan.abort) throw new TypeError('Failed to fetch');
+          if (plan.status !== 200) return new Response(JSON.stringify({ code: 'FORBIDDEN' }), { status: plan.status, headers: { 'content-type': 'application/json' } });
+          const body = new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode(plan.frames));
+              if (!plan.hold) { controller.close(); return; }
+              init?.signal?.addEventListener('abort', () => { try { controller.close(); } catch { /* already closed */ } }, { once: true });
+            },
+          });
+          return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+        };
+      }, eventsPath);
     });
     test.describe(`console-flow-run-page | superadmin | ${locale} | ${width}`, () => {
     test('data', async ({ parity }) => {
@@ -74,8 +97,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(node(parity, 'start')).toContainText(copy(parity).nodeStatus.completed);
       expect(eventCalls(parity)).toHaveLength(0);
       await node(parity, 'start').click();
-      await expect(parity.page.getByRole('region', { name: copy(parity).input, exact: true })).toContainText('synthetic');
-      await expect(parity.page.getByRole('region', { name: copy(parity).output, exact: true })).toContainText('synthetic');
+      await expect(payload(parity, 'entrada')).toContainText('synthetic');
+      await expect(payload(parity, 'salida')).toContainText('synthetic');
       await expect(parity.page.getByTestId('run-node-attempts').getByRole('listitem')).toHaveCount(2);
       // The cap: 4095 and 4096 render whole; 4097 is cut to 4096 characters plus an ellipsis with its badge.
       for (const [variant, cut] of [['payload-4095', false], ['payload-4096', false], ['payload-4097', true]]) {
@@ -88,17 +111,22 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
         await expect(parity.page.getByTestId('run-node-entrada-truncated')).toHaveCount(0);
       }
       await open(parity, 'payload-string-and-null'); await node(parity, 'start').click();
-      await expect(parity.page.getByRole('region', { name: copy(parity).input, exact: true })).toHaveText(/plain synthetic text/);
+      await expect(payload(parity, 'entrada')).toHaveText(/plain synthetic text/);
       await expect(parity.page.getByTestId('run-node-salida-empty')).toHaveText(/—/);
       // A running run streams with no key entered and its frames update the statuses.
-      await open(parity, 'running');
+      await open(parity, 'running', { stream: 'frames' });
       await expect(node(parity, 'review')).toContainText(copy(parity).nodeStatus.completed);
       await expect(parity.page.getByRole('textbox')).toHaveCount(0);
+      // A held-open stream keeps the node running and the live indicator on.
+      await open(parity, 'running');
+      await expect(parity.page.getByTestId('run-streaming-indicator')).toBeVisible();
+      await expect(node(parity, 'review')).toContainText(copy(parity).nodeStatus.started);
       await check.assertLocale(parity);
     });
     test('action', async ({ parity }) => {
       await open(parity, 'running', { variants: { 'flows.run.cancellations': 'success' } });
-      await expect(node(parity, 'review')).toContainText(copy(parity).nodeStatus.completed);
+      await expect(parity.page.getByTestId('run-streaming-indicator')).toBeVisible();
+      await expect(node(parity, 'review')).toContainText(copy(parity).nodeStatus.started);
       await parity.page.getByTestId('run-cancel-button').click();
       await parity.page.getByTestId('confirm-action-confirm').click();
       await expect.poll(() => runCalls(parity).filter(({ method, path }) => method === 'POST' && path === cancelPath)).toHaveLength(1);
@@ -110,6 +138,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       expect(runCalls(parity).some(({ method, path }) => method === 'POST' && path === retryPath)).toBe(true);
       for (const [button, approved] of [['approve', true], ['reject', false]]) {
         await open(parity, 'waiting-approval', { variants: { 'flows.run.signals': 'success' } });
+        await expect(parity.page.getByTestId('run-streaming-indicator')).toBeVisible();
         await parity.page.getByTestId(`run-${button}-button`).click(); await parity.page.getByTestId('confirm-action-confirm').click();
         await expect.poll(() => runCalls(parity).filter(({ method, path }) => method === 'POST' && path === signalPath).length).toBeGreaterThan(0);
         expect(runCalls(parity).filter(({ path }) => path === signalPath).at(-1).body).toEqual({ approved, nodeId: 'review' });
@@ -156,7 +185,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await expect(node(parity, 'start')).toHaveAccessibleName(new RegExp(copy(parity).nodeStatus.completed));
       await expect(parity.page.getByTestId('rf__controls')).toHaveAttribute('aria-label', copy(parity).controls.ariaLabel);
       await select(parity, 'start');
-      await expect(parity.page.getByRole('region', { name: copy(parity).payloadTruncated.replace('{name}', copy(parity).output), exact: true })).toBeVisible();
+      await expect(payload(parity, 'salida', copy(parity).payloadTruncated.replace('{name}', copy(parity).output))).toBeVisible();
       await check.assertAccessibility(parity); await check.assertLocale(parity);
       await parity.page.keyboard.press('Escape'); await expect(node(parity, 'start')).toBeFocused();
       await node(parity, 'review').focus(); await parity.page.keyboard.press('Space');
@@ -169,8 +198,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     });
     test('runtime-health', async ({ parity }) => {
       await open(parity, 'running');
-      await expect(node(parity, 'review')).toContainText(copy(parity).nodeStatus.completed);
+      await expect(parity.page.getByTestId('run-streaming-indicator')).toBeVisible();
+      await expect(node(parity, 'review')).toContainText(copy(parity).nodeStatus.started);
+      // Leaving the run unmounts it and closes the stream; wait for the history page before checking health.
       await parity.page.getByRole('link', { name: copy(parity).runs, exact: true }).first().click();
+      await expect(parity.page).toHaveURL(/\/console\/flows\/f1\/runs$/);
+      await expect(parity.page.getByRole('heading', { name: historyBundles[parity.locale].title, exact: true })).toBeVisible();
       await check.assertRuntimeHealth(parity);
       expect(parity.network.requests.every(({ path }) => !/apikey/i.test(path))).toBe(true);
     });
@@ -187,7 +220,12 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
     });
     test('visual-review', async ({ parity }, info) => {
       for (const variant of ['completed', 'running', 'waiting-approval', 'failed']) {
-        await open(parity, variant); await select(parity, variant === 'failed' ? 'done' : 'review'); await screenshot(parity, info, variant);
+        await open(parity, variant);
+        // Capture only once the intended state is in place: live for running, waiting for approval, static otherwise.
+        if (variant === 'running') { await expect(parity.page.getByTestId('run-streaming-indicator')).toBeVisible(); await expect(node(parity, 'review')).toContainText(copy(parity).nodeStatus.started); }
+        if (variant === 'waiting-approval') { await expect(parity.page.getByTestId('run-streaming-indicator')).toBeVisible(); await expect(parity.page.getByTestId('run-approve-button')).toBeVisible(); await expect(node(parity, 'review')).toContainText(copy(parity).nodeStatus['waiting-approval']); }
+        if (variant === 'completed' || variant === 'failed') await expect(parity.page.getByTestId('run-static-indicator')).toBeVisible();
+        await select(parity, variant === 'failed' ? 'done' : 'review'); await screenshot(parity, info, variant);
       }
       await open(parity, 'payload-4097'); await select(parity, 'start'); await screenshot(parity, info, 'payload-4097');
       await open(parity, 'completed', { variants: { 'flows.run.flow': 'no-definition' } }); await expect(heading(parity, 'noDefinition')).toBeVisible(); await screenshot(parity, info, 'no-definition');
