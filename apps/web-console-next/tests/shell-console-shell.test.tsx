@@ -329,3 +329,31 @@ test.each(Object.keys(navBeforeConsoleShell))('the navigation labels, hrefs and 
   const nav = within(await findSidebar()).getByRole('navigation', { name: names.es.nav })
   expect(Array.from(nav.querySelectorAll('a')).map((link) => `${link.textContent}|${link.getAttribute('href')}|${link.getAttribute('aria-current') ?? ''}`)).toEqual(navBeforeConsoleShell[role])
 })
+
+test('a scrolling main with no keyboard-reachable content becomes a tab stop, and stops being one when content is reachable again', async () => {
+  login(['tenant_owner'])
+  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
+  openApp('/console/overview')
+  await screen.findByRole('heading', { name: 'Vista general de la consola' })
+  const main = screen.getByRole('main')
+  const content = main.firstElementChild as HTMLElement
+  expect(main).toHaveAttribute('tabindex', '-1')
+  Object.defineProperty(main, 'scrollHeight', { configurable: true, value: 2000 })
+  Object.defineProperty(main, 'clientHeight', { configurable: true, value: 800 })
+  // Inert content is not reachable by keyboard, so the scroll region itself must be.
+  content.setAttribute('inert', '')
+  await waitFor(() => expect(main).toHaveAttribute('tabindex', '0'))
+  content.removeAttribute('inert')
+  await waitFor(() => expect(main).toHaveAttribute('tabindex', '-1'))
+})
+
+test('a main that does not scroll keeps tabindex -1 even when its content is unreachable', async () => {
+  login(['tenant_owner'])
+  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
+  openApp('/console/overview')
+  await screen.findByRole('heading', { name: 'Vista general de la consola' })
+  const main = screen.getByRole('main')
+  ;(main.firstElementChild as HTMLElement).setAttribute('inert', '')
+  await new Promise((done) => setTimeout(done, 50))
+  expect(main).toHaveAttribute('tabindex', '-1')
+})

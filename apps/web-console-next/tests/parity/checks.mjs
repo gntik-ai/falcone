@@ -61,6 +61,28 @@ export async function chooseTenant(parity, option) {
   await page.getByRole('option', { name: option, exact: true }).click();
   if (inDrawer) await closeSidebar(parity);
 }
+// An open modal makes the rest of the page inert to pointer input, so a user click cannot reach the sidebar. Replay the
+// pointer sequence as DOM events instead (the sidebar picker is in the DOM at every width, display:none below lg).
+// The select opens in its own portal and the modal's focus handling can close it again between two steps, so the
+// option is chosen in the same task in which it appears, and the sequence is repeated only while the option is not found.
+export async function chooseTenantUnderModal(parity, option) {
+  const { page, locale } = parity;
+  const picker = page.locator('aside').getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active tenant', exact: true, includeHidden: true });
+  await expect(async () => {
+    await picker.evaluate(async (element, name) => {
+      const press = (target, types) => { for (const type of types) target.dispatchEvent(new (type.startsWith('pointer') ? PointerEvent : MouseEvent)(type, { bubbles: true, cancelable: true, button: 0 })); };
+      const find = () => [...document.querySelectorAll('[role="option"]')].find((item) => item.textContent?.trim() === name);
+      if (!find()) press(element, ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']);
+      const started = Date.now();
+      const item = await new Promise((resolve) => {
+        const tick = () => { const found = find(); if (found || Date.now() - started > 2000) resolve(found); else requestAnimationFrame(tick); };
+        tick();
+      });
+      if (!item) throw new Error('tenant picker did not open');
+      press(item, ['pointerdown', 'click']);
+    }, option);
+  }).toPass({ timeout: 20_000 });
+}
 export async function awaitTransitions(page) {
   await page.evaluate(async () => {
     const frame = () => new Promise((done) => requestAnimationFrame(() => done()));

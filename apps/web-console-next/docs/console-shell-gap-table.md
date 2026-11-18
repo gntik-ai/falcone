@@ -35,5 +35,6 @@ Every row was checked against the installed kit (`@gntik-ai/templates`, `blocks`
 | About `Dialog` | `useAccountMenu().aboutDialog`, rendered by Shell | kept in Shell |
 | `AccountMenu` `mode="admin"` | Unchanged for `AdminLayout` (shares `useAccountMenu`) | kept in Shell |
 | `className="console-shell"` | `ConsoleShell` has no `className`; `overview.tsx` finds the tenant picker through the sidebar or drawer | named gap: no `className` prop |
+| Keyboard access to the scrolling `<main>` (previously guaranteed by the context controls inside it) | `KeyboardScrollableMain` in `Shell.tsx` makes `<main>` a tab stop only while it scrolls and holds nothing else reachable | named gap: `SidebarLayout` renders `<main tabindex="-1">` as a scroll container with no way to make it focusable (axe `scrollable-region-focusable`) |
 
 Open question from the OpenSpec: the installed 0.14.0 `SidebarLayout` drawer does render `sidebarHeader` and `sidebarFooter`, so no `drawerFooter` gap is needed.

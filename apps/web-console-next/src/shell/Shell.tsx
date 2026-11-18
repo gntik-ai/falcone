@@ -88,6 +88,7 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
       usage={null} helpHref={null}
       topbar={{ breadcrumb: <LinkProvider component={ContentLink}><Breadcrumbs items={breadcrumbs} /></LinkProvider>, environment: null, search: null, notifications: null, theme: 'cycle', user: null }}>
       <CloseDrawerOnNavigate />
+      <KeyboardScrollableMain />
       <div className="p-4 sm:p-6">
         <ShellErrorBoundary key={pathname}><Suspense fallback={<StatusPage state="loading" />}><LinkProvider component={ContentLink}><Outlet /></LinkProvider></Suspense></ShellErrorBoundary>
       </div>
@@ -102,6 +103,36 @@ function CloseDrawerOnNavigate() {
   const { key } = useLocation()
   const { setDrawerOpen } = useSidebarLayout()
   useEffect(() => { setDrawerOpen(false) }, [key])
+  return null
+}
+
+// The kit's <main> is a scroll container with tabindex=-1. The context controls used to sit inside it, which kept a
+// tab stop in every scrolling page; now that they live in the sidebar, a page whose content is read-only or inert
+// leaves the scroll region unreachable by keyboard (WCAG 2.1.1, axe scrollable-region-focusable). Make <main> itself a
+// tab stop only while it scrolls and holds nothing else reachable.
+const tabbable = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [contenteditable=""], [contenteditable="true"], [tabindex]:not([tabindex="-1"])'
+const mainFocusRing = ['focus-visible:outline-2', 'focus-visible:outline-offset-2', 'focus-visible:outline-focus-ring']
+function KeyboardScrollableMain() {
+  useEffect(() => {
+    const main = document.querySelector<HTMLElement>('main')
+    if (!main) return
+    const sync = () => {
+      const scrolls = main.scrollHeight > main.clientHeight || main.scrollWidth > main.clientWidth
+      const reachable = Array.from(main.querySelectorAll<HTMLElement>(tabbable)).some((element) => !element.matches(':disabled') && !element.closest('[inert], [hidden]'))
+      const needed = scrolls && !reachable
+      // Writing an unchanged attribute still queues a mutation record, which would re-enter this observer forever.
+      if (main.getAttribute('tabindex') !== (needed ? '0' : '-1')) main.setAttribute('tabindex', needed ? '0' : '-1')
+      main.classList.toggle('focus:outline-none', !needed)
+      mainFocusRing.forEach((name) => main.classList.toggle(name, needed))
+    }
+    sync()
+    const mutations = new MutationObserver(sync)
+    mutations.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'inert', 'disabled', 'tabindex', 'href'] })
+    const resizes = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync)
+    resizes?.observe(main)
+    if (main.firstElementChild) resizes?.observe(main.firstElementChild)
+    return () => { mutations.disconnect(); resizes?.disconnect() }
+  }, [])
   return null
 }
 

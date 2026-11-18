@@ -96,8 +96,9 @@ async function installSwitchShell(p) {
     await route.fulfill({ json: { items: second ? [workspace(tenantBWorkspaceId, tenantBId, 'Workspace B')] : [workspace(workspaceId, 'synthetic-tenant', 'Synthetic Workspace'), workspace(otherWorkspaceId, 'synthetic-tenant', 'Other Workspace')], page: { after: null } } });
   });
 }
-async function switchTenant(p) {
-  await check.chooseTenant(p, 'Tenant B');
+async function switchTenant(p, modalOpen = false) {
+  if (modalOpen) await check.chooseTenantUnderModal(p, 'Tenant B');
+  else await check.chooseTenant(p, 'Tenant B');
 }
 async function switchWorkspace(p, modalOpen = false) {
   // The context controls live in the sidebar header (the navigation drawer below lg); the drawer holds a second switcher while open.
@@ -284,7 +285,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
         else if (open_ === 'disclosure') { await rowButton(p, 'reveal').click(); await expect(disclosure(p, 'reveal')).toBeVisible(); }
         else { await rowButton(p, 'reveal').click(); await expect(retryIn(surface(p), p)).toBeVisible(); }
         const since = mark(p);
-        if (kind === 'tenant') await switchTenant(p); else await switchWorkspace(p, open_ !== 'failure');
+        if (kind === 'tenant') await switchTenant(p, open_ !== 'failure'); else await switchWorkspace(p, open_ !== 'failure');
         await expect(grid(p)).toContainText('Other workspace service');
         await expect(p.page.locator('[role="alertdialog"], [role="dialog"][aria-modal="true"]')).toHaveCount(0);
         await expect(retryIn(surface(p), p)).toHaveCount(0);
