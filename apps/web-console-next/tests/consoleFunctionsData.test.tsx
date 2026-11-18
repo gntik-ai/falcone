@@ -77,8 +77,8 @@ test('selecting a row keeps exactly one checked radio, clears the output and ann
   pick(1)
   expect(radios().filter((radio) => radio.checked)).toEqual([radios()[1]])
   expect(screen.getByText(es.selectedBadge.replace('{name}', 'synthetic-billing'))).toBeVisible()
-  fireEvent.click(button(es.invoke)); await screen.findByText('synthetic-hello', { exact: false })
-  fireEvent.click(button(es.viewActivations)); await screen.findByRole('table', { name: es.activationsLabel })
+  fireEvent.click(await screen.findByRole('button', { name: es.invoke })); await screen.findByText('synthetic-hello', { exact: false })
+  const activations = await screen.findByRole('button', { name: es.viewActivations }); await waitFor(() => expect(activations).toBeEnabled()); fireEvent.click(activations); await screen.findByRole('table', { name: es.activationsLabel })
   pick(0)
   expect(radios().filter((radio) => radio.checked)).toEqual([radios()[0]])
   expect(screen.queryByText('synthetic-hello', { exact: false })).toBeNull()
@@ -121,7 +121,7 @@ test.each([
   ['{"parameters":{},"responseMode":"wait_for_result"}', { parameters: {}, responseMode: 'wait_for_result' }],
 ])('invoke input %s is sent as %j and the result renders in the JSON viewer', async (value, body) => {
   setup({ [`POST ${invokePath}`]: invokeResult }); open(); await ready(); pick(1)
-  type(es.inputLabel, value); fireEvent.click(button(es.invoke))
+  type(es.inputLabel, value); fireEvent.click(await screen.findByRole('button', { name: es.invoke }))
   await screen.findByText('synthetic-hello', { exact: false })
   expect(calls().slice(1)).toEqual([{ method: 'POST', path: invokePath, body }])
   expect(screen.getByRole('tree', { name: es.resultLabel })).toBeVisible()
@@ -155,7 +155,7 @@ test.each([
 ])('%s sends nothing and shows the exact message', async (_name, target, value, message) => {
   setup(); open(); await ready(); pick(1)
   const label = target === 'deploy' ? es.deploySpecLabel : es.inputLabel
-  type(label, value); fireEvent.click(button(target === 'deploy' ? es.deploy : es.invoke))
+  type(label, value); fireEvent.click(await screen.findByRole('button', { name: target === 'deploy' ? es.deploy : es.invoke }))
   expect(await screen.findByText(message)).toBeVisible()
   const invalid = target === 'invoke' || message !== es.actionNameRequired
   if (invalid) expect(textbox(label)).toHaveAttribute('aria-invalid', 'true'); else expect(textbox(label)).not.toHaveAttribute('aria-invalid', 'true')
@@ -164,7 +164,7 @@ test.each([
 
 test('invoke and activations need a selection', async () => {
   setup(); open(); await ready()
-  fireEvent.click(button(es.invoke)); expect(await screen.findByText(es.selectToInvoke)).toBeVisible()
+  fireEvent.click(await screen.findByRole('button', { name: es.invoke })); expect(await screen.findByText(es.selectToInvoke)).toBeVisible()
   fireEvent.click(button(es.viewActivations)); expect(await screen.findByText(es.selectForActivations)).toBeVisible()
   expect(calls()).toHaveLength(1)
 })
@@ -183,7 +183,7 @@ test('formatting rewrites valid JSON and reports invalid JSON', async () => {
 test('buttons and textareas are disabled with busy labels while an operation runs', async () => {
   let release!: (response: Response) => void
   setup({ [`POST ${invokePath}`]: () => new Promise<Response>((done) => { release = done }) }); open(); await ready(); pick(1)
-  fireEvent.click(button(es.invoke))
+  fireEvent.click(await screen.findByRole('button', { name: es.invoke }))
   const busy = await screen.findByRole('button', { name: es.invoking }); expect(busy).toBeDisabled()
   for (const control of [button(es.deploy), button(es.viewActivations), ...screen.getAllByRole('button', { name: es.format }), textbox(es.deploySpecLabel), textbox(es.inputLabel)]) expect(control).toBeDisabled()
   await act(async () => release(Response.json(invokeResult)))
@@ -198,7 +198,7 @@ test('a failed deploy keeps the spec, shows the request id and Reintentar resend
   expect(panel).toBeVisible(); expect(document.body).toHaveTextContent('req_deploy_500'); expect(document.body).toHaveTextContent('500')
   expect(textbox(es.deploySpecLabel)).toHaveValue('{"name":"hello","runtime":"nodejs","code":"module.exports=async()=>({ok:true})"}')
   expect(button(es.deploy)).toHaveFocus()
-  fireEvent.click(button(es.retry))
+  fireEvent.click(await screen.findByRole('button', { name: es.retry }))
   await waitFor(() => expect(screen.queryByRole('heading', { name: es.deployError })).toBeNull())
   const posts = calls().filter((call) => call.method === 'POST'); expect(posts).toHaveLength(2); expect(posts[1]).toEqual(posts[0])
 })
@@ -206,14 +206,14 @@ test('a failed deploy keeps the spec, shows the request id and Reintentar resend
 test('a failed invoke keeps the input, shows the earlier result only as stale, and a retry replaces it', async () => {
   let attempt = 0
   setup({ [`POST ${invokePath}`]: () => ++attempt === 2 ? failure(500, 'req_invoke_500')() : Response.json(attempt === 1 ? invokeResult : { result: { fresh: true } }) }); open(); await ready(); pick(1)
-  type(es.inputLabel, '{"a":1}'); fireEvent.click(button(es.invoke)); await screen.findByText('synthetic-hello', { exact: false })
+  type(es.inputLabel, '{"a":1}'); fireEvent.click(await screen.findByRole('button', { name: es.invoke })); await screen.findByText('synthetic-hello', { exact: false })
   expect(screen.queryByText(es.resultStale)).toBeNull()
-  fireEvent.click(button(es.invoke))
+  fireEvent.click(await screen.findByRole('button', { name: es.invoke }))
   expect(await screen.findByRole('heading', { name: es.invokeError })).toBeVisible()
   expect(await screen.findByText(es.resultStale)).toBeVisible(); expect(await screen.findByText(es.staleAt, { exact: false })).toBeVisible()
   expect(screen.getByText('synthetic-hello', { exact: false })).toBeVisible()
   expect(textbox(es.inputLabel)).toHaveValue('{"a":1}'); await waitFor(() => expect(button(es.invoke)).toHaveFocus())
-  fireEvent.click(button(es.retry))
+  fireEvent.click(await screen.findByRole('button', { name: es.retry }))
   await screen.findByText('true', { exact: false })
   expect(screen.queryByText(es.resultStale)).toBeNull(); expect(screen.queryByText('synthetic-hello', { exact: false })).toBeNull()
   expect(calls().filter((call) => call.method === 'POST').map((call) => call.body)).toEqual(Array(3).fill({ parameters: { a: 1 } }))
@@ -221,14 +221,14 @@ test('a failed invoke keeps the input, shows the earlier result only as stale, a
 
 test('a failed retry returns focus to Reintentar', async () => {
   setup({ [`POST ${invokePath}`]: failure(500, 'req_invoke_500') }); open(); await ready(); pick(1)
-  fireEvent.click(button(es.invoke)); fireEvent.click(await screen.findByRole('button', { name: es.retry }))
+  fireEvent.click(await screen.findByRole('button', { name: es.invoke })); fireEvent.click(await screen.findByRole('button', { name: es.retry }))
   await waitFor(() => expect(calls().filter((call) => call.method === 'POST')).toHaveLength(2))
   await waitFor(() => expect(button(es.retry)).toHaveFocus())
 })
 
 test('a network failure of invoke shows the panel without a status code', async () => {
   setup({ [`POST ${invokePath}`]: () => { throw new TypeError('network') } }); open(); await ready(); pick(1)
-  fireEvent.click(button(es.invoke))
+  fireEvent.click(await screen.findByRole('button', { name: es.invoke }))
   expect(await screen.findByRole('heading', { name: es.invokeError })).toBeVisible(); expect(button(es.retry)).toBeVisible()
 })
 
@@ -236,13 +236,13 @@ test('a failed activations reload keeps the earlier list under Lista anterior un
   let attempt = 0
   setup({ [`GET ${activationsPath}`]: () => ++attempt === 1 ? Response.json(activations3) : attempt === 2 ? failure(500, 'req_act_500')() : Response.json(activationsRefreshed) }); open(); await ready(); pick(1)
   type(es.inputLabel, '{"keep":true}'); type(es.deploySpecLabel, '{"name":"kept"}')
-  fireEvent.click(button(es.viewActivations)); await screen.findByRole('table', { name: es.activationsLabel })
-  fireEvent.click(button(es.viewActivations))
+  const activations = await screen.findByRole('button', { name: es.viewActivations }); await waitFor(() => expect(activations).toBeEnabled()); fireEvent.click(activations); await screen.findByRole('table', { name: es.activationsLabel })
+  await waitFor(() => expect(activations).toBeEnabled()); fireEvent.click(activations)
   expect(await screen.findByRole('heading', { name: es.activationsError })).toBeVisible()
   expect(screen.getByText(es.activationsStale)).toBeVisible(); expect(screen.getByText('synthetic-activation-1')).toBeVisible()
   expect(screen.getByText('req_act_500')).toBeVisible()
   expect(textbox(es.inputLabel)).toHaveValue('{"keep":true}'); expect(textbox(es.deploySpecLabel)).toHaveValue('{"name":"kept"}')
-  fireEvent.click(button(es.retry))
+  fireEvent.click(await screen.findByRole('button', { name: es.retry }))
   await screen.findByText('synthetic-activation-4')
   expect(screen.queryByText(es.activationsStale)).toBeNull()
   expect(calls().filter((call) => call.path === activationsPath)).toHaveLength(3)
@@ -251,7 +251,7 @@ test('a failed activations reload keeps the earlier list under Lista anterior un
 test('a missing selected function offers a way back to the list', async () => {
   let count = 0
   setup({ [`GET ${list}`]: () => Response.json(++count === 1 ? actions2 : { items: [actions2.items[0]] }), [`POST ${invokePath}`]: failure(404, 'req_404') }); open(); await ready(); pick(1)
-  fireEvent.click(button(es.invoke))
+  fireEvent.click(await screen.findByRole('button', { name: es.invoke }))
   expect(await screen.findByRole('heading', { name: es.notFound })).toBeVisible()
   fireEvent.click(button(es.backToList))
   await waitFor(() => expect(radios()).toHaveLength(1)); expect(radios()[0]).not.toBeChecked()
@@ -277,17 +277,17 @@ test.each([['500', () => failure(500, 'req_list_500')()], ['network', () => { th
   setup({ [`GET ${list}`]: () => ++attempt === 1 ? (response as () => Response)() : Response.json(actions2) }); open()
   expect(await screen.findByRole('heading', { name: es.listError })).toBeVisible()
   if (_name === '500') expect(screen.getByText('req_list_500')).toBeVisible()
-  fireEvent.click(button(es.retry)); await ready(); expect(calls().filter((call) => call.path === list)).toHaveLength(2)
+  fireEvent.click(await screen.findByRole('button', { name: es.retry })); await ready(); expect(calls().filter((call) => call.path === list)).toHaveLength(2)
 })
 
 test('a failed list retry keeps keyboard focus on the replacement Reintentar and a successful one lands on the list', async () => {
   let attempt = 0
   setup({ [`GET ${list}`]: () => ++attempt < 3 ? failure(500, `req_list_${attempt}`)() : Response.json(actions2) }); open()
   await screen.findByRole('heading', { name: es.listError })
-  button(es.retry).focus(); fireEvent.click(button(es.retry))
+  const retry = await screen.findByRole('button', { name: es.retry }); retry.focus(); fireEvent.click(retry)
   await screen.findByText('req_list_2')
-  expect(button(es.retry)).toHaveFocus()
-  fireEvent.click(button(es.retry)); await ready()
+  await waitFor(() => expect(button(es.retry)).toHaveFocus())
+  fireEvent.click(await screen.findByRole('button', { name: es.retry })); await ready()
   expect(radios()[0]).toHaveFocus(); expect(calls().filter((call) => call.path === list)).toHaveLength(3)
 })
 
@@ -309,7 +309,7 @@ test('workspace states send no functions request until a workspace is picked', a
   context.value = { ...context.value, loading: true }; view.rerender(<StrictMode><MemoryRouter><ConsoleFunctionsDataPage /></MemoryRouter></StrictMode>)
   expect(screen.getByRole('status', { name: es.workspaceLoading })).toBeVisible()
   context.value = { ...context.value, loading: false, error: { status: 500 } }; view.rerender(<StrictMode><MemoryRouter><ConsoleFunctionsDataPage /></MemoryRouter></StrictMode>)
-  fireEvent.click(button(es.retry)); expect(reloadWorkspaces).toHaveBeenCalledTimes(1)
+  fireEvent.click(await screen.findByRole('button', { name: es.retry })); expect(reloadWorkspaces).toHaveBeenCalledTimes(1)
   expect(calls()).toEqual([])
 })
 
@@ -321,8 +321,8 @@ test('picking a workspace sends exactly one list request for it', async () => {
 
 test('only the four page endpoints are ever requested', async () => {
   setup({ [`POST ${deploy}`]: deployAccepted, [`POST ${invokePath}`]: invokeResult, [`GET ${activationsPath}`]: activations3 }); open(); await ready(); pick(1)
-  fireEvent.click(button(es.invoke)); await screen.findByText('synthetic-hello', { exact: false })
-  fireEvent.click(button(es.viewActivations)); await screen.findByRole('table', { name: es.activationsLabel })
-  fireEvent.click(button(es.deploy)); await waitFor(() => expect(calls().filter((call) => call.method === 'POST' && call.path === deploy)).toHaveLength(1))
+  fireEvent.click(await screen.findByRole('button', { name: es.invoke })); await screen.findByText('synthetic-hello', { exact: false })
+  const activations = await screen.findByRole('button', { name: es.viewActivations }); await waitFor(() => expect(activations).toBeEnabled()); fireEvent.click(activations); await screen.findByRole('table', { name: es.activationsLabel })
+  const deployButton = await screen.findByRole('button', { name: es.deploy }); await waitFor(() => expect(deployButton).toBeEnabled()); fireEvent.click(deployButton); await waitFor(() => expect(calls().filter((call) => call.method === 'POST' && call.path === deploy)).toHaveLength(1))
   for (const call of calls()) expect([`GET ${list}`, `POST ${deploy}`, `POST ${invokePath}`, `GET ${activationsPath}`]).toContain(`${call.method} ${call.path}`)
 })
