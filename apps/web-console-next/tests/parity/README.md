@@ -21,13 +21,38 @@ an isolated suite whose seeded faults must fail with specific diagnostics.
 `negative.spec.mjs` is excluded from the normal config. The negative verifier
 rejects missing tests, infrastructure failures and missing traces. Inspect both
 positive and negative HTML/JSON reports and traces under `test-results/parity/`.
-Only complete all-passed groups get `PARITY_PASS` in per-page JSON. A filtered
-run cannot certify a page. Each CI shard artifact's per-page JSON covers only
-that shard's tests, so an incomplete group may lack `PARITY_PASS` even when all
-tests in the shard pass. Screenshots are recorded and compared within each
+Only complete all-passed groups get `PARITY_PASS` in per-page JSON. In CI, use
+the merged `ui-parity-report` artifact as the certification source: its HTML,
+`results.json` and per-page JSON cover all 32 shards, including groups split
+between shards. It also includes every shard's reports, blobs and retained traces.
+The aggregate checks the merged test identities and count against an unsharded
+`--list`, with no duplicates, retries or skipped tests. Per-shard artifacts
+`ui-parity-shard-<n>` remain available for seven days; their incomplete groups
+cannot certify a page. A filtered run cannot certify a page either.
+Screenshots are recorded and compared within each
 visual check under the ignored output directory, with a fresh navigation before
 the comparison; no baseline is committed.
 The clock is fixed and randomness is seeded before any application script.
+
+CI uses two workers per shard; local runs keep one worker and zero retries.
+The CI run with three workers failed loading checks in console operations.
+Two workers leave CPU headroom for each browser; 32 shards compensate for the
+lower concurrency within a runner without filtering or retrying any tests.
+PR CI must confirm the browser failures are resolved and measure the wall time,
+including runner queue time; local discovery cannot establish either outcome.
+The worker-scoped servers use ephemeral ports and isolated temporary directories;
+reporters write once in the main process. Blob reports include the same synthetic
+results and attachments as the existing reports, plus test execution metadata.
+Merging replays those results without browser requests or additional fixtures.
+The job summary records each shard's test duration and the merged test count.
+Record setup, aggregate and total stage durations from the CI job timestamps in
+the PR description, along with the count compared to main. The initial timeouts
+(structure 10 min, shards 25 min, negatives 15 min, aggregate 10 min) are budgets
+to validate against that run, not measured performance claims. The shard budget
+includes setup margin over an estimated 8.5-minute slowest test run after
+quadrupling the old eight shards and using two workers (previous maximum:
+68 minutes). This estimate assumes even distribution and available runners;
+32 runner setups can increase total runner-minutes and queue time.
 
 The scanner accepts explicit file/directory paths, including temporary files.
 With no arguments it scans this suite's fixtures and the console-api builders.
