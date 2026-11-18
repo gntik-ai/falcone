@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { consoleAuthConfig } from '@in-falcone/console-api/config'
 import { persistConsoleShellSession } from '@in-falcone/console-api/session'
 import { I18nProvider } from '@gntik-ai/ui'
@@ -330,15 +330,29 @@ test.each(Object.keys(navBeforeConsoleShell))('the navigation labels, hrefs and 
   expect(Array.from(nav.querySelectorAll('a')).map((link) => `${link.textContent}|${link.getAttribute('href')}|${link.getAttribute('aria-current') ?? ''}`)).toEqual(navBeforeConsoleShell[role])
 })
 
-test('the scrolling main holds a keyboard tab stop even when the page content is inert', async () => {
-  login(['tenant_owner'])
-  requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
-  openApp('/console/overview')
-  await screen.findByRole('heading', { name: 'Vista general de la consola' })
-  const main = screen.getByRole('main')
-  const stop = main.firstElementChild as HTMLElement
-  expect(stop).toHaveAttribute('tabindex', '0')
-  expect(stop.contains(screen.getByRole('heading', { name: 'Vista general de la consola' }))).toBe(true)
-  stop.focus()
-  expect(document.activeElement).toBe(stop)
+test.each(['es', 'en'] as const)('the scrolling kit main is a named keyboard tab stop containing the page heading in %s', async (locale) => {
+  // jsdom has no layout engine; supply an overflowing viewport at the browser boundary.
+  vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(1000)
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  })
+  try {
+    await changeLocale(locale)
+    login(['tenant_owner'])
+    requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
+    openApp('/console/overview')
+    const heading = await screen.findByRole('heading', { name: locale === 'es' ? 'Vista general de la consola' : 'Console overview' })
+    const main = screen.getByRole('main', { name: locale === 'es' ? 'Contenido principal' : 'Main content' })
+    expect(main).toHaveAttribute('tabindex', '0')
+    expect(main).toContainElement(heading)
+    expect(main.firstElementChild).not.toHaveAttribute('tabindex')
+    main.focus()
+    expect(document.activeElement).toBe(main)
+  } finally {
+    cleanup()
+    vi.unstubAllGlobals()
+  }
 })
