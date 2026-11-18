@@ -12,6 +12,7 @@
     "tenant": "Active tenant",
     "workspace": "Active workspace",
     "selectTenant": "Select a tenant",
+    "noTenants": "No tenants",
     "selectWorkspace": "Select a workspace",
     "groups": {
       "main": "Main",

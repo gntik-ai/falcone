@@ -51,13 +51,11 @@ test.each(['es', 'en'] as const)('empty states and tenant switcher action are tr
   await i18n.changeLanguage(locale)
   const copy = locale === 'es' ? es : en
   state.context.activeTenantId = null
-  const showPicker = vi.fn()
-  const view = render(<div className="console-shell"><select aria-label="Tenant fixture"><option /></select><Overview /></div>)
-  const select = screen.getByRole('combobox') as HTMLSelectElement
-  select.showPicker = showPicker
+  const view = render(<div><aside><button type="button" role="combobox" aria-expanded="false" aria-label="Tenant fixture" /></aside><Overview /></div>)
+  const select = screen.getByRole('combobox')
   expect(screen.getByRole('heading', { name: copy.empty.tenant.title })).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: copy.empty.tenant.action }))
-  expect(select).toHaveFocus(); expect(showPicker).toHaveBeenCalledOnce(); assertLinks()
+  expect(select).toHaveFocus(); assertLinks()
   state.context.activeTenantId = 'synthetic-tenant'
   state.context.tenants = [{ ...overviewTenant, quotaProfile: undefined, inventorySummary: undefined }]
   view.rerender(<Overview />)

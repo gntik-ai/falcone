@@ -34,7 +34,7 @@ async function openDelete(p) { await notes(p).getByRole('button', { name: label(
 async function announce(p, key, politeness = 'polite') { await expect(p.page.locator(`[data-live-announcer="${politeness}"]`)).toContainText([label(p, key)]); }
 async function expand(p) { await button(p, 'earlier', { count: 1 }).click(); }
 async function contextReady(p) {
-  const context = p.page.getByRole('region', { name: p.locale === 'es' ? 'Contexto activo' : 'Active context', exact: true });
+  const context = p.page.getByRole('region', { name: p.locale === 'es' ? 'Contexto activo' : 'Active context', exact: true, includeHidden: true });
   await expect(context).toHaveAttribute('aria-busy', 'false');
   await expect(context.getByRole('button', { name: /^wrk-1,/ })).toBeVisible();
 }
@@ -208,7 +208,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       try {
         await p.open(manifest.route); await loaded(p);
         expect(docsRequests(p)).toEqual([{ method: 'GET', path: '/v1/workspaces/wrk-1/docs', body: undefined }]);
-        const context = p.page.getByRole('region', { name: locale === 'es' ? 'Contexto activo' : 'Active context', exact: true });
+        const context = p.page.getByRole('region', { name: locale === 'es' ? 'Contexto activo' : 'Active context', exact: true, includeHidden: true });
         await expect(context).toContainText('wrk-1');
         expect(await p.page.evaluate(() => JSON.parse(localStorage.getItem('in-falcone.console-active-context')).workspaceId)).toBe('wrk-1');
         await expect(p.page.getByText(locale === 'es' ? 'Página pendiente de migración' : 'Page awaiting migration', { exact: true })).toHaveCount(0);

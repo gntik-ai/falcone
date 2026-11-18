@@ -8,13 +8,13 @@ const manifest: ParityManifest = {
   data: [
     { name: 'overview title', locator: { es: 'h1:text-is("Vista general de la consola")', en: 'h1:text-is("Console overview")' } },
     { name: 'quick links', locator: { es: 'h2:text-is("Accesos rápidos")', en: 'h2:text-is("Quick links")' } },
-    { name: 'tenant', locator: 'select:has(option:checked:text-is("Synthetic Tenant"))' },
+    { name: 'tenant', locator: 'button[role="combobox"]:has-text("Synthetic Tenant")' },
     { name: 'workspace', locator: { es: 'button:has-text("Synthetic Workspace")', en: 'button:has-text("Synthetic Workspace")' } },
   ],
   actions: [{
     name: 'sign out',
     trigger: [
-      { es: 'button[aria-label="Menú de usuario"]', en: 'button[aria-label="User menu"]' },
+      { es: 'button[aria-label^="Menú de la cuenta de"]', en: 'button[aria-label^="Account menu for"]' },
       { es: '[role="menuitem"]:has-text("Cerrar sesión")', en: '[role="menuitem"]:has-text("Sign out")' },
     ],
     expected: { method: 'DELETE', path: '/v1/auth/login-sessions/synthetic-session', body: { refreshToken: 'synthetic-refresh-token' } },

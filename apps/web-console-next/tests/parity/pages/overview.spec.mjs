@@ -164,7 +164,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(switcher).toBeFocused();
       await parity.page.keyboard.press('Escape');
       if (role !== 'tenant_owner') {
-        await switcher.selectOption('synthetic-tenant');
+        await check.chooseTenant(parity, 'Synthetic Tenant');
         await expect(overview(parity).getByTestId('console-tenant-inventory-summary')).toBeVisible();
       }
       // Mirror the legacy authenticated shell journey, including session termination.
@@ -216,8 +216,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await expect(overview(parity).getByRole('heading', { name: copy(parity).empty.tenant.title })).toBeVisible();
         await check.assertAccessibility(parity);
         await assertOverviewLocale(parity);
-        const switcher = parity.page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active tenant', exact: true });
-        await switcher.selectOption('synthetic-tenant');
+        await check.chooseTenant(parity, 'Synthetic Tenant');
         await expect(overview(parity).getByTestId('console-tenant-inventory-summary')).toBeVisible();
         let releaseSwitch;
         const switching = new Promise((resolve) => { releaseSwitch = resolve; });

@@ -30,6 +30,19 @@ export async function errorEmpty(parity, manifest) {
 }
 // Dialogs fade in and out. axe reads computed colours, so a scan taken halfway through a transition
 // measures blended colours and reports contrast failures that do not exist at rest.
+// The tenant picker is the kit select in the ConsoleShell sidebar header, which lives in the navigation drawer below lg.
+export async function chooseTenant(parity, option) {
+  const { page, locale } = parity;
+  const picker = page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active tenant', exact: true });
+  const inDrawer = !(await picker.isVisible());
+  if (inDrawer) await page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
+  await picker.click();
+  await page.getByRole('option', { name: option, exact: true }).click();
+  if (inDrawer) {
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  }
+}
 export async function awaitTransitions(page) {
   await page.evaluate(async () => {
     const frame = () => new Promise((done) => requestAnimationFrame(() => done()));

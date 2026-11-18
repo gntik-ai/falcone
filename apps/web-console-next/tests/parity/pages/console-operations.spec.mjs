@@ -45,7 +45,7 @@ async function choose(p, labels, option) {
 async function settle(p) {
   await expect(p.page.locator('.console-operations')).toBeVisible();
   await expect(p.page.locator('.console-operations [aria-busy="true"]')).toHaveCount(0);
-  await expect(p.page.getByRole('region', { name: copy(p, 'Contexto activo', 'Active context'), exact: true })).toHaveAttribute('aria-busy', 'false');
+  await expect(p.page.getByRole('region', { name: copy(p, 'Contexto activo', 'Active context'), exact: true, includeHidden: true })).toHaveAttribute('aria-busy', 'false');
 }
 async function freeze(p) {
   const time = new Date('2026-06-01T12:00:00Z');

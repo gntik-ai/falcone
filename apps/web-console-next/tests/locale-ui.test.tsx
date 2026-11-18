@@ -23,7 +23,7 @@ test.each([
 test('the open user menu contains only menu language controls', async () => {
   render(<MemoryRouter initialEntries={['/console/overview']}><App /></MemoryRouter>)
   await screen.findByRole('heading', { name: 'Vista general de la consola' })
-  fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Menú de la cuenta de Synthetic Operator' }))
   const menu = screen.getByRole('menu')
   expect(within(menu).queryByRole('combobox')).not.toBeInTheDocument()
   expect(menu.querySelector('select, label')).toBeNull()
@@ -36,14 +36,14 @@ test('user menu changes the shell and route copy without navigation', async () =
   expect(await screen.findByRole('heading', { name: 'Vista general de la consola' })).toBeVisible()
   expect(screen.getByRole('navigation', { name: 'Ruta de navegación' })).toBeVisible()
   expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Menú de la cuenta de Synthetic Operator' }))
   fireEvent.click(screen.getByRole('menuitem', { name: 'Idioma' }))
   expect(await screen.findByRole('menuitemradio', { name: 'Español' })).toHaveAttribute('aria-checked', 'true')
   fireEvent.click(screen.getByRole('menuitemradio', { name: 'Inglés' }))
   expect(await screen.findByRole('heading', { name: 'Console overview' })).toBeVisible()
   expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
   expect(screen.queryByRole('navigation', { name: 'Ruta de navegación' })).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'User menu' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Account menu for Synthetic Operator' }))
   await waitFor(() => expect(screen.getByRole('menuitem', { name: 'About' })).toBeVisible())
   expect(document.documentElement.lang).toBe('en')
   expect(localStorage.getItem('falcone-next-locale')).toBe('en')
@@ -57,7 +57,7 @@ test('settings switch changes both controls', async () => {
   fireEvent.pointerDown(option)
   fireEvent.click(option)
   expect(await screen.findByRole('heading', { name: 'Console settings' })).toBeVisible()
-  fireEvent.click(screen.getByRole('button', { name: 'User menu' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Account menu for Synthetic Operator' }))
   expect(screen.getByRole('combobox', { name: 'Interface language' })).toBeVisible()
   fireEvent.click(screen.getByRole('menuitem', { name: 'Language' }))
   expect(await screen.findByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true')
@@ -75,12 +75,12 @@ test('language choices are disabled while a locale bundle is loading', async () 
   try {
     render(<MemoryRouter initialEntries={['/console/overview']}><App /></MemoryRouter>)
     await screen.findByRole('heading', { name: 'Vista general de la consola' })
-    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de la cuenta de Synthetic Operator' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Idioma' }))
     fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Inglés' }))
     expect(loads).toEqual(['en'])
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de la cuenta de Synthetic Operator' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Idioma' }))
     const spanish = await screen.findByRole('menuitemradio', { name: 'Español' })
     const english = await screen.findByRole('menuitemradio', { name: 'Inglés' })
@@ -99,8 +99,8 @@ test('language choices are disabled while a locale bundle is loading', async () 
 })
 
 test.each([
-  ['es', 'Vista general de la consola', 'Menú de usuario', 'Idioma', 'Español'],
-  ['en', 'Console overview', 'User menu', 'Language', 'English']
+  ['es', 'Vista general de la consola', 'Menú de la cuenta de Synthetic Operator', 'Idioma', 'Español'],
+  ['en', 'Console overview', 'Account menu for Synthetic Operator', 'Language', 'English']
 ] as const)('selecting the checked %s language does not reload bundles', async (locale, heading, trigger, language, checked) => {
   await changeLocale(locale)
   const loads: string[] = []
@@ -129,7 +129,7 @@ for (const role of ['tenant_owner', 'superadmin']) test.each(['ArrowRight', 'Ent
   try {
     render(<MemoryRouter initialEntries={['/console/overview']}><App /></MemoryRouter>)
     await screen.findByRole('heading', { name: 'Vista general de la consola' })
-    const trigger = screen.getByRole('button', { name: 'Menú de usuario' })
+    const trigger = screen.getByRole('button', { name: 'Menú de la cuenta de Synthetic Operator' })
     trigger.focus()
     fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     const first = await screen.findByRole('menuitem', { name: role === 'superadmin' ? 'Consola de administración' : 'Acerca de' })

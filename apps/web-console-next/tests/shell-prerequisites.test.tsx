@@ -106,8 +106,7 @@ test.each(['/next', '/preview'])('mobile navigation respects route opt-in under 
       <Route path="quotas" element={<h1>Quotas test page</h1>} />
       <Route path="functions" element={<h1>Migrated functions test page</h1>} />
     </Route></Routes></I18nProvider>, { basename, route: `${basename}/console/quotas` })
-    // jsdom also exposes SidebarLayout's unused drawer trigger before MobileNav.
-    fireEvent.click(screen.getAllByRole('button', { name: 'Abrir navegación' }).at(-1)!)
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir navegación' }))
     const drawer = await screen.findByRole('dialog')
     const migrated = within(drawer).getByRole('link', { name: 'Funciones: administrar' })
     expect(migrated).toHaveAttribute('href', `${basename}/console/functions`)

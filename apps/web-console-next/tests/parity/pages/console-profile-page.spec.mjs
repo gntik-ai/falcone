@@ -85,9 +85,9 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await parity.page.evaluate(() => { window.__profileDocument = true; });
       const tenant = parity.page.getByRole('region', { name: locale === 'es' ? 'Contexto activo' : 'Active context', exact: true }).getByRole('combobox');
       const requestCount = parity.network.requests.length;
-      await tenant.selectOption('');
+      await tenant.locator('xpath=following-sibling::button').click();
       await expect(surface(parity).getByText('Synthetic Workspace', { exact: true })).toBeVisible();
-      await expect(tenant).toHaveValue('synthetic-tenant');
+      await expect(tenant).toHaveText('Synthetic Tenant');
       await expect(surface(parity).getByText('Synthetic Tenant', { exact: true })).toBeVisible();
       await expect(surface(parity).getByText(copy(parity).missingContext, { exact: true })).toHaveCount(0);
       const updates = parity.network.requests.slice(requestCount);

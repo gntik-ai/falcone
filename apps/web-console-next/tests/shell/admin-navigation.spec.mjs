@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { startServer } from '../csp/server.mjs';
 import { installSession } from '../browser-session.mjs';
 import { assertAccessibility, assertResponsive, awaitTransitions } from '../parity/checks.mjs';
+import { openAccountMenu } from '../account-menu.mjs';
 
 let server;
 test.beforeAll(async () => { server = await startServer(); });
@@ -13,12 +14,19 @@ const copy = {
   es: { admin: 'Consola de administración', console: 'Consola', about: 'Acerca de', language: 'Idioma', signOut: 'Cerrar sesión', trigger: 'Menú de usuario' },
 };
 const pathname = (page) => new URL(page.url()).pathname;
+// The console account menu is the ConsoleShell sidebar footer menu (inside the navigation drawer below lg); the admin layout keeps its topbar menu.
+const consoleTrigger = (page, locale) => page.getByRole('button', { name: locale === 'es' ? /^Menú de la cuenta de / : /^Account menu for / });
+const adminTrigger = (page, locale) => page.getByRole('button', { name: copy[locale].trigger });
+const menuTrigger = (page, locale, route) => route.startsWith('admin') ? adminTrigger(page, locale) : consoleTrigger(page, locale);
+async function openMenu(page, locale, route = 'console/overview') {
+  if (route.startsWith('admin')) await adminTrigger(page, locale).click();
+  else await openAccountMenu(page, locale);
+}
 async function setup(page, locale, roles = ['superadmin']) {
   const unmatched = await installSession(page, roles);
   await page.addInitScript((language) => localStorage.setItem('falcone-next-locale', language), locale);
   await page.goto(server.url('console/overview'));
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.getByRole('button', { name: copy[locale].trigger })).toBeVisible();
   return unmatched;
 }
 async function tabTo(page, locator) {
@@ -32,26 +40,24 @@ async function tabTo(page, locator) {
 
 for (const locale of ['en', 'es']) {
   const text = copy[locale];
-  test(`superadmin menu and topbar preserve /next without document navigation in ${locale}`, async ({ page }) => {
+  test(`superadmin menu preserves /next without document navigation and the topbar has no Admin link in ${locale}`, async ({ page }) => {
     const unmatched = await setup(page, locale);
     expect(pathname(page)).toBe('/next/console/overview');
     const documents = [];
     page.on('request', (request) => { if (request.resourceType() === 'document') documents.push(request.url()); });
-    const trigger = () => page.getByRole('button', { name: text.trigger });
-    await trigger().click();
+    await expect(page.getByRole('link', { name: text.admin, exact: true })).toHaveCount(0);
+    await openMenu(page, locale);
     await expect(page.getByRole('menuitem')).toHaveText([text.admin, text.about, text.language, text.signOut]);
     await page.getByRole('menuitem', { name: text.admin, exact: true }).click();
     await expect(page).toHaveURL(server.url('admin'));
-    await trigger().click();
+    await openMenu(page, locale, 'admin');
     await expect(page.getByRole('menuitem')).toHaveText([text.console, text.about, text.language, text.signOut]);
     await expect(page.getByRole('menuitem', { name: text.admin, exact: true })).toHaveCount(0);
     await expect(page.getByRole('link', { name: text.admin, exact: true })).toHaveCount(0);
     await page.getByRole('menuitem', { name: text.console, exact: true }).click();
     await expect(page).toHaveURL(server.url('console/overview'));
-    const entry = page.getByRole('link', { name: text.admin, exact: true });
-    await expect(entry).toHaveAttribute('href', '/next/admin');
-    await expect(entry.locator('svg')).toHaveAttribute('aria-hidden', 'true');
-    await entry.click();
+    await openMenu(page, locale);
+    await page.getByRole('menuitem', { name: text.admin, exact: true }).click();
     await expect(page).toHaveURL(server.url('admin'));
     expect(documents).toEqual([]);
     expect(unmatched).toEqual([]);
@@ -66,9 +72,9 @@ for (const locale of ['en', 'es']) {
     await runs.click({ trial: true });
     const documents = [];
     page.on('request', (request) => { if (request.resourceType() === 'document') documents.push(request.url()); });
-    const entry = page.getByRole('link', { name: text.admin, exact: true });
-    await expect(entry).toBeVisible();
-    await entry.click();
+    // At 375 px the account menu sits in the navigation drawer.
+    await openMenu(page, locale);
+    await page.getByRole('menuitem', { name: text.admin, exact: true }).click();
     await expect(page).toHaveURL(server.url('admin'));
     expect(documents).toEqual([]);
     expect(unmatched).toEqual([]);
@@ -79,11 +85,8 @@ for (const locale of ['en', 'es']) {
       const unmatched = await setup(page, locale);
       const documents = [];
       page.on('request', (request) => { if (request.resourceType() === 'document') documents.push(request.url()); });
-      await tabTo(page, page.getByRole('link', { name: text.admin, exact: true }));
-      await page.keyboard.press('Enter');
-      await expect(page).toHaveURL(server.url('admin'));
-      for (const [label, destination] of [[text.console, 'console/overview'], [text.admin, 'admin']]) {
-        await tabTo(page, page.getByRole('button', { name: text.trigger }));
+      for (const [label, destination, route] of [[text.admin, 'admin', 'console/overview'], [text.console, 'console/overview', 'admin']]) {
+        await tabTo(page, menuTrigger(page, locale, route));
         await page.keyboard.press(openKey);
         const item = page.getByRole('menuitem', { name: label, exact: true });
         await expect(item).toBeVisible();
@@ -105,7 +108,7 @@ for (const locale of ['en', 'es']) {
   test(`closed menus meet the accessibility gate and open menus add no all-impact violations in ${locale}`, async ({ page, context }) => {
     const baselinePage = await context.newPage();
     const baselineRequests = await setup(baselinePage, locale, ['tenant_owner']);
-    await baselinePage.getByRole('button', { name: text.trigger }).click();
+    await openAccountMenu(baselinePage, locale);
     await expect(baselinePage.getByRole('menu')).toBeVisible();
     await awaitTransitions(baselinePage);
     const baseline = await new AxeBuilder({ page: baselinePage }).analyze();
@@ -119,7 +122,7 @@ for (const locale of ['en', 'es']) {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       await expect(page.getByRole('menu')).toHaveCount(0);
       await assertAccessibility({ page });
-      await page.getByRole('button', { name: text.trigger }).click();
+      await openMenu(page, locale, route);
       await expect(page.getByRole('menuitem', { name: label, exact: true })).toBeVisible();
       await awaitTransitions(page);
       const result = await new AxeBuilder({ page }).analyze();
@@ -150,7 +153,7 @@ for (const locale of ['en', 'es']) {
       const unmatched = await setup(page, locale, [role]);
       await page.goto(server.url(route));
       const label = entry && text[entry];
-      const trigger = page.getByRole('button', { name: text.trigger });
+      const trigger = menuTrigger(page, locale, route);
       const adminLink = page.getByRole('link', { name: text.admin, exact: true });
       const adminItem = page.getByRole('menuitem', { name: text.admin, exact: true });
       const measure = () => page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
@@ -163,13 +166,10 @@ for (const locale of ['en', 'es']) {
         const tag = `${locale}-${role}-${route.replace('/', '-')}-${width}`;
         const measured = { closed: await measure() };
         await assertResponsive({ page }, width);
-        if (role === 'superadmin' && route === 'console/overview') {
-          await expect(adminLink).toBeVisible();
-          await expect(adminLink).toHaveAttribute('href', '/next/admin');
-        } else await expect(adminLink).toHaveCount(0);
+        await expect(adminLink).toHaveCount(0);
         await test.info().attach(`${tag}-closed`, { body: await page.screenshot(), contentType: 'image/png' });
         if (entry) {
-          await trigger.click();
+          await openMenu(page, locale, route);
           if (entry === 'about') {
             await expect(page.getByRole('menuitem')).toHaveText([text.about, text.language, text.signOut]);
             await expect(adminItem).toHaveCount(0);
@@ -191,6 +191,11 @@ for (const locale of ['en', 'es']) {
           await test.info().attach(`${tag}-open`, { body: await page.screenshot(), contentType: 'image/png' });
           await page.keyboard.press('Escape');
           await expect(page.getByRole('menu')).toHaveCount(0);
+          // Below lg the console menu was opened from the navigation drawer; close it before the next resize.
+          if (!route.startsWith('admin') && width < 1024) {
+            await page.keyboard.press('Escape');
+            await expect(page.getByRole('dialog')).toHaveCount(0);
+          }
         } else await expect(trigger).toHaveCount(0);
         await test.info().attach(`${tag}-sizes`, { body: JSON.stringify({ locale, role, route, width, ...measured }), contentType: 'application/json' });
       }

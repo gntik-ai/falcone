@@ -12,6 +12,7 @@
     "tenant": "Organización activa",
     "workspace": "Área de trabajo activa",
     "selectTenant": "Selecciona una organización",
+    "noTenants": "No hay organizaciones",
     "selectWorkspace": "Selecciona un área de trabajo",
     "groups": {
       "main": "Principal",

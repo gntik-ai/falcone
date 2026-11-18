@@ -24,8 +24,8 @@ function open(path = '/console/overview') {
   return render(<MemoryRouter basename="/next" initialEntries={[`/next${path}`]}><CurrentLocation /><App /></MemoryRouter>)
 }
 const copy = {
-  en: { admin: 'Admin console', console: 'Console', about: 'About', language: 'Language', signOut: 'Sign out', trigger: 'User menu' },
-  es: { admin: 'Consola de administración', console: 'Consola', about: 'Acerca de', language: 'Idioma', signOut: 'Cerrar sesión', trigger: 'Menú de usuario' }
+  en: { admin: 'Admin console', console: 'Console', about: 'About', language: 'Language', signOut: 'Sign out', trigger: 'User menu', consoleTrigger: 'Account menu for Synthetic Operator' },
+  es: { admin: 'Consola de administración', console: 'Consola', about: 'Acerca de', language: 'Idioma', signOut: 'Cerrar sesión', trigger: 'Menú de usuario', consoleTrigger: 'Menú de la cuenta de Synthetic Operator' }
 } as const
 
 describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) => {
@@ -36,7 +36,7 @@ describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) 
     const assign = vi.fn()
     vi.stubGlobal('window', Object.create(window, { location: { value: { ...window.location, assign } } }))
     open()
-    fireEvent.click(await screen.findByRole('button', { name: text.trigger }))
+    fireEvent.click(await screen.findByRole('button', { name: text.consoleTrigger }))
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([text.admin, text.about, text.language, text.signOut])
     fireEvent.click(screen.getByRole('menuitem', { name: text.admin }))
     await waitFor(() => expect(visited.at(-1)).toBe('/next/admin'))
@@ -57,16 +57,12 @@ describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) 
     expect(assign).not.toHaveBeenCalled()
   })
 
-  test.each(['/console/overview', '/console/settings'])('topbar link at %s has a hidden icon and navigates within the basename', async (path) => {
-    const assign = vi.fn()
-    vi.stubGlobal('window', Object.create(window, { location: { value: { ...window.location, assign } } }))
+  test.each(['/console/overview', '/console/settings'])('the topbar has no Admin link at %s; the Admin item lives in the sidebar footer menu', async (path) => {
     open(path)
-    const link = await screen.findByRole('link', { name: text.admin })
-    expect(link).toHaveAttribute('href', '/next/admin')
-    expect(link.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
-    fireEvent.click(link)
-    await waitFor(() => expect(visited.at(-1)).toBe('/next/admin'))
-    expect(assign).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByRole('button', { name: text.consoleTrigger }))
+    expect(await screen.findByRole('menuitem', { name: text.admin })).toBeVisible()
+    expect(screen.queryByRole('link', { name: text.admin })).toBeNull()
+    expect(screen.getByRole('banner')).not.toHaveTextContent(text.admin)
   })
 
   test.each(['platform_admin', 'platform_operator', 'platform_auditor', 'tenant_owner', 'workspace_admin', 'tenant_member', undefined])('hides both entries for %s', async (role) => {
@@ -76,7 +72,7 @@ describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) 
       persistConsoleShellSession(session)
     }
     open()
-    fireEvent.click(await screen.findByRole('button', { name: text.trigger }))
+    fireEvent.click(await screen.findByRole('button', { name: text.consoleTrigger }))
     expect(screen.queryByRole('link', { name: text.admin })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: text.admin })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: text.console })).toBeNull()
@@ -90,7 +86,7 @@ describe.each(['en', 'es'] as const)('administrator navigation in %s', (locale) 
     const assign = vi.fn()
     vi.stubGlobal('window', Object.create(window, { location: { value: { ...window.location, assign } } }))
     open(path)
-    const trigger = await screen.findByRole('button', { name: text.trigger })
+    const trigger = await screen.findByRole('button', { name: path === '/admin' ? text.trigger : text.consoleTrigger })
     trigger.focus()
     fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     const item = await screen.findByRole('menuitem', { name: label })

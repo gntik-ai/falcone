@@ -97,18 +97,24 @@ async function installSwitchShell(p) {
   });
 }
 async function switchTenant(p) {
-  await p.page.getByLabel(common[p.locale].shell.tenant).first().evaluate((select, value) => {
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, value);
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  }, tenantBId);
+  await check.chooseTenant(p, 'Tenant B');
 }
 async function switchWorkspace(p, modalOpen = false) {
-  // The context panel lives in the main region; the navigation drawer holds a second switcher while open.
-  const trigger = p.page.locator('main').getByRole('button', { name: new RegExp(common[p.locale].shell.workspace), includeHidden: true }).first();
+  // The context controls live in the sidebar header (the navigation drawer below lg); the drawer holds a second switcher while open.
+  const trigger = p.page.locator('aside, [role="dialog"]').getByRole('button', { name: new RegExp(common[p.locale].shell.workspace), includeHidden: true }).first();
   const option = p.page.getByRole('menuitemradio', { name: /Other Workspace/ });
   if (!modalOpen) {
-    await trigger.click();
+    // Below lg the sidebar is hidden: open the navigation drawer, switch there, then close it again.
+    const inDrawer = !(await trigger.isVisible());
+    if (inDrawer) {
+      await p.page.getByRole('button', { name: p.locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
+      await p.page.getByRole('dialog').getByRole('button', { name: new RegExp(common[p.locale].shell.workspace) }).first().click();
+    } else await trigger.click();
     await option.click();
+    if (inDrawer) {
+      await p.page.keyboard.press('Escape');
+      await expect(p.page.getByRole('dialog')).toHaveCount(0);
+    }
     return;
   }
   // An open modal makes the rest of the page inert to pointer input, so the pointer sequence that a

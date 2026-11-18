@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { UserMenu, Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from '@gntik-ai/ui'
+import { useState, type ReactNode } from 'react'
+import { UserMenu, Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, type UserMenuEntry, type UserMenuUser } from '@gntik-ai/ui'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { consoleAuthConfig } from '@in-falcone/console-api/config'
@@ -8,7 +8,19 @@ import { LocaleMenu } from '../i18n/LocaleMenu'
 
 declare const __APP_VERSION__: string
 declare const __APP_COMMIT_SHA__: string
-export function AccountMenu({ mode = 'console' }: { mode?: 'console' | 'admin' }) {
+
+export interface AccountMenuModel {
+  user: UserMenuUser
+  userMenuItems: UserMenuEntry[]
+  onSignOut: () => void
+  /** The LocaleMenu entries that go inside the menu popup. */
+  children: ReactNode
+  /** The version dialog opened by the About item; render it once, outside the menu. */
+  aboutDialog: ReactNode
+}
+
+// Shared by the console sidebar footer (ConsoleShell) and the admin topbar menu.
+export function useAccountMenu(mode: 'console' | 'admin' = 'console'): AccountMenuModel {
   const { t } = useTranslation('common')
   const session = useSession()!
   const navigate = useNavigate()
@@ -23,18 +35,28 @@ export function AccountMenu({ mode = 'console' }: { mode?: 'console' | 'admin' }
     try { await signOut(session) } catch { /* Local sign-out still completes after a server failure. */ }
     navigate(consoleAuthConfig.loginPath, { replace: true })
   }
-  return <>
-    <UserMenu user={{ name: session.principal?.displayName || session.principal?.username || t('shell.operator'), email: session.principal?.primaryEmail }}
-      triggerLabel={t('shell.userMenu')} showTheme={false} signOutLabel={t('shell.signOut')} onSignOut={() => { void logout() }}
-      items={[
-        ...(superadmin ? [{ label: t(mode === 'admin' ? 'shell.backToConsole' : 'shell.adminConsole'), onSelect: () => navigate(mode === 'admin' ? '/console' : '/admin') }] : []),
-        { label: t('shell.about'), onSelect: () => setAbout(true) }
-      ]}>
-      <LocaleMenu />
-    </UserMenu>
-    <Dialog open={about} onOpenChange={setAbout}><DialogContent closeLabel={t('shell.close')}>
+  return {
+    user: { name: session.principal?.displayName || session.principal?.username || t('shell.operator'), email: session.principal?.primaryEmail },
+    userMenuItems: [
+      ...(superadmin ? [{ label: t(mode === 'admin' ? 'shell.backToConsole' : 'shell.adminConsole'), onSelect: () => navigate(mode === 'admin' ? '/console' : '/admin') }] : []),
+      { label: t('shell.about'), onSelect: () => setAbout(true) }
+    ],
+    onSignOut: () => { void logout() },
+    children: <LocaleMenu />,
+    aboutDialog: <Dialog open={about} onOpenChange={setAbout}><DialogContent closeLabel={t('shell.close')}>
       <DialogHeader><DialogTitle>{t('shell.about')}</DialogTitle></DialogHeader>
       <DialogBody><p>{version}{sha ? ` · ${sha.slice(0, 7)}` : ''}</p></DialogBody>
     </DialogContent></Dialog>
+  }
+}
+
+export function AccountMenu({ mode = 'console' }: { mode?: 'console' | 'admin' }) {
+  const { t } = useTranslation('common')
+  const { user, userMenuItems, onSignOut, children, aboutDialog } = useAccountMenu(mode)
+  return <>
+    <UserMenu user={user} triggerLabel={t('shell.userMenu')} showTheme={false} signOutLabel={t('shell.signOut')} onSignOut={onSignOut} items={userMenuItems}>
+      {children}
+    </UserMenu>
+    {aboutDialog}
   </>
 }
