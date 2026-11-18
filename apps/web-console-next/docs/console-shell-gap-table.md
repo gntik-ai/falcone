@@ -37,4 +37,36 @@ Every row was checked against the installed kit (`@gntik-ai/templates`, `blocks`
 | `className="console-shell"` | `ConsoleShell` has no `className`; `overview.tsx` finds the tenant picker through the sidebar or drawer | named gap: no `className` prop |
 | Keyboard access to the scrolling `<main>` (previously guaranteed by the context controls inside it) | `mainLabel={t('shell.mainContent')}` names the overflowing kit main, which supplies its own tab stop and inset focus ring; a plain `p-4 sm:p-6` div preserves content padding | resolved by 0.15.0 (gntik-ui#857); no kit DOM is queried or rewritten |
 
-Open question from the OpenSpec: the installed 0.14.0 `SidebarLayout` drawer does render `sidebarHeader` and `sidebarFooter`, so no `drawerFooter` gap is needed.
+The installed 0.15.0 `SidebarLayout` drawer renders `sidebarHeader` and `sidebarFooter`, so no `drawerFooter` gap is needed.
+
+## 0.15.0 visual-review captures
+
+`tests/parity/pages/console-shell.spec.mjs` attaches the following screenshots for the bump.
+The dark captures show the closed drawer below lg and the sidebar at desktop width; the drawer captures show the open drawer below lg.
+Screenshot assessment and baseline approval happen in the PR CI visual-review journey and at operator approval.
+Only differences caused by the kit bump are eligible for approval.
+
+| Screenshot attachment | Reason tied to 0.15.0 |
+| --- | --- |
+| `shell-dark-es-375` | Built-in topbar theme control replaces the search-slot workaround in the closed mobile frame (#857). |
+| `shell-dark-en-375` | Built-in topbar theme control replaces the search-slot workaround in the closed mobile frame (#857). |
+| `shell-dark-es-768` | Built-in topbar theme control replaces the search-slot workaround in the closed tablet frame (#857). |
+| `shell-dark-en-768` | Built-in topbar theme control replaces the search-slot workaround in the closed tablet frame (#857). |
+| `shell-dark-es-1280` | Built-in topbar theme control replaces the search-slot workaround in the desktop frame (#857). |
+| `shell-dark-en-1280` | Built-in topbar theme control replaces the search-slot workaround in the desktop frame (#857). |
+| `shell-light-es-375` | Kit themeOptions enables the light state after one click at mobile width (#857). |
+| `shell-light-en-375` | Kit themeOptions enables the light state after one click at mobile width (#857). |
+| `shell-light-es-768` | Kit themeOptions enables the light state after one click at tablet width (#857). |
+| `shell-light-en-768` | Kit themeOptions enables the light state after one click at tablet width (#857). |
+| `shell-light-es-1280` | Kit themeOptions enables the light state after one click at desktop width (#857). |
+| `shell-light-en-1280` | Kit themeOptions enables the light state after one click at desktop width (#857). |
+| `shell-main-focus-es-375` | Kit main owns the focus ring instead of the removed wrapper at mobile width (#857). |
+| `shell-main-focus-en-375` | Kit main owns the focus ring instead of the removed wrapper at mobile width (#857). |
+| `shell-main-focus-es-768` | Kit main owns the focus ring instead of the removed wrapper at tablet width (#857). |
+| `shell-main-focus-en-768` | Kit main owns the focus ring instead of the removed wrapper at tablet width (#857). |
+| `shell-main-focus-es-1280` | Kit main owns the focus ring instead of the removed wrapper at desktop width (#857). |
+| `shell-main-focus-en-1280` | Kit main owns the focus ring instead of the removed wrapper at desktop width (#857). |
+| `shell-drawer-es-375` | Kit owns the open mobile drawer and its close-on-navigation lifecycle (#855). |
+| `shell-drawer-en-375` | Kit owns the open mobile drawer and its close-on-navigation lifecycle (#855). |
+| `shell-drawer-es-768` | Kit owns the open tablet drawer and its close-on-navigation lifecycle (#855). |
+| `shell-drawer-en-768` | Kit owns the open tablet drawer and its close-on-navigation lifecycle (#855). |
