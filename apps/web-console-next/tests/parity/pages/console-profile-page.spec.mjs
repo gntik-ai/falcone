@@ -83,11 +83,14 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       await expect(surface(parity).getByText('Synthetic Tenant', { exact: true })).toBeVisible();
       await expect(surface(parity).getByText(copy(parity).missingContext, { exact: true })).toHaveCount(1);
       await parity.page.evaluate(() => { window.__profileDocument = true; });
+      // Below lg the context region lives in the navigation drawer: open it for the sidebar interaction, then close it.
+      const inDrawer = await check.openSidebar(parity);
       const tenant = parity.page.getByRole('region', { name: locale === 'es' ? 'Contexto activo' : 'Active context', exact: true }).getByRole('combobox');
       const requestCount = parity.network.requests.length;
-      await tenant.selectOption('');
+      await tenant.locator('xpath=following-sibling::button').click();
+      await expect(tenant).toHaveText('Synthetic Tenant');
+      if (inDrawer) await check.closeSidebar(parity);
       await expect(surface(parity).getByText('Synthetic Workspace', { exact: true })).toBeVisible();
-      await expect(tenant).toHaveValue('synthetic-tenant');
       await expect(surface(parity).getByText('Synthetic Tenant', { exact: true })).toBeVisible();
       await expect(surface(parity).getByText(copy(parity).missingContext, { exact: true })).toHaveCount(0);
       const updates = parity.network.requests.slice(requestCount);

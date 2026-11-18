@@ -101,7 +101,9 @@ export const test = base.extend({
         await expect(page.locator('main')).toBeVisible();
         await expect(page.locator('main h1')).toBeVisible();
         await expect(page.locator('main section[aria-busy="true"]')).toHaveCount(0);
-        const context = page.getByRole('region', { name: locale === 'es' ? 'Contexto activo' : 'Active context', exact: true });
+        // The region sits in the ConsoleShell sidebar header, which is display:none below lg. A role query skips hidden elements,
+        // so match the region by markup: at 375 px it must still gate the settle, not pass vacuously.
+        const context = page.locator(`section[aria-label="${locale === 'es' ? 'Contexto activo' : 'Active context'}"]`);
         // One retrying assertion, no separate existence check: the shell may re-render the region between a count() and a follow-up expect.
         await expect(context.and(page.locator('[aria-busy="true"]'))).toHaveCount(0);
         await page.evaluate(() => document.fonts.ready);

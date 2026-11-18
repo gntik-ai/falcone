@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { startServer } from '../csp/server.mjs';
 import { installSession } from '../browser-session.mjs';
 import { awaitTransitions } from '../parity/checks.mjs';
+import { openAccountMenu, closeNavigationDrawer } from '../account-menu.mjs';
 let server;
 test.beforeAll(async () => { server = await startServer(); });
 test.afterAll(async () => { await server?.close(); });
@@ -37,7 +38,7 @@ test('render errors retain navigation without stack text, and About shows build 
   await expect(page.locator('body')).not.toContainText(/req_8f2c41d07a9b|503|acme-web/);
   await expect(page.getByRole('navigation', { name: 'Navegación de consola' })).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/synthetic-render-failure|\bat https?:|Error:|Stack trace/);
-  await page.getByRole('button', { name: 'Menú de usuario' }).click();
+  await openAccountMenu(page, 'es');
   await page.getByRole('menuitem', { name: 'Acerca de' }).click();
   await expect(page.getByRole('dialog')).toContainText('1.2.3 · 0123456');
   expect(unmatched).toEqual([]);
@@ -67,15 +68,81 @@ test('the open mobile navigation drawer has no serious accessibility violations'
   await page.setViewportSize({ width: 375, height: 900 });
   await page.goto(server.url('console/overview'));
   await expect(page.getByRole('heading', { name: 'Vista general de la consola' })).toBeVisible();
-  const layoutTrigger = page.locator('.console-shell > div > header > button[aria-haspopup="dialog"]');
-  await expect(layoutTrigger).toHaveCount(1);
-  await expect(layoutTrigger).toBeHidden();
   await expect(page.getByRole('button', { name: 'Abrir navegación', exact: true })).toHaveCount(1);
   await page.getByRole('button', { name: 'Abrir navegación', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   const result = await new AxeBuilder({ page }).analyze();
   expect(result.violations.filter((v) => ['serious', 'critical'].includes(v.impact))).toEqual([]);
   expect(unmatched).toEqual([]);
+});
+
+// ConsoleShell frame: below lg the sidebar (nav, context region, account menu) lives in the drawer; at lg and above it is the sidebar.
+for (const locale of ['es', 'en']) {
+  const names = locale === 'es'
+    ? { heading: 'Vista general de la consola', open: 'Abrir navegación', region: 'Contexto activo', nav: 'Navegación de consola', account: /^Menú de la cuenta de /, tenant: 'Organización activa', flows: /Flujos/ }
+    : { heading: 'Console overview', open: 'Open navigation', region: 'Active context', nav: 'Console navigation', account: /^Account menu for /, tenant: 'Active tenant', flows: /Flows/ };
+  for (const width of [375, 768, 1280]) {
+    test(`the sidebar frame shows nav, context and account menu, with a closing drawer below lg, at ${width}px in ${locale}`, async ({ page }) => {
+      const unmatched = await installSession(page);
+      await page.addInitScript((language) => localStorage.setItem('falcone-next-locale', language), locale);
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(server.url('console/overview'));
+      await expect(page.getByRole('heading', { name: names.heading, exact: true })).toBeVisible();
+      const drawer = width < 1024;
+      if (drawer) {
+        await expect(page.getByRole('navigation', { name: names.nav })).toHaveCount(0);
+        await page.getByRole('button', { name: names.open, exact: true }).click();
+      }
+      const scope = drawer ? page.getByRole('dialog') : page.getByRole('complementary', { name: names.nav });
+      await expect(scope.getByRole('navigation', { name: names.nav })).toBeVisible();
+      await expect(scope.getByRole('region', { name: names.region, exact: true })).toHaveAttribute('aria-busy', 'false');
+      await expect(scope.getByRole('combobox', { name: names.tenant, exact: true })).toBeVisible();
+      await expect(scope.getByRole('button', { name: names.account })).toBeVisible();
+      await expect(scope.getByRole('link', { name: names.flows })).toHaveAttribute('href', '/next/console/flows');
+      await page.screenshot({ path: test.info().outputPath(`frame-${locale}-${width}.png`) });
+      if (drawer) {
+        await scope.getByRole('link', { name: names.flows }).click();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+      }
+      expect(unmatched).toEqual([]);
+    });
+  }
+}
+
+test('platform-global routes render no context region in the sidebar', async ({ page }) => {
+  const unmatched = await installSession(page);
+  await page.addInitScript(() => localStorage.setItem('falcone-next-locale', 'es'));
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(server.url('console/plans'));
+  await expect(page.getByRole('heading', { name: 'Catálogo de planes', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Contexto activo', includeHidden: true })).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Organización activa', includeHidden: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Área de trabajo activa', includeHidden: true })).toHaveCount(0);
+  expect(unmatched).toEqual([]);
+});
+
+test.describe('theme control', () => {
+  const themeButton = (page) => page.getByRole('button', { name: /^Tema: / });
+  test('defaults to dark, toggles light and dark, and persists falcone-next-theme across reloads', async ({ page }) => {
+    const unmatched = await installSession(page);
+    await page.addInitScript(() => localStorage.setItem('falcone-next-locale', 'es'));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(server.url('console/overview'));
+    await expect(page.getByRole('heading', { name: 'Vista general de la consola', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('falcone-next-theme'))).toBeNull();
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+    await expect(themeButton(page)).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /Notific|Buscar|Search/i })).toHaveCount(0);
+    for (const target of ['light', 'dark']) {
+      await themeButton(page).click();
+      expect(await page.evaluate(() => localStorage.getItem('falcone-next-theme'))).toBe(target);
+      await page.reload();
+      await expect(page.getByRole('heading', { name: 'Vista general de la consola', exact: true })).toBeVisible();
+      if (target === 'light') await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
+      else await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+    }
+    expect(unmatched).toEqual([]);
+  });
 });
 
 for (const role of ['tenant_owner', 'superadmin']) {
@@ -86,7 +153,7 @@ for (const role of ['tenant_owner', 'superadmin']) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(server.url('console/overview'));
       await expect(page.getByRole('heading', { name: 'Vista general de la consola' })).toBeVisible();
-      await page.getByRole('button', { name: 'Menú de usuario' }).click();
+      await openAccountMenu(page, 'es');
       await expect(page.getByRole('menu')).toBeVisible();
       await expect(page.getByRole('menu').locator('select, label, [role="combobox"]')).toHaveCount(0);
       await awaitTransitions(page);
@@ -119,7 +186,9 @@ for (const role of ['tenant_owner', 'superadmin']) {
       await page.setViewportSize({ width: 375, height: 900 });
       await page.goto(server.url('console/overview'));
       await expect(page.getByRole('heading', { name: 'Vista general de la consola' })).toBeVisible();
-      const trigger = page.getByRole('button', { name: 'Menú de usuario' });
+      // At 375 px the account menu sits in the navigation drawer.
+      await page.getByRole('button', { name: 'Abrir navegación', exact: true }).click();
+      const trigger = page.getByRole('button', { name: /^Menú de la cuenta de / });
       await trigger.focus();
       await trigger.press('Enter');
       const language = page.getByRole('menuitem', { name: 'Idioma', exact: true });
@@ -135,16 +204,18 @@ for (const role of ['tenant_owner', 'superadmin']) {
       await page.keyboard.press('ArrowDown');
       await expect(page.getByRole('menuitemradio', { name: 'Inglés' })).toBeFocused();
       await page.keyboard.press('Enter');
+      if (await page.getByRole('dialog').count()) await page.keyboard.press('Escape');
       await expect(page.getByRole('heading', { name: 'Console overview' })).toBeVisible();
       await expect(page.locator('html')).toHaveAttribute('lang', 'en');
       expect(await page.evaluate(() => localStorage.getItem('falcone-next-locale'))).toBe('en');
       await page.reload();
       await expect(page.getByRole('heading', { name: 'Console overview' })).toBeVisible();
       await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-      await page.getByRole('button', { name: 'User menu' }).click();
+      await openAccountMenu(page, 'en');
       await page.getByRole('menuitem', { name: 'Language', exact: true }).click();
       await expect(page.getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true');
       await page.getByRole('menuitemradio', { name: 'Spanish' }).click();
+      await closeNavigationDrawer(page);
       await expect(page.getByRole('heading', { name: 'Vista general de la consola' })).toBeVisible();
       await expect(page.locator('html')).toHaveAttribute('lang', 'es');
       expect(await page.evaluate(() => localStorage.getItem('falcone-next-locale'))).toBe('es');

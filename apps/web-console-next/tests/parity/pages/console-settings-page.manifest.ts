@@ -14,7 +14,8 @@ const manifest: ParityManifest = {
   // These local actions send no API request; the spec asserts that explicitly.
   actions: [],
   states: [
-    { fixture: 'workspaces', variant: '403', locator: { es: '[role="status"]:text-is("No tienes permiso para ver esta página.")', en: '[role="status"]:text-is("You do not have permission to view this page.")' } },
+    // The context error renders in the sidebar context region, which is in the navigation drawer below lg.
+    { fixture: 'workspaces', variant: '403', locator: { es: '[role="status"]:text-is("No tienes permiso para ver esta página.")', en: '[role="status"]:text-is("You do not have permission to view this page.")' }, sidebar: true },
   ],
 }
 export default manifest

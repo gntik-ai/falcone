@@ -31,7 +31,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await expect(parity.page.getByRole('main')).toBeVisible();
         await expect(parity.page.locator('.operation-detail').getByRole('heading', { name: copy(parity, 'Detalle de operación', 'Operation detail'), exact: true, level: 1 })).toBeVisible();
         await expect(parity.page.locator('.operation-detail [aria-busy="true"]')).toHaveCount(0);
-        await expect(parity.page.getByRole('region', { name: copy(parity, 'Contexto activo', 'Active context'), exact: true })).toHaveAttribute('aria-busy', 'false');
+        await expect(parity.page.getByRole('region', { name: copy(parity, 'Contexto activo', 'Active context'), exact: true, includeHidden: true })).toHaveAttribute('aria-busy', 'false');
         await parity.page.evaluate(() => document.fonts.ready);
       };
     });

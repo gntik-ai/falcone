@@ -1,7 +1,7 @@
 import { expect, vi } from 'vitest'
 import { buildConsoleLoginSessionFixture } from '@in-falcone/console-api/fixtures'
 import { createElement, type ReactNode } from 'react'
-import { render } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { SessionProvider } from '../src/shell/session'
 import { readConsoleShellSession, persistConsoleShellSession } from '@in-falcone/console-api/session'
@@ -32,4 +32,12 @@ export function renderWithSession(page: ReactNode, { route = '/console/overview'
   if (!session) throw new Error('Persist a shell session before rendering a page')
   return render(createElement(MemoryRouter, { initialEntries: [route], basename },
     createElement(SessionProvider, { value: session }, page)))
+}
+
+// The sidebar tenant picker is the kit's Base UI select, not a native <select>: open it and pick an option by name.
+export async function chooseOption(trigger: HTMLElement, name: string | RegExp) {
+  fireEvent.click(trigger)
+  const option = await screen.findByRole('option', { name })
+  fireEvent.pointerDown(option)
+  fireEvent.click(option)
 }

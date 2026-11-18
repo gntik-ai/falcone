@@ -8,15 +8,39 @@ import { runCli } from '../run-cli.mjs';
 const appRoot = fileURLToPath(new URL('../../', import.meta.url));
 const selector = (locator, locale) => typeof locator === 'string' ? locator : locator[locale];
 const locate = (parity, locator) => parity.page.locator(selector(locator, parity.locale));
+// The ConsoleShell sidebar (context region, account menu) is display:none below lg and lives in the navigation drawer
+// there. A manifest entry marked `sidebar` opens the drawer when the sidebar is not shown, and closes it after a read.
+// Toasts are role=dialog too, so the drawer is the dialog that holds the navigation landmark, never a bare dialog query.
+const drawer = (page) => page.getByRole('dialog').filter({ has: page.getByRole('navigation') });
+export async function openSidebar(parity) {
+  const { page, locale } = parity;
+  const opener = page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true });
+  if (!(await opener.isVisible())) return false;
+  await opener.click();
+  await expect(drawer(page)).toBeVisible();
+  return true;
+}
+export async function closeSidebar(parity) {
+  await parity.page.keyboard.press('Escape');
+  await expect(drawer(parity.page)).toHaveCount(0);
+}
+// The hidden sidebar and the open drawer both render the controls: only the one on screen counts.
+const onScreen = (parity, locator) => locate(parity, locator).filter({ visible: true });
+async function expectVisible(parity, entry, message) {
+  const opened = entry.sidebar ? await openSidebar(parity) : false;
+  await expect(entry.sidebar ? onScreen(parity, entry.locator) : locate(parity, entry.locator), message).toBeVisible();
+  if (opened) await closeSidebar(parity);
+}
 export async function data(parity, manifest) {
   await parity.open(manifest.route);
-  for (const field of manifest.data) await expect(locate(parity, field.locator), `data: ${field.name}`).toBeVisible();
+  for (const field of manifest.data) await expectVisible(parity, field, `data: ${field.name}`);
 }
 export async function action(parity, manifest) {
   for (const item of manifest.actions) {
     await parity.open(manifest.route);
     const start = parity.network.requests.length;
-    for (const trigger of item.trigger) await locate(parity, trigger).click();
+    if (item.sidebar) await openSidebar(parity);
+    for (const trigger of item.trigger) await (item.sidebar ? onScreen(parity, trigger) : locate(parity, trigger)).click();
     await expect(locate(parity, item.outcome), `action: ${item.name} outcome`).toBeVisible();
     const sent = parity.network.requests.slice(start);
     expect(sent, `action: ${item.name} expected ${item.expected.method} ${item.expected.path}`).toContainEqual({ ...item.expected, body: item.expected.body });
@@ -25,11 +49,42 @@ export async function action(parity, manifest) {
 export async function errorEmpty(parity, manifest) {
   for (const state of manifest.states) {
     await parity.open(manifest.route, { [state.fixture]: state.variant });
-    await expect(locate(parity, state.locator), `error-empty: ${state.fixture} ${state.variant}`).toBeVisible();
+    await expectVisible(parity, state, `error-empty: ${state.fixture} ${state.variant}`);
   }
 }
 // Dialogs fade in and out. axe reads computed colours, so a scan taken halfway through a transition
 // measures blended colours and reports contrast failures that do not exist at rest.
+// The tenant picker is the kit select in the ConsoleShell sidebar header, which lives in the navigation drawer below lg.
+export async function chooseTenant(parity, option) {
+  const { page, locale } = parity;
+  const picker = page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active tenant', exact: true });
+  const inDrawer = await openSidebar(parity);
+  await picker.click();
+  await page.getByRole('option', { name: option, exact: true }).click();
+  if (inDrawer) await closeSidebar(parity);
+}
+// An open modal makes the rest of the page inert to pointer input, so a user click cannot reach the sidebar. Replay the
+// pointer sequence as DOM events instead (the sidebar picker is in the DOM at every width, display:none below lg).
+// The select opens in its own portal and the modal's focus handling can close it again between two steps, so the
+// option is chosen in the same task in which it appears, and the sequence is repeated only while the option is not found.
+export async function chooseTenantUnderModal(parity, option) {
+  const { page, locale } = parity;
+  const picker = page.locator('aside').getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active tenant', exact: true, includeHidden: true });
+  await expect(async () => {
+    await picker.evaluate(async (element, name) => {
+      const press = (target, types) => { for (const type of types) target.dispatchEvent(new (type.startsWith('pointer') ? PointerEvent : MouseEvent)(type, { bubbles: true, cancelable: true, button: 0 })); };
+      const find = () => [...document.querySelectorAll('[role="option"]')].find((item) => item.textContent?.trim() === name);
+      if (!find()) press(element, ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']);
+      const started = Date.now();
+      const item = await new Promise((resolve) => {
+        const tick = () => { const found = find(); if (found || Date.now() - started > 2000) resolve(found); else requestAnimationFrame(tick); };
+        tick();
+      });
+      if (!item) throw new Error('tenant picker did not open');
+      press(item, ['pointerdown', 'click']);
+    }, option);
+  }).toPass({ timeout: 20_000 });
+}
 export async function awaitTransitions(page) {
   await page.evaluate(async () => {
     const frame = () => new Promise((done) => requestAnimationFrame(() => done()));

@@ -39,7 +39,7 @@ test.each(['es', 'en'] as const)('the settings breadcrumb is translated in %s wi
   await screen.findByRole('heading', { name: locale === 'es' ? 'Ajustes de consola' : 'Console settings', level: 1 })
   const breadcrumb = screen.getByRole('navigation', { name: locale === 'es' ? 'Ruta de navegación' : 'Breadcrumb' })
   expect(within(breadcrumb).getByText(locale === 'es' ? 'Configuración' : 'Settings')).toHaveAttribute('aria-current', 'page')
-  fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Menú de usuario' : 'User menu' }))
+  fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Menú de la cuenta de Synthetic Operator' : 'Account menu for Synthetic Operator' }))
   expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(locale === 'es' ? ['Acerca de', 'Idioma', 'Cerrar sesión'] : ['About', 'Language', 'Sign out'])
   network.verify()
 }, 10_000)
@@ -168,7 +168,7 @@ for (const locale of ['es', 'en'] as const) for (const route of ['/console/overv
         (screen.getByText(locale === 'es' ? 'Menú de usuario' : 'User menu').closest('details') as HTMLDetailsElement).open = true
         fireEvent.change(screen.getByRole('combobox', { name: locale === 'es' ? 'Idioma' : 'Language' }), { target: { value: locale === 'es' ? 'en' : 'es' } })
       } else {
-        fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Menú de usuario' : 'User menu' }))
+        fireEvent.click(screen.getByRole('button', { name: locale === 'es' ? 'Menú de la cuenta de Synthetic Operator' : 'Account menu for Synthetic Operator' }))
         fireEvent.click(screen.getByRole('menuitem', { name: locale === 'es' ? 'Idioma' : 'Language' }))
         fireEvent.click(await screen.findByRole('menuitemradio', { name: locale === 'es' ? 'Inglés' : 'Spanish' }))
       }

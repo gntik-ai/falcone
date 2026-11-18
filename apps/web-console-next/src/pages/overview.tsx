@@ -16,10 +16,19 @@ const severities = ['nominal', 'warning', 'blocked'] as const
 const counts = ['workspaceCount', 'applicationCount', 'managedResourceCount', 'serviceAccountCount'] as const
 
 function openTenantSwitcher() {
-  const switcher = document.querySelector<HTMLSelectElement>('.console-shell select')
-  switcher?.focus()
-  // Native select pickers are available only during a trusted user activation.
-  try { switcher?.showPicker?.() } catch { /* Focus preserves keyboard access. */ }
+  // The tenant picker is the kit select in the shell sidebar header, or in its drawer below the lg breakpoint.
+  const picker = () => Array.from(document.querySelectorAll<HTMLElement>('[role="combobox"]'))
+    .find((element) => element.closest('aside, [role="dialog"]') && element.checkVisibility?.() !== false)
+  const visible = picker()
+  if (visible) { visible.focus(); return }
+  document.querySelector<HTMLElement>('header button[aria-haspopup="dialog"]')?.click()
+  let attempts = 0
+  const focusWhenMounted = () => {
+    const mounted = picker()
+    if (mounted) mounted.focus()
+    else if (++attempts < 30) requestAnimationFrame(focusWhenMounted)
+  }
+  requestAnimationFrame(focusWhenMounted)
 }
 
 function OverviewContent() {

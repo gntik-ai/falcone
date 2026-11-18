@@ -3,6 +3,7 @@ import { test, expect } from '../parity/harness.mjs';
 import manifest, { loginPath } from '../parity/pages/login-page.manifest.ts';
 import { loginToConsole } from '../parity/pages/login-helper.mjs';
 import { assertRuntimeHealth, assertResponsive, assertAccessibility } from '../parity/checks.mjs';
+import { openAccountMenu } from '../account-menu.mjs';
 
 // These login-only ports run against CI's /next/ build as well as the root build.
 test.use({ pageEndpoints: manifest.endpoints, trace: 'off' });
@@ -39,7 +40,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.open('/login');
       await loginToConsole(page, copy);
       await expect(page).toHaveURL(server.url('console/overview'));
-      await page.getByRole('button', { name: locale === 'es' ? 'Menú de usuario' : 'User menu', exact: true }).click();
+      await openAccountMenu(page, locale);
       await page.getByRole('menuitem', { name: locale === 'es' ? 'Cerrar sesión' : 'Sign out', exact: true }).click();
       await expect(page.getByRole('heading', { level: 1, name: copy.title, exact: true })).toBeVisible();
       expect(await page.evaluate(() => sessionStorage.getItem('in-falcone.console-shell-session'))).toBeNull();

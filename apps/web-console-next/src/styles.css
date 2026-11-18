@@ -16,8 +16,8 @@ body {
   font-family: var(--font-sans);
 }
 
-/* MobileNav owns the shell drawer; hide SidebarLayout's redundant trigger.
-   In the pinned 0.11.0 layout, only the redundant trigger is the header's first child. */
+/* The admin layout has no mobile navigation, so hide SidebarLayout's drawer trigger there.
+   The console shell renders through ConsoleShell, which keeps its trigger. */
 .console-shell > div > header > button:first-child {
   display: none;
 }

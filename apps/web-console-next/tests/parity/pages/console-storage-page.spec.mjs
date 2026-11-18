@@ -117,10 +117,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
       harness.set({ buckets: 'otherContext' });
       // Programmatic shell activation simulates an external context change while a modal holds focus.
       if (kind === 'tenant') {
-        await parity.page.locator('main select').filter({ has: parity.page.locator('option[value="synthetic-other-tenant"]') }).evaluate((select) => {
-          Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'synthetic-other-tenant');
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-        });
+        await check.chooseTenantUnderModal(parity, 'Other Tenant');
       } else {
         await parity.page.locator('button').filter({ hasText: 'Synthetic Workspace' }).first().evaluate((node) => node.click());
         await parity.page.locator('[role="menuitemradio"]').filter({ hasText: 'Other Workspace' }).evaluate((node) => node.click());

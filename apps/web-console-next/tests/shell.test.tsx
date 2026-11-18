@@ -1,7 +1,7 @@
 import { buildConsoleSignupPolicyFixture } from '@in-falcone/console-api/fixtures'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ensureConsoleSession, persistConsoleShellSession, readConsoleShellSession, readProtectedRouteIntent } from '@in-falcone/console-api/session'
-import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
+import { chooseOption, login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
 import { App } from '../src/App'
@@ -131,7 +131,7 @@ test('route workspace overrides stored context, then tenant switching clears it 
   })
   open('/console/workspaces/w2')
   expect(await screen.findByRole('button', { name: /Workspace Two/ })).toBeVisible()
-  fireEvent.change(screen.getByLabelText('Organización activa'), { target: { value: 't2' } })
+  await chooseOption(screen.getByLabelText('Organización activa'), 'Tenant Two')
   await waitFor(() => expect(requests.mock.mock.calls.some(([url]) => url === workspaceUrl('t2'))).toBe(true))
   await waitFor(() => expect(screen.queryByRole('button', { name: /Workspace Two/ })).not.toBeInTheDocument())
   const snapshot = JSON.parse(localStorage.getItem('in-falcone.console-active-context')!)
@@ -198,7 +198,7 @@ test.each([204, 500])('sign-out revokes the shared session and leaves for login 
   })
   open('/console/overview')
   await screen.findByRole('heading', { name: 'Vista general de la consola' })
-  fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Menú de la cuenta de Synthetic Operator' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Cerrar sesión' }))
   expect(await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })).toBeVisible()
   expect(sessionStorage.getItem('in-falcone.console-shell-session')).toBeNull()
@@ -231,7 +231,7 @@ test('About belongs to the kit user menu and shows the injected build identity',
   vi.stubGlobal('__APP_COMMIT_SHA__', '0123456789abcdef0123456789abcdef01234567')
   open('/console/overview')
   await screen.findByRole('heading', { name: 'Vista general de la consola' })
-  fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Menú de la cuenta de Synthetic Operator' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Acerca de' }))
   expect(await screen.findByRole('dialog', { name: 'Acerca de' })).toHaveTextContent('1.2.3 · 0123456')
 })
@@ -246,7 +246,7 @@ test('a tenant route parameter does not replace stored context', async () => {
   })
   open('/console/tenants/t1/plan')
   await screen.findByRole('heading', { name: 'Plan de la organización' })
-  await waitFor(() => expect(screen.getByLabelText('Organización activa')).toHaveValue('t2'))
+  await waitFor(() => expect(screen.getByLabelText('Organización activa')).toHaveTextContent('Tenant Two'))
 })
 
 test.each(['plans', 'runtime'])('platform-global %s hides context controls', async (path) => {
@@ -278,7 +278,7 @@ test('sign-out uses the latest shared session after token rotation', async () =>
   session.tokenSet!.accessToken = 'synthetic-rotated-access'
   session.tokenSet!.refreshToken = 'synthetic-rotated-refresh'
   persistConsoleShellSession(session)
-  fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Menú de la cuenta de Synthetic Operator' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Cerrar sesión' }))
   await screen.findByRole('heading', { name: 'Accede a In Falcone Console' })
   const init = requests.mock.mock.calls[0][1]

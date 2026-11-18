@@ -1,5 +1,6 @@
 import { installSession } from '../browser-session.mjs';
 import { test, expect } from '@playwright/test';
+import { openAccountMenu } from '../account-menu.mjs';
 import { startServer } from './server.mjs';
 
 let server;
@@ -17,14 +18,14 @@ test('English is the browser-independent default; menu preference survives reloa
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('navigation', { name: 'Breadcrumb', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Console settings' })).toBeVisible();
-  await page.getByRole('button', { name: 'User menu' }).click();
+  await openAccountMenu(page, 'en');
   await page.getByRole('menuitem', { name: 'Language', exact: true }).click();
   await expect(page.getByRole('menuitemradio')).toHaveText(['Spanish', 'English']);
   await page.getByRole('menuitemradio', { name: 'Spanish', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'es');
   await expect(page.getByRole('navigation', { name: 'Ruta de navegación', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Ajustes de consola' })).toBeVisible();
-  await page.getByRole('button', { name: 'Menú de usuario' }).click();
+  await openAccountMenu(page, 'es');
   await expect(page.getByRole('menuitem', { name: 'Acerca de' })).toBeVisible();
   await page.keyboard.press('Escape');
   await page.reload();
@@ -39,7 +40,7 @@ test('settings control changes locale and corrupt storage recovers safely', asyn
   await language.click();
   await page.getByRole('option', { name: 'Spanish', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'es');
-  await expect(page.getByRole('img', { name: 'Consola', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Navegación de consola', exact: true }).getByRole('link').first().locator('svg').first()).toBeVisible();
   await page.evaluate(() => localStorage.setItem('falcone-next-locale', '{broken'));
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -48,11 +49,11 @@ test('settings control changes locale and corrupt storage recovers safely', asyn
 
 test('menu switches both directions on overview', async ({ page }) => {
   await page.goto(server.url('console/overview'));
-  await page.getByRole('button', { name: 'User menu' }).click();
+  await openAccountMenu(page, 'en');
   await page.getByRole('menuitem', { name: 'Language', exact: true }).click();
   await page.getByRole('menuitemradio', { name: 'Spanish', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Vista general de la consola' })).toBeVisible();
-  await page.getByRole('button', { name: 'Menú de usuario' }).click();
+  await openAccountMenu(page, 'es');
   await page.getByRole('menuitem', { name: 'Idioma', exact: true }).click();
   await page.getByRole('menuitemradio', { name: 'Inglés', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Console overview' })).toBeVisible();

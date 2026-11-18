@@ -305,8 +305,11 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1024, 1280]) {
       // Workspace switch: the form values and open dialogs are cleared.
       await open(parity, 'shell.workspace-switch', { active: 'synthetic-workspace' }); await ready(parity);
       await nameInput(parity).fill('half_typed'); await typeSecret(valueInput(parity), canary);
+      // Below lg the workspace switcher is in the navigation drawer, a modal that hides the page until it closes.
+      await check.openSidebar(parity);
       await parity.page.getByRole('button', { name: /Synthetic Workspace/ }).first().click();
       await parity.page.getByRole('menuitemradio', { name: 'Other Workspace', exact: true }).click();
+      if (width < 1024) await check.closeSidebar(parity);
       await expect(heading(parity, 'title')).toBeVisible();
       await expect(parity.page.getByRole('rowheader', { name: 'other_secret', exact: true })).toBeVisible();
       expect(harness(parity).state.otherReads, 'the second workspace list is read once').toBe(1);

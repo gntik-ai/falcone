@@ -1,7 +1,6 @@
-import { LayoutDashboard, Shield } from 'lucide-react'
-import { Suspense, useState, useEffect, type ComponentPropsWithRef } from 'react'
-import { AppSidebar, AppTopbar } from '@gntik-ai/blocks'
-import { SidebarLayout, Breadcrumbs, WorkspaceSwitcher, LinkProvider, MobileNav, type NavGroup } from '@gntik-ai/ui'
+import { Suspense, useEffect, type ComponentPropsWithRef } from 'react'
+import { ConsoleShell } from '@gntik-ai/templates'
+import { Breadcrumbs, LinkProvider, ThemeCycleButton, useSidebarLayout, useThemeOptions, type NavGroup } from '@gntik-ai/ui'
 import { Link, Outlet, useLocation, matchRoutes, type RouteObject } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
@@ -11,7 +10,8 @@ import { StatusPage } from '../StatusPage'
 import { ConsoleContextProvider, useConsoleContext } from './context'
 import { pendingConsoleRoutes } from './routes'
 import { useSession } from './session'
-import { AccountMenu } from './AccountMenu'
+import { useAccountMenu } from './AccountMenu'
+import { LocaleMenu } from '../i18n/LocaleMenu'
 import { isMigratedRoute, navigation, navigationGroups } from './navigation'
 import { buildBreadcrumbs } from './breadcrumbs'
 
@@ -59,8 +59,6 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
     observer.observe(document.querySelector('main') ?? document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'inert', 'style', 'aria-busy'] })
     return () => observer.disconnect()
   }, [pathname, state, key])
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  useEffect(() => setDrawerOpen(false), [pathname])
   const session = useSession()
   const context = useConsoleContext()
   const permissions = usePermissions()
@@ -77,38 +75,52 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
     }).map((item) => ({ label: t(`navigation.${item.key}`), href: item.path, icon: (props: { size?: number; 'aria-hidden'?: boolean; className?: string }) => <item.icon {...props} />, current: pathname === item.path || (!('exactActive' in item) && pathname.startsWith(item.path + '/')) }))
   })).filter((group) => group.items.length)
   const breadcrumbs = buildBreadcrumbs(pathname, t)
+  const account = useAccountMenu()
   return <LinkProvider component={ShellLink}>
-    <SidebarLayout fullScreen className="console-shell" drawerOpen={false} sidebarLabel={t('shell.navigation')}
-      sidebar={({ collapsed, closeDrawer }) => <>
-        <AppSidebar collapsed={collapsed} workspaces={[]} user={null} usage={null} helpHref="" navLabel={t('shell.navigation')}
-          currentHref={pathname} navGroups={groups} onNavigate={closeDrawer} />
-      </>}
-      topbar={<><MobileNav className="lg:hidden" groups={groups} currentHref={pathname} label={t('shell.navigation')}
-        open={drawerOpen} onOpenChange={setDrawerOpen} footer={!platformGlobal && <ContextPanel />} /><LayoutDashboard role="img" aria-label={t('shell.console')} className="shrink-0" size={20} /><AppTopbar breadcrumb={<LinkProvider component={ContentLink}><Breadcrumbs items={breadcrumbs} /></LinkProvider>} environment={null} search={null} notifications={null} theme={null} user={null} />
-        {roles.includes('superadmin') && <Link to="/admin" className="inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring">
-          <Shield aria-hidden="true" size={18} /><span className="sr-only sm:not-sr-only">{t('shell.adminConsole')}</span>
-        </Link>}<AccountMenu /></>}>
-      {!platformGlobal && <ContextPanel />}
-      <div className="p-4 sm:p-6">
+    {/* storageKey is omitted on purpose: no persisted collapsed state, so screenshots do not depend on it. */}
+    <ConsoleShell sidebarLabel={t('shell.navigation')} navLabel={t('shell.navigation')} nav={groups} currentHref={pathname} breadcrumbs={null}
+      tenants={context.tenants.map((tenant) => ({ id: tenant.tenantId, name: tenant.displayName }))} currentTenantId={context.activeTenantId}
+      onTenantSelect={context.selectTenant} tenantLabel={t('shell.tenant')} tenantPlaceholder={t('shell.selectTenant')} tenantEmptyText={t('shell.noTenants')}
+      workspaces={context.workspaces.map((workspace) => ({ id: workspace.workspaceId, name: workspace.displayName }))} currentWorkspaceId={context.activeWorkspaceId ?? ''}
+      onWorkspaceChange={(workspace) => context.selectWorkspace(workspace.id)} workspaceLabel={t('shell.workspace')} workspaceEmptyText={t('shell.selectWorkspace')}
+      hideWorkspaceContext={platformGlobal} contextRegionLabel={t('shell.context')} contextBusy={context.loading} contextStatus={<ContextStatus />}
+      user={account.user} userMenuItems={account.userMenuItems} userMenuShowTheme={false} userMenuChildren={<LocaleMenu />} onSignOut={account.onSignOut}
+      usage={null} helpHref={null}
+      topbar={{ breadcrumb: <LinkProvider component={ContentLink}><Breadcrumbs items={breadcrumbs} /></LinkProvider>, environment: null, search: <ThemeToggle />, notifications: null, theme: null, user: null }}>
+      <CloseDrawerOnNavigate />
+      {/* The kit's <main> scrolls but is not a tab stop (tabindex=-1). The context controls used to sit inside it; now that they live
+          in the sidebar, this wrapper keeps one keyboard stop inside the scroll region (WCAG 2.1.1, axe scrollable-region-focusable). */}
+      <div tabIndex={0} className="p-4 sm:p-6 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring">
         <ShellErrorBoundary key={pathname}><Suspense fallback={<StatusPage state="loading" />}><LinkProvider component={ContentLink}><Outlet /></LinkProvider></Suspense></ShellErrorBoundary>
       </div>
-    </SidebarLayout>
+    </ConsoleShell>
+    {account.aboutDialog}
   </LinkProvider>
 }
 
-function ContextPanel() {
+// TODO(gntik-ui#855): remove with the kit release that passes onNavigate to ConsoleShell's AppSidebarNav.
+// Until then the mobile drawer would stay open after a nav click, so close it on every navigation.
+function CloseDrawerOnNavigate() {
+  const { key } = useLocation()
+  const { setDrawerOpen } = useSidebarLayout()
+  useEffect(() => { setDrawerOpen(false) }, [key])
+  return null
+}
+
+// The kit's built-in topbar `theme: 'cycle'` walks four modes (dark, high contrast, system, light). Falcone offers light and dark only,
+// so the public ThemeCycleButton is limited to those two. The topbar's `search` slot is the only public slot on the right of the bar
+// (search itself is deferred), so the control is rendered there, in the same spot the built-in control occupies.
+function ThemeToggle() {
+  const options = useThemeOptions().filter((option) => option.value === 'light' || option.value === 'dark')
+  return <ThemeCycleButton options={options} />
+}
+
+function ContextStatus() {
   const { t } = useTranslation('common')
   const context = useConsoleContext()
   const permissions = usePermissions()
-  return <section className="flex flex-wrap items-center gap-3 border-b border-border p-4" aria-label={t('shell.context')} aria-busy={context.loading}>
-    <label>{t('shell.tenant')}<select value={context.activeTenantId ?? ''} onChange={(event) => context.selectTenant(event.target.value || null)}>
-      <option value="">{t('shell.selectTenant')}</option>
-      {context.tenants.map((tenant) => <option key={tenant.tenantId} value={tenant.tenantId}>{tenant.displayName}</option>)}
-    </select></label>
-    <WorkspaceSwitcher workspaces={context.workspaces.map((workspace) => ({ id: workspace.workspaceId, name: workspace.displayName }))}
-      currentId={context.activeWorkspaceId ?? ''} onSelect={(workspace) => context.selectWorkspace(workspace.id)} label={t('shell.workspace')}
-      emptyText={t('shell.selectWorkspace')} />
+  return <>
     {permissions.isReadOnly && <span>{t('shell.readOnly')}</span>}
     {context.error && <p role="status">{context.error.status === 403 ? t('states.forbidden.body') : t('states.network.body')}</p>}
-  </section>
+  </>
 }

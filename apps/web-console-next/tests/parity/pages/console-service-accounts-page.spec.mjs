@@ -96,19 +96,26 @@ async function installSwitchShell(p) {
     await route.fulfill({ json: { items: second ? [workspace(tenantBWorkspaceId, tenantBId, 'Workspace B')] : [workspace(workspaceId, 'synthetic-tenant', 'Synthetic Workspace'), workspace(otherWorkspaceId, 'synthetic-tenant', 'Other Workspace')], page: { after: null } } });
   });
 }
-async function switchTenant(p) {
-  await p.page.getByLabel(common[p.locale].shell.tenant).first().evaluate((select, value) => {
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, value);
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  }, tenantBId);
+async function switchTenant(p, modalOpen = false) {
+  if (modalOpen) await check.chooseTenantUnderModal(p, 'Tenant B');
+  else await check.chooseTenant(p, 'Tenant B');
 }
 async function switchWorkspace(p, modalOpen = false) {
-  // The context panel lives in the main region; the navigation drawer holds a second switcher while open.
-  const trigger = p.page.locator('main').getByRole('button', { name: new RegExp(common[p.locale].shell.workspace), includeHidden: true }).first();
+  // The context controls live in the sidebar header (the navigation drawer below lg); the drawer holds a second switcher while open.
+  const trigger = p.page.locator('aside, [role="dialog"]').getByRole('button', { name: new RegExp(common[p.locale].shell.workspace), includeHidden: true }).first();
   const option = p.page.getByRole('menuitemradio', { name: /Other Workspace/ });
   if (!modalOpen) {
-    await trigger.click();
+    // Below lg the sidebar is hidden: open the navigation drawer, switch there, then close it again.
+    const inDrawer = !(await trigger.isVisible());
+    if (inDrawer) {
+      await p.page.getByRole('button', { name: p.locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
+      await p.page.getByRole('dialog').getByRole('button', { name: new RegExp(common[p.locale].shell.workspace) }).first().click();
+    } else await trigger.click();
     await option.click();
+    if (inDrawer) {
+      await p.page.keyboard.press('Escape');
+      await expect(p.page.getByRole('dialog')).toHaveCount(0);
+    }
     return;
   }
   // An open modal makes the rest of the page inert to pointer input, so the pointer sequence that a
@@ -278,7 +285,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
         else if (open_ === 'disclosure') { await rowButton(p, 'reveal').click(); await expect(disclosure(p, 'reveal')).toBeVisible(); }
         else { await rowButton(p, 'reveal').click(); await expect(retryIn(surface(p), p)).toBeVisible(); }
         const since = mark(p);
-        if (kind === 'tenant') await switchTenant(p); else await switchWorkspace(p, open_ !== 'failure');
+        if (kind === 'tenant') await switchTenant(p, open_ !== 'failure'); else await switchWorkspace(p, open_ !== 'failure');
         await expect(grid(p)).toContainText('Other workspace service');
         await expect(p.page.locator('[role="alertdialog"], [role="dialog"][aria-modal="true"]')).toHaveCount(0);
         await expect(retryIn(surface(p), p)).toHaveCount(0);

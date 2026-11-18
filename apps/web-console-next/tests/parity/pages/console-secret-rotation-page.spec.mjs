@@ -14,6 +14,19 @@ const button = (p, key) => p.page.getByRole('button', { name: copy(p)[key], exac
 const posts = (p) => p.network.requests.filter(({ method, path }) => method === 'POST' && path.startsWith(base));
 const consumers = (p) => p.network.requests.filter(({ path }) => path === `${base}/consumer-status`);
 const ready = (p) => expect(section(p, 'history').getByRole('table')).toBeVisible();
+// With the clock paused, React's Suspense reveal throttle (a 300 ms setTimeout after a fallback commit) never fires, so a lazy
+// route that resolved right after its fallback stays on the busy fallback. Open normally, and only if the page has not settled
+// after 2 s advance the fake clock past the throttle. Healthy runs never reach the nudge, so the polling boundaries stay exact.
+async function openPaused(p, variants) {
+  let settled = false;
+  const nudge = (async () => {
+    for (let attempt = 0; attempt < 3 && !settled; attempt++) {
+      await new Promise((done) => setTimeout(done, attempt ? 1000 : 2000));
+      if (!settled) await p.page.clock.runFor(350).catch(() => {});
+    }
+  })();
+  try { await p.open(route, variants); } finally { settled = true; await nudge; }
+}
 const localizedTime = (p, value) => p.page.evaluate(({ value, locale }) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)), { value, locale: p.locale });
 async function confirm(p) {
   await button(p, 'submit').click();
@@ -96,7 +109,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await parity.page.clock.pauseAt(new Date('2026-06-01T12:00:01Z'));
       try {
         for (const fixture of ['rotation-consumers-empty', 'rotation-consumers-pending-then-confirmed', 'rotation-consumers-all-timeout']) {
-          await parity.open(route, { rotationConsumers: fixture }); await ready(parity);
+          await openPaused(parity, { rotationConsumers: fixture }); await ready(parity);
           // The timer starts after the consumer response, independently of history.
           if (fixture === 'rotation-consumers-empty') await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersEmpty })).toBeVisible();
           else await expect(section(parity, 'consumers').getByText(c.states[fixture === 'rotation-consumers-all-timeout' ? 'timeout' : 'pending'], { exact: true })).toBeVisible();
@@ -108,13 +121,13 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
             const after = consumers(parity).length; await parity.page.clock.runFor(15000); expect(consumers(parity)).toHaveLength(after);
           }
         }
-        await parity.open(route, { rotationConsumers: 'rotation-consumers-failed-and-unknown' }); await ready(parity);
+        await openPaused(parity, { rotationConsumers: 'rotation-consumers-failed-and-unknown' }); await ready(parity);
         for (const state of [c.states.failed, 'reloading', 'unknown']) await expect(section(parity, 'consumers').getByText(state, { exact: true })).toBeVisible();
         const nonterminalReads = consumers(parity).length;
         await parity.page.clock.runFor(5000); await expect.poll(() => consumers(parity).length).toBe(nonterminalReads + 1);
         for (const fixture of ['rotation-consumers-500-then-ok', 'rotation-consumers-network-then-ok']) {
           const updatedAt = await parity.page.evaluate(() => new Date().toISOString());
-          await parity.open(route, { rotationConsumers: fixture }); await ready(parity);
+          await openPaused(parity, { rotationConsumers: fixture }); await ready(parity);
           await expect(section(parity, 'consumers').getByRole('table', { name: c.consumersTitle })).toBeVisible();
           await parity.page.clock.runFor(5000);
           await expect(section(parity, 'consumers').getByRole('heading', { name: c.consumersError })).toBeVisible();

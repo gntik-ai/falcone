@@ -6,7 +6,7 @@ import { afterEach, expect, test } from 'vitest'
 import { buildConsoleRefreshSessionFixture } from '@in-falcone/console-api/fixtures'
 import { readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import { App } from '../src/App'
-import { login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
+import { chooseOption, login, strictFetch, tenantUrl, workspaceUrl } from './shell-support'
 import { overviewTenant } from './parity/fixtures/overview'
 import { isMigratedRoute } from '../src/shell/navigation'
 
@@ -63,7 +63,7 @@ test('switching to a tenant without summaries never retains the prior tenant inv
     [`GET ${workspaceUrl('synthetic-tenant')}`]: { items: [] }, [`GET ${workspaceUrl('synthetic-other')}`]: { items: [] },
   })
   open(); await screen.findByTestId('console-tenant-inventory-summary')
-  fireEvent.change(screen.getByRole('combobox', { name: 'Organización activa' }), { target: { value: 'synthetic-other' } })
+  await chooseOption(screen.getByRole('combobox', { name: 'Organización activa' }), 'Synthetic Other')
   expect(await screen.findByRole('heading', { name: 'Sin inventario' })).toBeVisible()
   expect(screen.queryByText('12.345')).not.toBeInTheDocument()
   expect(requests.mock).toHaveBeenCalledTimes(3)
@@ -80,7 +80,7 @@ test.each([403, 500, 'network'] as const)('a tenant switch clears populated summ
     [`GET ${workspaceUrl('synthetic-other')}`]: () => pending,
   })
   open(); await screen.findByTestId('console-tenant-inventory-summary')
-  fireEvent.change(screen.getByRole('combobox', { name: 'Organización activa' }), { target: { value: 'synthetic-other' } })
+  await chooseOption(screen.getByRole('combobox', { name: 'Organización activa' }), 'Synthetic Other')
   expect(await screen.findByRole('status', { name: 'Cargando resumen de cuotas.' })).toBeVisible()
   expect(screen.getByRole('status', { name: 'Cargando inventario.' })).toBeVisible()
   for (const kind of ['quota', 'inventory']) expect(screen.queryByTestId(`console-tenant-${kind}-summary`)).not.toBeInTheDocument()

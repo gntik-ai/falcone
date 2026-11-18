@@ -57,7 +57,7 @@ test('renders English with no stored locale and switches the page to Spanish', a
   await waitFor(() => expect(screen.getByRole('region', { name: commonEn.shell.context })).toHaveAttribute('aria-busy', 'false'))
   // The u0 kit switcher's built-in empty label is covered by the existing overview parity fixture.
   expect(screen.getByRole('button', { name: commonEn.shell.workspace })).toHaveTextContent('Select workspace')
-  fireEvent.click(screen.getByRole('button', { name: 'User menu' })); fireEvent.click(screen.getByRole('menuitem', { name: 'Language' })); fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Spanish' })); await screen.findByRole('heading', { name: es.title }); expect(document.documentElement.lang).toBe('es')
+  fireEvent.click(screen.getByRole('button', { name: 'Account menu for Synthetic Operator' })); fireEvent.click(screen.getByRole('menuitem', { name: 'Language' })); fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Spanish' })); await screen.findByRole('heading', { name: es.title }); expect(document.documentElement.lang).toBe('es')
   expect(screen.getByRole('button', { name: es.create })).toBeVisible()
   expect(screen.getByRole('heading', { name: es.inventory })).toBeVisible()
 })

@@ -5,6 +5,7 @@ import { sessionFor } from '../fixtures/shell.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { loginToConsole } from './login-helper.mjs';
+import { openAccountMenu } from '../../account-menu.mjs';
 
 // Never persist a trace of credential entry, including on test failure.
 test.use({ trace: 'off' });
@@ -72,7 +73,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
       expect(await page.evaluate(() => window.__loginDocument)).toBe(true);
       expect(parity.network.requests.filter((request) => request.path === loginPath)).toEqual([{ method: 'POST', path: loginPath, body: { username: 'operations', password: 'synthetic-login-password', rememberMe: false } }]);
       // Ported sign-out journey: revoke, return to login and protect another visit.
-      await page.getByRole('button', { name: locale === 'es' ? 'Menú de usuario' : 'User menu', exact: true }).click();
+      await openAccountMenu(page, locale);
       await page.getByRole('menuitem', { name: locale === 'es' ? 'Cerrar sesión' : 'Sign out', exact: true }).click();
       await expect(heading(page)).toBeVisible();
       expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBeNull();
