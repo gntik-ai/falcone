@@ -1,6 +1,6 @@
 import { Suspense, useEffect, type ComponentPropsWithRef } from 'react'
 import { ConsoleShell } from '@gntik-ai/templates'
-import { Breadcrumbs, LinkProvider, useSidebarLayout, type NavGroup } from '@gntik-ai/ui'
+import { Breadcrumbs, LinkProvider, ThemeCycleButton, useSidebarLayout, useThemeOptions, type NavGroup } from '@gntik-ai/ui'
 import { Link, Outlet, useLocation, matchRoutes, type RouteObject } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
@@ -86,7 +86,7 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
       hideWorkspaceContext={platformGlobal} contextRegionLabel={t('shell.context')} contextBusy={context.loading} contextStatus={<ContextStatus />}
       user={account.user} userMenuItems={account.userMenuItems} userMenuShowTheme={false} userMenuChildren={<LocaleMenu />} onSignOut={account.onSignOut}
       usage={null} helpHref={null}
-      topbar={{ breadcrumb: <LinkProvider component={ContentLink}><Breadcrumbs items={breadcrumbs} /></LinkProvider>, environment: null, search: null, notifications: null, theme: 'cycle', user: null }}>
+      topbar={{ breadcrumb: <LinkProvider component={ContentLink}><Breadcrumbs items={breadcrumbs} /></LinkProvider>, environment: null, search: <ThemeToggle />, notifications: null, theme: null, user: null }}>
       <CloseDrawerOnNavigate />
       {/* The kit's <main> scrolls but is not a tab stop (tabindex=-1). The context controls used to sit inside it; now that they live
           in the sidebar, this wrapper keeps one keyboard stop inside the scroll region (WCAG 2.1.1, axe scrollable-region-focusable). */}
@@ -105,6 +105,14 @@ function CloseDrawerOnNavigate() {
   const { setDrawerOpen } = useSidebarLayout()
   useEffect(() => { setDrawerOpen(false) }, [key])
   return null
+}
+
+// The kit's built-in topbar `theme: 'cycle'` walks four modes (dark, high contrast, system, light). Falcone offers light and dark only,
+// so the public ThemeCycleButton is limited to those two. The topbar's `search` slot is the only public slot on the right of the bar
+// (search itself is deferred), so the control is rendered there, in the same spot the built-in control occupies.
+function ThemeToggle() {
+  const options = useThemeOptions().filter((option) => option.value === 'light' || option.value === 'dark')
+  return <ThemeCycleButton options={options} />
 }
 
 function ContextStatus() {

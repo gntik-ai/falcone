@@ -300,7 +300,7 @@ test.each(['es', 'en'] as const)('the 375 px drawer repeats the nav hrefs, conte
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 
-test('the theme control cycles light and dark, persists in falcone-next-theme and defaults to dark', async () => {
+test('the theme control toggles light and dark, persists in falcone-next-theme and defaults to dark', async () => {
   login(['tenant_owner'])
   requests = strictFetch({ [`GET ${tenantUrl}`]: { items: [] } })
   const theme = () => screen.findByRole('button', { name: /^Tema: / })
@@ -311,13 +311,13 @@ test('the theme control cycles light and dark, persists in falcone-next-theme an
   expect(screen.queryByRole('button', { name: /Notific/i })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /Buscar|Search/i })).not.toBeInTheDocument()
   expect(screen.getAllByRole('button', { name: /^Tema: / })).toHaveLength(1)
-  for (let i = 0; i < 4 && localStorage.getItem('falcone-next-theme') !== 'light'; i++) fireEvent.click(await theme())
+  fireEvent.click(await theme())
   expect(localStorage.getItem('falcone-next-theme')).toBe('light')
   await waitFor(() => expect(document.documentElement).not.toHaveClass('dark'))
   first.unmount()
   openApp('/console/overview')
   expect(await theme()).toHaveAccessibleName(/^Tema: Claro/)
-  for (let i = 0; i < 4 && localStorage.getItem('falcone-next-theme') !== 'dark'; i++) fireEvent.click(await theme())
+  fireEvent.click(await theme())
   expect(localStorage.getItem('falcone-next-theme')).toBe('dark')
   await waitFor(() => expect(document.documentElement).toHaveClass('dark'))
 })

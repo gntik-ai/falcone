@@ -134,7 +134,7 @@ test.describe('theme control', () => {
     await expect(themeButton(page)).toHaveCount(1);
     await expect(page.getByRole('button', { name: /Notific|Buscar|Search/i })).toHaveCount(0);
     for (const target of ['light', 'dark']) {
-      for (let step = 0; step < 4 && (await page.evaluate(() => localStorage.getItem('falcone-next-theme'))) !== target; step++) await themeButton(page).click();
+      await themeButton(page).click();
       expect(await page.evaluate(() => localStorage.getItem('falcone-next-theme'))).toBe(target);
       await page.reload();
       await expect(page.getByRole('heading', { name: 'Vista general de la consola', exact: true })).toBeVisible();
