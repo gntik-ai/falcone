@@ -67,15 +67,18 @@ test('every concrete appRoutes path renders under the unchanged CSP with local a
     const response = await page.goto(server.origin + path);
     expect(response.headers()['content-security-policy']).toBe(securityHeaders['content-security-policy']);
     await expect(page.locator('main h1')).toBeVisible();
-    // The shell frame icons are inline SVG from the kit, so they need no asset request under the CSP.
-    await expect(page.getByRole('navigation', { name: 'Navegación de consola', exact: true }).getByRole('link').first().locator('svg').first()).toHaveJSProperty('tagName', 'svg');
+    // Icons are inline SVG from the kit, so they need no asset request under the CSP. Only /console routes render
+    // the shell nav; own-layout pages and /admin have none, so they are checked through their first inline SVG.
+    const consoleNav = page.getByRole('navigation', { name: 'Navegación de consola', exact: true });
+    const icon = path.startsWith('/console') ? consoleNav.getByRole('link').first().locator('svg').first() : page.locator('svg').first();
+    await expect(icon).toHaveJSProperty('tagName', 'svg');
     await expectFonts(page, observed);
     const favicon = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute('href');
     const url = new URL(favicon, page.url());
     expect(url.origin).toBe(server.origin);
-    const icon = await page.request.get(url.href);
-    expect(icon.status()).toBe(200);
-    expect(icon.headers()['content-type']).toContain('image/svg+xml');
+    const favicon200 = await page.request.get(url.href);
+    expect(favicon200.status()).toBe(200);
+    expect(favicon200.headers()['content-type']).toContain('image/svg+xml');
     await expectClean(page, observed);
   }
   expect(unmatched).toEqual([]);
