@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { startServer } from '../csp/server.mjs';
 import { installSession } from '../browser-session.mjs';
 import { awaitTransitions } from '../parity/checks.mjs';
-import { openAccountMenu } from '../account-menu.mjs';
+import { openAccountMenu, closeNavigationDrawer } from '../account-menu.mjs';
 let server;
 test.beforeAll(async () => { server = await startServer(); });
 test.afterAll(async () => { await server?.close(); });
@@ -215,6 +215,7 @@ for (const role of ['tenant_owner', 'superadmin']) {
       await page.getByRole('menuitem', { name: 'Language', exact: true }).click();
       await expect(page.getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true');
       await page.getByRole('menuitemradio', { name: 'Spanish' }).click();
+      await closeNavigationDrawer(page);
       await expect(page.getByRole('heading', { name: 'Vista general de la consola' })).toBeVisible();
       await expect(page.locator('html')).toHaveAttribute('lang', 'es');
       expect(await page.evaluate(() => localStorage.getItem('falcone-next-locale'))).toBe('es');

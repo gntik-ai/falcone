@@ -40,7 +40,7 @@ test('settings control changes locale and corrupt storage recovers safely', asyn
   await language.click();
   await page.getByRole('option', { name: 'Spanish', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'es');
-  await expect(page.getByRole('img', { name: 'Consola', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Navegación de consola', exact: true }).getByRole('link').first().locator('svg').first()).toBeVisible();
   await page.evaluate(() => localStorage.setItem('falcone-next-locale', '{broken'));
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');

@@ -5,7 +5,7 @@ import { seedHistoryPrincipal } from './console-flow-history-page.session.mjs';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
-import { openAccountMenu } from '../../account-menu.mjs';
+import { openAccountMenu, closeNavigationDrawer } from '../../account-menu.mjs';
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-workspaces-page.json`, import.meta.url), 'utf8'))]));
 const shellBundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/common.json`, import.meta.url), 'utf8'))]));
 const copy = (p) => bundles[p.locale];
@@ -92,7 +92,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       if (locale === 'en') {
         await p.page.addInitScript(() => document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') localStorage.removeItem('falcone-next-locale'); }, { once: true }));
         await open(p); await expect(surface(p).getByRole('heading', { name: bundles.en.title })).toBeVisible(); await expect(p.page.locator('html')).toHaveAttribute('lang', 'en');
-        await openAccountMenu(p.page, 'en'); await p.page.getByRole('menuitem', { name: 'Language', exact: true }).click(); await p.page.getByRole('menuitemradio', { name: 'Spanish', exact: true }).click(); await expect(surface(p).getByRole('heading', { name: bundles.es.title })).toBeVisible(); await expect(p.page.locator('html')).toHaveAttribute('lang', 'es');
+        await openAccountMenu(p.page, 'en'); await p.page.getByRole('menuitem', { name: 'Language', exact: true }).click(); await p.page.getByRole('menuitemradio', { name: 'Spanish', exact: true }).click(); await closeNavigationDrawer(p.page); await expect(surface(p).getByRole('heading', { name: bundles.es.title })).toBeVisible(); await expect(p.page.locator('html')).toHaveAttribute('lang', 'es');
       }
     });
     test('action', async ({ parity: p, server }) => {

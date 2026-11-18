@@ -67,7 +67,8 @@ test('every concrete appRoutes path renders under the unchanged CSP with local a
     const response = await page.goto(server.origin + path);
     expect(response.headers()['content-security-policy']).toBe(securityHeaders['content-security-policy']);
     await expect(page.locator('main h1')).toBeVisible();
-    await expect(page.getByRole('img', { name: 'Consola', exact: true })).toHaveJSProperty('tagName', 'svg');
+    // The shell frame icons are inline SVG from the kit, so they need no asset request under the CSP.
+    await expect(page.getByRole('navigation', { name: 'Navegación de consola', exact: true }).getByRole('link').first().locator('svg').first()).toHaveJSProperty('tagName', 'svg');
     await expectFonts(page, observed);
     const favicon = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute('href');
     const url = new URL(favicon, page.url());

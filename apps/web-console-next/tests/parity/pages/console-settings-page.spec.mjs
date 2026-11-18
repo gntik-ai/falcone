@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import manifest from './console-settings-page.manifest.ts';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
-import { openAccountMenu } from '../../account-menu.mjs';
+import { openAccountMenu, closeNavigationDrawer } from '../../account-menu.mjs';
 
 const build = JSON.parse(readFileSync(new URL('../../../dist/.vite/manifest.json', import.meta.url), 'utf8'));
 const copy = (locale, es, en) => locale === 'es' ? es : en;
@@ -17,6 +17,7 @@ async function choose(page, from, to, control) {
     await openAccountMenu(page, from);
     await page.getByRole('menuitem', { name: copy(from, 'Idioma', 'Language'), exact: true }).click();
     await page.getByRole('menuitemradio', { name: to === 'es' ? copy(from, 'Español', 'Spanish') : copy(from, 'Inglés', 'English'), exact: true }).click();
+    await closeNavigationDrawer(page);
   } else {
     await select(page, from).click();
     await page.getByRole('listbox').getByRole('option', { name: to === 'es' ? copy(from, 'Español', 'Spanish') : copy(from, 'Inglés', 'English'), exact: true }).click();

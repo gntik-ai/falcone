@@ -38,7 +38,7 @@ export async function action(parity, manifest) {
     await parity.open(manifest.route);
     const start = parity.network.requests.length;
     if (item.sidebar) await openSidebar(parity);
-    for (const trigger of item.trigger) await locate(parity, trigger).click();
+    for (const trigger of item.trigger) await (item.sidebar ? onScreen(parity, trigger) : locate(parity, trigger)).click();
     await expect(locate(parity, item.outcome), `action: ${item.name} outcome`).toBeVisible();
     const sent = parity.network.requests.slice(start);
     expect(sent, `action: ${item.name} expected ${item.expected.method} ${item.expected.path}`).toContainEqual({ ...item.expected, body: item.expected.body });
