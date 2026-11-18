@@ -5,10 +5,10 @@ import YAML from 'yaml';
 
 const root = resolve(process.argv[2] ?? resolve(dirname(fileURLToPath(import.meta.url)), '..'));
 const pins = {
-  '@gntik-ai/ui': '0.12.0',
-  '@gntik-ai/blocks': '0.12.0',
-  '@gntik-ai/templates': '0.12.0',
-  '@gntik-ai/tokens': '0.4.0',
+  '@gntik-ai/ui': '0.14.0',
+  '@gntik-ai/blocks': '0.14.0',
+  '@gntik-ai/templates': '0.14.0',
+  '@gntik-ai/tokens': '0.5.0',
 };
 
 try {
