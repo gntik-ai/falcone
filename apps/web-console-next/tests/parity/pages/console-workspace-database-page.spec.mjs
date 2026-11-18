@@ -165,9 +165,11 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await open(parity, server, 'workspace-database.rotate.success'); await ready(parity); await rotate(parity); await masked(parity);
     await parity.page.reload(); await ready(parity); await expect(parity.page.getByTestId('database-password')).toHaveCount(0);
     await open(parity, server, 'shell.workspace-switch'); await ready(parity); await rotate(parity); await masked(parity);
-    // The shell's context setter also backs the page's picker.
+    // The shell's context setter also backs the page's picker. Below lg the switcher is in the navigation drawer.
+    await check.openSidebar(parity);
     const switcher = parity.page.getByRole('button', { name: /Synthetic Workspace/ });
     await switcher.click(); await parity.page.getByRole('menuitemradio', { name: 'Other Workspace', exact: true }).click();
+    if (width < 1024) await check.closeSidebar(parity);
     await expect(parity.page.getByTestId('database-password')).toHaveCount(0);
     await expect(button(parity, 'provision')).toBeVisible();
     expect(harness(parity).calls().filter(({ path }) => path === '/v1/workspaces/synthetic-other/database')).toHaveLength(1);

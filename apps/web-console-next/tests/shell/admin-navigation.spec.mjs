@@ -187,7 +187,10 @@ for (const locale of ['en', 'es']) {
             expect(box.y + box.height).toBeLessThanOrEqual(height);
           }).toPass();
           measured.open = await measure();
-          await assertResponsive({ page }, width);
+          // The console menu is opened from the modal navigation drawer below lg; the modal keeps main out of the
+          // accessibility tree, so only the overflow half of assertResponsive applies while it is open.
+          if (!route.startsWith('admin') && width < 1024) expect(measured.open.scrollWidth, `responsive: horizontal overflow at ${width}px`).toBeLessThanOrEqual(measured.open.clientWidth);
+          else await assertResponsive({ page }, width);
           await test.info().attach(`${tag}-open`, { body: await page.screenshot(), contentType: 'image/png' });
           await page.keyboard.press('Escape');
           await expect(page.getByRole('menu')).toHaveCount(0);
