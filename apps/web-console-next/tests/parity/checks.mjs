@@ -10,17 +10,19 @@ const selector = (locator, locale) => typeof locator === 'string' ? locator : lo
 const locate = (parity, locator) => parity.page.locator(selector(locator, parity.locale));
 // The ConsoleShell sidebar (context region, account menu) is display:none below lg and lives in the navigation drawer
 // there. A manifest entry marked `sidebar` opens the drawer when the sidebar is not shown, and closes it after a read.
+// Toasts are role=dialog too, so the drawer is the dialog that holds the navigation landmark, never a bare dialog query.
+const drawer = (page) => page.getByRole('dialog').filter({ has: page.getByRole('navigation') });
 export async function openSidebar(parity) {
   const { page, locale } = parity;
   const opener = page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true });
   if (!(await opener.isVisible())) return false;
   await opener.click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(drawer(page)).toBeVisible();
   return true;
 }
 export async function closeSidebar(parity) {
   await parity.page.keyboard.press('Escape');
-  await expect(parity.page.getByRole('dialog')).toHaveCount(0);
+  await expect(drawer(parity.page)).toHaveCount(0);
 }
 // The hidden sidebar and the open drawer both render the controls: only the one on screen counts.
 const onScreen = (parity, locator) => locate(parity, locator).filter({ visible: true });
