@@ -557,7 +557,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -583,7 +583,7 @@ jobs:
         run: SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
 
       - name: Test parity shard
-        run: pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/16 --workers=3
+        run: pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/32 --workers=2
 
       - name: Upload parity reports and traces
         if: always()
@@ -721,7 +721,7 @@ jobs:
             assert.equal(test.results[0].status, 'passed', 'Every parity test must pass');
           }
           const lines = ['## UI parity', '', `Merged tests: ${actual.length}; unsharded tests: ${listed.length}.`, '', '| Shard | Test duration (min) |', '| --- | ---: |'];
-          for (let shard = 1; shard <= 16; shard++) {
+          for (let shard = 1; shard <= 32; shard++) {
             const path = `shards/ui-parity-shard-${shard}`;
             assert.equal(readdirSync(`${root}/${path}/blob`).filter((file) => file.endsWith('.zip')).length, 1, `Missing blob for shard ${shard}`);
             const report = read(`${path}/results.json`);

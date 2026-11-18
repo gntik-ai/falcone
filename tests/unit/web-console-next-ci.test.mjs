@@ -85,7 +85,7 @@ function assertParityWorkflow(ci) {
   const shards = ci.jobs[names[1]];
   const negatives = ci.jobs[names[2]];
   const aggregate = ci.jobs['ui-parity'];
-  assert.deepEqual(shards?.strategy, { 'fail-fast': false, matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] } });
+  assert.deepEqual(shards?.strategy, { 'fail-fast': false, matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32] } });
   for (const event of ['pull_request', 'push']) {
     assert.ok(Object.hasOwn(ci.on, event), `${event} must trigger parity`);
     assert.equal(ci.on[event]?.paths, undefined);
@@ -135,7 +135,7 @@ function assertParityWorkflow(ci) {
     assert.match(commands(job), /SHELL_TEST_FIXTURES=true VITE_BASE_PATH=\/ pnpm --filter @in-falcone\/web-console-next build/);
   }
   const shardTest = shards.steps.find((step) => step.name === 'Test parity shard');
-  assert.equal(shardTest?.run, 'pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/16 --workers=3');
+  assert.equal(shardTest?.run, 'pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/32 --workers=2');
   assert.doesNotMatch(commands(shards), /--grep|--test-list|test:parity|verify-negatives/);
   assert.equal(negatives.strategy, undefined, 'seeded faults run once');
   assert.ok(commands(negatives).includes('pnpm --filter @in-falcone/web-console-next exec node tests/parity/verify-negatives.mjs'));
@@ -226,7 +226,7 @@ test('ui-parity aggregate rejects non-success jobs, missing tests, duplicates, r
   try {
     mkdirSync(root, { recursive: true });
     write('expected.json', expected); write('results.json', merged);
-    for (let shard = 1; shard <= 16; shard++) {
+    for (let shard = 1; shard <= 32; shard++) {
       mkdirSync(join(root, `shards/ui-parity-shard-${shard}/blob`), { recursive: true });
       write(`shards/ui-parity-shard-${shard}/results.json`, { stats: merged.stats });
       write(`shards/ui-parity-shard-${shard}/blob/report-${shard}.zip`, {});
@@ -249,7 +249,7 @@ test('ui-parity aggregate rejects non-success jobs, missing tests, duplicates, r
       assert.equal((await run()).status, 1);
     }
     write('results.json', merged);
-    rmSync(join(root, 'shards/ui-parity-shard-16'), { recursive: true });
+    rmSync(join(root, 'shards/ui-parity-shard-32'), { recursive: true });
     assert.equal((await run()).status, 1);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
