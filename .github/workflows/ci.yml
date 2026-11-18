@@ -525,6 +525,7 @@ jobs:
 
   ui-parity-structure:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -552,10 +553,11 @@ jobs:
 
   ui-parity-shards:
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -581,7 +583,7 @@ jobs:
         run: SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
 
       - name: Test parity shard
-        run: pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/8
+        run: pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/parity/playwright.config.mjs --shard=${{ matrix.shard }}/16 --workers=3
 
       - name: Upload parity reports and traces
         if: always()
@@ -593,6 +595,7 @@ jobs:
 
   ui-parity-negatives:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -637,9 +640,53 @@ jobs:
 
   ui-parity:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     needs: [ui-parity-structure, ui-parity-shards, ui-parity-negatives]
     if: always()
     steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Some specs read the Vite manifest during collection, including --list.
+      - name: Build the shell fixtures
+        run: SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
+
+      - name: Download parity shards
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: ui-parity-shard-*
+          path: apps/web-console-next/test-results/parity/shards
+
+      - name: Merge parity reports
+        working-directory: apps/web-console-next
+        run: |
+          mkdir -p test-results/parity/blob
+          find test-results/parity/shards -path '*/blob/*.zip' -exec cp {} test-results/parity/blob/ \;
+          pnpm exec playwright merge-reports --config tests/parity/merge.config.mjs test-results/parity/blob
+          pnpm exec playwright test --config tests/parity/playwright.config.mjs --list --reporter=json > test-results/parity/expected.json
+
+      - name: Upload merged parity report and traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ui-parity-report
+          path: apps/web-console-next/test-results/parity/
+          retention-days: 7
+
       - name: Require every parity job to succeed
         env:
           STRUCTURE_RESULT: ${{ needs.ui-parity-structure.result }}
@@ -649,6 +696,38 @@ jobs:
           for result in "$STRUCTURE_RESULT" "$SHARDS_RESULT" "$NEGATIVES_RESULT"; do
             [ "$result" = success ] || exit 1
           done
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { appendFileSync, readFileSync, readdirSync } from 'node:fs';
+          const root = 'apps/web-console-next/test-results/parity';
+          const read = (path) => JSON.parse(readFileSync(`${root}/${path}`, 'utf8'));
+          const expected = read('expected.json'), merged = read('results.json');
+          const tests = (suites) => suites.flatMap((suite) => [
+            ...(suite.specs ?? []).flatMap((spec) => spec.tests.map((test) => ({ ...test, id: `${spec.id}:${test.projectName}` }))),
+            ...tests(suite.suites ?? []),
+          ]);
+          const listed = tests(expected.suites), actual = tests(merged.suites);
+          const ids = (rows) => rows.map((row) => row.id).sort();
+          assert.deepEqual(expected.errors, [], 'Unsharded collection must succeed');
+          assert.deepEqual(merged.errors, [], 'Merged report must have no infrastructure errors');
+          assert.ok(listed.length > 0, 'Parity must collect tests');
+          assert.equal(new Set(ids(actual)).size, actual.length, 'Every test must run exactly once');
+          assert.deepEqual(ids(actual), ids(listed), 'Merged coverage must equal the unsharded test list');
+          for (const test of actual) {
+            assert.equal(test.results.length, 1, 'Retries are forbidden');
+            assert.equal(test.expectedStatus, 'passed');
+            assert.equal(test.results[0].status, 'passed', 'Every parity test must pass');
+          }
+          const lines = ['## UI parity', '', `Merged tests: ${actual.length}; unsharded tests: ${listed.length}.`, '', '| Shard | Test duration (min) |', '| --- | ---: |'];
+          for (let shard = 1; shard <= 16; shard++) {
+            const path = `shards/ui-parity-shard-${shard}`;
+            assert.equal(readdirSync(`${root}/${path}/blob`).filter((file) => file.endsWith('.zip')).length, 1, `Missing blob for shard ${shard}`);
+            const report = read(`${path}/results.json`);
+            lines.push(`| ${shard} | ${(report.stats.duration / 60_000).toFixed(2)} |`);
+          }
+          lines.push('', `Sharded test wall time: ${(merged.stats.duration / 60_000).toFixed(2)} min.`, 'Record job setup, aggregate and total stage wall times from the CI job timestamps in the PR description.');
+          if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          NODE
 
   security:
     runs-on: ubuntu-24.04

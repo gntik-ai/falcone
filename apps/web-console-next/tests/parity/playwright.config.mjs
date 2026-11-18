@@ -13,6 +13,7 @@ export default defineConfig({
   reporter: [
     ['list'], ['html', { outputFolder: resolve(reports, 'html'), open: 'never' }],
     ['json', { outputFile: resolve(reports, 'results.json') }], ['./reporter.mjs'],
+    ['blob', { outputDir: resolve(reports, 'blob') }],
   ],
   use: { browserName: 'chromium', headless: true, locale: 'es', viewport: { width: 1280, height: 900 }, colorScheme: 'dark', reducedMotion: 'reduce', serviceWorkers: 'block', trace: 'retain-on-failure' },
 });
