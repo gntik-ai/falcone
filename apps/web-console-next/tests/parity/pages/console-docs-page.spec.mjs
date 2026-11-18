@@ -36,7 +36,10 @@ async function expand(p) { await button(p, 'earlier', { count: 1 }).click(); }
 async function contextReady(p) {
   const context = p.page.getByRole('region', { name: p.locale === 'es' ? 'Contexto activo' : 'Active context', exact: true, includeHidden: true });
   await expect(context).toHaveAttribute('aria-busy', 'false');
-  await expect(context.getByRole('button', { name: /^wrk-1,/ })).toBeVisible();
+  // Below lg the context controls live in the navigation drawer: open it to read them, then close it.
+  const opened = await check.openSidebar(p);
+  await expect(context.filter({ visible: true }).getByRole('button', { name: /^wrk-1,/ })).toBeVisible();
+  if (opened) await check.closeSidebar(p);
 }
 async function attach(p, info, state, width) {
   const body = await p.page.screenshot({ fullPage: true, animations: 'disabled' });

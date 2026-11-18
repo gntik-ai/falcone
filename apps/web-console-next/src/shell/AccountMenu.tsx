@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type JSX } from 'react'
 import { UserMenu, Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, type UserMenuEntry, type UserMenuUser } from '@gntik-ai/ui'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -13,10 +13,8 @@ export interface AccountMenuModel {
   user: UserMenuUser
   userMenuItems: UserMenuEntry[]
   onSignOut: () => void
-  /** The LocaleMenu entries that go inside the menu popup. */
-  children: ReactNode
   /** The version dialog opened by the About item; render it once, outside the menu. */
-  aboutDialog: ReactNode
+  aboutDialog: JSX.Element
 }
 
 // Shared by the console sidebar footer (ConsoleShell) and the admin topbar menu.
@@ -42,7 +40,6 @@ export function useAccountMenu(mode: 'console' | 'admin' = 'console'): AccountMe
       { label: t('shell.about'), onSelect: () => setAbout(true) }
     ],
     onSignOut: () => { void logout() },
-    children: <LocaleMenu />,
     aboutDialog: <Dialog open={about} onOpenChange={setAbout}><DialogContent closeLabel={t('shell.close')}>
       <DialogHeader><DialogTitle>{t('shell.about')}</DialogTitle></DialogHeader>
       <DialogBody><p>{version}{sha ? ` · ${sha.slice(0, 7)}` : ''}</p></DialogBody>
@@ -52,10 +49,10 @@ export function useAccountMenu(mode: 'console' | 'admin' = 'console'): AccountMe
 
 export function AccountMenu({ mode = 'console' }: { mode?: 'console' | 'admin' }) {
   const { t } = useTranslation('common')
-  const { user, userMenuItems, onSignOut, children, aboutDialog } = useAccountMenu(mode)
+  const { user, userMenuItems, onSignOut, aboutDialog } = useAccountMenu(mode)
   return <>
     <UserMenu user={user} triggerLabel={t('shell.userMenu')} showTheme={false} signOutLabel={t('shell.signOut')} onSignOut={onSignOut} items={userMenuItems}>
-      {children}
+      <LocaleMenu />
     </UserMenu>
     {aboutDialog}
   </>

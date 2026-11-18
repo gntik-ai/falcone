@@ -8,11 +8,12 @@ const manifest: ParityManifest = {
   data: [
     { name: 'overview title', locator: { es: 'h1:text-is("Vista general de la consola")', en: 'h1:text-is("Console overview")' } },
     { name: 'quick links', locator: { es: 'h2:text-is("Accesos rápidos")', en: 'h2:text-is("Quick links")' } },
-    { name: 'tenant', locator: 'button[role="combobox"]:has-text("Synthetic Tenant")' },
-    { name: 'workspace', locator: { es: 'button:has-text("Synthetic Workspace")', en: 'button:has-text("Synthetic Workspace")' } },
+    { name: 'tenant', locator: 'button[role="combobox"]:has-text("Synthetic Tenant")', sidebar: true },
+    { name: 'workspace', locator: { es: 'button:has-text("Synthetic Workspace")', en: 'button:has-text("Synthetic Workspace")' }, sidebar: true },
   ],
   actions: [{
     name: 'sign out',
+    sidebar: true,
     trigger: [
       { es: 'button[aria-label^="Menú de la cuenta de"]', en: 'button[aria-label^="Account menu for"]' },
       { es: '[role="menuitem"]:has-text("Cerrar sesión")', en: '[role="menuitem"]:has-text("Sign out")' },
@@ -22,9 +23,11 @@ const manifest: ParityManifest = {
   }],
   states: [
     // Known kit localisation gap: assert no selected workspace without requiring English in es.
-    { fixture: 'workspaces', variant: 'empty', locator: { es: 'button[aria-label="Área de trabajo activa"]:not(:has-text("Synthetic Workspace"))', en: 'button[aria-label="Active workspace"]:has-text("Select workspace")' } },
+    { fixture: 'workspaces', variant: 'empty', locator: { es: 'button[aria-label="Área de trabajo activa"]:not(:has-text("Synthetic Workspace"))', en: 'button[aria-label="Active workspace"]:has-text("Select workspace")' }, sidebar: true },
     ...(['401', '403', '404', '500', 'network'] as const).map((variant) => ({
       fixture: 'workspaces', variant,
+      // The context error renders inside the sidebar context region; the 401 outcome is the login page.
+      sidebar: variant !== '401',
       locator: variant === '401'
         ? { es: 'h1:text-is("Accede a In Falcone Console")', en: 'h1:text-is("Sign in to In Falcone Console")' }
         : variant === '403'

@@ -224,7 +224,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         await parity.page.route('**/v1/workspaces?**', holdSwitch);
         parity.network.setVariants({ ...variants('overview-multiple-tenants'), workspaces: '500' });
         try {
-          await switcher.selectOption('synthetic-tenant-other');
+          await check.chooseTenant(parity, 'Synthetic Other Tenant');
           for (const label of Object.values(copy(parity).loading)) await expect(overview(parity).getByRole('status', { name: label })).toBeVisible();
           for (const kind of ['quota', 'inventory']) await expect(overview(parity).getByTestId(`console-tenant-${kind}-summary`)).toHaveCount(0);
         } finally { releaseSwitch(); await parity.page.unroute('**/v1/workspaces?**', holdSwitch); }

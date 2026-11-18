@@ -11,6 +11,7 @@ import { ConsoleContextProvider, useConsoleContext } from './context'
 import { pendingConsoleRoutes } from './routes'
 import { useSession } from './session'
 import { useAccountMenu } from './AccountMenu'
+import { LocaleMenu } from '../i18n/LocaleMenu'
 import { isMigratedRoute, navigation, navigationGroups } from './navigation'
 import { buildBreadcrumbs } from './breadcrumbs'
 
@@ -83,7 +84,7 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
       workspaces={context.workspaces.map((workspace) => ({ id: workspace.workspaceId, name: workspace.displayName }))} currentWorkspaceId={context.activeWorkspaceId ?? ''}
       onWorkspaceChange={(workspace) => context.selectWorkspace(workspace.id)} workspaceLabel={t('shell.workspace')} workspaceEmptyText={t('shell.selectWorkspace')}
       hideWorkspaceContext={platformGlobal} contextRegionLabel={t('shell.context')} contextBusy={context.loading} contextStatus={<ContextStatus />}
-      user={account.user} userMenuItems={account.userMenuItems} userMenuShowTheme={false} userMenuChildren={account.children} onSignOut={account.onSignOut}
+      user={account.user} userMenuItems={account.userMenuItems} userMenuShowTheme={false} userMenuChildren={<LocaleMenu />} onSignOut={account.onSignOut}
       usage={null} helpHref={null}
       topbar={{ breadcrumb: <LinkProvider component={ContentLink}><Breadcrumbs items={breadcrumbs} /></LinkProvider>, environment: null, search: null, notifications: null, theme: 'cycle', user: null }}>
       <CloseDrawerOnNavigate />

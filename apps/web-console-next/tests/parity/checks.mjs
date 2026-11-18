@@ -8,14 +8,36 @@ import { runCli } from '../run-cli.mjs';
 const appRoot = fileURLToPath(new URL('../../', import.meta.url));
 const selector = (locator, locale) => typeof locator === 'string' ? locator : locator[locale];
 const locate = (parity, locator) => parity.page.locator(selector(locator, parity.locale));
+// The ConsoleShell sidebar (context region, account menu) is display:none below lg and lives in the navigation drawer
+// there. A manifest entry marked `sidebar` opens the drawer when the sidebar is not shown, and closes it after a read.
+export async function openSidebar(parity) {
+  const { page, locale } = parity;
+  const opener = page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true });
+  if (!(await opener.isVisible())) return false;
+  await opener.click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  return true;
+}
+export async function closeSidebar(parity) {
+  await parity.page.keyboard.press('Escape');
+  await expect(parity.page.getByRole('dialog')).toHaveCount(0);
+}
+// The hidden sidebar and the open drawer both render the controls: only the one on screen counts.
+const onScreen = (parity, locator) => locate(parity, locator).filter({ visible: true });
+async function expectVisible(parity, entry, message) {
+  const opened = entry.sidebar ? await openSidebar(parity) : false;
+  await expect(entry.sidebar ? onScreen(parity, entry.locator) : locate(parity, entry.locator), message).toBeVisible();
+  if (opened) await closeSidebar(parity);
+}
 export async function data(parity, manifest) {
   await parity.open(manifest.route);
-  for (const field of manifest.data) await expect(locate(parity, field.locator), `data: ${field.name}`).toBeVisible();
+  for (const field of manifest.data) await expectVisible(parity, field, `data: ${field.name}`);
 }
 export async function action(parity, manifest) {
   for (const item of manifest.actions) {
     await parity.open(manifest.route);
     const start = parity.network.requests.length;
+    if (item.sidebar) await openSidebar(parity);
     for (const trigger of item.trigger) await locate(parity, trigger).click();
     await expect(locate(parity, item.outcome), `action: ${item.name} outcome`).toBeVisible();
     const sent = parity.network.requests.slice(start);
@@ -25,7 +47,7 @@ export async function action(parity, manifest) {
 export async function errorEmpty(parity, manifest) {
   for (const state of manifest.states) {
     await parity.open(manifest.route, { [state.fixture]: state.variant });
-    await expect(locate(parity, state.locator), `error-empty: ${state.fixture} ${state.variant}`).toBeVisible();
+    await expectVisible(parity, state, `error-empty: ${state.fixture} ${state.variant}`);
   }
 }
 // Dialogs fade in and out. axe reads computed colours, so a scan taken halfway through a transition
@@ -34,14 +56,10 @@ export async function errorEmpty(parity, manifest) {
 export async function chooseTenant(parity, option) {
   const { page, locale } = parity;
   const picker = page.getByRole('combobox', { name: locale === 'es' ? 'Organización activa' : 'Active tenant', exact: true });
-  const inDrawer = !(await picker.isVisible());
-  if (inDrawer) await page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click();
+  const inDrawer = await openSidebar(parity);
   await picker.click();
   await page.getByRole('option', { name: option, exact: true }).click();
-  if (inDrawer) {
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog')).toHaveCount(0);
-  }
+  if (inDrawer) await closeSidebar(parity);
 }
 export async function awaitTransitions(page) {
   await page.evaluate(async () => {

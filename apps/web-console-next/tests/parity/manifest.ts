@@ -18,14 +18,16 @@ export interface ParityManifest {
   roles: Role[]
   fixtures: string[]
   sources: string[]
-  data: { name: string; locator: Locator }[]
+  // `sidebar` marks controls in the ConsoleShell sidebar, which is in the navigation drawer below lg.
+  data: { name: string; locator: Locator; sidebar?: boolean }[]
   actions: {
     name: string
+    sidebar?: boolean
     trigger: Locator[]
     expected: { method: string; path: string; body?: unknown }
     outcome: Locator
   }[]
-  states: { fixture: string; variant: Exclude<Variant, 'success'>; locator: Locator }[]
+  states: { fixture: string; variant: Exclude<Variant, 'success'>; locator: Locator; sidebar?: boolean }[]
 }
 
 // New console surfaces have no legacy page for screenshot comparison.
