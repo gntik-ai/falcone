@@ -154,11 +154,14 @@ function assertParityWorkflow(ci) {
   }
   assert.ok(commands(aggregate).includes('pnpm install --frozen-lockfile'));
   assert.match(commands(aggregate), /SHELL_TEST_FIXTURES=true VITE_BASE_PATH=\/ pnpm --filter @in-falcone\/web-console-next build/);
-  const download = aggregate.steps.findIndex((s) => s.uses?.startsWith('actions/download-artifact@'));
+  assert.deepEqual(aggregate.permissions, { contents: 'read', actions: 'read' });
+  const download = aggregate.steps.findIndex((s) => s.name === 'Download parity shards');
   assert.equal(download, 5);
-  assert.deepEqual(aggregate.steps[download].with, {
-    pattern: 'ui-parity-shard-*', path: 'apps/web-console-next/test-results/parity/shards',
+  assert.equal(aggregate.steps[download].uses, undefined);
+  assert.deepEqual(aggregate.steps[download].env, {
+    GH_TOKEN: '${{ github.token }}',
   });
+  assert.equal(aggregate.steps[download].run, 'gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern \'ui-parity-shard-*\' --dir apps/web-console-next/test-results/parity/shards');
   const merge = aggregate.steps.findIndex((s) => s.name === 'Merge parity reports');
   assert.equal(merge, 6);
   assert.match(aggregate.steps[merge].run, /playwright test --config tests\/parity\/playwright.config.mjs --list --reporter=json/);
@@ -198,6 +201,8 @@ test('ui-parity structure checks reject coverage loss and a bypassed aggregate',
     ...['ui-parity-structure', 'ui-parity-shards', 'ui-parity-negatives', 'ui-parity'].map((name) => (jobs) => { delete jobs[name]['timeout-minutes']; }),
     (jobs) => { jobs['ui-parity'].steps = jobs['ui-parity'].steps.filter((s) => s.name !== 'Merge parity reports'); },
     (jobs) => { jobs['ui-parity'].steps.find((s) => s.uses?.startsWith('actions/upload-artifact@')).with.name = 'wrong-report'; },
+    (jobs) => { delete jobs['ui-parity'].permissions.actions; },
+    (jobs) => { jobs['ui-parity'].steps.find((s) => s.name === 'Download parity shards').run = 'gh run download'; },
   ];
   for (const mutate of mutations) {
     const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));

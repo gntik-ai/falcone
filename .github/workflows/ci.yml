@@ -641,6 +641,9 @@ jobs:
   ui-parity:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
     needs: [ui-parity-structure, ui-parity-shards, ui-parity-negatives]
     if: always()
     steps:
@@ -666,10 +669,9 @@ jobs:
         run: SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
 
       - name: Download parity shards
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          pattern: ui-parity-shard-*
-          path: apps/web-console-next/test-results/parity/shards
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'ui-parity-shard-*' --dir apps/web-console-next/test-results/parity/shards
 
       - name: Merge parity reports
         working-directory: apps/web-console-next
