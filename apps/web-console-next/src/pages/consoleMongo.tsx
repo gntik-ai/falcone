@@ -101,13 +101,13 @@ function Surface() {
     { id: 'validation', header: t('columns.validation'), sortable: false, cell: (row) => row.validation?.validator ? <Tag label={t('validationActive')} tone="success" /> : <Tag label={t('validationNone')} tone="neutral" /> },
   ]
   const viewColumns: DataTableColumn<MongoView>[] = [
-    { id: 'name', header: t('columns.view'), sortable: false, accessor: (row) => row.viewName },
+    { id: 'name', header: t('columns.view'), sortable: false, cell: (row) => <span tabIndex={-1} data-mongo-row="" className={focusRing}>{row.viewName}</span> },
     { id: 'source', header: t('columns.source'), sortable: false, cell: (row) => row.viewOn ?? none },
     { id: 'pipeline', header: t('columns.pipeline'), sortable: false, cell: (row) => <Json data={row.pipeline ?? []} label={t('columns.pipeline')} height={160} /> },
   ]
   const rebuildTone = (state?: string) => state === 'in_progress' ? 'warning' : state === 'failed' ? 'destructive' : 'neutral'
   const indexColumns: DataTableColumn<MongoIndex>[] = [
-    { id: 'name', header: t('columns.index'), sortable: false, accessor: (row) => row.indexName },
+    { id: 'name', header: t('columns.index'), sortable: false, cell: (row) => <span tabIndex={-1} data-mongo-row="" className={focusRing}>{row.indexName}</span> },
     { id: 'fields', header: t('columns.fields'), sortable: false, cell: (row) => (row.keys ?? []).map((key) => `${key.fieldName}: ${String(key.direction ?? none)}`).join(', ') || none },
     { id: 'type', header: t('columns.type'), sortable: false, cell: (row) => row.indexType ?? none },
     { id: 'unique', header: t('columns.unique'), sortable: false, cell: (row) => yes(row.unique) },

@@ -44,8 +44,14 @@ export async function installMongoHarness(parity, server) {
     const reject = async () => { unmatched.push(`${method} ${path}`); await route.abort(); };
     const record = (extra = {}) => calls.push({ method, path, body, ...extra });
     const kind = kinds.find((key) => url.pathname === paths[key]);
+    // The reselection target `billing` answers its own collections and views reads, so rapid database switches stay matched.
+    const reselected = method === 'GET' ? /^\/v1\/mongo\/databases\/billing\/(collections|views)$/.exec(url.pathname) : null;
     let response;
-    if (method === 'GET' && kind) {
+    if (reselected) {
+      if (url.search !== '?page[size]=100') return reject();
+      record(); response = { body: { items: reselected[1] === 'collections' ? [collectionRow('invoices')] : [], page: {} } };
+      if (state.delayed.includes(reselected[1])) response.delay = 800;
+    } else if (method === 'GET' && kind) {
       const cursor = url.searchParams.get('page[after]');
       if (path !== readUrl(kind, cursor ?? undefined) || (cursor && cursor !== `next-${kind}`)) return reject();
       record(); attempts[kind] = (attempts[kind] ?? 0) + 1;
@@ -81,7 +87,8 @@ export async function installMongoHarness(parity, server) {
     else return reject();
     if (response.delay) await new Promise((resolve) => setTimeout(resolve, response.delay));
     if (response.network || response.status >= 400) injected.push({ url: request.url(), kind: response.network ? 'network' : String(response.status) });
-    if (response.network) await route.abort('failed'); else await route.fulfill({ status: response.status ?? 200, json: response.body, headers: response.headers });
+    // A delayed read may already be cancelled by the page when the delay ends.
+    try { if (response.network) await route.abort('failed'); else await route.fulfill({ status: response.status ?? 200, json: response.body, headers: response.headers }); } catch (error) { if (!response.delay) throw error; }
   });
   return { calls, unmatched, state, async open(patch = {}) {
     Object.assign(state, fresh(), patch); creates = 0;

@@ -26,7 +26,15 @@ async function activate(p, kind) {
   await collection(p);
   if (kind !== 'indexes') await tab(p, kind === 'detail' ? 'validation' : kind).click();
 }
-const shown = (p, kind) => sectionOf(p, kind);
+// Walks to a section through its successful parents without waiting for the target's own rows, so empty and failing fixtures never block the walk.
+async function reach(p, kind) {
+  if (kind === 'databases') return;
+  await ready(p); await row(p, 'catalog').click();
+  if (kind === 'collections') return;
+  if (kind === 'views') { await tab(p, 'views').click(); return; }
+  await expect(row(p, 'orders')).toBeVisible(); await row(p, 'orders').click();
+  if (kind !== 'indexes') await tab(p, kind === 'detail' ? 'validation' : kind).click();
+}
 async function capture(p, info, name) {
   await check.assertLocale(p); await p.page.evaluate(() => document.fonts.ready);
   const body = await p.page.screenshot({ animations: 'disabled', caret: 'hide' });
@@ -34,7 +42,8 @@ async function capture(p, info, name) {
 }
 async function wizard(p, { name = 'ventas', items = ['users'], upto = 'review' } = {}) {
   await button(p, 'newDatabase').click(); const dialog = p.page.getByTestId('mongo-wizard'); await expect(dialog).toBeVisible();
-  await button(p, 'next', dialog).click(); if (upto === 'workspace') return dialog;
+  if (upto === 'workspace') return dialog;
+  await button(p, 'next', dialog).click();
   await dialog.getByLabel(text(p, 'wizard.name'), { exact: true }).fill(name); if (upto === 'engine') return dialog;
   await button(p, 'next', dialog).click(); for (const item of items) await dialog.getByRole('checkbox', { name: item, exact: true }).click(); if (upto === 'config') return dialog;
   await button(p, 'next', dialog).click(); await expect(button(p, 'wizard.confirm', dialog)).toBeVisible(); return dialog;
@@ -101,11 +110,11 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
   test('error-empty', async ({ parity: p }) => {
     test.setTimeout(300000);
     for (const kind of ['databases', 'collections', 'views', 'indexes', 'detail', 'documents']) {
-      await h.open({ empty: [kind] }); await activate(p, kind);
+      await h.open({ empty: [kind] }); await reach(p, kind);
       const empty = { databases: 'empty.databases', collections: 'empty.collections', views: 'empty.views', indexes: 'empty.indexes', detail: 'empty.validation', documents: 'empty.documents' }[kind];
       await expect(surface(p).getByText(text(p, empty), { exact: true })).toBeVisible();
       for (const failure of failures) {
-        await h.open({ errors: { [kind]: failure } }); await activate(p, kind); const panel = surface(p).getByTestId(`mongo-failure-${kind === 'detail' ? 'validation' : kind}`); await expect(panel).toBeVisible();
+        await h.open({ errors: { [kind]: failure } }); await reach(p, kind); const panel = surface(p).getByTestId(`mongo-failure-${kind === 'detail' ? 'validation' : kind}`); await expect(panel).toBeVisible();
         if (failure === 500 || failure === 'network') { const count = h.calls.length; h.state.recovered = true; await button(p, 'retry', panel).click(); await expect(panel).toHaveCount(0); expect(h.calls.slice(count)).toEqual([{ method: 'GET', path: readUrl(kind), body: undefined }]); }
       }
     }
@@ -159,7 +168,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     if (width < 1024) await p.page.getByRole('button', { name: locale === 'es' ? 'Abrir navegación' : 'Open navigation', exact: true }).click(); await p.page.getByRole('link', { name: /MongoDB/ }).first().click(); await ready(p);
     await button(p, 'loadMore').click(); await row(p, 'catalog').click(); await row(p, 'orders').click();
     for (const key of ['views', 'collections']) await tab(p, key).click();
-    await row(p, 'billing').click(); await row(p, 'catalog').click();
+    // Rapid reselection: the slow collections reads of catalog and billing are superseded in flight and raise no error.
+    h.state.delayed = ['collections'];
+    await row(p, 'billing').click(); await row(p, 'catalog').click(); await row(p, 'billing').click(); await expect(row(p, 'invoices')).toBeVisible();
+    h.state.delayed = []; await row(p, 'catalog').click(); await expect(row(p, 'orders')).toBeVisible();
     const dialog = await wizard(p); await button(p, 'wizard.confirm', dialog).click(); await expect(dialog.getByTestId('mongo-wizard-outcome')).toBeVisible(); await button(p, 'retry', dialog).click(); await expect(dialog.getByTestId('mongo-wizard-result')).toBeVisible();
   });
   test('responsive', async ({ parity: p }) => {
@@ -173,7 +185,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await h.open({ cursors: ['databases'] }); await ready(p); await capture(p, info, 'databases');
     await database(p); await capture(p, info, 'database-collections'); await tab(p, 'views').click(); await capture(p, info, 'database-views'); await tab(p, 'collections').click();
     await collection(p); await capture(p, info, 'collection-indexes'); await tab(p, 'validation').click(); await capture(p, info, 'collection-validation'); await tab(p, 'documents').click(); await button(p, 'showJson').first().click(); await capture(p, info, 'collection-documents');
-    await h.open({ create: ['create-500'] }); await ready(p); let dialog = await wizard(p, { upto: 'workspace' }); await capture(p, info, 'wizard-workspace'); await dialog.getByLabel(text(p, 'wizard.name'), { exact: true }).fill('ventas'); await capture(p, info, 'wizard-engine'); await button(p, 'next', dialog).click(); await capture(p, info, 'wizard-config'); await button(p, 'next', dialog).click(); await capture(p, info, 'wizard-review');
+    await h.open({ create: ['create-500'] }); await ready(p); let dialog = await wizard(p, { upto: 'workspace' }); await capture(p, info, 'wizard-workspace'); await button(p, 'next', dialog).click(); await dialog.getByLabel(text(p, 'wizard.name'), { exact: true }).fill('ventas'); await capture(p, info, 'wizard-engine'); await button(p, 'next', dialog).click(); await capture(p, info, 'wizard-config'); await button(p, 'next', dialog).click(); await capture(p, info, 'wizard-review');
     await button(p, 'wizard.confirm', dialog).click(); await expect(dialog.getByTestId('mongo-wizard-outcome')).toBeVisible(); await capture(p, info, 'wizard-error');
     await h.open({ create: ['create-403'] }); await ready(p); dialog = await wizard(p); await button(p, 'wizard.confirm', dialog).click(); await expect(dialog.getByTestId('mongo-wizard-outcome')).toBeVisible(); await capture(p, info, 'wizard-no-access');
     await h.open({ empty: ['databases'] }); await capture(p, info, 'empty'); await h.open({ errors: { databases: 500 } }); await capture(p, info, 'error');

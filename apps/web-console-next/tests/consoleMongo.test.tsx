@@ -81,6 +81,18 @@ test('after the last Cargar más focus moves to the first appended row', async (
   fireEvent.click(await screen.findByRole('button', { name: 'Cargar más' })); const added = await screen.findByRole('button', { name: 'archive' })
   await waitFor(() => expect(added).toHaveFocus())
 })
+for (const [kind, load, cursorFixture, nextFixture, added] of [
+  ['views', async () => { await ready(); await selectDatabase(); tab('Vistas'); await screen.findByText('orders_view') }, fixtures.viewsCursor, fixtures.viewsNext, 'events_view'],
+  ['indexes', async () => { await ready(); await selectDatabase(); await selectCollection(); await screen.findByText('status_1') }, fixtures.indexesCursor, fixtures.indexesNext, 'created_1'],
+  ['collections', async () => { await ready(); await selectDatabase(); await screen.findByText('orders') }, fixtures.collectionsCursor, fixtures.collectionsNext, 'audit'],
+] as const) {
+  test(`${kind}: after the last Cargar más focus moves to the first appended row`, async () => {
+    const key = kind as 'views' | 'indexes' | 'collections', cursor = (cursorFixture.page as { nextCursor: string }).nextCursor
+    server = setup({ ...drill, [read(key)]: cursorFixture, [read(key, cursor)]: nextFixture }); open(); await load()
+    fireEvent.click(await screen.findByRole('button', { name: 'Cargar más' })); await screen.findByText(added)
+    await waitFor(() => expect(document.activeElement?.textContent?.trim()).toBe(added))
+  })
+}
 test('document JSON toggle exposes aria-expanded and shows the full document', async () => {
   server = setup(drill); open(); await ready(); await selectDatabase(); await selectCollection(); tab('Documentos')
   const toggle = (await screen.findAllByRole('button', { name: 'Ver JSON' }))[0]; expect(toggle).toHaveAttribute('aria-expanded', 'false'); fireEvent.click(toggle)
