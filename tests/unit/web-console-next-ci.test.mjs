@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import test from 'node:test';
 import YAML from 'yaml';
 
-test('the next-console CI job checks the scaffold and legacy release commands without publication or credentials', () => {
+test('the next-console CI job checks the scaffold and release commands without publication or credentials', () => {
   const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
   const job = ci.jobs['web-console-next'];
   assert.ok(job, 'web-console-next must run in the existing PR workflow');
@@ -23,10 +23,11 @@ test('the next-console CI job checks the scaffold and legacy release commands wi
     'pnpm --filter @in-falcone/web-console-next lint:i18n',
     'pnpm --filter @in-falcone/web-console-next test:i18n',
     'node scripts/validate-gntik-ui-pin.mjs',
-    'docker build -f apps/web-console/Dockerfile .',
+    'docker build -f apps/web-console/Dockerfile --build-arg APP_VERSION=0.0.0 --build-arg APP_COMMIT_SHA=${{ github.sha }} -t in-falcone-web-console:ci .',
+    'bash scripts/release/verify-web-console-image.sh',
   ]) assert.ok(commands.includes(command), `Missing CI check: ${command}`);
-  assert.ok(commands.some((command) => command.includes('VITE_BASE_PATH=') && command.includes('/next/') && command.includes('web-console-next build')));
-  const build = job.steps.find((step) => step.name === 'Build the next console at both base paths');
+  assert.ok(commands.some((command) => command.includes('VITE_BASE_PATH="$base"') && command.includes('for base in /;') && command.includes('web-console-next build')));
+  const build = job.steps.find((step) => step.name === 'Build the next console at the root base path');
   assert.match(build.run, /web-console-next test:i18n-chunks/);
   for (const command of ['check:i18n', 'lint:i18n', 'test:i18n']) {
     const step = job.steps.find((step) => step.run === `pnpm --filter @in-falcone/web-console-next ${command}`);
@@ -44,7 +45,7 @@ test('the next-console CI job checks the scaffold and legacy release commands wi
   assert.equal(ci.on.pull_request?.paths, undefined);
 });
 
-test('the next-console CSP step builds both bases and enforces the dist and Chromium checks', () => {
+test('the next-console CSP step builds the root base and enforces the dist and Chromium checks', () => {
   const job = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs['web-console-next'];
   const step = job.steps.find((step) => step.name === 'Validate next-console CSP and self-hosted assets');
   assert.ok(step, 'CSP validation must be an enforced CI step');
@@ -54,24 +55,28 @@ test('the next-console CSP step builds both bases and enforces the dist and Chro
   assert.equal(step.env, undefined);
   assert.match(step.run, /web-console-next exec playwright install --with-deps chromium/);
   assert.match(step.run, /node --test apps\/web-console-next\/tests\/validate-dist.test.mjs/);
-  assert.match(step.run, /for base in \/ \/next\//);
+  assert.match(step.run, /for base in \/; do/);
+  assert.doesNotMatch(step.run, /\/next\//);
   assert.match(step.run, /CSP_TEST_HARNESS=true.*web-console-next build/);
   assert.match(step.run, /web-console-next validate:dist/);
   assert.match(step.run, /VITE_BASE_PATH="\$base".*web-console-next test:csp/);
 });
 
-test('the shell step enforces release exclusion, fixture build and browser tests without changing legacy CI', () => {
+test('the shell step enforces release exclusion, fixture build and browser tests and the former legacy CI job runs the next unit tests', () => {
   const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
   const job = ci.jobs['web-console-next'];
   const shell = job.steps.find((step) => step.name === 'Test authenticated next-console shell');
   assert.ok(shell, 'The shell browser spec must be an enforced step');
   assert.equal(shell.if, undefined);
   assert.equal(shell['continue-on-error'], undefined);
-  assert.match(shell.run, /SHELL_TEST_FIXTURES= VITE_BASE_PATH=\/next\/.*web-console-next build/);
+  assert.match(shell.run, /SHELL_TEST_FIXTURES= VITE_BASE_PATH=\/ .*web-console-next build/);
   assert.match(shell.run, /node --test tests\/shell-release.test.mjs/);
   assert.match(shell.run, /SHELL_TEST_FIXTURES=true.*web-console-next build/);
   assert.match(shell.run, /web-console-next exec playwright test --config tests\/shell\/playwright.config.mjs/);
-  assert.equal(ci.jobs['web-console'].steps.some((step) => /web-console-next/.test(step.run ?? '')), false);
+  // The web-console job no longer runs the legacy suite: it runs the next console's unit tests.
+  const consoleRuns = ci.jobs['web-console'].steps.map((step) => step.run ?? '');
+  assert.ok(consoleRuns.includes('pnpm --filter @in-falcone/web-console-next test'));
+  assert.ok(!consoleRuns.some((run) => /@in-falcone\/web-console(?!-next)/.test(run)));
   const unit = job.steps.find((step) => step.run === 'pnpm --filter @in-falcone/web-console-next test');
   assert.equal(unit.if, undefined);
   assert.equal(unit['continue-on-error'], undefined);

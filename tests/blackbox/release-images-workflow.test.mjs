@@ -20,15 +20,13 @@ function stepNamed(name) {
 }
 
 test('console host and Docker builds receive the same validated version and source commit', () => {
-  const host = stepNamed('Build web-console SPA (vite)');
   const build = steps.find((step) => step.id === 'build');
-  assert.equal(host?.env?.VITE_APP_VERSION, '${{ steps.meta.outputs.version }}');
-  assert.equal(host?.env?.VITE_APP_COMMIT_SHA, '${{ github.sha }}');
+  assert.equal(stepNamed('Build web-console SPA (vite)'), undefined, 'the legacy bundle is no longer built');
   const next = stepNamed('Build web-console-next SPA (vite)');
-  assert.equal(next?.if, host.if);
-  assert.equal(next?.env?.VITE_APP_VERSION, host.env.VITE_APP_VERSION);
-  assert.equal(next?.env?.VITE_APP_COMMIT_SHA, host.env.VITE_APP_COMMIT_SHA);
-  assert.equal(next?.env?.VITE_BASE_PATH, '/next/');
+  assert.equal(next?.if, "matrix.build_spa == 'true'");
+  assert.equal(next?.env?.VITE_APP_VERSION, '${{ steps.meta.outputs.version }}');
+  assert.equal(next?.env?.VITE_APP_COMMIT_SHA, '${{ github.sha }}');
+  assert.equal(next?.env?.VITE_BASE_PATH, '/');
   assert.equal(next?.env?.CSP_TEST_HARNESS, '');
   assert.equal(next?.run, 'pnpm --filter @in-falcone/web-console-next exec vite build');
   assert.match(build?.with?.['build-args'] ?? '', /^APP_VERSION=\$\{\{ steps.meta.outputs.version \}\}$/m);
@@ -36,9 +34,10 @@ test('console host and Docker builds receive the same validated version and sour
   assert.doesNotMatch(build?.with?.['build-args'] ?? '', /token|password|npmrc/i);
 });
 
-test('both console bundles are verified at the evidenced digest, including existing-image replays', () => {
+test('the console bundle and image contract are verified at the evidenced digest, including existing-image replays', () => {
   const verify = stepNamed('Verify published image digests');
   const check = stepNamed('Verify published web-console version');
+  const contract = stepNamed('Verify published web-console image contract');
   assert.ok(check, 'published HTML verification step must exist');
   assert.equal(check.if, `${verify.if} && matrix.image == 'in-falcone-web-console'`);
   assert.ok(steps.indexOf(check) > steps.indexOf(verify));
@@ -46,6 +45,11 @@ test('both console bundles are verified at the evidenced digest, including exist
   assert.equal(verify.if, "(steps.existing.outputs.skip == 'true' || steps.build.outcome == 'success')");
   assert.equal(check.env.IMAGE_REF, '${{ steps.published.outputs.image_ref }}');
   assert.equal(check.env.VERSION, '${{ steps.meta.outputs.version }}');
+  assert.equal(contract?.if, check.if);
+  assert.equal(contract.env.IMAGE_REF, check.env.IMAGE_REF);
+  assert.equal(contract.env.VERSION, check.env.VERSION);
+  assert.equal(contract.env.COMMIT_SHA, '${{ github.sha }}');
+  assert.match(contract.run, /bash scripts\/release\/verify-web-console-image\.sh/);
 });
 
 test('digest verification fails closed and records a single immutable image reference for release evidence', () => {
@@ -89,40 +93,34 @@ test('published console check fails closed and appends the verified version to d
   try {
     const dockerPath = path.join(directory, 'docker');
     const htmlPath = path.join(directory, 'fixture.html');
-    const nextHtmlPath = path.join(directory, 'next.html');
     const summaryPath = path.join(directory, 'summary');
     const callsPath = path.join(directory, 'calls');
     writeFileSync(dockerPath, `#!/usr/bin/env bash
 echo "$*" >> "$CALLS"
 case "$1" in
   create) echo fixture-container ;;
-  cp) if [[ "$2" == *:/app/dist-next/index.html ]]; then cp "$NEXT_HTML_FIXTURE" "$3"; else cp "$HTML_FIXTURE" "$3"; fi ;;
+  cp) cp "$HTML_FIXTURE" "$3" ;;
   rm) exit 0 ;;
   *) echo 'unexpected Docker mutation' >&2; exit 1 ;;
 esac
 `);
     chmodSync(dockerPath, 0o755);
     const valid = '<meta name="version" content="1.2.3" />';
-    for (const [html, nextHtml, success] of [
-      [valid, valid, true],
-      ['<meta name="version" content="dev" />', valid, false],
-      [valid, '<meta name="version" content="dev" />', false],
-      ['<html></html>', valid, false],
-      [valid, '<html></html>', false],
-      [valid, '<meta name="version" content="1.2.30" />', false],
-      [valid, `${valid}<meta name="version" content="dev" />`, false],
-      [valid, null, false],
+    for (const [html, success] of [
+      [valid, true],
+      ['<meta name="version" content="dev" />', false],
+      ['<html></html>', false],
+      ['<meta name="version" content="1.2.30" />', false],
+      [`${valid}<meta name="version" content="dev" />`, false],
     ]) {
       writeFileSync(htmlPath, html);
-      if (nextHtml === null) rmSync(nextHtmlPath, { force: true });
-      else writeFileSync(nextHtmlPath, nextHtml);
       writeFileSync(callsPath, '');
       const evidence = '### in-falcone-web-console published\n\nregistry/image:1.2.3 and registry/image:sha-abcdef0 both resolve to `sha256:matching`.\n';
       writeFileSync(summaryPath, evidence);
       const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', check.run], {
         encoding: 'utf8',
         env: {...process.env, PATH: `${directory}:${process.env.PATH}`, IMAGE_REF: 'registry/image@sha256:matching',
-          VERSION: '1.2.3', HTML_FIXTURE: htmlPath, NEXT_HTML_FIXTURE: nextHtmlPath, CALLS: callsPath, GITHUB_STEP_SUMMARY: summaryPath},
+          VERSION: '1.2.3', HTML_FIXTURE: htmlPath, CALLS: callsPath, GITHUB_STEP_SUMMARY: summaryPath},
       });
       assert.equal(result.status, success ? 0 : 1, result.stderr);
       const summary = readFileSync(summaryPath, 'utf8');
@@ -135,7 +133,7 @@ esac
       const calls = readFileSync(callsPath, 'utf8');
       assert.match(calls, /^create --pull=always registry\/image@sha256:matching$/m);
       assert.match(calls, /^cp fixture-container:\/app\/dist\/index\.html /m);
-      if (success) assert.match(calls, /^cp fixture-container:\/app\/dist-next\/index\.html /m);
+      assert.doesNotMatch(calls, /dist-next/, 'there is no second bundle to verify');
       assert.match(calls, /^rm fixture-container$/m);
     }
   } finally {
@@ -620,11 +618,13 @@ test('bbx-1101-gates: no failure bypasses, credential leaks or expressions in sh
 
 
 test('bbx-1101-preservation: existing GHCR steps, triggers and workflow permissions stay byte-identical', () => {
-  // Fixed fingerprints of the approved source snapshot, independent of the changed workflow.
+  // Fixed fingerprints of the approved source snapshot, independent of the changed workflow. The steps
+  // fingerprint was re-pinned by the web-console-next cutover (#1304): one bundle build at /, and the image
+  // contract verification step.
   const fingerprint = (text) => createHash('sha256').update(text).digest('hex');
   const buildBlock = workflowText.slice(workflowText.indexOf('  build-push:'), workflowText.indexOf('  # Registry work is isolated:'));
   const originalSteps = buildBlock.slice(buildBlock.indexOf('    steps:')).trimEnd() + '\n';
-  assert.equal(fingerprint(originalSteps), 'de03d947cb1d7b8982d2f5f197a8130d3c66e038f71fe3ab59690e5390ba285d');
+  assert.equal(fingerprint(originalSteps), '3f4f020d0490166fc0253a55af2b61708a007a96b5f8b6e14ee0300b4e75824b');
   assert.equal(fingerprint(workflowText.slice(workflowText.indexOf('\non:'), workflowText.indexOf('\nenv:'))),
     'dbd47472dd8bdf0c7ed3dffe3eaabdaceeb3164dfc4d0d24ec7b2e8fe19a0a47');
 });

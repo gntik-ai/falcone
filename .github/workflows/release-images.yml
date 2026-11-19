@@ -14,8 +14,9 @@ name: release-images
 #                                       Keycloak JWT and dispatches /v1/* to the real action modules)
 #   in-falcone-control-plane-executor  apps/control-plane-executor/Dockerfile         (main.mjs: the data-plane
 #                                       executor that fronts the control-plane)
-#   in-falcone-web-console             apps/web-console/Dockerfile (static-server, numeric UID,
-#                                       zero-write — compatible with the restricted security profile)
+#   in-falcone-web-console             apps/web-console/Dockerfile (static-server serving the web-console-next
+#                                       bundle at /, numeric UID, zero-write — compatible with the restricted
+#                                       security profile; the legacy bundle is not in the image)
 #   in-falcone-fn-runtime              apps/fn-runtime/Dockerfile     (nodejs function runtime)
 #   in-falcone-workflow-worker         apps/workflow-worker/Dockerfile   (Temporal DSL worker)
 #   in-falcone-mcp-runtime             apps/mcp-runtime/Dockerfile           (first-party MCP JSON-RPC runtime)
@@ -165,17 +166,10 @@ jobs:
         if: matrix.build_spa == 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Build web-console SPA (vite)
-        if: matrix.build_spa == 'true'
-        env:
-          VITE_APP_VERSION: ${{ steps.meta.outputs.version }}
-          VITE_APP_COMMIT_SHA: ${{ github.sha }}
-        run: pnpm --filter @in-falcone/web-console exec vite build
-
       - name: Build web-console-next SPA (vite)
         if: matrix.build_spa == 'true'
         env:
-          VITE_BASE_PATH: /next/
+          VITE_BASE_PATH: /
           VITE_APP_VERSION: ${{ steps.meta.outputs.version }}
           VITE_APP_COMMIT_SHA: ${{ github.sha }}
           CSP_TEST_HARNESS: ''
@@ -348,18 +342,26 @@ jobs:
             exit 1
           fi
           expected_meta="<meta name=\"version\" content=\"${VERSION}\" />"
-          for bundle in dist dist-next; do
-            if ! docker cp "$container:/app/$bundle/index.html" "$INDEX_HTML"; then
-              echo "::error::could not read the published $bundle/index.html"
-              exit 1
-            fi
-            version_meta="$(grep -oE '<meta name="version" content="[^"]*" />' "$INDEX_HTML" || true)"
-            if [ "$version_meta" != "$expected_meta" ]; then
-              echo "::error::published $bundle HTML does not carry the expected release version"
-              exit 1
-            fi
-          done
-          printf '\nVerified web-console and web-console-next HTML version: `%s`.\n' "$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          if ! docker cp "$container:/app/dist/index.html" "$INDEX_HTML"; then
+            echo "::error::could not read the published dist/index.html"
+            exit 1
+          fi
+          version_meta="$(grep -oE '<meta name="version" content="[^"]*" />' "$INDEX_HTML" || true)"
+          if [ "$version_meta" != "$expected_meta" ]; then
+            echo "::error::published dist HTML does not carry the expected release version"
+            exit 1
+          fi
+          printf '\nVerified web-console HTML version: `%s`.\n' "$VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify published web-console image contract
+        if: (steps.existing.outputs.skip == 'true' || steps.build.outcome == 'success') && matrix.image == 'in-falcone-web-console'
+        env:
+          IMAGE_REF: ${{ steps.published.outputs.image_ref }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          bash scripts/release/verify-web-console-image.sh
+          printf '\nVerified web-console image contract at `%s`: UID 1000, next dist only, no token, read-only root, version `%s`, source `%s`.\n' "$IMAGE_REF" "$VERSION" "$COMMIT_SHA" >> "$GITHUB_STEP_SUMMARY"
 
   # Registry work is isolated: this queue never holds the GHCR build/push group.
   dockerhub-publish:

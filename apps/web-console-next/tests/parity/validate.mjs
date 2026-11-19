@@ -3,8 +3,15 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { checks } from './check-names.mjs';
+import { RULE, scanSource } from './no-implicit-sample-data.mjs';
 
-const root = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), 'pages'));
+// validate.mjs [pages dir] [--src <dir>]: the manifests under the pages dir, then the sample-data rule over the sources.
+const args = process.argv.slice(2);
+const flag = args.indexOf('--src');
+const srcArg = flag === -1 ? null : args.splice(flag, 2)[1];
+const here = dirname(fileURLToPath(import.meta.url));
+const root = resolve(args[0] ?? join(here, 'pages'));
+const srcRoot = resolve(srcArg ?? join(here, '../../src'));
 let failed = false;
 function fail(message) { console.error(message); failed = true; }
 function visitDirectory(dir) {
@@ -36,6 +43,15 @@ function visitDirectory(dir) {
   }
   return manifests;
 }
-try { if (!visitDirectory(root)) fail(`${root}: no manifests`); }
-catch (error) { fail(error.message); }
+function sources(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : sources(path);
+    return /\.(?:[jt]sx?|mjs)$/.test(entry.name) && !entry.name.endsWith('.d.ts') ? [path] : [];
+  });
+}
+try {
+  if (!visitDirectory(root)) fail(`${root}: no manifests`);
+  for (const file of sources(srcRoot)) for (const hit of scanSource(file, readFileSync(file, 'utf8'))) fail(`${file}:${hit.line}: ${RULE}: ${hit.message}`);
+} catch (error) { fail(error.message); }
 process.exitCode = failed ? 1 : 0;

@@ -21,7 +21,9 @@ VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next build
 Run fixture tests separately: the normal route-parity test checks the release
 route set, which intentionally excludes fixture routes.
 
-`VITE_BASE_PATH` defaults to `/`. Set it to `/next/` for side-by-side development;
+`VITE_BASE_PATH` defaults to `/`, and the released image is built with `/`: it serves this
+console at `/` and answers a permanent redirect for the former `/next` prefix. Another base
+path remains possible for local development;
 it configures both Vite asset URLs and the router basename. Tailwind's Vite plugin
 and stylesheet configuration are local to this package.
 

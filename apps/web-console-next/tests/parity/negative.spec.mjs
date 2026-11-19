@@ -2,7 +2,7 @@
 import { test, expect } from './harness.mjs';
 import manifest from './pages/overview.manifest.ts';
 import * as check from './checks.mjs';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -35,6 +35,25 @@ for (const fault of ['console.error', 'pageerror', 'unhandledrejection', 'securi
     await check.assertRuntimeHealth(parity);
   });
 }
+// The kit DataTable default rows must never reach a page. Each case shows a sample row only AFTER open() has settled,
+// so the check has to run on the later settled states: a guarded readiness assertion, a guarded action, and teardown.
+const [sampleRow] = JSON.parse(await readFile(new URL('./kit-sample-strings.json', import.meta.url), 'utf8')).strings;
+test('no-sample-data shown after open then a readiness assertion', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await seedText(parity.page, sampleRow);
+  await expect(parity.page.locator('main')).toBeVisible();
+});
+test('no-sample-data shown after open then an action', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await seedText(parity.page, 'synthetic-control');
+  await seedText(parity.page, sampleRow);
+  await parity.page.getByRole('button', { name: 'synthetic-control', exact: true }).click();
+});
+test('no-sample-data shown after open then teardown', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await seedText(parity.page, sampleRow);
+  // No further step: the automatic teardown check must fail this test.
+});
 test('accessibility serious violation', async ({ parity }) => {
   await parity.open(manifest.route);
   await parity.page.evaluate(() => { const image = document.createElement('img'); image.src = '/favicon.ico'; document.querySelector('main').append(image); });

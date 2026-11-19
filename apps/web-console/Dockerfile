@@ -1,17 +1,18 @@
 # Release runtime image for the Falcone web-console SPA.
 #
-# The SPA bundle is rebuilt in the builder stage with the same version and commit as the CI
-# host build (see .github/workflows/release-images.yml). The repo's `build` script is `tsc -b && vite
-# build`; the `tsc -b` type-check has a pre-existing error baseline that does NOT affect the
-# emitted bundle, so the release builds the deployable artifact with `vite build` directly.
+# The image serves the web-console-next bundle at / (basename /); the legacy bundle is not built or
+# copied. The SPA bundle is rebuilt in the builder stage with the same version and commit as the CI
+# host build (see .github/workflows/release-images.yml). The repo's `build` script is `tsc --noEmit &&
+# vite build`; the type-check does not affect the emitted bundle, so the release builds the deployable
+# artifact with `vite build` directly.
 #
 # Runtime is the dependency-free Node static server (apps/web-console/static-server.mjs):
-# serves the bundle on :3000, reverse-proxies same-origin /v1/* to the gateway (GATEWAY_UPSTREAM,
+# serves the bundle on :3000 (a /next prefix answers a permanent redirect to the root), reverse-proxies same-origin /v1/* to the gateway (GATEWAY_UPSTREAM,
 # default falcone-apisix:9080 — the chart overrides it), and exposes /healthz. Chosen over nginx
 # because the platform's `restricted` security profile enforces runAsNonRoot + readOnlyRootFilesystem:
 # this server makes ZERO filesystem writes and runs as a NUMERIC non-root user (1000), which nginx
 # (named user + writes to cache/pid/conf) cannot satisfy. Build context = repo root:
-#   pnpm --filter @in-falcone/web-console exec vite build
+#   pnpm --filter @in-falcone/web-console-next exec vite build
 #   docker build -f apps/web-console/Dockerfile -t in-falcone-web-console:<tag> .
 #
 # This is a multi-stage build, so both the builder and the runtime stage must be
@@ -27,17 +28,15 @@ ARG APP_VERSION=dev
 ARG APP_COMMIT_SHA=
 WORKDIR /src
 COPY . .
-RUN corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console... --filter @in-falcone/web-console-next...
-RUN NODE_OPTIONS=--max-old-space-size=3072 VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console exec vite build
-RUN NODE_OPTIONS=--max-old-space-size=3072 CSP_TEST_HARNESS= VITE_BASE_PATH=/next/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build
+RUN corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console-next...
+RUN NODE_OPTIONS=--max-old-space-size=3072 CSP_TEST_HARNESS= VITE_BASE_PATH=/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build
 
 FROM ${NODE_BASE_IMAGE}
 WORKDIR /app
 
-# Zero-dependency static server + both freshly built SPA bundles.
+# Zero-dependency static server + the freshly built next SPA bundle (the only bundle in the image).
 COPY apps/web-console/static-server.mjs ./static-server.mjs
-COPY --from=builder /src/apps/web-console/dist ./dist
-COPY --from=builder /src/apps/web-console-next/dist ./dist-next
+COPY --from=builder /src/apps/web-console-next/dist ./dist
 
 ENV NODE_ENV=production
 # Numeric non-root user -> passes runAsNonRoot verification under the restricted profile.

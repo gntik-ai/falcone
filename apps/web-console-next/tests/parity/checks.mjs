@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from './sample-data-guard.mjs';
 import AxeBuilder from '@axe-core/playwright';
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { runCli } from '../run-cli.mjs';
 
 const appRoot = fileURLToPath(new URL('../../', import.meta.url));
+// Rows the kit DataTable shows when a page forgets its `rows` prop (see scripts/extract-kit-sample-strings.mjs).
+const kitSampleStrings = JSON.parse(await readFile(resolve(appRoot, 'tests/parity/kit-sample-strings.json'), 'utf8')).strings;
 const selector = (locator, locale) => typeof locator === 'string' ? locator : locator[locale];
 const locate = (parity, locator) => parity.page.locator(selector(locator, parity.locale));
 // The ConsoleShell sidebar (context region, account menu) is display:none below lg and lives in the navigation drawer
@@ -30,6 +32,24 @@ async function expectVisible(parity, entry, message) {
   const opened = entry.sidebar ? await openSidebar(parity) : false;
   await expect(entry.sidebar ? onScreen(parity, entry.locator) : locate(parity, entry.locator), message).toBeVisible();
   if (opened) await closeSidebar(parity);
+}
+// A page must show its own data, never the kit's built-in sample rows. Throws (rather than using `expect`) because the
+// guard in sample-data-guard.mjs runs this after every guarded assertion.
+export async function assertNoSampleData(parity) {
+  const strings = kitSampleStrings;
+  const read = () => parity.page.evaluate((samples) => {
+    const text = (document.body.innerText ?? '').replace(/\s+/g, ' ');
+    return samples.filter((sample) => text.includes(sample));
+  }, strings);
+  let shown;
+  for (let attempt = 0; ; attempt += 1) {
+    try { shown = await read(); break; } catch (error) {
+      // A click that navigates destroys the execution context: wait for the new document, then read again.
+      if (attempt >= 3 || parity.page.isClosed() || !/Execution context was destroyed|navigat/i.test(error.message)) throw error;
+      await parity.page.waitForLoadState('domcontentloaded');
+    }
+  }
+  if (shown.length) throw new Error(`no-sample-data: the page shows kit sample rows: ${shown.join(', ')}`);
 }
 export async function data(parity, manifest) {
   await parity.open(manifest.route);

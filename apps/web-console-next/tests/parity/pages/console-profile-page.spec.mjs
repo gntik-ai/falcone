@@ -138,7 +138,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         if (['403', '404'].includes(state.variant)) {
           const back = surface(parity).getByRole('link', { name: copy(parity).context.back });
           await expect(back).toHaveAttribute('href', '/console');
-          // The root console belongs to the legacy app outside the /next server.
+          // /console is served by the same root build; the stub only keeps a stray document request off the test server.
           const legacy = (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><title>Console</title></head><body><main></main></body></html>' });
           await parity.page.route('**/console', legacy);
           const exitStart = parity.faults.length;

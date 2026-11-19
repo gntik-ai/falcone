@@ -17,7 +17,7 @@ test('next production builds validate version and SHA and inject them into HTML 
     ['<invalid-version>', 'not-a-sha', 'dev', '']
   ]) {
     const child = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'build', '--outDir', outDir, '--emptyOutDir'], {
-      cwd: appRoot, env: { ...process.env, VITE_BASE_PATH: '/next/', VITE_APP_VERSION: version, VITE_APP_COMMIT_SHA: sha, CSP_TEST_HARNESS: '' }
+      cwd: appRoot, env: { ...process.env, VITE_BASE_PATH: '/', VITE_APP_VERSION: version, VITE_APP_COMMIT_SHA: sha, CSP_TEST_HARNESS: '' }
     });
     let output = '';
     child.stdout.on('data', (chunk) => { output += chunk; });
@@ -26,7 +26,7 @@ test('next production builds validate version and SHA and inject them into HTML 
     assert.equal(status, 0, output);
     const html = await readFile(join(outDir, 'index.html'), 'utf8');
     assert.equal(html.match(/<meta name="version" content="([^"]*)"\s*\/>/)?.[1], expectedVersion);
-    assert.match(html, /src="\/next\/assets\//);
+    assert.match(html, /src="\/assets\//);
     const assets = await readdir(join(outDir, 'assets'));
     let javascript = '';
     for (const asset of assets.filter((name) => name.endsWith('.js'))) javascript += await readFile(join(outDir, 'assets', asset), 'utf8');

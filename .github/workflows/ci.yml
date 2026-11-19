@@ -50,6 +50,12 @@ jobs:
       - name: Lint and repository validation
         run: pnpm lint
 
+      - name: Install nginx for the console config runtime tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends nginx
+          nginx -v
+
       - name: Unit tests
         run: pnpm test:unit
 
@@ -415,8 +421,10 @@ jobs:
       - name: Console API unit tests (vitest)
         run: pnpm --filter @in-falcone/console-api test
 
-      - name: Web console unit tests (vitest)
-        run: pnpm --filter @in-falcone/web-console test
+      - name: Web console unit tests (vitest, next console)
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: pnpm --filter @in-falcone/web-console-next test
 
   web-console-next:
     runs-on: ubuntu-24.04
@@ -468,9 +476,9 @@ jobs:
           node --test tests/unit/web-console-next-colours.test.mjs
           node --test tests/unit/web-console-next-ci.test.mjs
 
-      - name: Build the next console at both base paths
+      - name: Build the next console at the root base path
         run: |
-          for base in / /next/; do
+          for base in /; do
             VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
             pnpm --filter @in-falcone/web-console-next test:i18n-chunks
             BASE_PATH="$base" node --input-type=module <<'NODE'
@@ -487,7 +495,7 @@ jobs:
         run: |
           pnpm --filter @in-falcone/web-console-next exec playwright install --with-deps chromium
           node --test apps/web-console-next/tests/validate-dist.test.mjs
-          for base in / /next/; do
+          for base in /; do
             CSP_TEST_HARNESS=true VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
             pnpm --filter @in-falcone/web-console-next validate:dist
             VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next test:csp
@@ -495,10 +503,10 @@ jobs:
 
       - name: Test authenticated next-console shell
         run: |
-          SHELL_TEST_FIXTURES= VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next build
+          SHELL_TEST_FIXTURES= VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
           (cd apps/web-console-next && node --test tests/shell-release.test.mjs)
-          SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/next/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
-          VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
+          SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
+          VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
 
       - name: Upload shell Playwright report
         if: always()
@@ -511,17 +519,22 @@ jobs:
             apps/web-console-next/test-results/shell
           if-no-files-found: warn
 
-      - name: Build the legacy release SPA
-        run: pnpm --filter @in-falcone/web-console exec vite build
-
       - name: Build the next release SPA
         env:
-          VITE_BASE_PATH: /next/
+          VITE_BASE_PATH: /
           CSP_TEST_HARNESS: ''
         run: pnpm --filter @in-falcone/web-console-next exec vite build
 
-      - name: Build the legacy console image without publishing
-        run: docker build -f apps/web-console/Dockerfile .
+      - name: Build the console image without publishing
+        run: docker build -f apps/web-console/Dockerfile --build-arg APP_VERSION=0.0.0 --build-arg APP_COMMIT_SHA=${{ github.sha }} -t in-falcone-web-console:ci .
+
+      - name: Verify the console image contract
+        env:
+          IMAGE_REF: in-falcone-web-console:ci
+          PULL_POLICY: never
+          VERSION: 0.0.0
+          COMMIT_SHA: ${{ github.sha }}
+        run: bash scripts/release/verify-web-console-image.sh
 
   ui-parity-structure:
     runs-on: ubuntu-24.04
@@ -550,6 +563,15 @@ jobs:
           node --test tests/unit/parity-tools.test.mjs
           pnpm --filter @in-falcone/web-console-next parity:scan
           pnpm --filter @in-falcone/web-console-next parity:validate
+
+      # kit-sample-strings.json is regenerated from the public npm tarball of the pinned kit version. The extraction
+      # first verifies the tarball integrity against pnpm-lock.yaml, then requires a byte-identical file.
+      - name: Regenerate the kit sample strings from the public tarball
+        run: |
+          version="$(node -p "require('./apps/web-console-next/package.json').dependencies['@gntik-ai/blocks']")"
+          workdir="$(mktemp -d)"
+          (cd "$workdir" && npm pack "@gntik-ai/blocks@${version}" --silent)
+          node apps/web-console-next/scripts/extract-kit-sample-strings.mjs --tarball "$workdir/gntik-ai-blocks-${version}.tgz" --check
 
   ui-parity-shards:
     runs-on: ubuntu-24.04
@@ -730,6 +752,32 @@ jobs:
           lines.push('', `Sharded test wall time: ${(merged.stats.duration / 60_000).toFixed(2)} min.`, 'Record job setup, aggregate and total stage wall times from the CI job timestamps in the PR description.');
           if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
           NODE
+
+  # Fail-closed gate for the web-console-next cutover (#1304): the committed evidence must cover exactly the
+  # Blocked-by items, and every entry is re-checked against the GitHub API. Any mismatch or API error fails.
+  cutover-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cutover gate tests
+        run: node --test tests/unit/cutover-gate.test.mjs
+
+      - name: Cutover gate against the GitHub API
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release/cutover-gate.mjs --api
 
   security:
     runs-on: ubuntu-24.04

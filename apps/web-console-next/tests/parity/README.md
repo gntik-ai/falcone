@@ -5,6 +5,13 @@ list clicks, the exact HTTP request (including body), and the visible outcome.
 States declare an endpoint fixture, variant and visible state locator. Declare
 all source files/directories used by the page for colour lint.
 
+No page may show the kit's built-in sample rows. `assertNoSampleData` (`checks.mjs`) fails a journey when the page
+shows a row of `kit-sample-strings.json`; `sample-data-guard.mjs` runs it after `open()`, after every Locator, keyboard
+and mouse action, after every web-first assertion (import `expect` from the harness) and before teardown. The file is
+extracted from the pinned `@gntik-ai/blocks` package (`node scripts/extract-kit-sample-strings.mjs --package <dir>`;
+CI regenerates it from the public tarball and requires a byte-identical file). `parity:validate` also runs the static
+rule `parity/no-implicit-sample-data` over `src`: a kit `DataTable` must have a `rows` that is provably supplied.
+
 Run from the workspace root:
 
 ```sh

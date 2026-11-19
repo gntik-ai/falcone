@@ -1,4 +1,6 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base } from '@playwright/test';
+import { expect, bindSampleDataGuard, unbindSampleDataGuard, guardActions } from './sample-data-guard.mjs';
+import { assertNoSampleData } from './checks.mjs';
 import { startServer } from '../csp/server.mjs';
 import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
 import { createEndpointRegistry } from './endpoint-registry.ts';
@@ -107,9 +109,18 @@ export const test = base.extend({
         // One retrying assertion, no separate existence check: the shell may re-render the region between a count() and a follow-up expect.
         await expect(context.and(page.locator('[aria-busy="true"]'))).toHaveCount(0);
         await page.evaluate(() => document.fonts.ready);
+        await assertNoSampleData(parity);
       },
     };
-    try { await use(parity); }
-    finally { expect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]); }
+    guardActions(page);
+    bindSampleDataGuard(parity, assertNoSampleData);
+    try {
+      await use(parity);
+      // Teardown is a settled state too: sample rows that appeared after the last guarded step still fail the journey.
+      if (!page.isClosed()) await assertNoSampleData(parity);
+    } finally {
+      unbindSampleDataGuard();
+      expect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]);
+    }
   }, { auto: true }],
 });

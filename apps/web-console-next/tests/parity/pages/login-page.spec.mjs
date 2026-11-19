@@ -63,7 +63,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
     });
     test('action', async ({ parity, server }) => {
       const page = parity.page;
-      // Ported protected deep-link journey; verify the /next/ build through server.url.
+      // Ported protected deep-link journey; verify the root build through server.url.
       await page.goto(server.url('console/settings?x=1#h'));
       await expect(page).toHaveURL(server.url('login'));
       await expect(heading(page)).toBeVisible();

@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import http from 'node:http';
+import net from 'node:net';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -26,28 +27,67 @@ const staticServers = [
   }
 ];
 
-test('next shell routes serve the separate index with the exact legacy security headers', async (t) => {
-  const { root, files } = await createDistRoot(t);
-  const nextRoot = await mkdtemp(join(tmpdir(), 'falcone-next-'));
-  t.after(() => rm(nextRoot, { recursive: true, force: true }));
-  const nextIndex = '<!doctype html><main>Next console</main>';
-  await writeFile(join(nextRoot, 'index.html'), nextIndex);
-  const { port } = await startStaticServer(t, 'apps/web-console/static-server.mjs', root, {
-    WEB_CONSOLE_NEXT_STATIC_ROOT: nextRoot
-  });
-  const legacy = await request(port, '/');
-  assert.equal(legacy.body.toString(), files['/index.html']);
-  for (const path of ['/next', '/next/', '/next/console/tenants', '/next/index.html?test=1']) {
+// Every /next request is a permanent redirect with a relative Location. The suffix and the query are copied
+// byte for byte from the raw request target, a percent-encoded unreserved prefix is the same prefix, and
+// traversal is refused before any redirect. Both servers must agree on every row.
+const NEXT_REDIRECTS = [
+  ['/next', '/'],
+  ['/next/', '/'],
+  ['/next?x=1', '/?x=1'],
+  ['/next/console/tenants?x=1', '/console/tenants?x=1'],
+  ['/next/a%2Fb', '/a%2Fb'],
+  ['/next/a%23b', '/a%23b'],
+  ['/next/a%3Fb?x=1', '/a%3Fb?x=1'],
+  ['/next/a%25b', '/a%25b'],
+  ['/%6Eext/a%2Fb', '/a%2Fb']
+];
+const NEXT_REFUSALS = [
+  ['/next/../index.html', 400],
+  ['/next/%2e%2e/index.html', 400],
+  ['/next/a/..?x=1', 400],
+  ['/%6Eext/%2e%2e/x', 400],
+  ['/x/../y', 400],
+  ['/next//evil.example', 400],
+  ['/next/\\evil.example', 400],
+  ['/next%2Fa', 404],
+  ['/legacy', 404],
+  ['/legacy/console/tenants', 404]
+];
+
+async function assertNextRedirects(port, label) {
+  for (const [path, location] of NEXT_REDIRECTS) {
     const response = await request(port, path);
-    assert.equal(response.statusCode, 200, path);
-    assert.equal(response.body.toString(), nextIndex, path);
-    assert.equal(response.headers['content-type'], 'text/html');
-    assert.equal(response.headers['cache-control'], 'no-store');
-    assertSecurityHeaders(response.headers, path);
-    for (const name of ['content-security-policy', 'x-frame-options', 'x-content-type-options', 'referrer-policy', 'permissions-policy']) {
-      assert.equal(response.headers[name], legacy.headers[name], name);
-    }
+    assert.equal(response.statusCode, 301, `${label} ${path}`);
+    assert.equal(response.headers.location, location, `${label} ${path}`);
+    assertSecurityHeaders(response.headers, `${label} ${path} redirect`);
   }
+  for (const [path, status] of NEXT_REFUSALS) {
+    const response = await request(port, path);
+    assert.equal(response.statusCode, status, `${label} ${path}`);
+    assert.equal(response.headers.location, undefined, `${label} ${path}`);
+  }
+}
+
+async function assertConsoleRoutes(port, label, index) {
+  for (const path of ['/', '/login', '/signup', '/console/tenants', '/console/flows/abc']) {
+    const response = await request(port, path);
+    assert.equal(response.statusCode, 200, `${label} ${path}`);
+    assert.equal(response.body.toString(), index, `${label} ${path}`);
+    assert.equal(response.headers['cache-control'], 'no-store', `${label} ${path}`);
+    assertSecurityHeaders(response.headers, `${label} ${path}`);
+  }
+  const missing = await request(port, '/assets/missing.0000.js');
+  assert.equal(missing.statusCode, 404, `${label} missing asset`);
+  const health = await request(port, '/healthz');
+  assert.equal(health.statusCode, 200, `${label} /healthz`);
+  assert.equal(health.body.toString(), 'ok', `${label} /healthz serves ok, not the SPA index`);
+}
+
+test('static server redirects /next to the root over a real socket, byte for byte', async (t) => {
+  const { root, files } = await createDistRoot(t);
+  const { port } = await startStaticServer(t, 'apps/web-console/static-server.mjs', root);
+  await assertNextRedirects(port, 'static server');
+  await assertConsoleRoutes(port, 'static server', files['/index.html']);
 });
 
 async function createDistRoot(t) {
@@ -221,24 +261,23 @@ function extractNginxLocation(source, pattern, name, scope) {
   return match[1];
 }
 
-test('nginx mirror serves the next index and assets with the legacy CSP and cache policies', async () => {
-  const source = await readFile(join(repoRoot, 'apps/web-console/nginx.conf'), 'utf8');
-  const legacy = extractNginxLocation(source, /location = \/index\.html \{([\s\S]*?)\n  \}/, 'nginx', 'legacy index');
-  for (const [scope, pattern, cache] of [
-    ['next index', /location = \/next\/index\.html \{([\s\S]*?)\n  \}/, 'no-store'],
-    ['next assets', /location \^~ \/next\/assets\/ \{([\s\S]*?)\n  \}/, IMMUTABLE],
-    ['next fallback', /location \/next\/ \{([\s\S]*?)\n  \}/, null]
-  ]) {
-    const location = extractNginxLocation(source, pattern, 'nginx', scope);
-    assertNginxSecurityHeaderSource(location, 'nginx', scope);
-    assert.equal(location.match(/add_header Content-Security-Policy[^\n]+/)[0], legacy.match(/add_header Content-Security-Policy[^\n]+/)[0]);
-    assert.match(location, /alias \/app\/dist-next\//);
-    if (cache) assert.ok(location.includes(`add_header Cache-Control '${cache}'`));
-    if (scope === 'next assets') assert.match(location, /try_files \$uri =404;/);
-    if (scope === 'next fallback') assert.match(location, /try_files \$uri \$uri\/ \/next\/index\.html;/);
-    assert.doesNotMatch(location, /proxy_pass/);
+test('nginx configs redirect /next with one relative, raw-target location and keep /v1 undecorated', async () => {
+  for (const path of ['apps/web-console/nginx.conf', 'deploy/kind/web-console/nginx.conf']) {
+    const source = await readFile(join(repoRoot, path), 'utf8');
+    const redirect = extractNginxLocation(source, /location ~ "\^\/next\(\?:\/\|\$\)" \{([\s\S]*?)\n  \}/, path, '/next redirect location');
+    assertNginxSecurityHeaderSource(redirect, path, '/next redirect location');
+    assert.match(redirect, /absolute_redirect off;/, `${path} keeps the Location relative`);
+    assert.match(redirect, /\$request_uri/, `${path} builds the target from the raw request URI`);
+    assert.doesNotMatch(redirect.replace(/#.*$/gm, ''), /\$uri\b/, `${path} never builds the target from the decoded URI`);
+    assert.match(redirect, /return 301 \$next_location;/);
+    assert.doesNotMatch(source, /location\s+=\s+\/next\b|location\s+\/next\/|dist-next|alias\s/, `${path} has no unreachable /next serving blocks`);
+    // Security headers sit on locations only: a server-level add_header would reach proxied /v1/ responses.
+    const serverLevel = source.replace(/\n  location [^\n]*\{[\s\S]*?\n  \}/g, '');
+    assert.doesNotMatch(serverLevel, /add_header/, `${path} declares no server-level headers`);
   }
-  assert.match(source, /location = \/next \{[\s\S]*?return 301 \/next\//);
+  const production = await readFile(join(repoRoot, 'apps/web-console/nginx.conf'), 'utf8');
+  const v1 = extractNginxLocation(production, /location \/v1\/ \{([\s\S]*?)\n  \}/, 'nginx', '/v1 proxy');
+  assert.doesNotMatch(v1, /add_header/);
 });
 
 function escapeRegex(value) {
@@ -255,7 +294,7 @@ function parseLinkAttributes(tag) {
 }
 
 test('web console declares a lightweight SVG-capable favicon asset', async () => {
-  const indexHtml = await readFile(join(repoRoot, 'apps/web-console/index.html'), 'utf8');
+  const indexHtml = (await readFile(join(repoRoot, 'apps/web-console-next/index.html'), 'utf8')).replaceAll('%BASE_URL%', '/');
   const iconLinks = [...indexHtml.matchAll(/<link\b[^>]*>/gi)]
     .map((match) => parseLinkAttributes(match[0]))
     .filter((attributes) => (attributes.rel ?? '').split(/\s+/).includes('icon'));
@@ -266,7 +305,7 @@ test('web console declares a lightweight SVG-capable favicon asset', async () =>
   assert.ok(primaryIcon.href, 'primary favicon declares an href');
   assert.match(primaryIcon.href, /^\//, 'primary favicon uses an app-root public path');
 
-  const assetPath = join(repoRoot, 'apps/web-console/public', primaryIcon.href.slice(1));
+  const assetPath = join(repoRoot, 'apps/web-console-next/public', primaryIcon.href.slice(1));
   const assetStats = await stat(assetPath);
   assert.ok(
     assetStats.size <= FAVICON_MAX_BYTES,
@@ -387,7 +426,7 @@ test('legacy nginx static-serving configs declare gzip, cache-control, and secur
     {
       name: 'production web-console nginx',
       path: 'apps/web-console/nginx.conf',
-      requiresHealthz: false
+      requiresHealthz: true
     },
     {
       name: 'kind web-console nginx',
@@ -437,9 +476,91 @@ test('legacy nginx static-serving configs declare gzip, cache-control, and secur
       /location\s+\/assets\/\s*\{[\s\S]*add_header\s+Cache-Control\s+'public, max-age=31536000, immutable'/,
       `${config.name} sets immutable cache-control on assets`
     );
-    assert.match(source, /location\s+\/\s*\{[^}]*try_files\s+\$uri\s+\$uri\/\s+\/index\.html;/, `${config.name} keeps SPA fallback`);
+    assert.match(source, /location\s+\/\s*\{[\s\S]*?try_files\s+\$uri\s+\$uri\/\s+\/index\.html;/, `${config.name} keeps SPA fallback`);
     if (config.requiresHealthz) {
       assert.match(source, /location\s+=\s+\/healthz\s*\{[^}]*return\s+200\s+"ok";/, `${config.name} keeps healthz`);
+      assert.ok(source.search(/location\s+=\s+\/healthz\b/) < source.search(/location\s+\/\s*\{/), `${config.name} declares healthz before the SPA fallback`);
     }
   }
+});
+
+// Runtime checks of the shipped nginx configs. They need an nginx binary: when it is absent (the maker
+// sandbox) they are skipped here and run in PR CI, where the web-console job installs nginx.
+const nginxBinary = spawnSync('nginx', ['-v'], { encoding: 'utf8' }).error ? null : 'nginx';
+
+function freePort() {
+  return new Promise((resolvePort, rejectPort) => {
+    const probe = net.createServer();
+    probe.on('error', rejectPort);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolvePort(port));
+    });
+  });
+}
+
+async function startNginx(t, confPath, root, upstreamPort) {
+  const dir = await mkdtemp(join(tmpdir(), 'falcone-nginx-'));
+  const port = await freePort();
+  const site = (await readFile(join(repoRoot, confPath), 'utf8'))
+    .replace('listen 3000;', `listen 127.0.0.1:${port};`)
+    .replaceAll('/usr/share/nginx/html', root)
+    .replaceAll('${GATEWAY_UPSTREAM}', `127.0.0.1:${upstreamPort}`);
+  await writeFile(join(dir, 'site.conf'), site);
+  await writeFile(join(dir, 'nginx.conf'), [
+    'daemon off;',
+    'worker_processes 1;',
+    `pid ${dir}/nginx.pid;`,
+    `error_log ${dir}/error.log;`,
+    'events { worker_connections 64; }',
+    'http {',
+    '  access_log off;',
+    '  default_type application/octet-stream;',
+    '  types { text/html html; text/javascript js; text/css css; application/json json; }',
+    ...['client_body', 'proxy', 'fastcgi', 'uwsgi', 'scgi'].map((name) => `  ${name}_temp_path ${dir}/${name};`),
+    `  include ${dir}/site.conf;`,
+    '}'
+  ].join('\n'));
+  const child = spawn(nginxBinary, ['-p', `${dir}/`, '-c', join(dir, 'nginx.conf'), '-e', join(dir, 'error.log')], { stdio: 'ignore' });
+  t.after(async () => {
+    await stopProcess(child);
+    await rm(dir, { recursive: true, force: true });
+  });
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    try {
+      const health = await request(port, '/healthz');
+      if (health.statusCode === 200) return { port };
+    } catch {
+      // not listening yet
+    }
+    await new Promise((done) => setTimeout(done, 100));
+  }
+  throw new Error(`nginx did not start for ${confPath}: ${await readFile(join(dir, 'error.log'), 'utf8').catch(() => '')}`);
+}
+
+for (const confPath of ['apps/web-console/nginx.conf', 'deploy/kind/web-console/nginx.conf']) {
+  test(`${confPath} serves the next index, redirects /next and answers /healthz (runtime)`, { skip: nginxBinary ? false : 'nginx is not installed; PR CI runs this' }, async (t) => {
+    const { root, files } = await createDistRoot(t);
+    const { port } = await startNginx(t, confPath, root, 9);
+    await assertConsoleRoutes(port, confPath, files['/index.html']);
+    await assertNextRedirects(port, confPath);
+    const asset = await request(port, '/assets/app.4f3c2a1b.js');
+    assert.equal(asset.statusCode, 200);
+    assert.equal(asset.headers['cache-control'], IMMUTABLE);
+  });
+}
+
+test('production nginx proxies /v1 unmodified and without security headers (runtime)', { skip: nginxBinary ? false : 'nginx is not installed; PR CI runs this' }, async (t) => {
+  const upstream = http.createServer((req, res) => {
+    res.writeHead(209, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ path: req.url }));
+  });
+  await new Promise((resolveListen) => upstream.listen(0, '127.0.0.1', resolveListen));
+  t.after(() => new Promise((resolveClose) => upstream.close(resolveClose)));
+  const { root } = await createDistRoot(t);
+  const { port } = await startNginx(t, 'apps/web-console/nginx.conf', root, upstream.address().port);
+  const response = await request(port, '/v1/x?y=1');
+  assert.equal(response.statusCode, 209);
+  assert.deepEqual(JSON.parse(response.body.toString()), { path: '/v1/x?y=1' });
+  assert.equal(response.headers['content-security-policy'], undefined);
 });

@@ -1,0 +1,34 @@
+{
+  "source": {
+    "package": "@gntik-ai/blocks",
+    "version": "0.15.0",
+    "integrity": "sha512-AY23AKYRthtNZcX2uATu1sD1yQrMvUHWIn/+FvE/d0eKjRDQse9inb73D1KFZcX9tGm89Qecj7XgeWoZtysOAQ==",
+    "shown": "DataTable default rows: name and region cells, in row order"
+  },
+  "strings": [
+    "orders-api eu-west-1",
+    "billing-sync eu-central-1",
+    "invoice-worker ap-south-1",
+    "search-index us-east-1",
+    "auth-gateway eu-west-1",
+    "media-resizer eu-central-1",
+    "nightly-export ap-south-1",
+    "webhooks us-east-1",
+    "reports eu-west-1",
+    "notifications eu-central-1",
+    "checkout-web ap-south-1",
+    "audit-log us-east-1",
+    "orders-api-staging eu-west-1",
+    "billing-sync-staging eu-central-1",
+    "invoice-worker-staging ap-south-1",
+    "search-index-staging us-east-1",
+    "auth-gateway-staging eu-west-1",
+    "media-resizer-staging eu-central-1",
+    "nightly-export-staging ap-south-1",
+    "webhooks-staging us-east-1",
+    "reports-staging eu-west-1",
+    "notifications-staging eu-central-1",
+    "checkout-web-staging ap-south-1",
+    "audit-log-staging us-east-1"
+  ]
+}
