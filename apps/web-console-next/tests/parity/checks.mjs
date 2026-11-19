@@ -1,9 +1,16 @@
-import { expect } from '@playwright/test';
+import { expect } from './settled-state.mjs';
 import AxeBuilder from '@axe-core/playwright';
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runCli } from '../run-cli.mjs';
+
+const sampleStrings = JSON.parse(await readFile(new URL('./kit-sample-strings.json', import.meta.url), 'utf8')).strings;
+export async function assertNoSampleData(parity) {
+  const text = (await Promise.all((await parity.page.getByRole('main').all()).map((main) => main.innerText()))).join(' ').replace(/\s+/g, ' ');
+  const found = sampleStrings.filter((sample) => text.includes(sample));
+  if (found.length) throw new Error(`assertNoSampleData: kit sample text ${found.join(', ')}`);
+}
 
 const appRoot = fileURLToPath(new URL('../../', import.meta.url));
 const selector = (locator, locale) => typeof locator === 'string' ? locator : locator[locale];

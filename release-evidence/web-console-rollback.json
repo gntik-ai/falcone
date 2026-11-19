@@ -1,0 +1,10 @@
+{
+  "prior": {
+    "tag": "sha-ca5183d",
+    "digest": "sha256:77e614f1a084b2ada754bccfab37c6018ffed5302078e87c89c055dd8c80dd5a"
+  },
+  "repository": "ghcr.io/gntik-ai/in-falcone-web-console",
+  "source": "Operator verification recorded in falcone#1304: in-falcone-staging/falcone-web-console pod imageID and GHCR single-platform OCI manifest.",
+  "verifiedAt": "2026-11-19",
+  "recovery": "Redeploy the prior chart and this immutable digest through the deterministic Helm adapter. Record the switch digest after release-images publishes it; rehearse rollback with an existing session."
+}

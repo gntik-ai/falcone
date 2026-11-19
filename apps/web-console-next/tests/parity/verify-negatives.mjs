@@ -13,6 +13,7 @@ const specs = [];
 function collect(suite) { specs.push(...(suite.specs ?? [])); for (const child of suite.suites ?? []) collect(child); }
 collect(report);
 const expected = new Map([
+  ['sample data appears after open', /assertNoSampleData/],
   ['unmatched request names method and path', /POST \/v1\/synthetic-unmatched/],
   ['unregistered request fails with page endpoints', /GET \/v1\/synthetic-page-unregistered/],
   ['external request fails even for a registered endpoint path', /GET \/v1\/synthetic-records/],

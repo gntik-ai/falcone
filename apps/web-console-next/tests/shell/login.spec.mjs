@@ -5,7 +5,7 @@ import { loginToConsole } from '../parity/pages/login-helper.mjs';
 import { assertRuntimeHealth, assertResponsive, assertAccessibility } from '../parity/checks.mjs';
 import { openAccountMenu } from '../account-menu.mjs';
 
-// These login-only ports run against CI's /next/ build as well as the root build.
+// These login-only ports run against CI's root build.
 test.use({ pageEndpoints: manifest.endpoints, trace: 'off' });
 for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
   const copy = JSON.parse(readFileSync(new URL(`../../src/locales/${locale}/pages.login-page.json`, import.meta.url), 'utf8'));

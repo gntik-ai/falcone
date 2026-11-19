@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import http from 'node:http';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -26,29 +26,84 @@ const staticServers = [
   }
 ];
 
-test('next shell routes serve the separate index with the exact legacy security headers', async (t) => {
-  const { root, files } = await createDistRoot(t);
-  const nextRoot = await mkdtemp(join(tmpdir(), 'falcone-next-'));
-  t.after(() => rm(nextRoot, { recursive: true, force: true }));
-  const nextIndex = '<!doctype html><main>Next console</main>';
-  await writeFile(join(nextRoot, 'index.html'), nextIndex);
-  const { port } = await startStaticServer(t, 'apps/web-console/static-server.mjs', root, {
-    WEB_CONSOLE_NEXT_STATIC_ROOT: nextRoot
-  });
-  const legacy = await request(port, '/');
-  assert.equal(legacy.body.toString(), files['/index.html']);
-  for (const path of ['/next', '/next/', '/next/console/tenants', '/next/index.html?test=1']) {
+const CSP = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; worker-src 'self' blob:; form-action 'self'";
+async function cutoverMatrix(port, index) {
+  for (const path of ['/', '/login', '/signup', '/console/tenants', '/console/flows/abc']) {
     const response = await request(port, path);
     assert.equal(response.statusCode, 200, path);
-    assert.equal(response.body.toString(), nextIndex, path);
-    assert.equal(response.headers['content-type'], 'text/html');
-    assert.equal(response.headers['cache-control'], 'no-store');
+    assert.equal(response.body.toString(), index, path);
+    assert.equal(response.headers['cache-control'], 'no-store', path);
+    assert.match(response.headers['content-type'], /^text\/html/);
+    assert.equal(response.headers['content-security-policy'], CSP, path);
     assertSecurityHeaders(response.headers, path);
-    for (const name of ['content-security-policy', 'x-frame-options', 'x-content-type-options', 'referrer-policy', 'permissions-policy']) {
-      assert.equal(response.headers[name], legacy.headers[name], name);
-    }
   }
-});
+  for (const [path, location] of [
+    ['/next', '/'], ['/next/', '/'], ['/next?x=1', '/?x=1'],
+    ['/next/console/tenants?x=1', '/console/tenants?x=1'],
+    ['/next/a%2Fb', '/a%2Fb'], ['/next/a%23b', '/a%23b'],
+    ['/next/a%3Fb?x=1', '/a%3Fb?x=1'], ['/%6Eext/a%2Fb', '/a%2Fb'],
+    ['/n%65%78%74/a%25b?x=%23', '/a%25b?x=%23'],
+  ]) {
+    const response = await request(port, path);
+    assert.equal(response.statusCode, 301, path);
+    assert.equal(response.headers.location, location, path);
+    assertSecurityHeaders(response.headers, path);
+    assert.equal(response.headers['content-security-policy'], CSP, path);
+  }
+  for (const path of ['/x/../y', '/next/../x', '/next/%2e%2e/x', '/%6Eext/%2E%2e%2Fx', '/next/..%5c..%5cx', '/next//external.test/x']) {
+    assert.equal((await request(port, path)).statusCode, 400, path);
+  }
+  for (const path of ['/legacy', '/legacy/', '/legacy/login', '/next%2Fconsole', '/%6Eext%2fconsole', '/assets/missing.js']) assert.equal((await request(port, path)).statusCode, 404, path);
+  const asset = await request(port, '/assets/app.4f3c2a1b.js');
+  assert.equal(asset.statusCode, 200);
+  assert.equal(asset.headers['cache-control'], IMMUTABLE);
+  const health = await request(port, '/healthz');
+  assert.equal(health.statusCode, 200);
+  assert.equal(health.body.toString(), 'ok');
+  const proxied = await request(port, '/v1/x?x=%2F');
+  assert.equal(proxied.statusCode, 209);
+  assert.equal(proxied.body.toString(), '/v1/x?x=%2F');
+  assert.equal(proxied.headers['content-security-policy'], undefined);
+  assert.equal(proxied.headers['cache-control'], undefined);
+}
+
+for (const implementation of ['node', 'nginx']) {
+  test(`${implementation} passes the cutover request matrix`, { skip: implementation === 'nginx' && spawnSync('nginx', ['-v']).error ? 'nginx unavailable; PR CI runs the request matrix' : false }, async (t) => {
+    const { root, files } = await createDistRoot(t);
+    const upstream = http.createServer((req, res) => { res.writeHead(209); res.end(req.url); });
+    await new Promise((done) => upstream.listen(0, '127.0.0.1', done));
+    t.after(() => new Promise((done) => upstream.close(done)));
+    const gateway = `127.0.0.1:${upstream.address().port}`;
+    let port;
+    if (implementation === 'node') {
+      ({ port } = await startStaticServer(t, 'apps/web-console/static-server.mjs', root, { GATEWAY_UPSTREAM: gateway }));
+    } else {
+      const listener = http.createServer();
+      await new Promise((done) => listener.listen(0, '127.0.0.1', done));
+      port = listener.address().port;
+      await new Promise((done) => listener.close(done));
+      const source = (await readFile(join(repoRoot, 'apps/web-console/nginx.conf'), 'utf8'))
+        .replace('listen 3000;', `listen ${port};`).replace('/usr/share/nginx/html', root).replaceAll('${GATEWAY_UPSTREAM}', gateway);
+      const config = join(root, 'nginx.conf');
+      await writeFile(config, `pid ${root}/nginx.pid;
+error_log stderr;
+events {}
+http { types { text/html html; text/javascript js; text/css css; } access_log off; proxy_temp_path ${root}/proxy; client_body_temp_path ${root}/body;
+${source}
+}`);
+      const check = spawnSync('nginx', ['-t', '-c', config, '-p', root], { encoding: 'utf8' });
+      assert.equal(check.status, 0, check.stderr);
+      const child = spawn('nginx', ['-c', config, '-p', root, '-g', 'daemon off;'], { stdio: ['ignore', 'pipe', 'pipe'] });
+      t.after(() => stopProcess(child));
+      let ready = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        try { await request(port, '/healthz'); ready = true; break; } catch { await new Promise((done) => setTimeout(done, 50)); }
+      }
+      assert.ok(ready, 'nginx started');
+    }
+    await cutoverMatrix(port, files['/index.html']);
+  });
+}
 
 async function createDistRoot(t) {
   const root = await mkdtemp(join(tmpdir(), 'falcone-web-console-static-'));
@@ -221,26 +276,6 @@ function extractNginxLocation(source, pattern, name, scope) {
   return match[1];
 }
 
-test('nginx mirror serves the next index and assets with the legacy CSP and cache policies', async () => {
-  const source = await readFile(join(repoRoot, 'apps/web-console/nginx.conf'), 'utf8');
-  const legacy = extractNginxLocation(source, /location = \/index\.html \{([\s\S]*?)\n  \}/, 'nginx', 'legacy index');
-  for (const [scope, pattern, cache] of [
-    ['next index', /location = \/next\/index\.html \{([\s\S]*?)\n  \}/, 'no-store'],
-    ['next assets', /location \^~ \/next\/assets\/ \{([\s\S]*?)\n  \}/, IMMUTABLE],
-    ['next fallback', /location \/next\/ \{([\s\S]*?)\n  \}/, null]
-  ]) {
-    const location = extractNginxLocation(source, pattern, 'nginx', scope);
-    assertNginxSecurityHeaderSource(location, 'nginx', scope);
-    assert.equal(location.match(/add_header Content-Security-Policy[^\n]+/)[0], legacy.match(/add_header Content-Security-Policy[^\n]+/)[0]);
-    assert.match(location, /alias \/app\/dist-next\//);
-    if (cache) assert.ok(location.includes(`add_header Cache-Control '${cache}'`));
-    if (scope === 'next assets') assert.match(location, /try_files \$uri =404;/);
-    if (scope === 'next fallback') assert.match(location, /try_files \$uri \$uri\/ \/next\/index\.html;/);
-    assert.doesNotMatch(location, /proxy_pass/);
-  }
-  assert.match(source, /location = \/next \{[\s\S]*?return 301 \/next\//);
-});
-
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -255,7 +290,7 @@ function parseLinkAttributes(tag) {
 }
 
 test('web console declares a lightweight SVG-capable favicon asset', async () => {
-  const indexHtml = await readFile(join(repoRoot, 'apps/web-console/index.html'), 'utf8');
+  const indexHtml = await readFile(join(repoRoot, 'apps/web-console-next/index.html'), 'utf8');
   const iconLinks = [...indexHtml.matchAll(/<link\b[^>]*>/gi)]
     .map((match) => parseLinkAttributes(match[0]))
     .filter((attributes) => (attributes.rel ?? '').split(/\s+/).includes('icon'));
@@ -264,9 +299,9 @@ test('web console declares a lightweight SVG-capable favicon asset', async () =>
 
   const primaryIcon = iconLinks.find((attributes) => attributes.type === 'image/svg+xml') ?? iconLinks[0];
   assert.ok(primaryIcon.href, 'primary favicon declares an href');
-  assert.match(primaryIcon.href, /^\//, 'primary favicon uses an app-root public path');
+  assert.match(primaryIcon.href, /^(?:\/|%BASE_URL%)/, 'primary favicon uses an app-root public path');
 
-  const assetPath = join(repoRoot, 'apps/web-console/public', primaryIcon.href.slice(1));
+  const assetPath = join(repoRoot, 'apps/web-console-next/public', primaryIcon.href.replace(/^%BASE_URL%|^\//, ''));
   const assetStats = await stat(assetPath);
   assert.ok(
     assetStats.size <= FAVICON_MAX_BYTES,
@@ -382,12 +417,12 @@ test('deploy kind static server keeps the same-origin /v1 proxy ahead of the SPA
   });
 });
 
-test('legacy nginx static-serving configs declare gzip, cache-control, and security-header parity', async () => {
+test('nginx static-serving configs declare gzip, cache-control, and security-header parity', async () => {
   const configs = [
     {
       name: 'production web-console nginx',
       path: 'apps/web-console/nginx.conf',
-      requiresHealthz: false
+      requiresHealthz: true
     },
     {
       name: 'kind web-console nginx',

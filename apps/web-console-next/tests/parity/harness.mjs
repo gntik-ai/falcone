@@ -1,4 +1,6 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base } from '@playwright/test';
+import { expect, guardParity } from './settled-state.mjs';
+import { assertNoSampleData } from './checks.mjs';
 import { startServer } from '../csp/server.mjs';
 import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
 import { createEndpointRegistry } from './endpoint-registry.ts';
@@ -109,7 +111,11 @@ export const test = base.extend({
         await page.evaluate(() => document.fonts.ready);
       },
     };
-    try { await use(parity); }
-    finally { expect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]); }
+    const guarded = guardParity(parity, assertNoSampleData);
+    try { await use(guarded); }
+    finally {
+      try { await guarded.settled(); expect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]); }
+      finally { guarded.dispose(); }
+    }
   }, { auto: true }],
 });

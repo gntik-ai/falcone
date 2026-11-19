@@ -98,7 +98,7 @@ for (const locale of ['es', 'en']) {
       await expect(scope.getByRole('region', { name: names.region, exact: true })).toHaveAttribute('aria-busy', 'false');
       await expect(scope.getByRole('combobox', { name: names.tenant, exact: true })).toBeVisible();
       await expect(scope.getByRole('button', { name: names.account })).toBeVisible();
-      await expect(scope.getByRole('link', { name: names.flows })).toHaveAttribute('href', '/next/console/flows');
+      await expect(scope.getByRole('link', { name: names.flows })).toHaveAttribute('href', '/console/flows');
       await page.screenshot({ path: test.info().outputPath(`frame-${locale}-${width}.png`) });
       if (drawer) {
         await scope.getByRole('link', { name: names.flows }).click();

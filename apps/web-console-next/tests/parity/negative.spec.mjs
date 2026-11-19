@@ -96,3 +96,11 @@ test.describe('registered page endpoints keep the unmatched-request gate', () =>
     // The endpoint path matches, but the origin must still be rejected.
   });
 });
+
+// No explicit sample assertion: the harness must catch data appearing only
+// after open() has completed, at an action checkpoint or at teardown.
+test('sample data appears after open', async ({ parity }) => {
+  await parity.open(manifest.route);
+  const fixture = JSON.parse(await (await import('node:fs/promises')).readFile(new URL('./kit-sample-strings.json', import.meta.url), 'utf8'));
+  await seedText(parity.page, fixture.strings[0]);
+});

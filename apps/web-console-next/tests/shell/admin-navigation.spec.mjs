@@ -40,9 +40,9 @@ async function tabTo(page, locator) {
 
 for (const locale of ['en', 'es']) {
   const text = copy[locale];
-  test(`superadmin menu preserves /next without document navigation and the topbar has no Admin link in ${locale}`, async ({ page }) => {
+  test(`superadmin menu preserves root routes without document navigation and the topbar has no Admin link in ${locale}`, async ({ page }) => {
     const unmatched = await setup(page, locale);
-    expect(pathname(page)).toBe('/next/console/overview');
+    expect(pathname(page)).toBe('/console/overview');
     const documents = [];
     page.on('request', (request) => { if (request.resourceType() === 'document') documents.push(request.url()); });
     await expect(page.getByRole('link', { name: text.admin, exact: true })).toHaveCount(0);

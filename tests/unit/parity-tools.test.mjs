@@ -100,3 +100,33 @@ test('the Playwright reporter never certifies skipped or unexpectedly passing ch
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('the parity CLI accepts explicit rows and rejects implicit kit sample rows', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'parity-rows-'));
+  try {
+    const file = join(dir, 'page.tsx');
+    const prefix = "import { DataTable } from '@gntik-ai/blocks';\n";
+    for (const [source, pass] of [
+      ['export const Page = ({ data }) => <DataTable rows={data.items} />', true],
+      ['export function Page() { const props = { rows: [] }; return <DataTable {...props} /> }', true],
+      ['export const Page = (props) => <DataTable {...props} rows={[]} />', true],
+      ['export const Page = () => <DataTable />', false],
+      ['const props = { rows: [] }; export const Page = (props) => <DataTable {...props} />', false],
+      ['export function Page() { let props = { rows: [] }; props = {}; return <DataTable {...props} /> }', false],
+      ['export function Page() { const props = { rows: [] }; props.rows = undefined; return <DataTable {...props} /> }', false],
+      ['export const Page = (props) => <DataTable rows={[]} {...props} />', false],
+      ['export const Page = () => <DataTable {...unknown} />', false],
+      ['export const Page = (props = { rows: [] }) => <DataTable {...props} />', false],
+      ['export const Page = ({ rows = [] }) => <DataTable rows={rows} />', false],
+      ['export function Page() { const props = { rows: [], ...unknown }; return <DataTable {...props} /> }', false],
+      ['export const Page = () => <DataTable rows={undefined} />', false],
+    ]) {
+      writeFileSync(file, prefix + source);
+      const result = await run('validate.mjs', '--source', file);
+      assert.equal(result.status, pass ? 0 : 1, source + '\n' + result.stderr);
+      if (!pass) assert.match(result.stderr, /parity\/no-implicit-sample-data/);
+    }
+    const result = await run('validate.mjs');
+    assert.equal(result.status, 0, result.stderr);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

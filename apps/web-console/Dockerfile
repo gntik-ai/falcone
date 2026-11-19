@@ -11,7 +11,7 @@
 # because the platform's `restricted` security profile enforces runAsNonRoot + readOnlyRootFilesystem:
 # this server makes ZERO filesystem writes and runs as a NUMERIC non-root user (1000), which nginx
 # (named user + writes to cache/pid/conf) cannot satisfy. Build context = repo root:
-#   pnpm --filter @in-falcone/web-console exec vite build
+#   pnpm --filter @in-falcone/web-console-next exec vite build
 #   docker build -f apps/web-console/Dockerfile -t in-falcone-web-console:<tag> .
 #
 # This is a multi-stage build, so both the builder and the runtime stage must be
@@ -27,17 +27,15 @@ ARG APP_VERSION=dev
 ARG APP_COMMIT_SHA=
 WORKDIR /src
 COPY . .
-RUN corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console... --filter @in-falcone/web-console-next...
-RUN NODE_OPTIONS=--max-old-space-size=3072 VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console exec vite build
-RUN NODE_OPTIONS=--max-old-space-size=3072 CSP_TEST_HARNESS= VITE_BASE_PATH=/next/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build
+RUN corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console-next...
+RUN NODE_OPTIONS=--max-old-space-size=3072 CSP_TEST_HARNESS= VITE_BASE_PATH=/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build
 
 FROM ${NODE_BASE_IMAGE}
 WORKDIR /app
 
-# Zero-dependency static server + both freshly built SPA bundles.
+# Zero-dependency static server and the next console bundle.
 COPY apps/web-console/static-server.mjs ./static-server.mjs
-COPY --from=builder /src/apps/web-console/dist ./dist
-COPY --from=builder /src/apps/web-console-next/dist ./dist-next
+COPY --from=builder /src/apps/web-console-next/dist ./dist
 
 ENV NODE_ENV=production
 # Numeric non-root user -> passes runAsNonRoot verification under the restricted profile.

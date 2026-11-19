@@ -13,7 +13,6 @@ import { promisify } from 'node:util';
 import { brotliCompress, gzip } from 'node:zlib';
 
 const ROOT = process.env.WEB_CONSOLE_STATIC_ROOT || '/app/dist';
-const NEXT_ROOT = process.env.WEB_CONSOLE_NEXT_STATIC_ROOT || '/app/dist-next';
 const configuredPort = Number.parseInt(process.env.PORT ?? '3000', 10);
 const PORT = Number.isFinite(configuredPort) ? configuredPort : 3000;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.svg':'image/svg+xml', '.png':'image/png', '.ico':'image/x-icon', '.woff2':'font/woff2', '.map':'application/json' };
@@ -109,29 +108,42 @@ const server = http.createServer(async (req, res) => {
   let pathname;
   try {
     pathname = decodeURIComponent((req.url ?? '/').split('?')[0]);
-    // Validate before normalization so /next/../ cannot be reclassified as legacy.
+    // Validate before normalization or redirecting so traversal always fails closed.
     if (pathname.includes('\0') || pathname.split(/[/\\]/).includes('..')) throw new Error('Invalid path');
   } catch {
     res.writeHead(400, { ...SECURITY_HEADERS, 'content-type': 'text/plain' });
     return res.end('Bad request');
   }
-  const isNext = pathname === '/next' || pathname.startsWith('/next/');
-  const root = isNext ? NEXT_ROOT : ROOT;
-  let p = normalize(isNext ? (pathname.slice('/next'.length) || '/') : pathname).replace(/^(\.\.[/\\])+/, '');
+  // Match only the prefix after RFC 3986 unreserved normalization. Keep the
+  // suffix and query raw: decoding reserved bytes changes redirect semantics.
+  const prefix = (req.url ?? '/').match(/^\/(?:n|%6[eE])(?:e|%65)(?:x|%78)(?:t|%74)(?=\/|\?|$)/);
+  if (prefix) {
+    const suffix = req.url.slice(prefix[0].length);
+    if (suffix.startsWith('//') || suffix.startsWith('/\\')) {
+      res.writeHead(400, { ...SECURITY_HEADERS, 'content-type': 'text/plain' });
+      return res.end('Bad request');
+    }
+    res.writeHead(301, { ...SECURITY_HEADERS, location: suffix.startsWith('/') ? suffix : `/${suffix}` });
+    return res.end();
+  }
+  if (pathname === '/legacy' || pathname.startsWith('/legacy/') || pathname === '/next' || pathname.startsWith('/next/')) {
+    res.writeHead(404, { ...SECURITY_HEADERS, 'content-type': 'text/plain' });
+    return res.end('Not found');
+  }
+  let p = normalize(pathname).replace(/^(\.\.[/\\])+/, '');
   if (p === '/' || p === '\\') p = '/index.html';
   try {
-    const body = await readFile(join(root, p));
+    const body = await readFile(join(ROOT, p));
     await sendStatic(req, res, p, body, MIME[extname(p)] ?? 'application/octet-stream');
   } catch {
-    if (isNext && p.startsWith('/assets/')) {
+    if (p.startsWith('/assets/')) {
       res.writeHead(404, { ...SECURITY_HEADERS, 'content-type': 'text/plain' });
       return res.end('Not found');
     }
     try {
-      const body = await readFile(join(root, 'index.html'));
+      const body = await readFile(join(ROOT, 'index.html'));
       await sendStatic(req, res, '/index.html', body, 'text/html');
-    } catch (error) {
-      if (!isNext) throw error;
+    } catch {
       res.writeHead(404, { ...SECURITY_HEADERS, 'content-type': 'text/plain' });
       res.end('Not found');
     }

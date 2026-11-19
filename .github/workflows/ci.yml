@@ -416,7 +416,7 @@ jobs:
         run: pnpm --filter @in-falcone/console-api test
 
       - name: Web console unit tests (vitest)
-        run: pnpm --filter @in-falcone/web-console test
+        run: pnpm --filter @in-falcone/web-console-next test
 
   web-console-next:
     runs-on: ubuntu-24.04
@@ -468,9 +468,9 @@ jobs:
           node --test tests/unit/web-console-next-colours.test.mjs
           node --test tests/unit/web-console-next-ci.test.mjs
 
-      - name: Build the next console at both base paths
+      - name: Build the next console at the root
         run: |
-          for base in / /next/; do
+          for base in /; do
             VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
             pnpm --filter @in-falcone/web-console-next test:i18n-chunks
             BASE_PATH="$base" node --input-type=module <<'NODE'
@@ -487,7 +487,7 @@ jobs:
         run: |
           pnpm --filter @in-falcone/web-console-next exec playwright install --with-deps chromium
           node --test apps/web-console-next/tests/validate-dist.test.mjs
-          for base in / /next/; do
+          for base in /; do
             CSP_TEST_HARNESS=true VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
             pnpm --filter @in-falcone/web-console-next validate:dist
             VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next test:csp
@@ -495,10 +495,10 @@ jobs:
 
       - name: Test authenticated next-console shell
         run: |
-          SHELL_TEST_FIXTURES= VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next build
+          SHELL_TEST_FIXTURES= VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
           (cd apps/web-console-next && node --test tests/shell-release.test.mjs)
-          SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/next/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
-          VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
+          SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
+          VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
 
       - name: Upload shell Playwright report
         if: always()
@@ -511,17 +511,41 @@ jobs:
             apps/web-console-next/test-results/shell
           if-no-files-found: warn
 
-      - name: Build the legacy release SPA
-        run: pnpm --filter @in-falcone/web-console exec vite build
-
       - name: Build the next release SPA
         env:
-          VITE_BASE_PATH: /next/
+          VITE_BASE_PATH: /
           CSP_TEST_HARNESS: ''
         run: pnpm --filter @in-falcone/web-console-next exec vite build
 
-      - name: Build the legacy console image without publishing
-        run: docker build -f apps/web-console/Dockerfile .
+      - name: Build the console image without publishing
+        run: docker build --build-arg APP_VERSION=1.2.3 --build-arg APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 -t falcone-console-cutover -f apps/web-console/Dockerfile .
+
+      - name: Test the image and Docker build context
+        env:
+          CUTOVER_IMAGE: falcone-console-cutover
+        run: node --test tests/unit/web-console-cutover-image.test.mjs
+
+  web-console-cutover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs: [web-console-next, ui-parity]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install nginx for the request matrix
+        run: sudo apt-get update && sudo apt-get install -y nginx
+      - name: Test both serving implementations and offline release fixtures
+        run: |
+          node --test tests/unit/web-console-static-server.test.mjs
+          node --test tests/unit/web-console-cutover-gate.test.mjs
+      - name: Verify blocking issues and rollback evidence on the cutover commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release/cutover-gate.mjs
 
   ui-parity-structure:
     runs-on: ubuntu-24.04
@@ -548,6 +572,8 @@ jobs:
         run: |
           node --test tests/unit/web-console-next-ci.test.mjs
           node --test tests/unit/parity-tools.test.mjs
+          node --test apps/web-console-next/tests/parity-sample-data.test.mjs
+          node apps/web-console-next/tests/parity/extract-kit-sample-strings.mjs --check
           pnpm --filter @in-falcone/web-console-next parity:scan
           pnpm --filter @in-falcone/web-console-next parity:validate
 

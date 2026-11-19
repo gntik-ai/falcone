@@ -1,0 +1,870 @@
+{
+  "schemaVersion": 1,
+  "blueprint": {
+    "id": "57f536f4-a597-4564-9c85-bc835b96e41f",
+    "sha256": "d52c1d932d0f68f904568c8caf9694f0ae2046daf5220d2b6465df6a0355f15d"
+  },
+  "source": {
+    "issue": "https://github.com/gntik-ai/falcone/issues/1304",
+    "verifiedAt": "2026-11-19T07:13:00Z",
+    "artifactSha256": "ac4ff6f5d29069056f998286be696ddabdef57189fbefda216d06ca4cbd4dd23"
+  },
+  "attestation": "Recorded operator issue-closure evidence. mergedBeforeClosed and referencesIssue attest the recorded relationship; actual timestamps and PR text are rechecked by CI. No API timestamp or full SHA has been invented.",
+  "entries": [
+    {
+      "item": "page:console-auth-config-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1259,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1538,
+        "merged": true,
+        "mergeCommit": "62554134",
+        "referencesIssue": 1259,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-auth-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1268,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1585,
+        "merged": true,
+        "mergeCommit": "c36b5bf6",
+        "referencesIssue": 1268,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-docs-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1247,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1318,
+        "merged": true,
+        "mergeCommit": "7ae9d3f2",
+        "referencesIssue": 1247,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-events-data-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1300,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1636,
+        "merged": true,
+        "mergeCommit": "8eceab9c",
+        "referencesIssue": 1300,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-flow-designer-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1288,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1508,
+        "merged": true,
+        "mergeCommit": "b694e45e",
+        "referencesIssue": 1288,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-flow-history-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1287,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1437,
+        "merged": true,
+        "mergeCommit": "8ba222a3",
+        "referencesIssue": 1287,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-flow-run-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1286,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1640,
+        "merged": true,
+        "mergeCommit": "7c36ac1e",
+        "referencesIssue": 1286,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-flows-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1301,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1472,
+        "merged": true,
+        "mergeCommit": "b1491edf",
+        "referencesIssue": 1301,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-function-registry-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1299,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1496,
+        "merged": true,
+        "mergeCommit": "8bd1bc8a",
+        "referencesIssue": 1299,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-functions-data-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1298,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1516,
+        "merged": true,
+        "mergeCommit": "7a8ad809",
+        "referencesIssue": 1298,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-functions-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1303,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1637,
+        "merged": true,
+        "mergeCommit": "fb5cb9eb",
+        "referencesIssue": 1303,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-iam-access-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1275,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1620,
+        "merged": true,
+        "mergeCommit": "288a47db",
+        "referencesIssue": 1275,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-kafka-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1297,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1635,
+        "merged": true,
+        "mergeCommit": "1d91a02d",
+        "referencesIssue": 1297,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-mcp-server-detail-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1296,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1488,
+        "merged": true,
+        "mergeCommit": "7619def8",
+        "referencesIssue": 1296,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-members-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1266,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1572,
+        "merged": true,
+        "mergeCommit": "ab5e0fc4",
+        "referencesIssue": 1266,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-mongo-data-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1295,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1634,
+        "merged": true,
+        "mergeCommit": "3efba8d4",
+        "referencesIssue": 1295,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-mongo-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1302,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1654,
+        "merged": true,
+        "mergeCommit": "ca5183d4",
+        "referencesIssue": 1302,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-observability-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1260,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1560,
+        "merged": true,
+        "mergeCommit": "a19f40ab",
+        "referencesIssue": 1260,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-operation-detail-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1215,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1229,
+        "merged": true,
+        "mergeCommit": "47674add",
+        "referencesIssue": 1215,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-operations-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1244,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1252,
+        "merged": true,
+        "mergeCommit": "e3461e83",
+        "referencesIssue": 1244,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-overview-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1243,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1256,
+        "merged": true,
+        "mergeCommit": "726a8c07",
+        "referencesIssue": 1243,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-plan-catalog-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1276,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1329,
+        "merged": true,
+        "mergeCommit": "6cc52944",
+        "referencesIssue": 1276,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-plan-create-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1271,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1323,
+        "merged": true,
+        "mergeCommit": "3bd9532b",
+        "referencesIssue": 1271,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-plan-detail-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1261,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1556,
+        "merged": true,
+        "mergeCommit": "ca0b50f4",
+        "referencesIssue": 1261,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-postgres-data-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1294,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1632,
+        "merged": true,
+        "mergeCommit": "0bdacb18",
+        "referencesIssue": 1294,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-postgres-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1293,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1630,
+        "merged": true,
+        "mergeCommit": "2cb8214b",
+        "referencesIssue": 1293,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-profile-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1245,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1305,
+        "merged": true,
+        "mergeCommit": "376d2184",
+        "referencesIssue": 1245,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-quotas-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1277,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1336,
+        "merged": true,
+        "mergeCommit": "5feec7d2",
+        "referencesIssue": 1277,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-realtime-changes-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1292,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1531,
+        "merged": true,
+        "mergeCommit": "90a59a9a",
+        "referencesIssue": 1292,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-realtime-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1291,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1527,
+        "merged": true,
+        "mergeCommit": "d075c640",
+        "referencesIssue": 1291,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-runtime-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1223,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1231,
+        "merged": true,
+        "mergeCommit": "9de897f5",
+        "referencesIssue": 1223,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-secret-rotation-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1273,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1601,
+        "merged": true,
+        "mergeCommit": "36da6d89",
+        "referencesIssue": 1273,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-secrets-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1264,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1545,
+        "merged": true,
+        "mergeCommit": "0f6ead10",
+        "referencesIssue": 1264,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-service-accounts-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1263,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1574,
+        "merged": true,
+        "mergeCommit": "b0bcd492",
+        "referencesIssue": 1263,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-settings-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1246,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1248,
+        "merged": true,
+        "mergeCommit": "72048953",
+        "referencesIssue": 1246,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-storage-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1290,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1623,
+        "merged": true,
+        "mergeCommit": "42eafaa6",
+        "referencesIssue": 1290,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-tenant-allocation-summary-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1272,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1324,
+        "merged": true,
+        "mergeCommit": "2364ad09",
+        "referencesIssue": 1272,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-tenant-plan-overview-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1267,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1525,
+        "merged": true,
+        "mergeCommit": "1dd32a0b",
+        "referencesIssue": 1267,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-tenant-plan-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1265,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1518,
+        "merged": true,
+        "mergeCommit": "c6117890",
+        "referencesIssue": 1265,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-tenants-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1270,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1359,
+        "merged": true,
+        "mergeCommit": "013f36df",
+        "referencesIssue": 1270,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-workspace-dashboard-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1274,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1401,
+        "merged": true,
+        "mergeCommit": "602782b2",
+        "referencesIssue": 1274,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-workspace-database-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1289,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1628,
+        "merged": true,
+        "mergeCommit": "30bdbe33",
+        "referencesIssue": 1289,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-workspace-secrets-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1262,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1621,
+        "merged": true,
+        "mergeCommit": "06e77449",
+        "referencesIssue": 1262,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:console-workspaces-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1269,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1593,
+        "merged": true,
+        "mergeCommit": "e7d3d8fd",
+        "referencesIssue": 1269,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:login-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1239,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1306,
+        "merged": true,
+        "mergeCommit": "c33d8cd9",
+        "referencesIssue": 1239,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:not-found-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1238,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1250,
+        "merged": true,
+        "mergeCommit": "d0e7c94c",
+        "referencesIssue": 1238,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:password-recovery-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1240,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1317,
+        "merged": true,
+        "mergeCommit": "9d778950",
+        "referencesIssue": 1240,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:pending-activation-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1242,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1251,
+        "merged": true,
+        "mergeCommit": "b42cf9f6",
+        "referencesIssue": 1242,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:signup-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1241,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1322,
+        "merged": true,
+        "mergeCommit": "ae45f7f8",
+        "referencesIssue": 1241,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "page:welcome-page",
+      "repo": "gntik-ai/falcone",
+      "issue": 1237,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1249,
+        "merged": true,
+        "mergeCommit": "102d4e18",
+        "referencesIssue": 1237,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "gap:gap-falcone-console-version-dev",
+      "repo": "gntik-ai/falcone",
+      "issue": 1092,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1146,
+        "merged": true,
+        "mergeCommit": "42350f69",
+        "referencesIssue": 1092,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "gap:merged-6be392bfcea941b7",
+      "repo": "gntik-ai/falcone",
+      "issue": 1095,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1156,
+        "merged": true,
+        "mergeCommit": "6d0ccf2f",
+        "referencesIssue": 1095,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "gap:gap-b001-flow-events-apikey-query",
+      "repo": "gntik-ai/falcone",
+      "issue": 1081,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1639,
+        "merged": true,
+        "mergeCommit": "e3791fc1",
+        "referencesIssue": 1081,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "gap:gap-b002-iam-membership-uninventoried",
+      "repo": "gntik-ai/falcone",
+      "issue": 1084,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1160,
+        "merged": true,
+        "mergeCommit": "dce3f1e3",
+        "referencesIssue": 1084,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "gap:gap-b002-iam-users-continuation",
+      "repo": "gntik-ai/falcone",
+      "issue": 1085,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/falcone",
+        "number": 1158,
+        "merged": true,
+        "mergeCommit": "634752bf",
+        "referencesIssue": 1085,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "gap:gap-kit-builtin-copy-english",
+      "repo": "gntik-ai/gntik-ui",
+      "issue": 30,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/gntik-ui",
+        "number": 86,
+        "merged": true,
+        "mergeCommit": "4b36fc51",
+        "referencesIssue": 30,
+        "mergedBeforeClosed": true
+      }
+    },
+    {
+      "item": "gap:gap-b006-status-layout-page-header",
+      "repo": "gntik-ai/gntik-ui",
+      "issue": 13,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "pr": {
+        "repo": "gntik-ai/gntik-ui",
+        "number": 49,
+        "merged": true,
+        "mergeCommit": "496709a5",
+        "referencesIssue": 13,
+        "mergedBeforeClosed": true
+      }
+    }
+  ]
+}
