@@ -138,6 +138,11 @@ test('403 shows no-access with Confirmar disabled, the values visible and only C
 test('409 DB_ALREADY_PROVISIONED shows a localized callout without Reintentar and no success', async () => {
   run({ [post]: sequence('create-409') }); await wizard(); await confirm(); const callout = await screen.findByTestId('mongo-wizard-outcome')
   expect(callout).toHaveTextContent('El recurso ya existe o entra en conflicto con otro.'); expect(callout.textContent).not.toContain('raw-backend-message'); expect(maybe('Reintentar')).toBeNull(); expect(success()).toBeNull(); expect(document.querySelector('[data-testid="mongo-wizard-result"]')).toBeNull()
+  expect(maybe('Confirmar')).toBeNull(); expect(maybe('Anterior')).toBeNull(); expect(inside('Cerrar')).toBeVisible(); expect(posts()).toHaveLength(1)
+})
+test('an ordinary 422 shows a localized callout with only Cerrar and cannot be submitted again', async () => {
+  run({ [post]: () => Response.json({ code: 'VALIDATION_ERROR', message: 'raw-backend-message' }, { status: 422 }) }); await wizard(); await confirm(); const callout = await screen.findByTestId('mongo-wizard-outcome')
+  expect(callout.textContent).not.toContain('raw-backend-message'); expect(maybe('Confirmar')).toBeNull(); expect(maybe('Anterior')).toBeNull(); expect(maybe('Reintentar')).toBeNull(); expect(inside('Cerrar')).toBeVisible(); expect(success()).toBeNull(); expect(posts()).toHaveLength(1)
 })
 test('a 401 is refreshed once and the POST is replayed with its body and key; a rejected refresh sends no replay', async () => {
   let count = 0

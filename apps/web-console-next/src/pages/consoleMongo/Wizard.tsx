@@ -51,7 +51,9 @@ export function Wizard({ close, opener, onReplayUnavailable }: { close: () => vo
   const allowed = can('workspace.write'), denial = denyReason('workspace.write')
   const denialKey = denial?.includes('Developer') ? 'developer' : denial?.includes('Viewer') ? 'viewer' : denial?.includes('Tu rol actual') ? 'generic' : 'unknown'
   const forbidden = outcome?.kind === 'forbidden'
-  const terminal = Boolean(result) || forbidden || outcome?.kind === 'replay-unavailable'
+  // Ordinary 409 and 422 outcomes (not IN_PROGRESS or KEY_MISMATCH) are final: only Cerrar remains.
+  const closeOnly = Boolean(result) || outcome?.kind === 'replay-unavailable' || outcome?.kind === 'conflict' || outcome?.kind === 'invalid'
+  const terminal = closeOnly || forbidden
   const validation = step === 0 && !activeWorkspaceId ? t('wizard.workspaceMissing') : step === 1 && !form.name.trim() ? t('wizard.nameRequired') : step === 1 && !quota ? t('wizard.quotaExhausted') : null
 
   function cancel() {
@@ -148,7 +150,7 @@ export function Wizard({ close, opener, onReplayUnavailable }: { close: () => vo
       </DialogBody>
       <DialogFooter className="flex-wrap gap-2">
         <Action disabled={busy} onClick={() => { if (step === 0 || !allowed || terminal) { cancel(); setOpen(false) } else move(step - 1) }}>{t(terminal ? 'close' : step === 0 || !allowed ? 'cancel' : 'previous')}</Action>
-        {allowed && !result && outcome?.kind !== 'replay-unavailable' && (step < 3 ? <Action variant="primary" disabled={Boolean(validation)} onClick={() => move(step + 1)}>{t('next')}</Action> : <Action id="mongo-wizard-confirm" variant="primary" busy={busy} disabled={forbidden || waiting || !quota || !activeWorkspaceId || !form.name.trim()} onClick={confirm}>{t(busy ? 'wizard.confirming' : 'wizard.confirm')}</Action>)}
+        {allowed && !closeOnly && (step < 3 ? <Action variant="primary" disabled={Boolean(validation)} onClick={() => move(step + 1)}>{t('next')}</Action> : <Action id="mongo-wizard-confirm" variant="primary" busy={busy} disabled={forbidden || waiting || !quota || !activeWorkspaceId || !form.name.trim()} onClick={confirm}>{t(busy ? 'wizard.confirming' : 'wizard.confirm')}</Action>)}
       </DialogFooter>
     </DialogContent>
   </Dialog>
