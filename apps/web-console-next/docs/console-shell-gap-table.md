@@ -70,3 +70,11 @@ Only differences caused by the kit bump are eligible for approval.
 | `shell-drawer-en-375` | Kit owns the open mobile drawer and its close-on-navigation lifecycle (#855). |
 | `shell-drawer-es-768` | Kit owns the open tablet drawer and its close-on-navigation lifecycle (#855). |
 | `shell-drawer-en-768` | Kit owns the open tablet drawer and its close-on-navigation lifecycle (#855). |
+
+## CI follow-up
+
+The reported `ui-parity-shards (28)` failure occurred before the fixture build or browser tests:
+`playwright install --with-deps chromium` exited 100 because apt reported no installation candidate for `fonts-freefont-ttf`.
+The Ubuntu 24.04 runner, Playwright 1.58.2 pin and browser installation command are unchanged from base `b11d1fde8820a56a08833922e089a167fda2dd37`.
+The aggregate `ui-parity` job reported `SHARDS_RESULT: failure`; this log provides no shell assertion failure to repair.
+Rerun the existing PR CI jobs to verify browser coverage after dependency installation succeeds; retain every shard and aggregate coverage assertion.
