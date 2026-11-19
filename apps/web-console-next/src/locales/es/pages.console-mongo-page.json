@@ -48,7 +48,7 @@
     "pipeline": "Pipeline",
     "index": "Índice",
     "fields": "Campos",
-    "unique": "Unique",
+    "unique": "Único",
     "sparse": "Sparse",
     "ttl": "TTL",
     "partialFilter": "Partial filter",
