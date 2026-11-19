@@ -3,7 +3,7 @@
 //
 //  - a `rows` attribute that is not nullish and comes after every spread attribute, or
 //  - a spread whose binding resolves statically, in an enclosing scope, to a `const` object literal that has a `rows`
-//    property, where the literal has no spread, the binding is never reassigned or mutated (it is only spread into
+//    property, where the literal has no spread or accessor, the binding is never reassigned or mutated (it is only spread into
 //    DataTable elements or read through property access), and no later spread or attribute can override it.
 //
 // Anything else fails: shadowed names, parameters (with or without defaults), `let`/`var`, reassignment or mutation, a
@@ -49,6 +49,8 @@ function classifyLiteral(literal) {
       if (propertyName(property.name) === 'rows') { if (isNullish(property.initializer)) return 'unknown'; supplies = true; }
       continue;
     }
+    // An accessor runs while the literal is spread and can delete or redefine rows on its receiver, whatever its name.
+    if (ts.isGetAccessorDeclaration(property) || ts.isSetAccessorDeclaration(property)) return 'unknown';
     if (property.name && (ts.isComputedPropertyName(property.name) || propertyName(property.name) === 'rows')) return 'unknown';
   }
   return supplies ? 'supplies' : 'neutral';
