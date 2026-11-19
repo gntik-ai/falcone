@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect } from '@playwright/test';
+import { expect } from '../sample-data-guard.mjs';
 export const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-events-data-page.json`, import.meta.url), 'utf8'))]));
 export const copy = (parity) => bundles[parity.locale];
 export async function assertEventsLocale(parity) {

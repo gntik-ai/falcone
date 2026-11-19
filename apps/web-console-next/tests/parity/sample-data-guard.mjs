@@ -1,6 +1,8 @@
 // Runs the no-sample-data check on every settled state of a parity journey: after open() (harness.mjs), after every
 // Locator/keyboard/mouse action, after every web-first readiness assertion (the `expect` exported here wraps
-// Playwright's), and once more before teardown (harness.mjs). The check itself is assertNoSampleData in checks.mjs.
+// Playwright's; journey helpers import it from here, never from @playwright/test), after every Locator.waitFor and
+// Page.waitFor* readiness call, and once more before teardown (harness.mjs). The check itself is assertNoSampleData
+// in checks.mjs.
 import { expect as playwrightExpect } from '@playwright/test';
 
 let current = null;
@@ -19,13 +21,13 @@ export async function settled() {
   try { await check(current); } finally { running = false; }
 }
 
-const ACTIONS = ['click', 'dblclick', 'tap', 'fill', 'clear', 'press', 'pressSequentially', 'type', 'check', 'uncheck', 'setChecked', 'selectOption', 'selectText', 'setInputFiles', 'hover', 'focus', 'blur', 'dispatchEvent', 'dragTo'];
+const ACTIONS = ['click', 'dblclick', 'tap', 'fill', 'clear', 'press', 'pressSequentially', 'type', 'check', 'uncheck', 'setChecked', 'selectOption', 'selectText', 'setInputFiles', 'hover', 'focus', 'blur', 'dispatchEvent', 'dragTo', 'waitFor'];
 let patched = false;
-// Journeys drive the page through Locators, page.keyboard and page.mouse: wrap their action methods once per worker.
+// Journeys drive the page through Locators, page.keyboard and page.mouse: wrap their action and readiness methods once per worker.
 export function guardActions(page) {
   if (patched) return;
   patched = true;
-  const prototypes = [[Object.getPrototypeOf(page.locator('body')), ACTIONS], [Object.getPrototypeOf(page.keyboard), ['press', 'type', 'insertText']], [Object.getPrototypeOf(page.mouse), ['click', 'dblclick', 'up', 'wheel']]];
+  const prototypes = [[Object.getPrototypeOf(page.locator('body')), ACTIONS], [Object.getPrototypeOf(page), ['waitForSelector', 'waitForURL', 'waitForFunction']], [Object.getPrototypeOf(page.keyboard), ['press', 'type', 'insertText']], [Object.getPrototypeOf(page.mouse), ['click', 'dblclick', 'up', 'wheel']]];
   for (const [prototype, names] of prototypes) {
     for (const name of names) {
       const original = prototype[name];

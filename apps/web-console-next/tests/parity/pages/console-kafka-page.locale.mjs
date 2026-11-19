@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from '../sample-data-guard.mjs';
 import { readdir, readFile } from 'node:fs/promises';
 import { fixtures, legacyJourneyFixtures } from './console-kafka-page.manifest.ts';
 const flatten = (object, prefix = '') => Object.entries(object).flatMap(([key, value]) => typeof value === 'string' ? [[prefix + key, value]] : value && typeof value === 'object' ? flatten(value, `${prefix}${key}.`) : []);

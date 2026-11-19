@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -72,6 +72,14 @@ const negatives = {
   'a spread inside the literal': 'export function A({ rest }) { const shared = { rows: items, ...rest }; return <DataTable {...shared} /> }',
   'a computed key in the literal': 'export function A({ key }) { const shared = { [key]: items }; return <DataTable {...shared} /> }',
   'the kit DataTable used as a value': 'const Wrapped = DataTable\nexport const A = () => <Wrapped rows={items} />',
+  'a parenthesised assignment of rows': 'export function A() { const shared = { rows: items }; (shared.rows) = undefined; return <DataTable {...shared} /> }',
+  'a non-null assignment of rows': 'export function A() { const shared = { rows: items }; shared.rows! = undefined; return <DataTable {...shared} /> }',
+  'an object destructuring assignment to rows': 'export function A() { const shared = { rows: items }; ({ rows: shared.rows } = { rows: undefined }); return <DataTable {...shared} /> }',
+  'a parenthesised destructuring target': 'export function A() { const shared = { rows: items }; ({ rows: (shared.rows) } = {}); return <DataTable {...shared} /> }',
+  'an array destructuring assignment to rows': 'export function A() { const shared = { rows: items }; [shared.rows] = [undefined]; return <DataTable {...shared} /> }',
+  'a destructuring assignment with a rest target': 'export function A() { const shared = { rows: items }; [...shared.rows] = []; return <DataTable {...shared} /> }',
+  'a for-of head writing rows': 'export function A() { const shared = { rows: items }; for (shared.rows of [undefined]) {} return <DataTable {...shared} /> }',
+  'a logical assignment of rows': 'export function A() { const shared = { rows: items }; shared.rows ??= undefined; return <DataTable {...shared} /> }',
   'a destructured binding': 'export function A({ source }) { const { shared } = source; return <DataTable {...shared} /> }',
 };
 for (const [name, body] of Object.entries(negatives)) {
@@ -90,26 +98,39 @@ test('parity:validate reports 0 hits on the real src', async () => {
 
 // --- assertNoSampleData and the settled-state guard, against a fake page (no browser needed) ---
 
+// The fake classes are module-level: guardActions patches prototypes once per worker, as it does for Playwright's.
+class FakeLocator {
+  click() { return Promise.resolve('clicked'); }
+  fill() { return Promise.resolve('filled'); }
+  waitFor() { return Promise.resolve('waited'); }
+}
+class FakeKeyboard { press() { return Promise.resolve(); } }
+class FakeMouse { click() { return Promise.resolve(); } }
+class FakePage {
+  constructor(text, failures) {
+    this.closed = false;
+    this.calls = { evaluate: 0 };
+    this.keyboard = new FakeKeyboard();
+    this.mouse = new FakeMouse();
+    this.text = text;
+    this.failures = failures;
+  }
+  locator() { return new FakeLocator(); }
+  isClosed() { return this.closed; }
+  async waitForLoadState() {}
+  waitForSelector() { return Promise.resolve('found'); }
+  waitForURL() { return Promise.resolve(); }
+  waitForFunction() { return Promise.resolve('evaluated'); }
+  async evaluate(fn, argument) {
+    this.calls.evaluate += 1;
+    if (this.calls.evaluate <= this.failures) throw new Error('Execution context was destroyed, most likely because of a navigation');
+    globalThis.document = { body: { innerText: typeof this.text === 'function' ? this.text() : this.text } };
+    try { return fn(argument); } finally { delete globalThis.document; }
+  }
+}
 function fakePage(text, { failures = 0 } = {}) {
-  const calls = { evaluate: 0 };
-  class Locator { click() { return Promise.resolve('clicked'); } fill() { return Promise.resolve('filled'); } }
-  class Keyboard { press() { return Promise.resolve(); } }
-  class Mouse { click() { return Promise.resolve(); } }
-  const page = {
-    closed: false,
-    locator: () => new Locator(),
-    keyboard: new Keyboard(),
-    mouse: new Mouse(),
-    isClosed() { return this.closed; },
-    waitForLoadState: async () => {},
-    async evaluate(fn, argument) {
-      calls.evaluate += 1;
-      if (calls.evaluate <= failures) throw new Error('Execution context was destroyed, most likely because of a navigation');
-      globalThis.document = { body: { innerText: typeof text === 'function' ? text() : text } };
-      try { return fn(argument); } finally { delete globalThis.document; }
-    }
-  };
-  return { page, calls };
+  const page = new FakePage(text, failures);
+  return { page, calls: page.calls };
 }
 
 test('assertNoSampleData fails on a kit sample row and names it', async () => {
@@ -148,6 +169,41 @@ test('the guard fails a journey whose sample text appears only after open(), at 
   await assert.rejects(page.mouse.click(1, 1), /no-sample-data/);
   await assert.rejects(expect(Promise.resolve(1)).resolves.toBe(1), /no-sample-data/);
   await assert.rejects(assertNoSampleData(parity), /billing-sync eu-central-1/);
+});
+
+test('the guard fails a journey whose sample text appears only after open() at a Locator.waitFor or a Page readiness wait', async (t) => {
+  let text = 'Inicio';
+  const { page } = fakePage(() => text);
+  guardActions(page);
+  bindSampleDataGuard({ page }, assertNoSampleData);
+  t.after(unbindSampleDataGuard);
+  assert.equal(await page.locator('x').waitFor(), 'waited');
+  assert.equal(await page.waitForSelector('x'), 'found');
+  text = `Funciones ${sampleStrings[2]} Running`;
+  await assert.rejects(page.locator('x').waitFor(), /no-sample-data/);
+  await assert.rejects(page.waitForSelector('x'), /no-sample-data/);
+  await assert.rejects(page.waitForURL('**/x'), /no-sample-data/);
+  await assert.rejects(page.waitForFunction(() => true), /no-sample-data/);
+});
+
+// A journey helper that imports Playwright's own expect would let sample data appear at its readiness assertion and
+// disappear again before the next guarded step. Every journey helper imports the guarded expect instead.
+test('no parity journey helper imports the unguarded Playwright expect', () => {
+  const unguarded = [];
+  const scan = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) { if (entry.name !== 'node_modules') scan(path); continue; }
+      if (!/\.(?:mjs|ts|tsx)$/.test(entry.name) || /\.d\.mts$|\.config\.mjs$/.test(entry.name) || entry.name === 'sample-data-guard.mjs') continue;
+      const source = readFileSync(path, 'utf8');
+      for (const match of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]@playwright\/test['"]/g)) {
+        if (/\bexpect\b/.test(match[1])) unguarded.push(path.slice(appRoot.length + 1));
+      }
+    }
+  };
+  scan(join(appRoot, 'tests'));
+  // The shell and CSP specs do not run through the parity harness; everything else shares its journeys' helpers.
+  assert.deepEqual(unguarded.filter((path) => !path.startsWith('tests/shell/') && !path.startsWith('tests/csp/')), []);
 });
 
 test('the guard leaves synchronous assertions untouched and ignores closed pages', async (t) => {

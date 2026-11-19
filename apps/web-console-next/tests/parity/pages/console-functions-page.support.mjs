@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { expect } from '@playwright/test';
+import { expect } from '../sample-data-guard.mjs';
 import es from '../../../src/locales/es/pages.console-functions-page.json' with { type: 'json' };
 import en from '../../../src/locales/en/pages.console-functions-page.json' with { type: 'json' };
 import { actionPath, query } from './console-functions-page.manifest.ts';

@@ -88,12 +88,20 @@ function isNeverMutated(scope, declaration, name) {
       const spreadIntoJsx = ts.isJsxSpreadAttribute(parent) && strip(parent.expression) === node;
       let propertyRead = false;
       if ((ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) && parent.expression === node) {
-        const outer = parent.parent;
-        const written = (ts.isBinaryExpression(outer) && outer.left === parent && outer.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && outer.operatorToken.kind <= ts.SyntaxKind.LastAssignment)
+        // Climb out of wrappers, `(shared.rows) = x` and `shared.rows! = x` write like `shared.rows = x`, and treat a property
+        // used as a destructuring target (`({ a: shared.rows } = x)`, `[shared.rows] = x`) as a write as well: any
+        // enclosing literal, property, spread or loop head is conservatively a write.
+        let target = parent;
+        while (target.parent && strip(target.parent) === strip(target) && target.parent !== target) target = target.parent;
+        const outer = target.parent;
+        const written = (ts.isBinaryExpression(outer) && outer.left === target && outer.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && outer.operatorToken.kind <= ts.SyntaxKind.LastAssignment)
           || ((ts.isPrefixUnaryExpression(outer) || ts.isPostfixUnaryExpression(outer)) && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(outer.operator))
           || ts.isDeleteExpression(outer)
           || ts.isShorthandPropertyAssignment(outer)
-          || (ts.isArrayLiteralExpression(outer) || ts.isObjectLiteralExpression(outer) || ts.isForInStatement(outer) || ts.isForOfStatement(outer));
+          || ts.isPropertyAssignment(outer)
+          || ts.isSpreadElement(outer)
+          || ts.isSpreadAssignment(outer)
+          || ts.isArrayLiteralExpression(outer) || ts.isObjectLiteralExpression(outer) || ts.isForInStatement(outer) || ts.isForOfStatement(outer);
         propertyRead = !written;
       }
       if (!spreadIntoJsx && !propertyRead) clean = false;

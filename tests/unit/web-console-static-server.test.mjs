@@ -68,6 +68,23 @@ async function assertNextRedirects(port, label) {
   }
 }
 
+// Targets that nginx would normalise into another location (/healthz, /v1/, the SPA) must still be refused on the raw
+// target, as static-server.mjs does.
+const TRAVERSAL_REFUSALS = [
+  '/next/../healthz', '/next/%2e%2e/healthz', '/next/%2E%2E%2Fhealthz', '/x/../healthz', '/%2e%2e/healthz',
+  '/x/../v1/foo', '/next/../v1/foo', '/x/%2e%2e/v1/foo', '/assets/../../outside.html', '/next/a/..?x=1', '/%00'
+];
+
+async function assertTraversalRefused(port, label) {
+  for (const path of TRAVERSAL_REFUSALS) {
+    const response = await request(port, path);
+    assert.equal(response.statusCode, 400, `${label} ${path}`);
+    assert.equal(response.headers.location, undefined, `${label} ${path}`);
+    assertSecurityHeaders(response.headers, `${label} ${path} refusal`);
+    assert.notEqual(response.body.toString(), 'ok', `${label} ${path} is not the health probe`);
+  }
+}
+
 async function assertConsoleRoutes(port, label, index) {
   for (const path of ['/', '/login', '/signup', '/console/tenants', '/console/flows/abc']) {
     const response = await request(port, path);
@@ -87,6 +104,7 @@ test('static server redirects /next to the root over a real socket, byte for byt
   const { root, files } = await createDistRoot(t);
   const { port } = await startStaticServer(t, 'apps/web-console/static-server.mjs', root);
   await assertNextRedirects(port, 'static server');
+  await assertTraversalRefused(port, 'static server');
   await assertConsoleRoutes(port, 'static server', files['/index.html']);
 });
 
@@ -272,6 +290,13 @@ test('nginx configs redirect /next with one relative, raw-target location and ke
     assert.match(redirect, /return 301 \$next_location;/);
     assert.doesNotMatch(source, /location\s+=\s+\/next\b|location\s+\/next\/|dist-next|alias\s/, `${path} has no unreachable /next serving blocks`);
     // Security headers sit on locations only: a server-level add_header would reach proxied /v1/ responses.
+    // The traversal guard runs at server level, before location dispatch, and answers through a headed internal location.
+    assert.match(source, /\n  if \(\$bad_target\) \{ rewrite \^ \/__bad_target last; \}/, `${path} refuses traversal before location dispatch`);
+    const refusal = extractNginxLocation(source, /location = \/__bad_target \{([\s\S]*?)\n  \}/, path, 'traversal refusal location');
+    assertNginxSecurityHeaderSource(refusal, path, 'traversal refusal location');
+    assert.match(refusal, /\binternal;/);
+    assert.match(refusal, /return 400\b/);
+    assert.ok(source.indexOf('rewrite ^ /__bad_target last') < source.indexOf('\n  location '), `${path} guards before the first location`);
     const serverLevel = source.replace(/\n  location [^\n]*\{[\s\S]*?\n  \}/g, '');
     assert.doesNotMatch(serverLevel, /add_header/, `${path} declares no server-level headers`);
   }
@@ -544,6 +569,7 @@ for (const confPath of ['apps/web-console/nginx.conf', 'deploy/kind/web-console/
     const { port } = await startNginx(t, confPath, root, 9);
     await assertConsoleRoutes(port, confPath, files['/index.html']);
     await assertNextRedirects(port, confPath);
+    await assertTraversalRefused(port, confPath);
     const asset = await request(port, '/assets/app.4f3c2a1b.js');
     assert.equal(asset.statusCode, 200);
     assert.equal(asset.headers['cache-control'], IMMUTABLE);
@@ -563,4 +589,10 @@ test('production nginx proxies /v1 unmodified and without security headers (runt
   assert.equal(response.statusCode, 209);
   assert.deepEqual(JSON.parse(response.body.toString()), { path: '/v1/x?y=1' });
   assert.equal(response.headers['content-security-policy'], undefined);
+  // A genuine /v1 request is not filtered, even with a dot segment; one that only normalises into /v1/ is refused.
+  const dotted = await request(port, '/v1/a/../b?y=1');
+  assert.equal(dotted.statusCode, 209);
+  assert.equal(dotted.headers['content-security-policy'], undefined);
+  const disguised = await request(port, '/x/../v1/foo');
+  assert.equal(disguised.statusCode, 400);
 });

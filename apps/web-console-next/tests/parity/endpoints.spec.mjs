@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from './sample-data-guard.mjs';
 import { test } from './harness.mjs';
 import { endpoints, variants } from './fixtures/shell.ts';
 
