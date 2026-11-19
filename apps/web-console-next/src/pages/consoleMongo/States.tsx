@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ComponentProps, type KeyboardEvent, type ReactNode } from 'react'
 import { Badge, Button, EmptyState, Field, FieldLabel, Input, StatusTag, Text } from '@gntik-ai/ui'
 import { DataTable, ErrorPanel, NoAccessEmpty, NotFoundEmpty, SectionHeader, TableSkeleton, type DataTableColumn } from '@gntik-ai/blocks'
 import type { Failure } from './api'
@@ -31,9 +31,26 @@ export function TextField({ id, label, placeholder, value, onChange, busy = fals
 export function Details({ term, value }: { term: string; value: ReactNode }) {
   return <div className="min-w-0"><Text as="p" variant="label" tone="default">{term}</Text><Text as="p" variant="body" tone="default">{value}</Text></div>
 }
-export function Table<T extends object>({ rows, columns, id, label, loadingLabel }: { rows: T[]; columns: DataTableColumn<T>[]; id: (row: T) => string; label: string; loadingLabel: string }) {
-  const { t } = useCopy()
-  return <div className="min-w-0 max-w-full"><DataTable rows={rows} columns={columns} getRowId={id} getRowLabel={id} caption={label} showCaption={false} paginated={false} selectable={false} selectionMode="none" selectedIds={[]} selectionSummary={false} rowActions={undefined} toolbar={null} sort={null} defaultSort={null} manualSorting={true} loading={false} loadingRows={0} emptyState={null} showDensityToggle={false} showColumnMenu={false} showViewSwitcher={false} views={[]} defaultViews={[]} hiddenColumns={[]} resizable={false} virtualize={false} groupBy={undefined} showPinMenu={false} labels={{ scrollRegion: label, emptyTitle: t('none'), emptyDescription: '', loading: () => loadingLabel }} /></div>
+// Selectable tables use the kit's single selection (one radio per row). The kit marks the chosen row with data-selected only,
+// so aria-selected is mirrored onto the row, and Enter selects like Space.
+export type RowSelection = { name: string; selectedId: string | null; choose: (id: string) => void }
+export function Table<T extends object>({ rows, columns, id, label, loadingLabel, selection }: { rows: T[]; columns: DataTableColumn<T>[]; id: (row: T) => string; label: string; loadingLabel: string; selection?: RowSelection }) {
+  const { t } = useCopy(), box = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (!selection) return
+    box.current?.querySelectorAll<HTMLElement>('tr[data-row-id]').forEach((row) => row.setAttribute('aria-selected', String(row.dataset.rowId === selection.selectedId)))
+  })
+  const labels = { scrollRegion: label, selection: t('selectionColumn'), selectRow: (name: string) => name, emptyTitle: t('none'), emptyDescription: '', loading: () => loadingLabel }
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target
+    if (event.key === 'Enter' && target instanceof HTMLInputElement && target.type === 'radio' && !target.checked) { event.preventDefault(); target.click() }
+  }
+  const shared = { rows, columns, getRowId: id, getRowLabel: id, caption: label, showCaption: false, paginated: false as const, selectionSummary: false, rowActions: undefined, toolbar: null, sort: null, defaultSort: null, manualSorting: true, loading: false, loadingRows: 0, emptyState: null, showDensityToggle: false, showColumnMenu: false, showViewSwitcher: false, views: [], defaultViews: [], hiddenColumns: [], resizable: false, virtualize: false, groupBy: undefined, showPinMenu: false, labels }
+  return <div ref={box} className="min-w-0 max-w-full" onKeyDown={onKeyDown}>
+    {selection
+      ? <DataTable {...shared} selectionMode="single" selectionName={selection.name} aria-label={label} selectedId={selection.selectedId} onSelectedIdChange={selection.choose} isRowDisabled={() => false} />
+      : <DataTable {...shared} selectable={false} selectionMode="none" selectedIds={[]} />}
+  </div>
 }
 
 // 403 stays in the failing section, 404 offers the breadcrumb way back, everything else is an error panel with the request id.

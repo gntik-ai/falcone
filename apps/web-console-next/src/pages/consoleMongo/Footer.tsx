@@ -20,7 +20,7 @@ export function PagedBody<T>({ list, name, children }: { list: CursorList<T>; na
       return
     }
     announce(t('appended', { count: count - before, section: t(name) }), 'polite')
-    const target = button.current?.isConnected ? button.current : box.current?.querySelectorAll<HTMLElement>('[data-mongo-row]')[before]
+    const target = button.current?.isConnected ? button.current : box.current?.querySelectorAll<HTMLElement>('[data-mongo-row], input[type="radio"]')[before]
     target?.focus()
   }, [list.moreBusy, list.moreError])
   const more = (retry: boolean) => { retried.current = retry; pending.current = { before: count }; void list.more() }

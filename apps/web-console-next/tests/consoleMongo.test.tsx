@@ -43,7 +43,7 @@ test('names are URL-encoded in every path and a database change discards the pre
     [`GET /v1/mongo/workspaces/ws-1/data/${enc(odd)}/collections/${enc(col)}/documents?page%5Bsize%5D=20`]: fixtures.documents,
     [`GET /v1/mongo/databases/other/collections?page[size]=100`]: fixtures.empty, [`GET /v1/mongo/databases/other/views?page[size]=100`]: fixtures.empty,
   })
-  open(); await screen.findByRole('button', { name: odd }); await selectDatabase(odd); await selectCollection(col); await screen.findByText('status_1')
+  open(); await screen.findByRole('radio', { name: odd }); await selectDatabase(odd); await selectCollection(col); await screen.findByText('status_1')
   await selectDatabase('other'); await waitFor(() => expect(screen.queryByText('status_1')).toBeNull()); expect(screen.queryByText(col)).toBeNull()
 })
 for (const [kind, load] of [['databases', async () => { await ready() }], ['collections', async () => { await ready(); await selectDatabase(); await screen.findByText('orders') }], ['views', async () => { await ready(); await selectDatabase(); tab('Vistas'); await screen.findByText('orders_view') }], ['indexes', async () => { await ready(); await selectDatabase(); await selectCollection(); await screen.findByText('status_1') }]] as const) {
@@ -78,7 +78,7 @@ test('documents: Cargar más uses page.after, appends cards and a new collection
 })
 test('after the last Cargar más focus moves to the first appended row', async () => {
   server = setup({ ...drill, [read('databases')]: fixtures.databasesCursor, [read('databases', 'db/cursor+1')]: fixtures.databasesNext }); open(); await ready()
-  fireEvent.click(await screen.findByRole('button', { name: 'Cargar más' })); const added = await screen.findByRole('button', { name: 'archive' })
+  fireEvent.click(await screen.findByRole('button', { name: 'Cargar más' })); const added = await screen.findByRole('radio', { name: 'archive' })
   await waitFor(() => expect(added).toHaveFocus())
 })
 for (const [kind, load, cursorFixture, nextFixture, added] of [
@@ -90,7 +90,7 @@ for (const [kind, load, cursorFixture, nextFixture, added] of [
     const key = kind as 'views' | 'indexes' | 'collections', cursor = (cursorFixture.page as { nextCursor: string }).nextCursor
     server = setup({ ...drill, [read(key)]: cursorFixture, [read(key, cursor)]: nextFixture }); open(); await load()
     fireEvent.click(await screen.findByRole('button', { name: 'Cargar más' })); await screen.findByText(added)
-    await waitFor(() => expect(document.activeElement?.textContent?.trim()).toBe(added))
+    await waitFor(() => expect(document.activeElement?.textContent?.trim() || document.activeElement?.getAttribute('aria-label')).toBe(added))
   })
 }
 test('document JSON toggle exposes aria-expanded and shows the full document', async () => {
@@ -98,13 +98,26 @@ test('document JSON toggle exposes aria-expanded and shows the full document', a
   const toggle = (await screen.findAllByRole('button', { name: 'Ver JSON' }))[0]; expect(toggle).toHaveAttribute('aria-expanded', 'false'); fireEvent.click(toggle)
   expect(toggle).toHaveAttribute('aria-expanded', 'true'); expect(toggle).toHaveTextContent('Ocultar JSON'); expect(await screen.findByText(/nested/)).toBeVisible()
 })
-test('selected rows expose aria-pressed and breadcrumbs sit in a nav with aria-current', async () => {
-  server = setup(drill); open(); await ready(); const row = screen.getByRole('button', { name: 'billing' }); expect(row).toHaveAttribute('aria-pressed', 'false')
-  await selectDatabase(); expect(screen.getAllByRole('button', { name: database })[0]).toHaveAttribute('aria-pressed', 'true')
+const rowOf = (name: string) => screen.getByRole('radio', { name }).closest('tr') as HTMLElement
+test('rows select with Enter and Space and expose aria-selected; breadcrumbs sit in a nav with aria-current', async () => {
+  server = setup(drill); open(); await ready()
+  expect(rowOf('billing')).toHaveAttribute('aria-selected', 'false'); expect(rowOf(database)).toHaveAttribute('aria-selected', 'false')
+  const radio = screen.getByRole('radio', { name: database }); radio.focus(); fireEvent.keyDown(radio, { key: 'Enter' }); await settle()
+  expect(rowOf(database)).toHaveAttribute('aria-selected', 'true'); expect(rowOf('billing')).toHaveAttribute('aria-selected', 'false'); expect(screen.getByRole('radio', { name: database })).toBeChecked()
+  expect(count(urls.collections())).toBe(1)
+  fireEvent.click(screen.getByRole('radio', { name: database })); await settle(); expect(count(urls.collections())).toBe(1)
+  await screen.findByText('orders'); expect(rowOf('orders')).toHaveAttribute('aria-selected', 'false')
   const nav = screen.getByRole('navigation', { name: 'Navegación MongoDB' }); expect(nav.querySelector('[aria-current="page"]')).toHaveTextContent(database)
-  await selectCollection(); expect(nav.querySelector('[aria-current="page"]')).toHaveTextContent('orders')
+  fireEvent.click(screen.getByRole('radio', { name: 'orders' })); await settle(); expect(rowOf('orders')).toHaveAttribute('aria-selected', 'true'); expect(nav.querySelector('[aria-current="page"]')).toHaveTextContent('orders')
   fireEvent.click(within(nav).getByRole('button', { name: database })); await settle(); expect(screen.queryByText('status_1')).toBeNull()
   fireEvent.click(within(nav).getByRole('button', { name: 'Bases de datos' })); await settle(); expect(screen.queryByRole('heading', { name: /Base de datos: catalog/ })).toBeNull()
+})
+test('an expanded document stays expanded across a tab round trip and resets for another collection', async () => {
+  server = setup(drill); open(); await ready(); await selectDatabase(); await selectCollection(); tab('Documentos')
+  const toggle = (await screen.findAllByRole('button', { name: 'Ver JSON' }))[0]; fireEvent.click(toggle); expect(await screen.findByText(/nested/)).toBeVisible()
+  tab('Validación'); await screen.findByText('Nivel: strict'); tab('Índices'); await screen.findByText('status_1'); tab('Documentos')
+  const again = (await screen.findAllByRole('button', { name: 'Ocultar JSON' }))[0]; expect(again).toHaveAttribute('aria-expanded', 'true'); expect(screen.getByText(/nested/)).toBeVisible()
+  fireEvent.click(again); expect(screen.getAllByRole('button', { name: 'Ver JSON' })[0]).toHaveAttribute('aria-expanded', 'false')
 })
 test('Actualizar re-issues only the databases read', async () => {
   server = setup(); open(); await ready(); const before = paths().length

@@ -31,9 +31,9 @@ export const open = () => render(element())
 export const press = (name: string | RegExp, root: { getByRole: typeof screen.getByRole } = screen) => fireEvent.click(root.getByRole('button', { name }))
 export const tab = (name: string) => fireEvent.click(screen.getByRole('tab', { name }))
 export const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
-export const ready = () => screen.findByRole('button', { name: database })
-export async function selectDatabase(name = database) { fireEvent.click(await screen.findByRole('button', { name })); await settle() }
-export async function selectCollection(name = 'orders') { fireEvent.click(await screen.findByRole('button', { name })); await settle() }
+export const ready = () => screen.findByRole('radio', { name: database })
+export async function selectDatabase(name = database) { fireEvent.click(await screen.findByRole('radio', { name })); await settle() }
+export async function selectCollection(name = 'orders') { fireEvent.click(await screen.findByRole('radio', { name })); await settle() }
 export const calls = (server: ReturnType<typeof setup>) => server.mock.mock.calls.map(([path, init]) => ({ path: String(path), method: init?.method ?? 'GET', body: init?.body ? JSON.parse(String(init.body)) : undefined, headers: new Headers(init?.headers) }))
 export const changeLocale = setLocale
 export { waitFor }

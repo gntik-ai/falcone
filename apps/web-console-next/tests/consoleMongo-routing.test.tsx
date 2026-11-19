@@ -19,7 +19,7 @@ const mongoCalls = () => requests.mock.mock.calls.filter(([path]) => String(path
 
 test.each(['tenant_viewer', 'tenant_owner', 'superadmin'])('authenticated %s reaches MongoDB with no guard and exactly the databases read', async (role) => {
   login([role], ['synthetic-tenant']); requests = strictFetch({ ...shell(), [`GET ${urls.databases()}`]: fixtures.databases }); open()
-  expect(await screen.findByRole('button', { name: 'catalog' }, { timeout: 10000 })).toBeVisible()
+  expect(await screen.findByRole('radio', { name: 'catalog' }, { timeout: 10000 })).toBeVisible()
   expect(isMigratedRoute('/console/mongo')).toBe(true); expect(isMigratedRoute('/console/mongo/data')).toBe(true); expect(pendingConsoleRoutes.find(({ path }) => path === 'mongo')?.migrated).toBe(true)
   expect(mongoCalls()).toEqual([{ method: 'GET', path: urls.databases(), body: undefined }])
 })
@@ -28,7 +28,7 @@ test.each([false, true])('401 rejected=%s has one refresh and exactly the permit
   const refresh = '/v1/auth/login-sessions/synthetic-session/refresh'
   requests = strictFetch({ ...shell(), [`GET ${urls.databases()}`]: () => ++count === 1 ? Response.json({}, { status: 401 }) : Response.json(fixtures.databases), [`POST ${refresh}`]: () => rejected ? Response.json({}, { status: 400 }) : Response.json(fresh) }); open()
   if (rejected) { await screen.findByRole('heading', { name: 'Accede a In Falcone Console' }, { timeout: 10000 }); expect(screen.getByLabelText('Current location')).toHaveTextContent('/login'); expect(readProtectedRouteIntent()).toBe('/console/mongo'); expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toContain('ventas') }
-  else { await screen.findByRole('button', { name: 'catalog' }, { timeout: 10000 }); expect(screen.getByLabelText('Current location')).toHaveTextContent('/console/mongo') }
+  else { await screen.findByRole('radio', { name: 'catalog' }, { timeout: 10000 }); expect(screen.getByLabelText('Current location')).toHaveTextContent('/console/mongo') }
   expect(mongoCalls()).toEqual([{ method: 'GET', path: urls.databases(), body: undefined }, { method: 'POST', path: refresh, body: { refreshToken: initial.tokenSet?.refreshToken } }, ...(rejected ? [] : [{ method: 'GET', path: urls.databases(), body: undefined }])])
   if (!rejected) { const reads = requests.mock.mock.calls.filter(([path]) => path === urls.databases()); expect(new Headers(reads[1][1]?.headers).get('Authorization')).toBe(`Bearer ${fresh.tokenSet?.accessToken}`) }
 })
@@ -38,7 +38,7 @@ test('a 401 on the wizard POST refreshes once and replays the POST with its body
     const refresh = '/v1/auth/login-sessions/synthetic-session/refresh', submit = '/v1/workspaces/synthetic-workspace/databases'
     requests = strictFetch({ ...shell(), [`GET ${urls.databases()}`]: fixtures.databases, 'GET /v1/metrics/tenants/synthetic-tenant/quotas': {}, 'GET /v1/metrics/tenants/synthetic-tenant/overview': {}, 'GET /v1/metrics/workspaces/synthetic-workspace/quotas': { dimensions: [] }, 'GET /v1/metrics/workspaces/synthetic-workspace/overview': {},
       [`POST ${submit}`]: () => ++count === 1 ? Response.json({}, { status: 401 }) : Response.json({ databaseId: 'catalog' }, { status: 201 }), [`POST ${refresh}`]: () => rejected ? Response.json({}, { status: 400 }) : Response.json(fresh) })
-    const view = open(); await screen.findByRole('button', { name: 'catalog' }, { timeout: 10000 }); fireEvent.click(screen.getByRole('button', { name: 'Nueva base de datos' }))
+    const view = open(); await screen.findByRole('radio', { name: 'catalog' }, { timeout: 10000 }); fireEvent.click(screen.getByRole('button', { name: 'Nueva base de datos' }))
     const dialog = await screen.findByTestId('mongo-wizard'); const { within } = await import('@testing-library/react')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Siguiente' })); fireEvent.change(within(dialog).getByLabelText('Nombre'), { target: { value: 'ventas' } }); fireEvent.click(within(dialog).getByRole('button', { name: 'Siguiente' })); fireEvent.click(within(dialog).getByRole('button', { name: 'Siguiente' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar' }))

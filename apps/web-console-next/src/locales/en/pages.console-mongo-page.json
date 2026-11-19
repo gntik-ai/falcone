@@ -25,6 +25,7 @@
   "indexes": "Indexes",
   "validation": "Validation",
   "documents": "Documents",
+  "selectionColumn": "Select",
   "tableLabels": {
     "databases": "MongoDB databases list",
     "collections": "MongoDB collections of the selected database",

@@ -10,7 +10,9 @@ const text = (p, key) => key.split('.').reduce((value, part) => value?.[part], b
 const button = (p, key, scope = p.page) => scope.getByRole('button', { name: text(p, key), exact: true });
 const tab = (p, key) => p.page.getByRole('tab', { name: text(p, key), exact: true });
 const surface = (p) => p.page.getByTestId('mongo-page');
-const row = (p, name) => p.page.getByRole('button', { name, exact: true });
+// Database and collection rows are the kit's single-selection radios; the row element carries aria-selected.
+const row = (p, name) => p.page.getByRole('radio', { name, exact: true });
+const rowElement = (p, name) => row(p, name).locator('xpath=ancestor::tr[1]');
 const KEY = /^[A-Za-z0-9._:-]{8,128}$/;
 const sections = { databases: 'mongo-databases', collections: 'mongo-collections', views: 'mongo-views', indexes: 'mongo-indexes', validation: 'mongo-validation', documents: 'mongo-documents' };
 const sectionOf = (p, kind) => p.page.locator(`[id="${sections[kind === 'detail' ? 'validation' : kind]}"]`);
@@ -35,8 +37,10 @@ async function reach(p, kind) {
   await expect(row(p, 'orders')).toBeVisible(); await row(p, 'orders').click();
   if (kind !== 'indexes') await tab(p, kind === 'detail' ? 'validation' : kind).click();
 }
-async function capture(p, info, name) {
+// A target section is scrolled to the top of the viewport and asserted in view before the shot, so the state under review is always pictured (375 px stacks three snippets above the indexes).
+async function capture(p, info, name, target) {
   await check.assertLocale(p); await p.page.evaluate(() => document.fonts.ready);
+  if (target) { await expect(target).toBeVisible(); await target.evaluate((node) => node.scrollIntoView({ block: 'start', inline: 'nearest' })); await expect(target).toBeInViewport(); }
   const body = await p.page.screenshot({ animations: 'disabled', caret: 'hide' });
   await info.attach(`${name}-${p.locale}-sha256-${createHash('sha256').update(body).digest('hex')}`, { body, contentType: 'image/png' });
 }
@@ -69,6 +73,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await tab(p, 'validation').click(); await expect(p.page.getByText(text(p, 'validationLevel').replace('{value}', 'strict'), { exact: true })).toBeVisible();
     await tab(p, 'documents').click(); await expect(p.page.getByText('doc-1', { exact: true })).toBeVisible();
     const toggle = button(p, 'showJson').first(); await expect(toggle).toHaveAttribute('aria-expanded', 'false'); await toggle.click(); await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    // The expansion survives a tab round trip for the same collection.
+    await tab(p, 'indexes').click(); await tab(p, 'documents').click(); await expect(button(p, 'hideJson').first()).toHaveAttribute('aria-expanded', 'true');
     await check.assertLocale(p);
     const gets = h.calls.map(({ path }) => path);
     for (const kind of ['databases', 'collections', 'views', 'detail', 'indexes', 'documents']) expect(gets).toContain(readUrl(kind));
@@ -154,7 +160,10 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     await collection(p); await check.assertAccessibility(p); for (const key of ['validation', 'documents']) { await tab(p, key).click(); await check.assertAccessibility(p); }
     await button(p, 'showJson').first().click(); await check.assertAccessibility(p);
     const crumb = p.page.getByRole('navigation', { name: text(p, 'navigation') }); await expect(crumb.locator('[aria-current="page"]')).toHaveCount(1);
-    await row(p, 'orders').focus(); await p.page.keyboard.press('Enter'); await expect(row(p, 'orders')).toHaveAttribute('aria-pressed', 'true');
+    await expect(rowElement(p, 'orders')).toHaveAttribute('aria-selected', 'true'); await expect(rowElement(p, 'catalog')).toHaveAttribute('aria-selected', 'true');
+    // Enter and Space select a focused row and move aria-selected with it.
+    await row(p, 'billing').focus(); await p.page.keyboard.press('Enter'); await expect(rowElement(p, 'billing')).toHaveAttribute('aria-selected', 'true'); await expect(rowElement(p, 'catalog')).toHaveAttribute('aria-selected', 'false');
+    await row(p, 'catalog').focus(); await p.page.keyboard.press('Space'); await expect(rowElement(p, 'catalog')).toHaveAttribute('aria-selected', 'true'); await expect(rowElement(p, 'billing')).toHaveAttribute('aria-selected', 'false');
     await h.open({ create: ['create-500', 'create-success'] }); await ready(p); await button(p, 'newDatabase').click(); const dialog = p.page.getByTestId('mongo-wizard');
     await check.assertAccessibility(p); await button(p, 'next', dialog).click(); await dialog.getByLabel(text(p, 'wizard.name'), { exact: true }).fill('ventas'); await check.assertAccessibility(p); await button(p, 'next', dialog).click(); await check.assertAccessibility(p); await button(p, 'next', dialog).click(); await check.assertAccessibility(p);
     await button(p, 'wizard.confirm', dialog).click(); const panel = dialog.getByTestId('mongo-wizard-outcome'); await expect(panel).toBeFocused(); await check.assertAccessibility(p);
@@ -182,14 +191,14 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
   });
   test('visual-review', async ({ parity: p }, info) => {
     test.setTimeout(240000);
-    await h.open({ cursors: ['databases'] }); await ready(p); await capture(p, info, 'databases');
-    await database(p); await capture(p, info, 'database-collections'); await tab(p, 'views').click(); await capture(p, info, 'database-views'); await tab(p, 'collections').click();
-    await collection(p); await capture(p, info, 'collection-indexes'); await tab(p, 'validation').click(); await capture(p, info, 'collection-validation'); await tab(p, 'documents').click(); await button(p, 'showJson').first().click(); await capture(p, info, 'collection-documents');
+    await h.open({ cursors: ['databases'] }); await ready(p); await capture(p, info, 'databases', sectionOf(p, 'databases'));
+    await database(p); await capture(p, info, 'database-collections', sectionOf(p, 'collections')); await tab(p, 'views').click(); await expect(p.page.getByText('orders_view', { exact: true })).toBeVisible(); await capture(p, info, 'database-views', sectionOf(p, 'views')); await tab(p, 'collections').click();
+    await collection(p); await capture(p, info, 'collection-indexes', sectionOf(p, 'indexes')); await tab(p, 'validation').click(); await expect(p.page.getByText(text(p, 'validationLevel').replace('{value}', 'strict'), { exact: true })).toBeVisible(); await capture(p, info, 'collection-validation', sectionOf(p, 'validation')); await tab(p, 'documents').click(); await expect(p.page.getByText('doc-1', { exact: true })).toBeVisible(); await button(p, 'showJson').first().click(); await expect(button(p, 'hideJson').first()).toHaveAttribute('aria-expanded', 'true'); await capture(p, info, 'collection-documents', sectionOf(p, 'documents'));
     await h.open({ create: ['create-500'] }); await ready(p); let dialog = await wizard(p, { upto: 'workspace' }); await capture(p, info, 'wizard-workspace'); await button(p, 'next', dialog).click(); await dialog.getByLabel(text(p, 'wizard.name'), { exact: true }).fill('ventas'); await capture(p, info, 'wizard-engine'); await button(p, 'next', dialog).click(); await capture(p, info, 'wizard-config'); await button(p, 'next', dialog).click(); await capture(p, info, 'wizard-review');
     await button(p, 'wizard.confirm', dialog).click(); await expect(dialog.getByTestId('mongo-wizard-outcome')).toBeVisible(); await capture(p, info, 'wizard-error');
     await h.open({ create: ['create-403'] }); await ready(p); dialog = await wizard(p); await button(p, 'wizard.confirm', dialog).click(); await expect(dialog.getByTestId('mongo-wizard-outcome')).toBeVisible(); await capture(p, info, 'wizard-no-access');
-    await h.open({ empty: ['databases'] }); await capture(p, info, 'empty'); await h.open({ errors: { databases: 500 } }); await capture(p, info, 'error');
-    await h.open({ errors: { views: 500 } }); await database(p); await tab(p, 'views').click(); await expect(surface(p).getByTestId('mongo-failure-views')).toBeVisible(); await capture(p, info, 'views-error');
+    await h.open({ empty: ['databases'] }); await expect(surface(p).getByText(text(p, 'empty.databases'), { exact: true })).toBeVisible(); await capture(p, info, 'empty', sectionOf(p, 'databases')); await h.open({ errors: { databases: 500 } }); await expect(surface(p).getByTestId('mongo-failure-databases')).toBeVisible(); await capture(p, info, 'error', sectionOf(p, 'databases'));
+    await h.open({ errors: { views: 500 } }); await database(p); await tab(p, 'views').click(); await expect(surface(p).getByTestId('mongo-failure-views')).toBeVisible(); await capture(p, info, 'views-error', sectionOf(p, 'views'));
   });
   test('kit-conformance', async () => { await check.kitConformance(manifest); });
 });

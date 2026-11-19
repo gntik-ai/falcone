@@ -7,7 +7,7 @@ import { collectionPath, collectionsPath, databasesPath, documentsPath, document
 import { focusRing, useCopy } from './consoleMongo/copy'
 import { PagedBody } from './consoleMongo/Footer'
 import { Snippets } from './consoleMongo/Snippets'
-import { Action, Chip, Empty, Heading, Section, Table, Tag } from './consoleMongo/States'
+import { Chip, Empty, Heading, Section, Table, Tag } from './consoleMongo/States'
 import { LocalizedToaster } from './consoleMongo/Toaster'
 import { useCursorList, useOne } from './consoleMongo/useRemote'
 import { Wizard } from './consoleMongo/Wizard'
@@ -40,8 +40,9 @@ function Json({ data, label, height = 200 }: { data: unknown; label: string; hei
   return <div className="min-w-0 max-w-full"><JsonViewer data={data} label={label} defaultExpandDepth={1} maxDepth={undefined} search="" toolbar={false} maxHeight={height} maxDisplayChars={undefined} emptyContent={undefined} labels={labels} className="min-w-0" /></div>
 }
 
-function DocumentCard({ document, index }: { document: MongoDocument; index: number }) {
-  const { t } = useCopy(), [open, setOpen] = useState(false), id = String(document._id)
+// Expansion lives with the page, so it survives a tab round trip for the same collection selection.
+function DocumentCard({ document, index, open, setOpen }: { document: MongoDocument; index: number; open: boolean; setOpen: (open: boolean) => void }) {
+  const { t } = useCopy(), id = String(document._id)
   return <Card variant="default" className="min-w-0" data-testid="mongo-document"><CardBody className="min-w-0 space-y-3">
     <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
       <div className="min-w-0"><Text as="p" variant="supporting" tone="muted">{t('documentLabel')}</Text><Text as="p" variant="label" tone="default" id={`mongo-doc-${index}`}>{id}</Text></div>
@@ -58,7 +59,7 @@ function Surface() {
   const { activeTenantId: tenant, activeWorkspaceId: workspace } = context
   const [database, setDatabase] = useState<string | null>(null), [picked, setPicked] = useState<{ workspace: string | null; name: string } | null>(null)
   const [databaseTab, setDatabaseTab] = useState('collections'), [collectionTab, setCollectionTab] = useState('indexes')
-  const [wizard, setWizard] = useState(false)
+  const [wizard, setWizard] = useState(false), [expanded, setExpanded] = useState<{ target: string | null; ids: string[] }>({ target: null, ids: [] })
   const toolbar = useRef<HTMLDivElement>(null), breadcrumbRef = useRef<HTMLElement | null>(null), crumbIntent = useRef(false), lastWorkspace = useRef(workspace)
 
   // A collection belongs to the workspace it was picked in, so a switch never requests the old collection under the new workspace.
@@ -72,6 +73,8 @@ function Surface() {
   const indexes = useCursorList<MongoIndex>(target ? `indexes:${target}` : null, (cursor) => listUrl(indexesPath(database!, collection!), cursor))
   const documents = useCursorList<MongoDocument>(target ? `documents:${target}` : null, (cursor) => documentsUrl(documentsPath(workspace!, database!, collection!), cursor))
 
+  const expandedIds = expanded.target === target ? expanded.ids : []
+  const toggleDocument = (id: string, open: boolean) => setExpanded({ target, ids: open ? [...expandedIds.filter((item) => item !== id), id] : expandedIds.filter((item) => item !== id) })
   function chooseCollection(name: string | null) { setPicked(name === null ? null : { workspace, name }); setCollectionTab('indexes') }
   function chooseDatabase(name: string | null) { setDatabase(name); setDatabaseTab('collections'); chooseCollection(null) }
   // A workspace switch refetches collections and views through their keys and drops the collection detail.
@@ -82,11 +85,10 @@ function Surface() {
   const bytes = (value?: number) => formatBytes(value, locale, none)
   const yes = (value?: boolean) => t(value ? 'yes' : 'no')
   const opener = () => Array.from(toolbar.current?.querySelectorAll<HTMLElement>('button') ?? []).find((button) => button.textContent?.trim() === t('newDatabase')) ?? null
-  const select = (name: string, selected: boolean, choose: () => void) => <Action variant={selected ? 'secondary' : 'ghost'} data-mongo-row="" aria-pressed={selected} onClick={choose}>{name}</Action>
   const crumb = (action: () => void) => <button type="button" className={focusRing} onClick={(event) => { event.preventDefault(); crumbIntent.current = true; action() }} />
 
   const databaseColumns: DataTableColumn<MongoDatabase>[] = [
-    { id: 'name', header: t('columns.database'), sortable: false, cell: (row) => select(row.databaseName, database === row.databaseName, () => chooseDatabase(row.databaseName)) },
+    { id: 'name', header: t('columns.database'), sortable: false, cell: (row) => row.databaseName },
     { id: 'dataSize', header: t('columns.dataSize'), sortable: false, cell: (row) => bytes(row.stats?.dataSize) },
     { id: 'storageSize', header: t('columns.storageSize'), sortable: false, cell: (row) => bytes(row.stats?.storageSize) },
     { id: 'collections', header: t('columns.collections'), sortable: false, cell: (row) => row.stats?.collections ?? none },
@@ -94,7 +96,7 @@ function Surface() {
   ]
   const typeTone = (type?: string) => type === 'capped' ? 'warning' : type === 'time-series' ? 'info' : 'neutral'
   const collectionColumns: DataTableColumn<MongoCollection>[] = [
-    { id: 'name', header: t('columns.collection'), sortable: false, cell: (row) => select(row.collectionName, collection === row.collectionName, () => chooseCollection(row.collectionName)) },
+    { id: 'name', header: t('columns.collection'), sortable: false, cell: (row) => row.collectionName },
     { id: 'type', header: t('columns.type'), sortable: false, cell: (row) => { const type = row.collectionType ?? 'standard'; return <Tag label={t(`types.${type}`, { defaultValue: type })} tone={typeTone(type)} /> } },
     { id: 'documents', header: t('columns.documents'), sortable: false, cell: (row) => row.documentCount ?? none },
     { id: 'size', header: t('columns.size'), sortable: false, cell: (row) => bytes(row.estimatedSize) },
@@ -132,13 +134,13 @@ function Surface() {
         primaryAction={{ label: t('newDatabase'), variant: 'primary', onClick: () => setWizard(true) }} />
     </div>
     {!tenant ? <Empty level="h2" title={t('noTenant')} /> : <Section id="mongo-databases" name="databases" title={t('databases')} description={t('databasesDescription')} busy={databases.busy} error={databases.error} retry={() => void databases.reload()}>
-      {databases.items.length ? <PagedBody list={databases} name="databases"><Table rows={databases.items} id={(row) => row.databaseName} label={t('tableLabels.databases')} loadingLabel={t('loading.databases')} columns={databaseColumns} /></PagedBody> : <Empty title={t('empty.databases')} />}
+      {databases.items.length ? <PagedBody list={databases} name="databases"><Table rows={databases.items} id={(row) => row.databaseName} selection={{ name: 'mongo-databases', selectedId: database, choose: chooseDatabase }} label={t('tableLabels.databases')} loadingLabel={t('loading.databases')} columns={databaseColumns} /></PagedBody> : <Empty title={t('empty.databases')} />}
     </Section>}
     {database && <section className="min-w-0 space-y-4" aria-label={t('databaseHeading', { name: database })}>
       <Heading title={t('databaseHeading', { name: database })} description={t('databaseDescription')} />
       <TabSet value={databaseTab} change={setDatabaseTab} choices={['collections', 'views']} label={t('databaseHeading', { name: database })}>
         {databaseTab === 'collections' && (!workspace ? <WorkspaceGate /> : <Section id="mongo-collections" name="collections" title={t('collections')} level="h3" busy={collections.busy} error={collections.error} retry={() => void collections.reload()}>
-          {collections.items.length ? <PagedBody list={collections} name="collections"><Table rows={collections.items} id={(row) => row.collectionName} label={t('tableLabels.collections')} loadingLabel={t('loading.collections')} columns={collectionColumns} /></PagedBody> : <Empty title={t('empty.collections')} />}
+          {collections.items.length ? <PagedBody list={collections} name="collections"><Table rows={collections.items} id={(row) => row.collectionName} selection={{ name: 'mongo-collections', selectedId: collection, choose: chooseCollection }} label={t('tableLabels.collections')} loadingLabel={t('loading.collections')} columns={collectionColumns} /></PagedBody> : <Empty title={t('empty.collections')} />}
         </Section>)}
         {databaseTab === 'views' && <Section id="mongo-views" name="views" title={t('views')} level="h3" busy={views.busy} error={views.error} retry={() => void views.reload()}>
           {views.items.length ? <PagedBody list={views} name="views"><Table rows={views.items} id={(row) => row.viewName} label={t('tableLabels.views')} loadingLabel={t('loading.views')} columns={viewColumns} /></PagedBody> : <Empty title={t('empty.views')} />}
@@ -160,7 +162,7 @@ function Surface() {
             </div>}
           </Section>}
           {collectionTab === 'documents' && <Section key={target} id="mongo-documents" name="documents" title={t('documents')} level="h3" busy={documents.busy} error={documents.error} retry={() => void documents.reload()}>
-            {documents.items.length ? <PagedBody list={documents} name="documents"><div className="min-w-0 space-y-3">{documents.items.map((document, index) => <DocumentCard key={`${String(document._id)}-${index}`} document={document} index={index} />)}</div></PagedBody> : <Empty title={t('empty.documents')} />}
+            {documents.items.length ? <PagedBody list={documents} name="documents"><div className="min-w-0 space-y-3">{documents.items.map((document, index) => <DocumentCard key={`${String(document._id)}-${index}`} document={document} index={index} open={expandedIds.includes(String(document._id))} setOpen={(open) => toggleDocument(String(document._id), open)} />)}</div></PagedBody> : <Empty title={t('empty.documents')} />}
           </Section>}
         </TabSet>
       </section>
