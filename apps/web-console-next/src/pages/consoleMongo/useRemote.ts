@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createRequestId } from '@in-falcone/console-api/http'
 import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import { failureOf, isAbort, type Collection, type Failure } from './api'
 
 // Every section owns one AbortController. A new key (selection, workspace, tenant) or an unmount aborts the
 // in-flight request, so a late response can neither restore a cleared selection nor raise an error.
+// Every GET attempt carries its own X-Request-Id. A failure the server did not tag (a network error) keeps this id,
+// so its error panel always has a copyable request id.
+const tagged = (cause: unknown, requestId: string): Failure => { const failure = failureOf(cause); return { ...failure, requestId: failure.requestId ?? requestId } }
+
 export type ListState<T> = { key: string | null; items: T[]; cursor: string | null; busy: boolean; error: Failure | null; moreBusy: boolean; moreError: Failure | null }
 const idle = <T,>(key: string | null): ListState<T> => ({ key, items: [], cursor: null, busy: Boolean(key), error: null, moreBusy: false, moreError: null })
 
@@ -17,15 +22,15 @@ export function useCursorList<T>(key: string | null, urlFor: (cursor: string | n
     controller.current?.abort()
     const own = new AbortController()
     controller.current = own
-    const more = cursor !== null
+    const more = cursor !== null, requestId = createRequestId('mongo')
     setState((previous) => more && previous.key === key ? { ...previous, moreBusy: true, moreError: null } : idle<T>(key))
     try {
-      const page = await requestConsoleSessionJson<Collection<T>>(url.current(cursor), { signal: own.signal })
+      const page = await requestConsoleSessionJson<Collection<T>>(url.current(cursor), { signal: own.signal, headers: { 'X-Request-Id': requestId } })
       if (own.signal.aborted) return
       setState((previous) => ({ key, items: more ? [...previous.items, ...(page?.items ?? [])] : page?.items ?? [], cursor: page?.page?.nextCursor ?? page?.page?.after ?? null, busy: false, error: null, moreBusy: false, moreError: null }))
     } catch (cause) {
       if (own.signal.aborted || isAbort(cause)) return
-      const failure = failureOf(cause)
+      const failure = tagged(cause, requestId)
       setState((previous) => more ? { ...previous, moreBusy: false, moreError: failure } : { ...idle<T>(key), busy: false, error: failure })
     }
   }, [key])
@@ -51,13 +56,14 @@ export function useOne<T>(key: string | null, path: string) {
     controller.current?.abort()
     const own = new AbortController()
     controller.current = own
+    const requestId = createRequestId('mongo')
     setState({ key, data: null, busy: true, error: null })
     try {
-      const data = await requestConsoleSessionJson<T>(target.current, { signal: own.signal })
+      const data = await requestConsoleSessionJson<T>(target.current, { signal: own.signal, headers: { 'X-Request-Id': requestId } })
       if (!own.signal.aborted) setState({ key, data, busy: false, error: null })
     } catch (cause) {
       if (own.signal.aborted || isAbort(cause)) return
-      setState({ key, data: null, busy: false, error: failureOf(cause) })
+      setState({ key, data: null, busy: false, error: tagged(cause, requestId) })
     }
   }, [key])
   useEffect(() => {

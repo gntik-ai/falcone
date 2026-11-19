@@ -192,3 +192,24 @@ test('missing optional index fields render placeholders instead of failing', asy
   server = setup({ ...drill, [read('indexes')]: { items: [indexRow('a_1'), { indexName: 'bare' }], page: {} }, [read('documents')]: { items: [documentRow('doc-9')], page: {} } }); open(); await ready(); await selectDatabase(); await selectCollection()
   const row = (await screen.findByText('bare')).closest('tr')!; expect(within(row).getAllByText('—').length).toBeGreaterThanOrEqual(4); expect(within(row).getAllByText('No')).toHaveLength(2)
 })
+// An empty page that still carries a cursor must not strand the list: the empty copy shows and Cargar más stays reachable.
+for (const [kind, load, empty, next, added] of [
+  ['databases', async () => { await screen.findByText('No hay bases de datos MongoDB disponibles para esta organización.') }, null, fixtures.databasesNext, 'archive'],
+  ['collections', async () => { await ready(); await selectDatabase(); await screen.findByText('La base seleccionada no tiene colecciones visibles.') }, null, fixtures.collectionsNext, 'audit'],
+  ['views', async () => { await ready(); await selectDatabase(); tab('Vistas'); await screen.findByText('La base seleccionada no tiene vistas MongoDB.') }, null, fixtures.viewsNext, 'events_view'],
+  ['indexes', async () => { await ready(); await selectDatabase(); await selectCollection(); await screen.findByText('No hay índices visibles para esta colección.') }, null, fixtures.indexesNext, 'created_1'],
+  ['documents', async () => { await ready(); await selectDatabase(); await selectCollection(); tab('Documentos'); await screen.findByText('Colección sin documentos.') }, null, fixtures.documentsNext, 'doc-2'],
+] as const) {
+  test(`${kind}: an empty page with a cursor keeps Cargar más and the next page appends`, async () => {
+    const key = kind as 'databases' | 'collections' | 'views' | 'indexes' | 'documents', cursor = 'empty-cursor'
+    const page = { items: [], page: key === 'documents' ? { after: cursor } : { nextCursor: cursor } }
+    server = setup({ ...drill, [read(key)]: page, [read(key, cursor)]: next }); open(); await load()
+    fireEvent.click(await screen.findByRole('button', { name: 'Cargar más' })); expect(await screen.findByText(added)).toBeVisible()
+    expect(count(urls[key](cursor))).toBe(1); expect(screen.queryByRole('button', { name: 'Cargar más' })).toBeNull()
+  })
+}
+test('a network failure on a section GET still shows a copyable request id that matches the X-Request-Id header sent', async () => {
+  server = setup({ [read('databases')]: () => { throw new TypeError('Failed to fetch') } }); open()
+  const panel = await screen.findByTestId('mongo-failure-databases'); const sent = calls(server).find(({ path }) => path === urls.databases())?.headers.get('X-Request-Id')
+  expect(sent).toMatch(/^mongo_/); expect(panel).toHaveTextContent(sent as string); expect(within(panel).getByRole('button', { name: 'Copiar ID de solicitud' })).toBeVisible(); expect(within(panel).getByRole('button', { name: 'Reintentar' })).toBeVisible()
+})

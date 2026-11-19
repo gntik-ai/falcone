@@ -6,7 +6,8 @@ import { Action, FailureView, retryButton } from './States'
 
 // Loaded count, Cargar más and the failed-page panel shared by every cursor-paged list.
 // After a page lands the focus stays on Cargar más, or moves to the first appended row once the button is gone.
-export function PagedBody<T>({ list, name, children }: { list: CursorList<T>; name: string; children: ReactNode }) {
+// An empty page that still carries a cursor shows the empty copy and keeps Cargar más, so the next page stays reachable.
+export function PagedBody<T>({ list, name, empty, children }: { list: CursorList<T>; name: string; empty: ReactNode; children: ReactNode }) {
   const { t } = useCopy(), announce = useAnnounce()
   const box = useRef<HTMLDivElement>(null), button = useRef<HTMLButtonElement>(null)
   const pending = useRef<{ before: number } | null>(null), retried = useRef(false)
@@ -25,11 +26,11 @@ export function PagedBody<T>({ list, name, children }: { list: CursorList<T>; na
   }, [list.moreBusy, list.moreError])
   const more = (retry: boolean) => { retried.current = retry; pending.current = { before: count }; void list.more() }
   return <div ref={box} className="min-w-0 space-y-4">
-    {children}
-    <div className="flex min-w-0 flex-wrap items-center gap-3">
+    {count ? children : empty}
+    {(count > 0 || list.cursor !== null) && <div className="flex min-w-0 flex-wrap items-center gap-3">
       <Text as="p" variant="supporting" tone="muted">{t('loaded', { count })}</Text>
       {list.cursor !== null && !list.moreError && <Action ref={button} busy={list.moreBusy} onClick={() => more(false)}>{t(list.moreBusy ? 'loadingMore' : 'loadMore')}</Action>}
-    </div>
+    </div>}
     {list.moreError && <FailureView section="more" title={t(name === 'documents' ? 'errors.moreDocuments' : 'errors.more')} error={list.moreError} retry={() => more(true)} />}
   </div>
 }

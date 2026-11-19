@@ -138,16 +138,16 @@ function Surface() {
         primaryAction={{ label: t('newDatabase'), variant: 'primary', onClick: () => setWizard(true) }} />
     </div>
     {!tenant ? <Empty level="h2" title={t('noTenant')} /> : <Section id="mongo-databases" name="databases" title={t('databases')} description={t('databasesDescription')} busy={databases.busy} error={databases.error} retry={() => void databases.reload()}>
-      {databases.items.length ? <PagedBody list={databases} name="databases"><Table rows={databases.items} id={(row) => row.databaseName} selection={{ name: 'mongo-databases', selectedId: database, choose: chooseDatabase }} label={t('tableLabels.databases')} loadingLabel={t('loading.databases')} columns={databaseColumns} /></PagedBody> : <Empty title={t('empty.databases')} />}
+      <PagedBody list={databases} name="databases" empty={<Empty title={t('empty.databases')} />}><Table rows={databases.items} id={(row) => row.databaseName} selection={{ name: 'mongo-databases', selectedId: database, choose: chooseDatabase }} label={t('tableLabels.databases')} loadingLabel={t('loading.databases')} columns={databaseColumns} /></PagedBody>
     </Section>}
     {database && <section className="min-w-0 space-y-4" aria-label={t('databaseHeading', { name: database })}>
       <Heading title={t('databaseHeading', { name: database })} description={t('databaseDescription')} />
       <TabSet value={databaseTab} change={setDatabaseTab} choices={['collections', 'views']} label={t('databaseHeading', { name: database })}>
         {databaseTab === 'collections' && (!workspace ? <WorkspaceGate /> : <Section id="mongo-collections" name="collections" title={t('collections')} level="h3" busy={collections.busy} error={collections.error} retry={() => void collections.reload()}>
-          {collections.items.length ? <PagedBody list={collections} name="collections"><Table rows={collections.items} id={(row) => row.collectionName} selection={{ name: 'mongo-collections', selectedId: collection, choose: chooseCollection }} label={t('tableLabels.collections')} loadingLabel={t('loading.collections')} columns={collectionColumns} /></PagedBody> : <Empty title={t('empty.collections')} />}
+          <PagedBody list={collections} name="collections" empty={<Empty title={t('empty.collections')} />}><Table rows={collections.items} id={(row) => row.collectionName} selection={{ name: 'mongo-collections', selectedId: collection, choose: chooseCollection }} label={t('tableLabels.collections')} loadingLabel={t('loading.collections')} columns={collectionColumns} /></PagedBody>
         </Section>)}
         {databaseTab === 'views' && <Section id="mongo-views" name="views" title={t('views')} level="h3" busy={views.busy} error={views.error} retry={() => void views.reload()}>
-          {views.items.length ? <PagedBody list={views} name="views"><Table rows={views.items} id={(row) => row.viewName} label={t('tableLabels.views')} loadingLabel={t('loading.views')} columns={viewColumns} /></PagedBody> : <Empty title={t('empty.views')} />}
+          <PagedBody list={views} name="views" empty={<Empty title={t('empty.views')} />}><Table rows={views.items} id={(row) => row.viewName} label={t('tableLabels.views')} loadingLabel={t('loading.views')} columns={viewColumns} /></PagedBody>
         </Section>}
       </TabSet>
     </section>}
@@ -157,7 +157,7 @@ function Surface() {
         <Heading title={t('collectionHeading', { name: collection })} description={t('collectionDescription')} />
         <TabSet value={collectionTab} change={setCollectionTab} choices={['indexes', 'validation', 'documents']} label={t('collectionHeading', { name: collection })}>
           {collectionTab === 'indexes' && <Section id="mongo-indexes" name="indexes" title={t('indexes')} level="h3" busy={indexes.busy} error={indexes.error} retry={() => void indexes.reload()}>
-            {onlyId || !indexes.items.length ? <Empty title={t(onlyId ? 'empty.onlyId' : 'empty.indexes')} /> : <PagedBody list={indexes} name="indexes"><Table rows={indexes.items} id={(row) => row.indexName} label={t('tableLabels.indexes')} loadingLabel={t('loading.indexes')} columns={indexColumns} /></PagedBody>}
+            {onlyId ? <Empty title={t('empty.onlyId')} /> : <PagedBody list={indexes} name="indexes" empty={<Empty title={t('empty.indexes')} />}><Table rows={indexes.items} id={(row) => row.indexName} label={t('tableLabels.indexes')} loadingLabel={t('loading.indexes')} columns={indexColumns} /></PagedBody>}
           </Section>}
           {collectionTab === 'validation' && <Section id="mongo-validation" name="validation" title={t('validation')} level="h3" busy={detail.busy} error={detail.error} retry={() => void detail.reload()}>
             {!validation?.validator ? <Empty title={t('empty.validation')} /> : <div className="min-w-0 space-y-3">
@@ -166,7 +166,7 @@ function Surface() {
             </div>}
           </Section>}
           {collectionTab === 'documents' && <Section key={target} id="mongo-documents" name="documents" title={t('documents')} level="h3" busy={documents.busy} error={documents.error} retry={() => void documents.reload()}>
-            {documents.items.length ? <PagedBody list={documents} name="documents"><div className="min-w-0 space-y-3">{documents.items.map((document, index) => <DocumentCard key={`${String(document._id)}-${index}`} document={document} index={index} open={expanded.includes(index)} setOpen={(open) => toggleDocument(index, open)} />)}</div></PagedBody> : <Empty title={t('empty.documents')} />}
+            <PagedBody list={documents} name="documents" empty={<Empty title={t('empty.documents')} />}><div className="min-w-0 space-y-3">{documents.items.map((document, index) => <DocumentCard key={`${String(document._id)}-${index}`} document={document} index={index} open={expanded.includes(index)} setOpen={(open) => toggleDocument(index, open)} />)}</div></PagedBody>
           </Section>}
         </TabSet>
       </section>
