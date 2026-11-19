@@ -1,5 +1,5 @@
 import { test as base } from '@playwright/test';
-import { expect, guardParity } from './settled-state.mjs';
+import { expect, guardBrowserPage, guardParity } from './settled-state.mjs';
 import { assertNoSampleData } from './checks.mjs';
 import { startServer } from '../csp/server.mjs';
 import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
@@ -10,6 +10,7 @@ import { sectionFailureEndpoints } from './pages/console-functions-page.manifest
 
 export { expect };
 export const test = base.extend({
+  page: async ({ page }, use) => { await use(guardBrowserPage(page)); },
   role: ['superadmin', { option: true }],
   preserveLocale: [false, { option: true }],
   pageEndpoints: [{}, { option: true }],

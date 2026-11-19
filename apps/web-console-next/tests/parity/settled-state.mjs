@@ -52,12 +52,18 @@ export const expect = new Proxy(baseExpect, {
     return ['soft', 'poll'].includes(name) ? new Proxy(value, { apply(fn, self, args) { return matchers(Reflect.apply(fn, self, args.map(options)), checkpoints.get(args[0])); } }) : value;
   },
 });
+// This fixture-level proxy covers journeys that use `page` directly. The
+// checkpoint is installed by the automatic parity fixture before the test runs.
+export function guardBrowserPage(page) {
+  return wrapBrowser(page, async () => { await activeCheckpoint?.(); }, new WeakMap());
+}
 export function guardParity(parity, check) {
-  const settled = () => check(parity);
+  const raw = { ...parity, page: unwrap(parity.page) };
+  const settled = () => check(raw);
   activeCheckpoint = settled;
   return {
     dispose() { if (activeCheckpoint === settled) activeCheckpoint = undefined; },
-    ...parity, page: wrapBrowser(parity.page, settled, new WeakMap()), settled,
+    ...parity, page: wrapBrowser(raw.page, settled, new WeakMap()), settled,
     async open(...args) { await parity.open(...args); await settled(); },
   };
 }

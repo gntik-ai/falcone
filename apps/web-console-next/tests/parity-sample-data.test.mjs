@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runCli } from './run-cli.mjs';
 import { assertNoSampleData } from './parity/checks.mjs';
-import { guardParity } from './parity/settled-state.mjs';
+import { guardBrowserPage, guardParity } from './parity/settled-state.mjs';
 import { readFileSync } from 'node:fs';
 
 test('sample strings reproduce from the installed pinned kit without network', async () => {
@@ -25,4 +25,16 @@ test('the harness detects sample text appearing after open and after an action',
       else { text = sample; await assert.rejects(guarded.settled(), /assertNoSampleData/); }
     }
   }
+});
+
+test('journeys using the browser page fixture also check every settled action', async () => {
+  let text = 'Synthetic records';
+  const sample = 'orders-api';
+  const locator = { locator() { return this; }, all: async () => [{ innerText: async () => text }], click: async () => { text = sample; } };
+  const page = guardBrowserPage({ getByRole() { return locator; } });
+  const parity = guardParity({ page, async open() {} }, assertNoSampleData);
+  try {
+    await parity.open('/');
+    await assert.rejects(page.getByRole('button').click(), /assertNoSampleData.*orders-api/);
+  } finally { parity.dispose(); }
 });
