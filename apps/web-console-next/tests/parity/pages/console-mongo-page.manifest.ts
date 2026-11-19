@@ -34,7 +34,7 @@ export const fixtures = {
   databases: { items: [databaseRow('catalog'), databaseRow('billing')], page: {} },
   databasesCursor: { items: [databaseRow('catalog'), databaseRow('billing')], page: { nextCursor: 'db/cursor+1' } },
   databasesNext: { items: [databaseRow('archive')], page: {} },
-  collections: { items: [collectionRow(collection, { collectionType: 'time-series', validation: { validator: { bsonType: 'object' } } }), collectionRow('events', { collectionType: 'capped' }), collectionRow('users')], page: {} },
+  collections: { items: [collectionRow(collection, { collectionType: 'time-series', validation: { validator: { bsonType: 'object' } } }), collectionRow('events', { collectionType: 'capped' }), collectionRow('customers')], page: {} },
   collectionsCursor: { items: [collectionRow(collection, { validation: { validator: { bsonType: 'object' } } })], page: { nextCursor: 'col-2' } },
   collectionsNext: { items: [collectionRow('audit')], page: {} },
   views: { items: [{ viewName: 'orders_view', viewOn: collection, pipeline: [{ $match: { status: 'open' } }] }], page: {} },

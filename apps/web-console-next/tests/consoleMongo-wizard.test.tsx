@@ -15,13 +15,15 @@ const sequence = (...names: string[]) => { let index = 0; return () => response(
 const dialog = () => screen.getByTestId('mongo-wizard')
 const inside = (name: string | RegExp) => { const all = within(dialog()).getAllByRole('button', { name }); return all[all.length - 1] }
 const maybe = (name: string | RegExp) => within(dialog()).queryByRole('button', { name })
+// Collection options read "name (collection)"; extensions keep their bare name.
+const box = (item: string) => within(dialog()).getByRole('checkbox', { name: new RegExp(`^${item}( \\(.*\\))?$`) })
 const next = () => fireEvent.click(inside('Siguiente'))
 async function wizard({ name = 'ventas', engine, items = [] as string[], stop = 'review' }: { name?: string; engine?: 'postgresql' | 'mongodb'; items?: string[]; stop?: 'review' | 'config' | 'engine' } = {}) {
   fireEvent.click(await screen.findByRole('button', { name: 'Nueva base de datos' })); await screen.findByTestId('mongo-wizard'); next()
   fireEvent.change(within(dialog()).getByLabelText('Nombre'), { target: { value: name } })
   if (engine === 'postgresql') { fireEvent.click(within(dialog()).getByRole('combobox')); const option = await screen.findByRole('option', { name: 'PostgreSQL' }); fireEvent.pointerDown(option); fireEvent.click(option) }
   if (stop === 'engine') return
-  next(); for (const item of items) fireEvent.click(within(dialog()).getByRole('checkbox', { name: item }))
+  next(); for (const item of items) fireEvent.click(box(item))
   if (stop === 'config') return
   next(); await within(dialog()).findByRole('button', { name: 'Confirmar' })
 }
@@ -43,7 +45,7 @@ test('selecting users then switching to PostgreSQL clears the selection and send
   fireEvent.click(inside('Anterior')); await wizard2()
   async function wizard2() {
     fireEvent.click(within(dialog()).getByRole('combobox')); const option = await screen.findByRole('option', { name: 'PostgreSQL' }); fireEvent.pointerDown(option); fireEvent.click(option)
-    next(); expect(within(dialog()).getByRole('checkbox', { name: 'uuid-ossp' })).not.toBeChecked(); expect(within(dialog()).queryByRole('checkbox', { name: 'users' })).toBeNull()
+    next(); expect(within(dialog()).getByRole('checkbox', { name: 'uuid-ossp' })).not.toBeChecked(); expect(within(dialog()).queryByRole('checkbox', { name: /^users/ })).toBeNull()
     fireEvent.click(within(dialog()).getByRole('checkbox', { name: 'pgcrypto' })); next()
   }
   await confirm(); expect(posts()[0].body).toEqual({ engine: 'postgresql', name: 'ventas', extensions: ['pgcrypto'], collections: [] })
@@ -56,7 +58,7 @@ test('selecting users then switching to PostgreSQL clears the selection and send
 })
 test('Mongo is preselected and changing the engine clears the chosen items', async () => {
   run(); await wizard({ stop: 'engine' }); expect(within(dialog()).getByRole('combobox')).toHaveTextContent('MongoDB')
-  next(); fireEvent.click(within(dialog()).getByRole('checkbox', { name: 'orders' })); fireEvent.click(inside('Anterior'))
+  next(); fireEvent.click(box('orders')); fireEvent.click(inside('Anterior'))
   fireEvent.click(within(dialog()).getByRole('combobox')); const option = await screen.findByRole('option', { name: 'PostgreSQL' }); fireEvent.pointerDown(option); fireEvent.click(option); next()
   expect(within(dialog()).getByRole('checkbox', { name: 'uuid-ossp' })).not.toBeChecked(); expect(within(dialog()).getByRole('checkbox', { name: 'pgcrypto' })).not.toBeChecked()
 })
@@ -93,7 +95,7 @@ test('create-500-500-then-success: after the failed Reintentar focus stays on Re
 })
 test('an Anterior edit followed by Confirmar sends a new key and the edited body', async () => {
   run({ [post]: sequence('create-500', 'create-success') }); await wizard({ items: ['users'] }); await confirm(); await screen.findByTestId('mongo-wizard-outcome')
-  fireEvent.click(inside('Anterior')); fireEvent.click(within(dialog()).getByRole('checkbox', { name: 'orders' })); next(); await confirm(); await screen.findByTestId('mongo-wizard-result')
+  fireEvent.click(inside('Anterior')); fireEvent.click(box('orders')); next(); await confirm(); await screen.findByTestId('mongo-wizard-result')
   expect(posts()).toHaveLength(2); expect(keys()[1]).not.toBe(keys()[0]); expect(keys()[1]).toMatch(KEY); expect(posts()[1].body).toEqual({ engine: 'mongodb', name: 'ventas', extensions: [], collections: ['users', 'orders'] })
 })
 test('503 IDEMPOTENCY_UNAVAILABLE shows the error panel and Reintentar reuses the key', async () => {

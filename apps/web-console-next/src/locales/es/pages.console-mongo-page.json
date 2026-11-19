@@ -179,6 +179,7 @@
     "review": "Resumen",
     "extensions": "Extensiones iniciales",
     "collections": "Colecciones iniciales",
+    "collectionOption": "{name} (colección)",
     "initialConfig": "Configuración inicial",
     "notConfigured": "No configurado",
     "confirm": "Confirmar",

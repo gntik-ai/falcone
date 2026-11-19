@@ -49,7 +49,7 @@ async function wizard(p, { name = 'ventas', items = ['users'], upto = 'review' }
   if (upto === 'workspace') return dialog;
   await button(p, 'next', dialog).click();
   await dialog.getByLabel(text(p, 'wizard.name'), { exact: true }).fill(name); if (upto === 'engine') return dialog;
-  await button(p, 'next', dialog).click(); for (const item of items) await dialog.getByRole('checkbox', { name: item, exact: true }).click(); if (upto === 'config') return dialog;
+  await button(p, 'next', dialog).click(); for (const item of items) await dialog.getByRole('checkbox', { name: new RegExp(`^${item}( \\(.*\\))?$`) }).click(); if (upto === 'config') return dialog;
   await button(p, 'next', dialog).click(); await expect(button(p, 'wizard.confirm', dialog)).toBeVisible(); return dialog;
 }
 const posts = (h) => h.calls.filter(({ method, path }) => method === 'POST' && path === submitPath);
@@ -67,12 +67,13 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     const table = surface(p).getByRole('table', { name: text(p, 'tableLabels.databases'), exact: true });
     await expect(table.getByText(`${bytes(p, 2)} KB`, { exact: true }).first()).toBeVisible(); await expect(button(p, 'loadMore')).toBeVisible(); await expect(surface(p).getByText(text(p, 'loaded').replace('{count}', '2'), { exact: true })).toBeVisible();
     await row(p, 'catalog').click();
-    for (const name of ['orders', 'events', 'users']) await expect(row(p, name)).toBeVisible();
+    for (const name of ['orders', 'events', 'customers']) await expect(row(p, name)).toBeVisible();
     await tab(p, 'views').click(); await expect(p.page.getByText('orders_view', { exact: true })).toBeVisible(); await tab(p, 'collections').click();
     await row(p, 'orders').click(); await expect(p.page.getByText('status_1', { exact: true })).toBeVisible(); await expect(p.page.getByText('failed', { exact: true })).toBeVisible();
     await tab(p, 'validation').click(); await expect(p.page.getByText(text(p, 'validationLevel').replace('{value}', 'strict'), { exact: true })).toBeVisible();
     await tab(p, 'documents').click(); await expect(p.page.getByText('doc-1', { exact: true })).toBeVisible();
-    const toggle = button(p, 'showJson').first(); await expect(toggle).toHaveAttribute('aria-expanded', 'false'); await toggle.click(); await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const toggle = button(p, 'showJson').first(); await expect(toggle).toHaveAttribute('aria-expanded', 'false'); await toggle.click(); // The accessible name flips to Ocultar JSON, so the expanded trigger is found by its new name.
+    await expect(button(p, 'hideJson').first()).toHaveAttribute('aria-expanded', 'true');
     // The expansion survives a tab round trip for the same collection.
     await tab(p, 'indexes').click(); await tab(p, 'documents').click(); await expect(button(p, 'hideJson').first()).toHaveAttribute('aria-expanded', 'true');
     await check.assertLocale(p);
@@ -103,7 +104,7 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) test.de
     }
     // An Anterior edit gets a new key.
     await h.open({ create: ['create-500', 'create-success'] }); await ready(p); dialog = await wizard(p); await button(p, 'wizard.confirm', dialog).click(); await expect(dialog.getByTestId('mongo-wizard-outcome')).toBeVisible();
-    await button(p, 'previous', dialog).click(); await dialog.getByRole('checkbox', { name: 'orders', exact: true }).click(); await button(p, 'next', dialog).click(); await button(p, 'wizard.confirm', dialog).click(); await expect(dialog.getByTestId('mongo-wizard-result')).toBeVisible();
+    await button(p, 'previous', dialog).click(); await dialog.getByRole('checkbox', { name: /^orders( \(.*\))?$/ }).click(); await button(p, 'next', dialog).click(); await button(p, 'wizard.confirm', dialog).click(); await expect(dialog.getByTestId('mongo-wizard-result')).toBeVisible();
     expect(posts(h)[1].key).not.toBe(posts(h)[0].key);
     // PostgreSQL branch.
     await h.open({ create: ['create-postgres-credential'] }); await ready(p); dialog = await wizard(p, { upto: 'engine' });
