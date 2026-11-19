@@ -25,7 +25,7 @@ function validate(t, files) {
   const checks = ['data', 'action', 'error-empty', 'accessibility', 'runtime-health', 'responsive', 'visual-review', 'kit-conformance'];
   writeFileSync(join(pages, 'overview.manifest.ts'), 'export default {}');
   writeFileSync(join(pages, 'overview.spec.mjs'), checks.map((name) => `test('${name}', async () => { await check(); });`).join('\n'));
-  for (const [name, body] of Object.entries(files)) writeFileSync(join(src, name), `${body.startsWith('import * as Kit') ? '' : "import { DataTable } from '@gntik-ai/blocks'\n"}${body}\n`);
+  for (const [name, body] of Object.entries(files)) writeFileSync(join(src, name), `${/^(?:import |export \*|export \{[^}]*\} from)/.test(body) ? '' : "import { DataTable } from '@gntik-ai/blocks'\n"}${body}\n`);
   return runCli(['tests/parity/validate.mjs', pages, '--src', src]);
 }
 
@@ -94,6 +94,25 @@ const negatives = {
   'a receiver method call that redefines rows': 'export function A() { const shared = { rows: items }; shared.__defineGetter__(\'rows\', () => undefined); return <DataTable {...shared} /> }',
   'a computed receiver method call that redefines rows': 'export function A() { const shared = { rows: items }; shared[\'__defineGetter__\'](\'rows\', () => undefined); return <DataTable {...shared} /> }',
 };
+// A kit DataTable that reaches a page through a re-export or a local barrel cannot be followed per file, so the file that re-exports it is refused.
+const reexports = {
+  'a named re-export': "export { DataTable } from '@gntik-ai/blocks'",
+  'a renamed re-export': "export { DataTable as Table } from '@gntik-ai/blocks'",
+  'a star re-export': "export * from '@gntik-ai/blocks'",
+  'a namespace re-export': "export * as Kit from '@gntik-ai/blocks'",
+  'a re-export of a local kit import': "import { DataTable } from '@gntik-ai/blocks'\nexport { DataTable }",
+  'a default re-export of the kit table': "import { DataTable } from '@gntik-ai/blocks'\nexport default DataTable",
+  'a dynamic import of the kit': "export const load = () => import('@gntik-ai/blocks')",
+  'a require of the kit': "const kit = require('@gntik-ai/blocks')\nexport const Table = kit.DataTable",
+};
+for (const [name, body] of Object.entries(reexports)) {
+  test(`parity:validate fails ${RULE} for ${name}, even when the page that renders it supplies no rows through a local barrel`, async (t) => {
+    const result = await validate(t, { 'barrel.ts': body, 'page.tsx': "import { DataTable, Table } from './barrel'\nexport const A = () => <><DataTable columns={columns} /><Table columns={columns} /></>" });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /barrel\.ts:\d+: parity\/no-implicit-sample-data:/);
+  });
+}
+
 for (const [name, body] of Object.entries(negatives)) {
   test(`parity:validate fails ${RULE} for ${name}`, async (t) => {
     const result = await validate(t, { 'fixture.tsx': body });

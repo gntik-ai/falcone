@@ -9,7 +9,9 @@
 // Anything else fails: shadowed names, parameters (with or without defaults), `let`/`var`, reassignment or mutation, a
 // later spread, an unresolvable spread, `rows` set to undefined/null, a method call on the binding (it may redefine `rows`),
 // and any use of the kit DataTable outside JSX, including through a namespace import that is destructured, indexed, aliased
-// or passed on.
+// or passed on. A file that re-exports the kit (`export { DataTable } from`, `export * from`, `export * as Kit from`), or that
+// loads it with a dynamic import or a require, is refused as well: the files that consume it through a local barrel cannot be
+// followed one by one, so the table would reach a page under a name this rule never sees.
 import ts from 'typescript';
 
 export const RULE = 'parity/no-implicit-sample-data';
@@ -23,6 +25,8 @@ const isNullish = (node) => {
   return !node || node.kind === ts.SyntaxKind.NullKeyword || ts.isVoidExpression(node) || (ts.isIdentifier(node) && node.text === 'undefined');
 };
 const propertyName = (name) => (ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : null);
+
+const isKitModule = (node) => !!node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && node.text.startsWith('@gntik-ai/');
 
 function kitBindings(source) {
   const direct = new Set();
@@ -150,7 +154,6 @@ export function scanSource(fileName, text) {
   if (!text.includes('@gntik-ai/')) return [];
   const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, /\.[jt]sx$/.test(fileName) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const { direct, namespaces } = kitBindings(source);
-  if (!direct.size && !namespaces.size) return [];
   const hits = [];
   const report = (node, message) => hits.push({ line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1, message });
   const isKitTag = (tag) => (ts.isIdentifier(tag) && direct.has(tag.text)) || (ts.isPropertyAccessExpression(tag) && ts.isIdentifier(tag.expression) && namespaces.has(tag.expression.text) && tag.name.text === 'DataTable');
@@ -169,6 +172,15 @@ export function scanSource(fileName, text) {
   const visit = (node) => {
     if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && isKitTag(node.tagName)) {
       if (!rowsProvided(node)) report(node, 'DataTable renders the kit sample rows: its `rows` prop is not provably supplied');
+    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && isKitModule(node.moduleSpecifier)) {
+      // `export type { DataTable } from` and a named re-export of anything else leave the table alone.
+      if (!node.isTypeOnly && (!node.exportClause || ts.isNamespaceExport(node.exportClause) || node.exportClause.elements.some((element) => (element.propertyName ?? element.name).text === 'DataTable'))) {
+        report(node, 'the kit is re-exported, so a DataTable reaching a page through this barrel cannot be proven to receive `rows`');
+      }
+      return;
+    } else if ((ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require')) && node.arguments[0] && isKitModule(node.arguments[0]))
+      || (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && isKitModule(node.moduleReference.expression))) {
+      report(node, 'the kit is loaded outside a static import, so its DataTable cannot be followed and its `rows` prop cannot be proven');
     } else if (ts.isJsxClosingElement(node) || ts.isImportDeclaration(node) || ts.isTypeNode(node)) {
       return;
     } else if (ts.isIdentifier(node) && direct.has(node.text) && !(ts.isJsxOpeningLikeElement(node.parent) && node.parent.tagName === node)

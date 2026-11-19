@@ -49,4 +49,6 @@ A parity journey SHALL fail when the page shows a string of `kit-sample-strings.
 state: after `open()`, after each guarded action or readiness assertion, and before teardown.
 `parity:validate` SHALL fail with `parity/no-implicit-sample-data` for a kit `DataTable` whose `rows` is
 not provably supplied, including missing rows, shadowing, reassignment, a later override and an
-unresolvable spread.
+unresolvable spread. A file that re-exports the kit (named, renamed, `export *` or namespace) or loads
+it by dynamic import or `require` SHALL fail too, because a table consumed through a local barrel
+cannot be followed.
