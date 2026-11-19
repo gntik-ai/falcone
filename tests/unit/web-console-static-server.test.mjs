@@ -559,7 +559,7 @@ async function startNginx(t, confPath, root, upstreamPort) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try {
       const health = await request(port, '/healthz');
-      if (health.statusCode === 200) return { port };
+      if (health.statusCode === 200) return { port, errorLog: join(dir, 'error.log') };
     } catch {
       // not listening yet
     }
@@ -568,16 +568,29 @@ async function startNginx(t, confPath, root, upstreamPort) {
   throw new Error(`nginx did not start for ${confPath}: ${await readFile(join(dir, 'error.log'), 'utf8').catch(() => '')}`);
 }
 
+// A failed assertion carries nginx's own error log, so a CI failure names the request nginx mishandled.
+async function withNginxLog(errorLog, run) {
+  try {
+    await run();
+  } catch (error) {
+    const log = await readFile(errorLog, 'utf8').catch(() => '');
+    if (error instanceof Error) error.message += `\nnginx error.log:\n${log || '(empty)'}`;
+    throw error;
+  }
+}
+
 for (const confPath of ['apps/web-console/nginx.conf', 'deploy/kind/web-console/nginx.conf']) {
   test(`${confPath} serves the next index, redirects /next and answers /healthz (runtime)`, { skip: nginxBinary ? false : 'nginx is not installed; PR CI runs this' }, async (t) => {
     const { root, files } = await createDistRoot(t);
-    const { port } = await startNginx(t, confPath, root, 9);
-    await assertConsoleRoutes(port, confPath, files['/index.html']);
-    await assertNextRedirects(port, confPath);
-    await assertTraversalRefused(port, confPath, { server: 'nginx' });
-    const asset = await request(port, '/assets/app.4f3c2a1b.js');
-    assert.equal(asset.statusCode, 200);
-    assert.equal(asset.headers['cache-control'], IMMUTABLE);
+    const { port, errorLog } = await startNginx(t, confPath, root, 9);
+    await t.test('serves the next index at every console route and answers /healthz', () => withNginxLog(errorLog, () => assertConsoleRoutes(port, confPath, files['/index.html'])));
+    await t.test('redirects /next byte for byte and refuses unsafe targets', () => withNginxLog(errorLog, () => assertNextRedirects(port, confPath)));
+    await t.test('refuses traversal before location dispatch', () => withNginxLog(errorLog, () => assertTraversalRefused(port, confPath, { server: 'nginx' })));
+    await t.test('serves assets immutable', () => withNginxLog(errorLog, async () => {
+      const asset = await request(port, '/assets/app.4f3c2a1b.js');
+      assert.equal(asset.statusCode, 200);
+      assert.equal(asset.headers['cache-control'], IMMUTABLE);
+    }));
   });
 }
 
