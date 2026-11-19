@@ -7,7 +7,9 @@
 //    DataTable elements or read through property access), and no later spread or attribute can override it.
 //
 // Anything else fails: shadowed names, parameters (with or without defaults), `let`/`var`, reassignment or mutation, a
-// later spread, an unresolvable spread, `rows` set to undefined/null, and any use of the kit DataTable outside JSX.
+// later spread, an unresolvable spread, `rows` set to undefined/null, a method call on the binding (it may redefine `rows`),
+// and any use of the kit DataTable outside JSX, including through a namespace import that is destructured, indexed, aliased
+// or passed on.
 import ts from 'typescript';
 
 export const RULE = 'parity/no-implicit-sample-data';
@@ -102,7 +104,9 @@ function isNeverMutated(scope, declaration, name) {
           || ts.isSpreadElement(outer)
           || ts.isSpreadAssignment(outer)
           || ts.isArrayLiteralExpression(outer) || ts.isObjectLiteralExpression(outer) || ts.isForInStatement(outer) || ts.isForOfStatement(outer);
-        propertyRead = !written;
+        // A call on the binding (`shared.__defineGetter__('rows', ...)`) can redefine rows, so it is not a plain read.
+        const called = (ts.isCallExpression(outer) && outer.expression === target) || (ts.isTaggedTemplateExpression(outer) && outer.tag === target) || (ts.isNewExpression(outer) && outer.expression === target);
+        propertyRead = !written && !called;
       }
       if (!spreadIntoJsx && !propertyRead) clean = false;
     }
@@ -141,23 +145,37 @@ function rowsProvided(element) {
 
 // Returns [{ line, message }] for one source file.
 export function scanSource(fileName, text) {
-  if (!text.includes('DataTable')) return [];
+  if (!text.includes('@gntik-ai/')) return [];
   const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, /\.[jt]sx$/.test(fileName) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const { direct, namespaces } = kitBindings(source);
   if (!direct.size && !namespaces.size) return [];
   const hits = [];
   const report = (node, message) => hits.push({ line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1, message });
   const isKitTag = (tag) => (ts.isIdentifier(tag) && direct.has(tag.text)) || (ts.isPropertyAccessExpression(tag) && ts.isIdentifier(tag.expression) && namespaces.has(tag.expression.text) && tag.name.text === 'DataTable');
+  // Only `Kit.Other` and `Kit['Other']` leave the namespace alone. Destructuring, aliasing, passing it on and computed keys
+  // can all produce the kit DataTable under another name, so they are refused.
+  const namespaceUseIsSafe = (node) => {
+    const parent = node.parent;
+    if ((ts.isPropertyAccessExpression(parent) || ts.isPropertyAssignment(parent) || ts.isPropertySignature(parent)) && parent.name === node) return true;
+    if (ts.isPropertyAccessExpression(parent) && parent.expression === node) return parent.name.text !== 'DataTable' || (ts.isJsxOpeningLikeElement(parent.parent) && parent.parent.tagName === parent);
+    if (ts.isElementAccessExpression(parent) && parent.expression === node) {
+      const key = parent.argumentExpression;
+      return !!key && (ts.isStringLiteral(key) || ts.isNoSubstitutionTemplateLiteral(key)) && key.text !== 'DataTable';
+    }
+    return false;
+  };
   const visit = (node) => {
     if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && isKitTag(node.tagName)) {
       if (!rowsProvided(node)) report(node, 'DataTable renders the kit sample rows: its `rows` prop is not provably supplied');
-    } else if (ts.isJsxClosingElement(node) || ts.isImportSpecifier(node) || ts.isTypeNode(node)) {
+    } else if (ts.isJsxClosingElement(node) || ts.isImportDeclaration(node) || ts.isTypeNode(node)) {
       return;
     } else if (ts.isIdentifier(node) && direct.has(node.text) && !(ts.isJsxOpeningLikeElement(node.parent) && node.parent.tagName === node)
       && !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) && !(ts.isPropertyAssignment(node.parent) && node.parent.name === node)) {
       report(node, 'the kit DataTable is used outside JSX, so its `rows` prop cannot be proven');
     } else if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && namespaces.has(node.expression.text) && node.name.text === 'DataTable' && !(ts.isJsxOpeningLikeElement(node.parent) && node.parent.tagName === node)) {
       report(node, 'the kit DataTable is used outside JSX, so its `rows` prop cannot be proven');
+    } else if (ts.isIdentifier(node) && namespaces.has(node.text) && !namespaceUseIsSafe(node)) {
+      report(node, 'the kit namespace is used in a way that can reach DataTable outside JSX, so its `rows` prop cannot be proven');
     }
     ts.forEachChild(node, visit);
   };

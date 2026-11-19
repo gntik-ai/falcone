@@ -25,7 +25,7 @@ function validate(t, files) {
   const checks = ['data', 'action', 'error-empty', 'accessibility', 'runtime-health', 'responsive', 'visual-review', 'kit-conformance'];
   writeFileSync(join(pages, 'overview.manifest.ts'), 'export default {}');
   writeFileSync(join(pages, 'overview.spec.mjs'), checks.map((name) => `test('${name}', async () => { await check(); });`).join('\n'));
-  for (const [name, body] of Object.entries(files)) writeFileSync(join(src, name), `import { DataTable } from '@gntik-ai/blocks'\n${body}\n`);
+  for (const [name, body] of Object.entries(files)) writeFileSync(join(src, name), `${body.startsWith('import * as Kit') ? '' : "import { DataTable } from '@gntik-ai/blocks'\n"}${body}\n`);
   return runCli(['tests/parity/validate.mjs', pages, '--src', src]);
 }
 
@@ -81,6 +81,14 @@ const negatives = {
   'a for-of head writing rows': 'export function A() { const shared = { rows: items }; for (shared.rows of [undefined]) {} return <DataTable {...shared} /> }',
   'a logical assignment of rows': 'export function A() { const shared = { rows: items }; shared.rows ??= undefined; return <DataTable {...shared} /> }',
   'a destructured binding': 'export function A({ source }) { const { shared } = source; return <DataTable {...shared} /> }',
+  'a namespace member destructured into a local': "import * as Kit from '@gntik-ai/blocks'\n" + 'export const A = () => { const { DataTable: Table } = Kit; return <Table columns={columns} /> }',
+  'a namespace member destructured under its own name': "import * as Kit from '@gntik-ai/blocks'\n" + 'export const A = () => { const { DataTable } = Kit; return <DataTable columns={columns} /> }',
+  'a namespace bracket access': "import * as Kit from '@gntik-ai/blocks'\n" + "export const A = () => { const Table = Kit['DataTable']; return <Table columns={columns} /> }",
+  'a namespace computed access': "import * as Kit from '@gntik-ai/blocks'\n" + "export const A = ({ name }) => { const Table = Kit[name]; return <Table columns={columns} /> }",
+  'a namespace aliased as a value': "import * as Kit from '@gntik-ai/blocks'\n" + 'export const A = () => { const K = Kit; return <K.DataTable columns={columns} /> }',
+  'a namespace passed to a function': "import * as Kit from '@gntik-ai/blocks'\n" + 'export const A = () => { const T = pick(Kit); return <T columns={columns} /> }',
+  'a receiver method call that redefines rows': 'export function A() { const shared = { rows: items }; shared.__defineGetter__(\'rows\', () => undefined); return <DataTable {...shared} /> }',
+  'a computed receiver method call that redefines rows': 'export function A() { const shared = { rows: items }; shared[\'__defineGetter__\'](\'rows\', () => undefined); return <DataTable {...shared} /> }',
 };
 for (const [name, body] of Object.entries(negatives)) {
   test(`parity:validate fails ${RULE} for ${name}`, async (t) => {
