@@ -91,7 +91,7 @@ async function sendStatic(req, res, filePath, body, contentType) {
 
 const [GW_HOST, GW_PORT = '9080'] = (process.env.GATEWAY_UPSTREAM ?? 'falcone-apisix:9080').split(':');
 const server = http.createServer(async (req, res) => {
-  if (req.url === '/healthz') { res.writeHead(200); return res.end('ok'); }
+  if (req.url === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('ok'); }
   // Proxy the same-origin API surface to the gateway (must precede the SPA fallback).
   if (req.url === '/v1' || req.url?.startsWith('/v1/')) {
     const upstream = http.request(
@@ -119,7 +119,7 @@ const server = http.createServer(async (req, res) => {
   const prefix = (req.url ?? '/').match(/^\/(?:n|%6[eE])(?:e|%65)(?:x|%78)(?:t|%74)(?=\/|\?|$)/);
   if (prefix) {
     const suffix = req.url.slice(prefix[0].length);
-    if (suffix.startsWith('//') || suffix.startsWith('/\\')) {
+    if (/^\/(?:\/|\\|%5c)/i.test(suffix)) {
       res.writeHead(400, { ...SECURITY_HEADERS, 'content-type': 'text/plain' });
       return res.end('Bad request');
     }

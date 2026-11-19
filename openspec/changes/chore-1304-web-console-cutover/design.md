@@ -25,6 +25,19 @@ The health response sets its default type to text/plain instead of adding a
 second Content-Type; the request matrix checks the raw header count under an
 application/octet-stream parent default.
 
+Checker follow-up: Node also emits one text/plain Content-Type for health,
+including when the bundle is absent. The transport-only request regression
+failed on the missing header before this correction. The same regression caught
+a 301 instead of 400 for /next/%5Cexternal.test/x; Node now rejects that leading
+encoded backslash like nginx, without decoding redirect suffixes.
+Reproduction command: node tests/unit/web-console-static-routing.test.mjs.
+
+The non-blocking error-response differences remain outside the redirect parity
+contract: nginx rejects traversal at server level, while Node retains its existing
+proxy-first /v1 handling and static-error security headers. This preserves the
+approved API routing boundary. The parity checkpoint relies on Playwright's
+existing worker isolation; concurrent tests within one worker are not enabled.
+
 The cutover CI job grants only contents, issues and pull-requests read access.
 Its workflow contract checks those effective permissions and an unconditional
 live gate. PR CI must confirm that the falcone GITHUB_TOKEN can also read the

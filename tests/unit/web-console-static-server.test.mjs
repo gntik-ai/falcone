@@ -50,7 +50,7 @@ async function cutoverMatrix(port, index) {
     assertSecurityHeaders(response.headers, path);
     assert.equal(response.headers['content-security-policy'], CSP, path);
   }
-  for (const path of ['/x/../y', '/next/../x', '/next/%2e%2e/x', '/%6Eext/%2E%2e%2Fx', '/next/..%5c..%5cx', '/next//external.test/x']) {
+  for (const path of ['/x/../y', '/next/../x', '/next/%2e%2e/x', '/%6Eext/%2E%2e%2Fx', '/next/..%5c..%5cx', '/next//external.test/x', '/next/%5Cexternal.test/x', '/%6Eext/%5cexternal.test/x']) {
     assert.equal((await request(port, path)).statusCode, 400, path);
   }
   for (const path of ['/legacy', '/legacy/', '/legacy/login', '/next%2Fconsole', '/%6Eext%2fconsole', '/assets/missing.js']) assert.equal((await request(port, path)).statusCode, 404, path);

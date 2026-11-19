@@ -10,5 +10,7 @@
 - [ ] PR CI: socket/nginx request matrix, Docker context/image tests and browser suites.
 - [x] Companion deployment maker: digest/tag chart rendering tests (charts commit 7940297bb75dba989db8061769374466af5a6a6f, independently checked).
 - [x] Correct cutover-job API read permissions and use a single plain-text health Content-Type.
+- [x] Reproduce the missing Node health Content-Type through the HTTP handler, add it, and reconcile the routing assertion with the shared request matrix.
+- [x] Reject encoded leading backslashes after the next prefix in both servers; cover literal and encoded prefixes in the shared request matrix.
 - [ ] PR CI: confirm the falcone job token can read gntik-ai/gntik-ui issues 30 and 13 and PRs 86 and 49; API errors must keep failing closed.
 - [ ] Operator: attach switch digest, parity/visual review and staging rollback evidence.

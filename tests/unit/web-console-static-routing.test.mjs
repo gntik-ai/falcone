@@ -119,7 +119,8 @@ test('raw and encoded traversal and malformed paths cannot escape either static 
   for (const path of [
     '/next/../index.html', '/next/%2e%2e/index.html', '/next/%2E%2E%2Findex.html',
     '/next/assets/../../outside.html', '/next/..%5c..%5coutside.html',
-    '/%2e%2e/outside.html', '/next/%00', '/next/%zz', '/x/../y', '/%6Eext/%2e%2e/x', '/next//external.test/x'
+    '/%2e%2e/outside.html', '/next/%00', '/next/%zz', '/x/../y', '/%6Eext/%2e%2e/x', '/next//external.test/x',
+    '/next/%5Cexternal.test/x', '/%6Eext/%5cexternal.test/x'
   ]) {
     const response = await request(path);
     assert.equal(response.status, 400, path);
@@ -133,5 +134,5 @@ test('a missing next bundle fails closed and never falls back to legacy', async 
   for (const path of ['/', '/index.html', '/login', '/console/tenants', '/assets/app.js']) {
     assert.equal((await request(path)).status, 404, path);
   }
-  assert.deepEqual(await request('/healthz'), { status: 200, headers: {}, body: 'ok' });
+  assert.deepEqual(await request('/healthz'), { status: 200, headers: { 'content-type': 'text/plain' }, body: 'ok' });
 });
