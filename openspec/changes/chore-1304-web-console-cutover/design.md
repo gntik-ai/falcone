@@ -21,6 +21,23 @@ letters of the next prefix. Reserved suffix/query bytes remain unchanged.
 Traversal is rejected before routing/redirects. A suffix that could produce a
 network-path redirect is rejected instead of emitting an external Location.
 Security headers are location-scoped so proxy responses remain undecorated.
+The health response sets its default type to text/plain instead of adding a
+second Content-Type; the request matrix checks the raw header count under an
+application/octet-stream parent default.
+
+The cutover CI job grants only contents, issues and pull-requests read access.
+Its workflow contract checks those effective permissions and an unconditional
+live gate. PR CI must confirm that the falcone GITHUB_TOKEN can also read the
+two gntik-ai/gntik-ui issue/PR pairs. Cross-repository access cannot be verified
+offline. An API denial remains a gate failure; there is no offline fallback.
+If access is denied, the operator must provision an approved token with read
+access to both repositories before rerunning the gate. No credentials are
+retrieved or introduced by this source change.
+
+The count 57 and prior tag in the gate intentionally bind this switch to its
+approved snapshot. Generalizing this release-specific safety check is outside
+the switch-release scope. The late-sample browser negative is enforced by the
+existing ui-parity-negatives job and its required aggregate result.
 
 Rollback evidence is operator-recorded from staging imageID and the GHCR manifest
 on 2026-11-19. The switch digest must be recorded after publication. A staging

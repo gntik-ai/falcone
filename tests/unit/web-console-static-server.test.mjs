@@ -60,6 +60,8 @@ async function cutoverMatrix(port, index) {
   const health = await request(port, '/healthz');
   assert.equal(health.statusCode, 200);
   assert.equal(health.body.toString(), 'ok');
+  assert.match(health.headers['content-type'], /^text\/plain(?:;|$)/);
+  assert.equal(health.rawHeaders.filter((value, index) => index % 2 === 0 && value.toLowerCase() === 'content-type').length, 1);
   const proxied = await request(port, '/v1/x?x=%2F');
   assert.equal(proxied.statusCode, 209);
   assert.equal(proxied.body.toString(), '/v1/x?x=%2F');
@@ -88,7 +90,7 @@ for (const implementation of ['node', 'nginx']) {
       await writeFile(config, `pid ${root}/nginx.pid;
 error_log stderr;
 events {}
-http { types { text/html html; text/javascript js; text/css css; } access_log off; proxy_temp_path ${root}/proxy; client_body_temp_path ${root}/body;
+http { default_type application/octet-stream; types { text/html html; text/javascript js; text/css css; } access_log off; proxy_temp_path ${root}/proxy; client_body_temp_path ${root}/body;
 ${source}
 }`);
       const check = spawnSync('nginx', ['-t', '-c', config, '-p', root], { encoding: 'utf8' });
@@ -193,6 +195,7 @@ function request(port, path, { method = 'GET', headers = {}, body } = {}) {
           resolveResponse({
             statusCode: res.statusCode,
             headers: res.headers,
+            rawHeaders: res.rawHeaders,
             body: Buffer.concat(chunks)
           });
         });

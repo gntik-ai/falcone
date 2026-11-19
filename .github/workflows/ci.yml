@@ -529,6 +529,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: [web-console-next, ui-parity]
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

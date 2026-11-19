@@ -6,6 +6,17 @@ import { spawn } from 'node:child_process';
 import test from 'node:test';
 import YAML from 'yaml';
 
+test('the cutover gate can read blocking issues and pull requests with its CI token', () => {
+  const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
+  const job = ci.jobs['web-console-cutover'];
+  const permissions = job.permissions ?? ci.permissions;
+  assert.deepEqual(permissions, { contents: 'read', issues: 'read', 'pull-requests': 'read' });
+  const gate = job.steps.find((step) => step.run === 'node scripts/release/cutover-gate.mjs');
+  assert.equal(gate.env.GITHUB_TOKEN, '${{ secrets.GITHUB_TOKEN }}');
+  assert.equal(gate.if, undefined);
+  assert.equal(gate['continue-on-error'], undefined);
+});
+
 test('the next-console CI job checks the root console and release commands without publication or credentials', () => {
   const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
   const job = ci.jobs['web-console-next'];
