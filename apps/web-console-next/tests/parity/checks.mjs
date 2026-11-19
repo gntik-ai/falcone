@@ -5,7 +5,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runCli } from '../run-cli.mjs';
 
-const appRoot = fileURLToPath(new URL('../../', import.meta.url));
+// A string path, not new URL(): under vitest's jsdom environment the global URL is not Node's, and fileURLToPath rejects it.
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 // Rows the kit DataTable shows when a page forgets its `rows` prop (see scripts/extract-kit-sample-strings.mjs).
 const kitSampleStrings = JSON.parse(await readFile(resolve(appRoot, 'tests/parity/kit-sample-strings.json'), 'utf8')).strings;
 const selector = (locator, locale) => typeof locator === 'string' ? locator : locator[locale];

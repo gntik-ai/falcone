@@ -112,12 +112,16 @@ export const test = base.extend({
         await assertNoSampleData(parity);
       },
     };
-    guardActions(page);
-    bindSampleDataGuard(parity, assertNoSampleData);
+    // The vitest harness tests drive this fixture with a stub that has no rendering API: there is no page to read.
+    const rendered = typeof page.locator === 'function';
+    if (rendered) {
+      guardActions(page);
+      bindSampleDataGuard(parity, assertNoSampleData);
+    }
     try {
       await use(parity);
       // Teardown is a settled state too: sample rows that appeared after the last guarded step still fail the journey.
-      if (!page.isClosed()) await assertNoSampleData(parity);
+      if (rendered && !page.isClosed()) await assertNoSampleData(parity);
     } finally {
       unbindSampleDataGuard();
       expect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]);

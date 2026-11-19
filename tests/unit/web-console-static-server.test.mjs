@@ -75,12 +75,17 @@ const TRAVERSAL_REFUSALS = [
   '/x/../v1/foo', '/next/../v1/foo', '/x/%2e%2e/v1/foo', '/assets/../../outside.html', '/next/a/..?x=1', '/%00'
 ];
 
-async function assertTraversalRefused(port, label) {
+// nginx's own request parser answers these with a bare 400 before any location runs (a target that climbs above the
+// root, or a NUL), so that response carries none of the configured headers. The status and the absence of a
+// redirect are still required of it.
+const NGINX_CORE_REFUSALS = new Set(['/%2e%2e/healthz', '/assets/../../outside.html', '/%00']);
+
+async function assertTraversalRefused(port, label, { server = 'node' } = {}) {
   for (const path of TRAVERSAL_REFUSALS) {
     const response = await request(port, path);
     assert.equal(response.statusCode, 400, `${label} ${path}`);
     assert.equal(response.headers.location, undefined, `${label} ${path}`);
-    assertSecurityHeaders(response.headers, `${label} ${path} refusal`);
+    if (!(server === 'nginx' && NGINX_CORE_REFUSALS.has(path))) assertSecurityHeaders(response.headers, `${label} ${path} refusal`);
     assert.notEqual(response.body.toString(), 'ok', `${label} ${path} is not the health probe`);
   }
 }
@@ -569,7 +574,7 @@ for (const confPath of ['apps/web-console/nginx.conf', 'deploy/kind/web-console/
     const { port } = await startNginx(t, confPath, root, 9);
     await assertConsoleRoutes(port, confPath, files['/index.html']);
     await assertNextRedirects(port, confPath);
-    await assertTraversalRefused(port, confPath);
+    await assertTraversalRefused(port, confPath, { server: 'nginx' });
     const asset = await request(port, '/assets/app.4f3c2a1b.js');
     assert.equal(asset.statusCode, 200);
     assert.equal(asset.headers['cache-control'], IMMUTABLE);

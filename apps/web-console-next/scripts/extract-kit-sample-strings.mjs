@@ -24,7 +24,8 @@ const PACKAGE = '@gntik-ai/blocks';
 
 function lockIntegrity(version) {
   const lock = readFileSync(join(repoRoot, 'pnpm-lock.yaml'), 'utf8');
-  const match = lock.match(new RegExp(`^  '${PACKAGE}@${version.replace(/\./g, '\\.')}':\\n    resolution: \\{integrity: (sha512-[^,}]+)`, 'm'));
+  const escaped = `${PACKAGE}@${version}`.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+  const match = lock.match(new RegExp(`^  '${escaped}':\\n    resolution: \\{integrity: (sha512-[^,}]+)`, 'm'));
   if (!match) throw new Error(`pnpm-lock.yaml records no integrity for ${PACKAGE}@${version}`);
   return match[1];
 }

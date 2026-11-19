@@ -147,7 +147,10 @@ const server = http.createServer(async (req, res) => {
   const rest = rawRemainder(rawPath, '/next');
   if (rest !== null) {
     if (/^\/[/\\]/.test(rest)) return sendText(res, 400, 'Bad request');
-    res.writeHead(301, { ...SECURITY_HEADERS, location: (rest || '/') + rawQuery });
+    const location = (rest || '/') + rawQuery;
+    // Same-origin only: one leading slash, no backslash, no whitespace or control character anywhere.
+    if (!/^\/(?![/\\])[^\\\s\x00-\x1f\x7f]*$/.test(location)) return sendText(res, 400, 'Bad request');
+    res.writeHead(301, { ...SECURITY_HEADERS, location });
     return res.end();
   }
   // Nothing serves a /next or /legacy path any more, not even through an encoded separator.
