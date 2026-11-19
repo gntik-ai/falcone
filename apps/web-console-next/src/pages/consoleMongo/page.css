@@ -1,0 +1,4 @@
+/* The legacy page has no search. PageToolbar always renders one, so hide it and keep Actualizar and Nueva base de datos. */
+.mongo-toolbar div:has(> input[type="search"]) { display: none; }
+.mongo-toolbar > div:first-child { flex: 0 1 auto; min-width: 0; }
+.mongo-toolbar { justify-content: flex-end; }
