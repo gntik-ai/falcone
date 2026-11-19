@@ -7,7 +7,7 @@ import { collectionPath, collectionsPath, databasesPath, documentsPath, document
 import { focusRing, useCopy } from './consoleMongo/copy'
 import { PagedBody } from './consoleMongo/Footer'
 import { Snippets } from './consoleMongo/Snippets'
-import { Chip, Empty, Heading, Section, Table, Tag } from './consoleMongo/States'
+import { Chip, Empty, FailureView, Heading, Loading, Section, Table, Tag } from './consoleMongo/States'
 import { LocalizedToaster } from './consoleMongo/Toaster'
 import { useCursorList, useOne } from './consoleMongo/useRemote'
 import { Wizard } from './consoleMongo/Wizard'
@@ -15,7 +15,10 @@ import './consoleMongo/page.css'
 
 function WorkspaceGate() {
   const { t } = useCopy(), context = useConsoleContext(), { can } = usePermissions()
+  // Legacy WorkspaceRequiredState.tsx:35-58: loading, error with Reintentar, then the picker, create link or denial note.
   // Tenant discovery and workspaces share loading and error in the shell context. This gate only mounts under an active tenant.
+  if (context.loading) return <section role="status"><Heading title={t('workspaceLoading')} description={t('workspaceLoadingDescription')} level="h3" /><Loading label={t('workspaceLoading')} /></section>
+  if (context.error) return <FailureView section="workspace" error={context.error} retry={() => void context.reloadWorkspaces?.()} />
   const action: ComponentPropsOf<typeof EmptyState>['primaryAction'] = context.workspaces.length
     ? <Field invalid={false} disabled={false} className="min-w-0"><FieldLabel htmlFor="mongo-workspace">{t('workspacePicker')}</FieldLabel><SimpleSelect id="mongo-workspace" value="" defaultValue="" placeholder={t('workspacePlaceholder')} clearable={false} size="md" items={context.workspaces.map((workspace) => ({ value: workspace.workspaceId, label: workspace.displayName }))} onValueChange={(id) => context.selectWorkspace(id || null)} className={`w-full min-w-0 ${focusRing}`} /></Field>
     : can('tenant.workspaces.create') ? <Link href="/console/workspaces" tone="primary" underline="always" external={false} externalLabel="" className={focusRing}>{t('workspaceCreate')}</Link> : <Text as="p" variant="body" tone="muted">{t('workspaceDenied')}</Text>
@@ -59,7 +62,7 @@ function Surface() {
   const { activeTenantId: tenant, activeWorkspaceId: workspace } = context
   const [database, setDatabase] = useState<string | null>(null), [picked, setPicked] = useState<{ workspace: string | null; name: string } | null>(null)
   const [databaseTab, setDatabaseTab] = useState('collections'), [collectionTab, setCollectionTab] = useState('indexes')
-  const [wizard, setWizard] = useState(false), [expanded, setExpanded] = useState<{ target: string | null; ids: string[] }>({ target: null, ids: [] })
+  const [wizard, setWizard] = useState(false), [expanded, setExpanded] = useState<number[]>([])
   const toolbar = useRef<HTMLDivElement>(null), breadcrumbRef = useRef<HTMLElement | null>(null), crumbIntent = useRef(false), lastWorkspace = useRef(workspace)
 
   // A collection belongs to the workspace it was picked in, so a switch never requests the old collection under the new workspace.
@@ -73,9 +76,10 @@ function Surface() {
   const indexes = useCursorList<MongoIndex>(target ? `indexes:${target}` : null, (cursor) => listUrl(indexesPath(database!, collection!), cursor))
   const documents = useCursorList<MongoDocument>(target ? `documents:${target}` : null, (cursor) => documentsUrl(documentsPath(workspace!, database!, collection!), cursor))
 
-  const expandedIds = expanded.target === target ? expanded.ids : []
-  const toggleDocument = (id: string, open: boolean) => setExpanded({ target, ids: open ? [...expandedIds.filter((item) => item !== id), id] : expandedIds.filter((item) => item !== id) })
-  function chooseCollection(name: string | null) { setPicked(name === null ? null : { workspace, name }); setCollectionTab('indexes') }
+  // Expansion is keyed by row position like legacy (ConsoleMongoPage.tsx:173, :727), because object-valued _id values can stringify identically.
+  // It is cleared on every collection selection (legacy :309) and kept across tab switches.
+  const toggleDocument = (position: number, open: boolean) => setExpanded((current) => open ? [...current.filter((item) => item !== position), position] : current.filter((item) => item !== position))
+  function chooseCollection(name: string | null) { setPicked(name === null ? null : { workspace, name }); setCollectionTab('indexes'); setExpanded([]) }
   function chooseDatabase(name: string | null) { setDatabase(name); setDatabaseTab('collections'); chooseCollection(null) }
   // A workspace switch refetches collections and views through their keys and drops the collection detail.
   useLayoutEffect(() => { if (lastWorkspace.current !== workspace) { lastWorkspace.current = workspace; chooseCollection(null); setWizard(false) } }, [workspace])
@@ -162,7 +166,7 @@ function Surface() {
             </div>}
           </Section>}
           {collectionTab === 'documents' && <Section key={target} id="mongo-documents" name="documents" title={t('documents')} level="h3" busy={documents.busy} error={documents.error} retry={() => void documents.reload()}>
-            {documents.items.length ? <PagedBody list={documents} name="documents"><div className="min-w-0 space-y-3">{documents.items.map((document, index) => <DocumentCard key={`${String(document._id)}-${index}`} document={document} index={index} open={expandedIds.includes(String(document._id))} setOpen={(open) => toggleDocument(String(document._id), open)} />)}</div></PagedBody> : <Empty title={t('empty.documents')} />}
+            {documents.items.length ? <PagedBody list={documents} name="documents"><div className="min-w-0 space-y-3">{documents.items.map((document, index) => <DocumentCard key={`${String(document._id)}-${index}`} document={document} index={index} open={expanded.includes(index)} setOpen={(open) => toggleDocument(index, open)} />)}</div></PagedBody> : <Empty title={t('empty.documents')} />}
           </Section>}
         </TabSet>
       </section>
