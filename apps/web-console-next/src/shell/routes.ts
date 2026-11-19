@@ -28,7 +28,7 @@ export const pendingConsoleRoutes: PendingConsoleRoute[] = [
   { path: 'auth-config', migrated: true },
   { path: 'postgres', migrated: true },
   { path: 'postgres/data', migrated: true },
-  { path: 'mongo' },
+  { path: 'mongo', migrated: true },
   { path: 'mongo/data', migrated: true },
   { path: 'kafka', migrated: true },
   { path: 'events/data', migrated: true },

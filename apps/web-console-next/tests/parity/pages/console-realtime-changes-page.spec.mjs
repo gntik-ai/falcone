@@ -200,6 +200,8 @@ for (const locale of ['es', 'en']) for (const width of [375, 768, 1280]) {
       await start(p, 'realtime-sse-malformed'); await expect(rows(p)).toHaveCount(2); await check.assertRuntimeHealth(p);
       await start(p, 'realtime-sse-drop-retry'); await retry(p).click(); await expect(rows(p)).toHaveCount(2); await check.assertRuntimeHealth(p);
       await start(p, 'realtime-sse-404');
+      // /console/mongo is a migrated page now: following the link mounts it, and it lists the tenant's databases.
+      await p.page.route((url) => url.pathname === '/v1/mongo/databases', (route) => route.fulfill({ json: { items: [], page: {} } }));
       await p.page.route((url) => ['/console/mongo', '/console/postgres'].includes(url.pathname), (route) => route.fulfill({ contentType: 'text/html', body: `<html lang="${locale}"><body><main><h1>${c.notFoundMongo}</h1></main></body></html>` }));
       await surface(p).getByRole('link', { name: c.notFoundMongo, exact: true }).click();
       await expect(p.page).toHaveURL(new URL('/console/mongo', server.origin).href);

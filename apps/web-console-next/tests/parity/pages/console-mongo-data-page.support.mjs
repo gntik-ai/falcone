@@ -80,6 +80,9 @@ export async function installMongoDataHarness(parity, server) {
       record(); await gated('delete'); response = failure('delete') ?? { body: fixtures['mongo:delete-ok'] }; if (response.body) state.deleted = true;
     } else if (method === 'POST' && path === paths.keys && body?.keyType === 'anon') {
       record(); response = { body: fixtures['mongo:anon-key-issued-synthetic'] };
+    } else if (method === 'GET' && url.pathname === '/v1/mongo/databases') {
+      // The sidebar link to /console/mongo mounts the migrated databases page, which lists the tenant's databases; not a data-editor request.
+      response = { body: { items: [], page: {} } };
     } else if (method === 'POST' && path === '/v1/auth/login-sessions/synthetic-session/refresh' && state.refresh) {
       record(); response = state.refresh === 'rejected' ? { status: 400, body: {} } : { body: buildConsoleRefreshSessionFixture() };
     } else if (method === 'GET' && url.pathname === '/v1/workspaces' && state.noWorkspace) {
