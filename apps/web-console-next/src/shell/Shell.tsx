@@ -1,6 +1,6 @@
 import { Suspense, useEffect, type ComponentPropsWithRef } from 'react'
 import { ConsoleShell } from '@gntik-ai/templates'
-import { Breadcrumbs, LinkProvider, ThemeCycleButton, useSidebarLayout, useThemeOptions, type NavGroup } from '@gntik-ai/ui'
+import { Breadcrumbs, LinkProvider, useThemeOptions, type NavGroup } from '@gntik-ai/ui'
 import { Link, Outlet, useLocation, matchRoutes, type RouteObject } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { canManageWorkspaceSecrets } from '@in-falcone/console-api/workspace-secrets-access'
@@ -76,9 +76,10 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
   })).filter((group) => group.items.length)
   const breadcrumbs = buildBreadcrumbs(pathname, t)
   const account = useAccountMenu()
+  const themeOptions = useThemeOptions().filter((option) => option.value === 'light' || option.value === 'dark')
   return <LinkProvider component={ShellLink}>
     {/* storageKey is omitted on purpose: no persisted collapsed state, so screenshots do not depend on it. */}
-    <ConsoleShell sidebarLabel={t('shell.navigation')} navLabel={t('shell.navigation')} nav={groups} currentHref={pathname} breadcrumbs={null}
+    <ConsoleShell mainLabel={t('shell.mainContent')} sidebarLabel={t('shell.navigation')} navLabel={t('shell.navigation')} nav={groups} currentHref={pathname} breadcrumbs={null}
       tenants={context.tenants.map((tenant) => ({ id: tenant.tenantId, name: tenant.displayName }))} currentTenantId={context.activeTenantId}
       onTenantSelect={context.selectTenant} tenantLabel={t('shell.tenant')} tenantPlaceholder={t('shell.selectTenant')} tenantEmptyText={t('shell.noTenants')}
       workspaces={context.workspaces.map((workspace) => ({ id: workspace.workspaceId, name: workspace.displayName }))} currentWorkspaceId={context.activeWorkspaceId ?? ''}
@@ -86,33 +87,13 @@ function ShellContent({ platformGlobal }: { platformGlobal: boolean }) {
       hideWorkspaceContext={platformGlobal} contextRegionLabel={t('shell.context')} contextBusy={context.loading} contextStatus={<ContextStatus />}
       user={account.user} userMenuItems={account.userMenuItems} userMenuShowTheme={false} userMenuChildren={<LocaleMenu />} onSignOut={account.onSignOut}
       usage={null} helpHref={null}
-      topbar={{ breadcrumb: <LinkProvider component={ContentLink}><Breadcrumbs items={breadcrumbs} /></LinkProvider>, environment: null, search: <ThemeToggle />, notifications: null, theme: null, user: null }}>
-      <CloseDrawerOnNavigate />
-      {/* The kit's <main> scrolls but is not a tab stop (tabindex=-1). The context controls used to sit inside it; now that they live
-          in the sidebar, this wrapper keeps one keyboard stop inside the scroll region (WCAG 2.1.1, axe scrollable-region-focusable). */}
-      <div tabIndex={0} className="p-4 sm:p-6 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring">
+      topbar={{ breadcrumb: <LinkProvider component={ContentLink}><Breadcrumbs items={breadcrumbs} /></LinkProvider>, environment: null, search: null, notifications: null, theme: 'cycle', themeOptions, user: null }}>
+      <div className="p-4 sm:p-6">
         <ShellErrorBoundary key={pathname}><Suspense fallback={<StatusPage state="loading" />}><LinkProvider component={ContentLink}><Outlet /></LinkProvider></Suspense></ShellErrorBoundary>
       </div>
     </ConsoleShell>
     {account.aboutDialog}
   </LinkProvider>
-}
-
-// TODO(gntik-ui#855): remove with the kit release that passes onNavigate to ConsoleShell's AppSidebarNav.
-// Until then the mobile drawer would stay open after a nav click, so close it on every navigation.
-function CloseDrawerOnNavigate() {
-  const { key } = useLocation()
-  const { setDrawerOpen } = useSidebarLayout()
-  useEffect(() => { setDrawerOpen(false) }, [key])
-  return null
-}
-
-// The kit's built-in topbar `theme: 'cycle'` walks four modes (dark, high contrast, system, light). Falcone offers light and dark only,
-// so the public ThemeCycleButton is limited to those two. The topbar's `search` slot is the only public slot on the right of the bar
-// (search itself is deferred), so the control is rendered there, in the same spot the built-in control occupies.
-function ThemeToggle() {
-  const options = useThemeOptions().filter((option) => option.value === 'light' || option.value === 'dark')
-  return <ThemeCycleButton options={options} />
 }
 
 function ContextStatus() {
