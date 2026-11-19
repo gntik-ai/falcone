@@ -139,11 +139,11 @@ for (const [status, label] of [[403, 'Sin acceso'], [404, 'Recurso no encontrado
 test('403 on the databases read shows no-access in that section without Reintentar', async () => {
   server = setup({ [read('databases')]: () => Response.json({}, { status: 403 }) }); open(); expect(await screen.findByText('Sin acceso')).toBeVisible(); expect(screen.queryByRole('button', { name: 'Reintentar' })).toBeNull()
 })
-test('network failure shows the error panel, retry succeeds and moves focus to the section', async () => {
+test('network failure shows the error panel, retry succeeds and moves focus to the section heading', async () => {
   let failing = true
   server = setup({ [read('databases')]: () => { if (failing) throw new TypeError('raw-backend-message'); return Response.json(fixtures.databases) } }); open()
   const panel = await screen.findByTestId('mongo-failure-databases'); expect(panel.textContent).not.toContain('raw-backend-message'); failing = false
-  fireEvent.click(within(panel).getByRole('button', { name: 'Reintentar' })); await ready(); await waitFor(() => expect(document.getElementById('mongo-databases')).toHaveFocus())
+  fireEvent.click(within(panel).getByRole('button', { name: 'Reintentar' })); await ready(); await waitFor(() => expect(screen.getByRole('heading', { name: 'Bases de datos' })).toHaveFocus())
 })
 test('empty states: every legacy message including the _id_-only index case', async () => {
   server = setup({ [read('databases')]: fixtures.empty }); open(); expect(await screen.findByText('No hay bases de datos MongoDB disponibles para esta organización.')).toBeVisible(); cleanup(); server.verify()

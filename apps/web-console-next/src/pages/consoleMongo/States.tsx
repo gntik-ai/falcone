@@ -66,7 +66,7 @@ export function FailureView({ error, section, title, retry }: { error: Failure; 
 }
 
 // One section of the drill-down. It owns the heading, the skeleton, the failure view and the focus hand-off after Reintentar:
-// a recovered section moves focus to its own region, a failed retry keeps focus on Reintentar.
+// a recovered section moves focus to its own heading, a failed retry keeps focus on Reintentar.
 export function Section({ id, name, title, description, busy, error, retry, children, level = 'h2' }: { id: string; name: string; title: string; description?: string; busy: boolean; error: Failure | null; retry: () => void; children: ReactNode; level?: 'h2' | 'h3' }) {
   const { t } = useCopy()
   const region = useRef<HTMLElement>(null), retried = useRef(false)
@@ -74,7 +74,10 @@ export function Section({ id, name, title, description, busy, error, retry, chil
     if (!retried.current || busy) return
     retried.current = false
     if (error) (retryButton(region.current, t('retry')) ?? region.current)?.focus()
-    else region.current?.focus()
+    else {
+      const heading = region.current?.querySelector<HTMLElement>('h2, h3')
+      if (heading) { heading.tabIndex = -1; heading.classList.add(...focusRing.split(' ').filter(Boolean)); heading.focus() } else region.current?.focus()
+    }
   }, [busy, error])
   return <section id={id} ref={region} tabIndex={-1} className={`min-w-0 space-y-4 ${focusRing}`} aria-label={title} aria-busy={busy}>
     <Heading title={title} description={description} level={level} />
