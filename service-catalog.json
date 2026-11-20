@@ -83,7 +83,7 @@
       "interServiceCalls": [
         "serves the built SPA from apps/web-console-next/dist",
         "reverse-proxies same-origin /v1 requests to the APISIX gateway via GATEWAY_UPSTREAM",
-        "the SPA consumes the control-plane public API through apps/web-console-next/src/services"
+        "the SPA consumes the control-plane public API through apps/web-console-next/src/pages and packages/console-api"
       ]
     },
     {

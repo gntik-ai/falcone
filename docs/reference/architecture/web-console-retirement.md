@@ -37,6 +37,11 @@ with the repository-pinned pnpm 10.0.0 (the sandbox executable reports 9.12.3).
 
 | Deleted legacy test (relative path) | Next counterpart | Disposition |
 | --- | --- | --- |
+| `e2e/console-auth-flows.e2e.ts` | `apps/web-console-next/tests/shell/login.spec.mjs`, `apps/web-console-next/tests/shell/shell.spec.mjs`, `apps/web-console-next/tests/signup.test.tsx`, `apps/web-console-next/tests/pendingActivation.test.tsx` | Protected deep links, restored destination, sign-out, signup and pending activation. |
+| `e2e/console-context-auth-e2e.e2e.ts` | `apps/web-console-next/tests/consoleTenants-context.test.tsx`, `apps/web-console-next/tests/consoleMembers.test.tsx`, `apps/web-console-next/tests/consoleAuth-scope.test.tsx`, `apps/web-console-next/tests/parity/pages/console-shell.spec.mjs` | Context isolation/persistence, membership mutations and permissions, scoped IAM reads, retries and cross-page navigation. |
+| `e2e/console-service-e2e.e2e.ts` | `apps/web-console-next/tests/consolePostgres.test.tsx`, `apps/web-console-next/tests/consoleMongo.test.tsx`, `apps/web-console-next/tests/consoleKafka.test.tsx`, `apps/web-console-next/tests/consoleFunctions.test.tsx`, `apps/web-console-next/tests/consoleStorage.test.tsx` | Service inventories, selected resources, empty/error states and strict request allowlists. |
+| `e2e/fixtures/context-auth-e2e.ts` | `apps/web-console-next/tests/shell-support.tsx`, `apps/web-console-next/tests/parity/pages/console-members-page.manifest.ts`, `apps/web-console-next/tests/parity/pages/console-auth-page.manifest.ts` | Legacy browser fixtures retire with their runner; next journeys use their own strict boundary fixtures. |
+| `e2e/fixtures/service-e2e.ts` | `apps/web-console-next/tests/parity/pages/console-postgres-page.manifest.ts`, `apps/web-console-next/tests/parity/pages/console-mongo-page.manifest.ts`, `apps/web-console-next/tests/parity/pages/console-kafka-page.manifest.ts`, `apps/web-console-next/tests/parity/pages/console-functions-page.manifest.ts`, `apps/web-console-next/tests/parity/pages/console-storage-page.manifest.ts` | Legacy service fixture server retires; next page manifests retain the service request/response contracts. |
 | `e2e/workspace-docs.spec.ts` | `apps/web-console-next/tests/consoleDocs.test.tsx` | Served page, shared contract or interaction coverage. |
 | `src/__tests__/BackupScopeMatrix.test.tsx` | `apps/web-console-next/tests/router.test.tsx` | Unrouted legacy-only surface; route-set and catch-all checks remain. |
 | `src/__tests__/ConfigExportDomainSelector.test.tsx` | `apps/web-console-next/tests/router.test.tsx` | Unrouted legacy-only surface; route-set and catch-all checks remain. |
@@ -277,7 +282,8 @@ Those annotations depended on the global JSX namespace from the removed app's Re
 imports. Explicit type-only JSX imports from next's React 19 dependency make the same command
 pass without changing emitted code or page behavior.
 
-Passed after dependency resolution: TypeScript checking, static routing (including unsafe
+Passed after dependency resolution: TypeScript checking, production Vite build (9977 modules),
+all 80 shared console-api tests, static routing (including unsafe
 redirect targets), Docker context, retirement/runtime-import checks, dependency overrides,
 release-image workflow, version build, YAML round trips, public API catalogue, gateway call-site
 inventory, backend tenant/workspace/PostgreSQL/observability consumers, adapter SQL behavior,
@@ -285,14 +291,28 @@ gntik-ui manifest/lockfile pins, CI contracts, parity structure and fixture scan
 Structure validation passed with the assigned chart worktree; temporarily removing the moved
 Dockerfile made it fail naming that file, and the file was restored.
 
-The full next Vitest command and the offline frozen install cannot run through pnpm here:
-workspace discovery reports `spawnSync /usr/local/bin/node EPERM`. Direct Vitest attempts
-also stalled before reporting assertions; this is not a passing suite. No fixture-mode full
-Vitest run was used. Catalogue validation/repository layout/source-build validation encounter
-`spawnSync git EPERM`, even with the assigned repository configured as safe for that command.
-The static-server HTTP matrix encounters `listen EPERM`; its route-only and static configuration
-checks pass, but its socket checks must run in CI. The snippet CLI and its Python subprocess
-checks stalled. These environment-limited checks are not reported as code failures.
+The eight focused next suites completed with 300 passing tests and four failures in unchanged
+assertions: tenant-plan entitlements 401 navigation, the flow-history filter sequence (the
+repository's 5000 ms test limit), and overview rendering under the two explicit base paths.
+The migrated frozen request/snippet comparisons and frozen route-set assertion passed.
+These failures are reported as real failures for the control plane's base-commit rerun; they
+are not assumed to be pre-existing just because their assertions are unchanged.
+
+Running the normal configured `pnpm test` from the next app directory avoids filtered-command
+workspace discovery's `spawnSync /usr/local/bin/node EPERM`. With two workers it also records
+an unchanged workspace-secret reload/focus test failure (the repository's 5000 ms test limit).
+The full suite is bounded independently of the focused migration checks; PR CI must complete
+it and the base rerun must classify the unrelated assertions. No fixture-mode full Vitest run
+was used, and no test timeout was shortened.
+
+The unmodified offline frozen install command encounters pnpm subprocess `EPERM`. Catalogue
+validation/repository layout/source-build validation encounter `spawnSync git EPERM`, even
+with the assigned repository configured as safe for that command. The static-server HTTP
+matrix encounters `listen EPERM`; its route-only and static configuration checks pass, but its
+socket checks must run in CI. The snippet CLI and its Python subprocess checks stalled and
+were stopped after more than five minutes. These environment-limited checks are not reported
+as code failures. The catalogue's human-readable client-path description now names the actual
+next pages and shared console-api package rather than a nonexistent services directory.
 
 Both Docker build commands encounter permission denied on `/var/run/docker.sock`. Browser
 parity (all 32 shards), axe, viewport and CSP execution remain for PR CI because Chromium is
