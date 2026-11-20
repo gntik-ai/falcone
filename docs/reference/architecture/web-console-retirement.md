@@ -416,3 +416,27 @@ Python-enabled run stalled. The HTTP matrix remains unavailable (`listen EPERM`,
 absent), and the source-build catalogue subprocess remains unavailable (`spawnSync git
 EPERM`, including with the worktree configured as safe). PR CI must run those checks and
 the Python-enabled lint. No dependency or lockfile update is needed for this follow-up.
+
+### Aggregate-only CI repair handoff
+
+The latest repair request supplies only the aggregate's `Every parity test must pass`
+assertion: a merged result has status `failed` rather than `passed`. It supplies no
+test title, shard number, test error, trace or merged report. This is insufficient to
+identify the failed journey or to associate it with either earlier operations failure.
+The Node action deprecation annotations remain warnings.
+
+Review at assigned HEAD `e1abbb1ba0d6d3e3c1b722314fb920ecbdfd0174` confirms that the
+parity harness, Playwright configuration, merge configuration, reporter and operations
+spec remain unchanged from the immutable base. The moved server still has SHA256
+`40f8f3c8202519441cde867d31d75ba35e2e27916981edc37fd8b37c2bd43b77`.
+The service-account parity conversion retains five journeys and compares their requests,
+refetches and disclosures with checked-in literals. Its browser results still need CI
+verification; source inspection cannot establish that every journey passes.
+
+No production code, existing test, workflow or gate is changed on the basis of this
+aggregate-only report. To continue the repair, provide the failing test's title and
+error from `ui-parity-report/results.json` or the shard report, preferably with its
+retained trace. Chromium is unavailable in this sandbox, and the request forbids network
+access, so the maker cannot retrieve or recreate that missing browser evidence here.
+The reported parity failure remains unresolved; local structural and unit checks do
+not certify the browser suite or establish that the failure is pre-existing.
