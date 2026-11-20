@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, type JSX } from 'react'
 import { Trash2 } from 'lucide-react'
 import { Badge, Button, EmptyState, Tabs, TabsList, TabsPanel, TabsTab } from '@gntik-ai/ui'
 import { ActivationsTab } from './ActivationsTab'

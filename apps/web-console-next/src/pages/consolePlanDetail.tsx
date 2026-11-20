@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button, EmptyState, Page, Stepper, Tabs, TabsList, TabsPanel, TabsTab, Text, ToastProvider, useAnnounce, useToast } from '@gntik-ai/ui'

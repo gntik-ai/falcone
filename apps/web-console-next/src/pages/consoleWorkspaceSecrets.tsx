@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, type JSX } from 'react'
 import { Alert, Badge, EmptyState, Field, FieldLabel, I18nProvider, Link, LiveAnnouncer, Page, SimpleSelect, Text, Toolbar, ToolbarButton, ToolbarEnd, ToastProvider, useAnnounce, useToast } from '@gntik-ai/ui'
 import { ErrorPanel, PageHeader, TableSkeleton } from '@gntik-ai/blocks'
 import type { Workspace } from '@in-falcone/console-api/clients'

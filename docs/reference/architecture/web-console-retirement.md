@@ -30,8 +30,10 @@ is removed. The existing standalone realtime syntax and guide checks remain.
 The dependency override regression stays at the workspace boundary: `glob@10.5.0` is now an
 explicit root test dependency instead of being reachable only through the removed legacy
 coverage-v8 dependency. Its minimatch 9 / patched brace-expansion 2 assertions are unchanged.
-The platform must regenerate `pnpm-lock.yaml` with pinned pnpm 10.0.0, prune the legacy importer,
-and verify the frozen offline install. No lockfile was hand-edited.
+Hermes regenerated `pnpm-lock.yaml` in dependency-resolution commit `be31c4fa`; the legacy
+importer is absent and the root glob dependency is resolved. No lockfile was hand-edited.
+The sandbox offline frozen install is blocked by pnpm subprocess `EPERM`; CI must verify it
+with the repository-pinned pnpm 10.0.0 (the sandbox executable reports 9.12.3).
 
 | Deleted legacy test (relative path) | Next counterpart | Disposition |
 | --- | --- | --- |
@@ -60,8 +62,8 @@ and verify the frozen offline install. No lockfile was hand-edited.
 | `src/components/RouteErrorBoundary.test.tsx` | `apps/web-console-next/tests/welcome-chunk-error.test.tsx` | Served page, shared contract or interaction coverage. |
 | `src/components/auth/ProtectedRoute.session-invalidation.test.tsx` | `apps/web-console-next/tests/auth-guard.test.tsx` | Served page, shared contract or interaction coverage. |
 | `src/components/auth/ProtectedRoute.test.tsx` | `apps/web-console-next/tests/auth-guard.test.tsx` | Served page, shared contract or interaction coverage. |
-| `src/components/backup/__tests__/RestoreConfirmationDialog.test.tsx` | `apps/web-console-next/tests/consoleServiceAccounts.test.tsx` | Served page, shared contract or interaction coverage. |
-| `src/components/backup/__tests__/RestoreSimulationDialog.test.tsx` | `apps/web-console-next/tests/consoleServiceAccounts.test.tsx` | Served page, shared contract or interaction coverage. |
+| `src/components/backup/__tests__/RestoreConfirmationDialog.test.tsx` | `apps/web-console-next/tests/router.test.tsx` | Unrouted legacy-only restore surface retires; route-set and catch-all checks remain. |
+| `src/components/backup/__tests__/RestoreSimulationDialog.test.tsx` | `apps/web-console-next/tests/router.test.tsx` | Unrouted legacy-only simulation surface retires; route-set and catch-all checks remain. |
 | `src/components/backup/__tests__/TenantNameInput.test.tsx` | `apps/web-console-next/tests/router.test.tsx` | Unrouted legacy-only surface; route-set and catch-all checks remain. |
 | `src/components/console/ActiveOperationsIndicator.test.tsx` | `apps/web-console-next/tests/consoleOperations.test.tsx` | Served page, shared contract or interaction coverage. |
 | `src/components/console/BackupScopeLegend.test.tsx` | `apps/web-console-next/tests/router.test.tsx` | Unrouted legacy-only surface; route-set and catch-all checks remain. |
@@ -261,31 +263,39 @@ Chromium is unavailable in the maker sandbox. Parity screenshots still require c
 assessment and operator approval. Docker builds require access to a Docker daemon. The chart
 maker must validate its matching OpenShift BuildConfig and chart tests separately.
 
-## Maker verification and dependency handoff
+## Maker verification after dependency resolution
 
-Red before the move: the moved-path routing test failed with `ERR_MODULE_NOT_FOUND`;
-the retirement test rejected the existing legacy tree and its live consumers. The shared
-console API inventory test also reproduced its missing legacy-source read before being
-repointed to frozen base rows. The cause was serving configuration and test/tool consumers
-still rooted in the retired app.
+The original moved-path reproduction (`node --test tests/unit/web-console-static-routing.test.mjs`)
+failed with `ERR_MODULE_NOT_FOUND` before the move. The retirement test rejected the existing
+legacy tree and its live consumers. The confirmed cause was serving configuration and test/tool
+consumers still rooted in the retired app. The server blob remains unchanged
+(`d1886d2da1088e0aec2367e523fed01e5428fdee`).
 
-Passed: next TypeScript checking, the frozen public route-set checks, the shared console API
-suite (80 tests), static routing including unsafe redirect targets, Docker context, retirement
-and runtime-import checks, dependency override compatibility, gateway call-site publication,
-YAML round trips, gntik-ui pins, and structure validation including the missing-Dockerfile
-negative. The server blob is unchanged (`d1886d2da1088e0aec2367e523fed01e5428fdee`).
+After the regenerated lockfile was installed, `cd apps/web-console-next && node
+node_modules/typescript/bin/tsc --noEmit` failed with ten TS2503 diagnostics in eight files.
+Those annotations depended on the global JSX namespace from the removed app's React 18
+imports. Explicit type-only JSX imports from next's React 19 dependency make the same command
+pass without changing emitted code or page behavior.
 
-The wider next Vitest run recorded a login assertion failure before it was stopped at the
-dependency handoff; a scoped router run also recorded two overview-loading assertions. No
-page implementation changed. These are real failures for the control plane's base rerun,
-not claimed passes. The frozen route-set assertions passed separately. The release-workflow,
-next-CI, backend tenant/workspace/PostgreSQL/observability, public-catalogue and adapter SQL
-checks passed in the scoped Node run.
+Passed after dependency resolution: TypeScript checking, static routing (including unsafe
+redirect targets), Docker context, retirement/runtime-import checks, dependency overrides,
+release-image workflow, version build, YAML round trips, public API catalogue, gateway call-site
+inventory, backend tenant/workspace/PostgreSQL/observability consumers, adapter SQL behavior,
+gntik-ui manifest/lockfile pins, CI contracts, parity structure and fixture scanning.
+Structure validation passed with the assigned chart worktree; temporarily removing the moved
+Dockerfile made it fail naming that file, and the file was restored.
 
-Environment limits: pinned pnpm 10.0.0 is absent and Corepack cannot download it without
-network, so lockfile regeneration and the offline frozen install are deferred to the platform.
-The source-build test's new retired-importer assertion requires that regenerated lockfile.
-Catalogue validation and the full static-server suite encountered subprocess/socket `EPERM`.
-The snippet CLI encountered a stalled Python subprocess. Docker cannot access its daemon.
-Browser parity, axe and viewport checks require Chromium in PR CI. Re-run these gates after
-dependency resolution; screenshot review and the companion chart test remain required.
+The full next Vitest command and the offline frozen install cannot run through pnpm here:
+workspace discovery reports `spawnSync /usr/local/bin/node EPERM`. Direct Vitest attempts
+also stalled before reporting assertions; this is not a passing suite. No fixture-mode full
+Vitest run was used. Catalogue validation/repository layout/source-build validation encounter
+`spawnSync git EPERM`, even with the assigned repository configured as safe for that command.
+The static-server HTTP matrix encounters `listen EPERM`; its route-only and static configuration
+checks pass, but its socket checks must run in CI. The snippet CLI and its Python subprocess
+checks stalled. These environment-limited checks are not reported as code failures.
+
+Both Docker build commands encounter permission denied on `/var/run/docker.sock`. Browser
+parity (all 32 shards), axe, viewport and CSP execution remain for PR CI because Chromium is
+unavailable. Screenshot assessment and operator approval remain necessary. The deployment
+maker owns the matching chart change and Helm/chart verification. No deployment, publication
+or release credential access was performed.

@@ -1,4 +1,4 @@
-import type { Ref } from 'react'
+import type { JSX, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@gntik-ai/ui'
 import { ErrorPanel, NoAccessEmpty, NotFoundEmpty } from '@gntik-ai/blocks'
