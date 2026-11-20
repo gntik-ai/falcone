@@ -1,4 +1,4 @@
-import { test as base, expect as baseExpect } from '@playwright/test';
+import { test as base } from '@playwright/test';
 import { startServer } from '../csp/server.mjs';
 import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
 import { createEndpointRegistry } from './endpoint-registry.ts';
@@ -6,17 +6,8 @@ import { consumeResourceDiagnostic } from './resource-diagnostics.mjs';
 import { catalogResponse, isPlansQuery } from './pages/console-plan-catalog-page.manifest.ts';
 import { sectionFailureEndpoints } from './pages/console-functions-page.manifest.ts';
 import { assertNoSampleData } from './checks.mjs';
+import { expect, baseExpect, settle, trackParity, trackedParity } from './settled-expect.mjs';
 
-const expect = baseExpect;
-// The parity fixture of the test that is running in this worker (tests run one at a time per worker).
-let current;
-// assertNoSampleData runs on every settled state: after open(), after every action and readiness assertion a journey runs
-// (the wrappers below), after every check in checks.mjs, and once more before teardown.
-const settle = async () => {
-  if (!current || current.settling) return;
-  current.settling = true;
-  try { await current.assertNoSampleData(); } finally { current.settling = false; }
-};
 // Every interface a journey can change the page through: locator and page actions, the keyboard, the mouse and the touchscreen.
 // `typed` is the argument index of text the journey itself supplies, which is exempt from the sample-data check.
 const INTERFACES = {
@@ -43,7 +34,7 @@ function instrumentActions(page) {
         actionDepth += 1;
         try {
           const result = await original.apply(this, args);
-          if (current && typed >= 0 && args[typed] !== undefined) current.network.supplied.push(String(args[typed]));
+          if (typed >= 0 && trackedParity() && args[typed] !== undefined) trackedParity().network.supplied.push(String(args[typed]));
           return result;
         } finally {
           actionDepth -= 1;
@@ -54,29 +45,8 @@ function instrumentActions(page) {
     prototype.parityInstrumented = true;
   }
 }
-const wrapMatchers = (matchers) => new Proxy(matchers, {
-  get(target, property) {
-    const value = Reflect.get(target, property);
-    if (['not', 'resolves', 'rejects'].includes(property)) return wrapMatchers(value);
-    if (typeof value !== 'function') return value;
-    return (...args) => {
-      const result = value.apply(target, args);
-      return typeof result?.then === 'function' ? result.then(async (outcome) => { await settle(); return outcome; }) : result;
-    };
-  },
-});
-// Journeys import this expect: every awaited matcher (a readiness assertion) is followed by the sample-data check.
-// The harness itself uses the plain expect.
-// expect.poll and expect.soft return matchers too, and journeys use them as readiness assertions.
-const checkedExpect = new Proxy(baseExpect, {
-  apply: (target, thisArg, args) => wrapMatchers(Reflect.apply(target, thisArg, args)),
-  get(target, property) {
-    const value = Reflect.get(target, property);
-    if (['poll', 'soft'].includes(property) && typeof value === 'function') return (...args) => wrapMatchers(value.apply(target, args));
-    return value;
-  },
-});
-export { checkedExpect as expect };
+// Journeys import this expect: it settles after every readiness assertion. The harness itself uses the plain one.
+export { expect };
 export const test = base.extend({
   role: ['superadmin', { option: true }],
   preserveLocale: [false, { option: true }],
@@ -172,22 +142,24 @@ export const test = base.extend({
       async open(route, variants = {}) {
         setVariants(variants);
         await page.goto(server.url(route.replace(/^\//, '')));
-        await expect(page.locator('main')).toBeVisible();
-        await expect(page.locator('main h1')).toBeVisible();
-        await expect(page.locator('main section[aria-busy="true"]')).toHaveCount(0);
+        await baseExpect(page.locator('main')).toBeVisible();
+        await baseExpect(page.locator('main h1')).toBeVisible();
+        await baseExpect(page.locator('main section[aria-busy="true"]')).toHaveCount(0);
         // The region sits in the ConsoleShell sidebar header, which is display:none below lg. A role query skips hidden elements,
         // so match the region by markup: at 375 px it must still gate the settle, not pass vacuously.
         const context = page.locator(`section[aria-label="${locale === 'es' ? 'Contexto activo' : 'Active context'}"]`);
         // One retrying assertion, no separate existence check: the shell may re-render the region between a count() and a follow-up expect.
-        await expect(context.and(page.locator('[aria-busy="true"]'))).toHaveCount(0);
+        await baseExpect(context.and(page.locator('[aria-busy="true"]'))).toHaveCount(0);
         await page.evaluate(() => document.fonts.ready);
         await settle();
       },
       assertNoSampleData: () => assertNoSampleData(parity),
     };
-    instrumentActions(page);
-    current = parity;
+    // Page doubles in unit tests have no locators or document: nothing to instrument or inspect there.
+    const live = typeof page.locator === 'function' && typeof page.evaluate === 'function';
+    if (live) instrumentActions(page);
+    const release = trackParity(parity, live);
     try { await use(parity); await settle(); }
-    finally { current = undefined; expect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]); }
+    finally { release(); baseExpect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]); }
   }, { auto: true }],
 });

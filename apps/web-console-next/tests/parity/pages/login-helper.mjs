@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from '../settled-expect.mjs';
 
 // Port of the login-only helper from the legacy context-auth journey.
 export async function loginToConsole(page, copy, username = 'operations') {

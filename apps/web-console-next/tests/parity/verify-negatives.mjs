@@ -30,6 +30,7 @@ const expected = new Map([
   ...['catalogue', 'raw key', 'kit copy', 'accessible name', 'title', 'placeholder'].map((name) => [`locale ${name}`, /locale: unexpected copy/]),
   ['sample-data appears only after open', /sample-data: .*orders-api/s],
   ['sample-data after a readiness assertion', /sample-data: .*billing-sync-staging/s],
+  ['sample-data after a shared helper assertion', /sample-data: .*webhooks/s],
   ['sample-data after an action', /sample-data: .*webhooks/s],
   ['sample-data after a keyboard action', /sample-data: .*orders-api/s],
   ['sample-data after a mouse action', /sample-data: .*billing-sync-staging/s],

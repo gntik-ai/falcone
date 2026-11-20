@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { expect } from '@playwright/test';
+import { expect } from '../settled-expect.mjs';
 import { copy } from './console-events-data-page.locale.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
 export const surface = (parity) => parity.page.getByTestId('console-events-data-page');
