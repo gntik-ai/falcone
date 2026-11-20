@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from './settled-expect.mjs';
 import AxeBuilder from '@axe-core/playwright';
 import { existsSync } from 'node:fs';
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
