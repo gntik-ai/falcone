@@ -10,7 +10,7 @@ const fnDockerfilePath = path.join(repoRoot, 'apps/fn-runtime/Dockerfile');
 const webDockerfilePath = path.join(repoRoot, 'apps/web-console/Dockerfile');
 const fnDockerfile = fs.readFileSync(fnDockerfilePath, 'utf8');
 const webDockerfile = fs.readFileSync(webDockerfilePath, 'utf8');
-const filteredInstall = 'corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console-next...';
+const filteredInstall = 'corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console-next... --filter @in-falcone/internal-contracts';
 const nextBuild = 'NODE_OPTIONS=--max-old-space-size=3072 CSP_TEST_HARNESS= VITE_BASE_PATH=/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build';
 // The web-console FROM stages are parameterized by a base-image build arg (issue #929); the ARG
 // default preserves the current base. These literal strings are single-quoted so `${...}` stays
@@ -103,7 +103,7 @@ function validateWebBuilder(source) {
   assert.deepEqual(runs.map((entry) => entry.args), [filteredInstall, nextBuild]);
   assert.ok(builder.indexOf(contextCopy) < builder.indexOf(runs[0]));
   assert.ok(builder.indexOf(runs[0]) < builder.indexOf(runs[1]));
-  assert.match(runs[0].args, /pnpm install --frozen-lockfile --filter @in-falcone\/web-console-next\.\.\.$/);
+  assert.match(runs[0].args, /pnpm install --frozen-lockfile --filter @in-falcone\/web-console-next\.\.\. --filter @in-falcone\/internal-contracts$/);
   assert.doesNotMatch(runs.map((entry) => entry.args).join('\n'), /@in-falcone\/web-console(?!-next)/, 'the legacy console is not built');
   assert.match(runs[1].args, /^NODE_OPTIONS=--max-old-space-size=3072\s/);
 

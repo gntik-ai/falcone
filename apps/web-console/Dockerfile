@@ -27,7 +27,9 @@ ARG APP_VERSION=dev
 ARG APP_COMMIT_SHA=
 WORKDIR /src
 COPY . .
-RUN corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console-next...
+# web-console-next imports packages/internal-contracts by relative path (the shared flow validator), so its
+# dependencies (cel-js, ajv) must be installed too, even though it is not a declared workspace dependency.
+RUN corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console-next... --filter @in-falcone/internal-contracts
 RUN NODE_OPTIONS=--max-old-space-size=3072 CSP_TEST_HARNESS= VITE_BASE_PATH=/ VITE_APP_VERSION="$APP_VERSION" VITE_APP_COMMIT_SHA="$APP_COMMIT_SHA" pnpm --filter @in-falcone/web-console-next exec vite build
 
 FROM ${NODE_BASE_IMAGE}
