@@ -25,7 +25,12 @@ retains catch-all behavior. No shipped page is removed by this change.
 `lint:snippets` is retained: its realtime catalogue membership checks now read both next locale
 catalogues, and its syntax/placeholder checks read the functions, PostgreSQL and storage
 page snippet modules. The legacy shared-catalogue file check is retired because that catalogue
-is removed. The existing standalone realtime syntax and guide checks remain.
+is removed. The standalone realtime syntax checks remain. The guide code-block count check
+is retired: `docs/guides/realtime/frontend-quickstart.md`, `nodejs-quickstart.md` and
+`python-quickstart.md` were already absent at the immutable base after the documentation
+clean slate, so it checked no remaining guide. `tests/unit/snippet-lint-cli.test.mjs` runs
+the CLI and verifies that invalid JavaScript in each served page, credential-like tokens
+and missing realtime entries in either locale still fail validation.
 
 The dependency override regression stays at the workspace boundary: `glob@10.5.0` is now an
 explicit root test dependency instead of being reachable only through the removed legacy
@@ -315,13 +320,40 @@ Node version and writable PNPM_HOME reaches `EACCES` opening
 validation/repository layout/source-build validation encounter `spawnSync git EPERM`, even
 with the assigned repository configured as safe for that command. The static-server HTTP
 matrix encounters `listen EPERM`; its route-only and static configuration checks pass, but its
-socket checks must run in CI. The snippet CLI and its Python subprocess checks stalled and
-were stopped after more than five minutes. These environment-limited checks are not reported
-as code failures. The catalogue's human-readable client-path description now names the actual
-next pages and shared console-api package rather than a nonexistent services directory.
+socket checks must run in CI. The initial handoff recorded the snippet CLI as stalled; checker
+revalidation identified a real failure reading the deleted realtime guides, corrected below.
+The Python subprocess checks stalled in the maker sandbox. The catalogue's human-readable
+client-path description now names the actual next pages and shared console-api package
+rather than a nonexistent services directory.
 
 Both Docker build commands encounter permission denied on `/var/run/docker.sock`. Browser
 parity (all 32 shards), axe, viewport and CSP execution remain for PR CI because Chromium is
 unavailable. Screenshot assessment and operator approval remain necessary. The deployment
 maker owns the matching chart change and Helm/chart verification. No deployment, publication
 or release credential access was performed.
+
+## Checker follow-up
+
+The deterministic reproduction `PATH=/usr/local/bin node scripts/lint-snippet-templates.mjs`
+failed with `ENOENT` on `docs/guides/realtime/frontend-quickstart.md`. The PATH setting selects
+the CLI's supported Python-unavailable fallback to avoid the sandbox's Python stdin stall.
+The new CLI regression failed on the same missing file before removing the obsolete guide
+loop. With that check retired, the CLI and its positive and negative regression cases pass.
+The per-page lint is exercised through the CLI in the normal CI unit suite. Python syntax
+validation still requires a run with working subprocess stdin in PR CI.
+
+The static-delivery document now describes the removed legacy source and the next runtime
+location. The repository-layout test asserts the console's source as a literal instead of
+duplicating the validator's special-case conditional. The platform-secret inventory test
+compares the public API result directly with the frozen legacy fixture; the redundant
+constant-to-constant comparison is removed.
+
+Follow-up verification passed: the CLI regression cases, frozen inventory API tests (2/2),
+structure validation (including rejection when the moved Dockerfile is temporarily absent),
+gntik-ui pins, static routing with unsafe-target cases, Docker context, release-images workflow
+and runtime-consumer retirement checks. Repository-layout validation is skipped after
+`spawnSync git EPERM`; its other two cases pass. The HTTP server matrix is skipped after
+`listen EPERM`, and nginx is unavailable. Offline frozen installation is skipped after
+`spawnSync /usr/local/bin/node EPERM`; the installed pnpm is still 9.12.3 rather than the pinned
+10.0.0. Python-enabled lint, Docker builds and browser checks remain for PR CI. No dependencies,
+lockfiles, workflows, serving behavior or deployment files were changed by this follow-up.

@@ -18,11 +18,6 @@ function toParsableJavascript(code) {
   return code.replace(/^import .*$/gm, '')
 }
 
-function parseMarkdownCodeBlocks(markdown) {
-  const matches = markdown.matchAll(/```(javascript|typescript|js|ts|python)\n([\s\S]*?)```/g)
-  return Array.from(matches, (match) => ({ language: match[1], code: match[2].trim() }))
-}
-
 let failed = false
 for (const item of realtimeSnippetTemplates) {
   const code = fill(item.template)
@@ -46,21 +41,6 @@ for (const item of realtimeSnippetTemplates) {
       console.error(`Python syntax error in ${item.id}: ${python.stderr}`)
       failed = true
     }
-  }
-}
-
-const guides = [
-  'docs/guides/realtime/frontend-quickstart.md',
-  'docs/guides/realtime/nodejs-quickstart.md',
-  'docs/guides/realtime/python-quickstart.md'
-]
-
-for (const guide of guides) {
-  const markdown = readFileSync(new URL(`../${guide}`, import.meta.url), 'utf8')
-  const blocks = parseMarkdownCodeBlocks(markdown)
-  if (blocks.length < 3) {
-    console.error(`Expected at least 3 code blocks in ${guide}`)
-    failed = true
   }
 }
 

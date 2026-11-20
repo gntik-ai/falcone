@@ -1,7 +1,7 @@
 # Web console static asset delivery
 
 Falcone serves the built web-console SPA through the co-located release runtime under
-`apps/web-console`:
+`apps/web-console-next`:
 
 - `apps/web-console-next/Dockerfile` is the release Dockerfile for `in-falcone-web-console`.
 - `apps/web-console-next/static-server.mjs` is the restricted-profile Node server used by the release
@@ -10,14 +10,14 @@ Falcone serves the built web-console SPA through the co-located release runtime 
 - `apps/web-console-next/nginx.conf` and `deploy/kind/web-console/nginx.conf` are legacy compatibility
   configs only; they are not the release image runtime.
 
-## What the image serves (switch release)
+## What the image serves
 
 The image holds only the `apps/web-console-next` bundle, built at base `/` and copied to `/app/dist`.
 `GET /`, `/login`, `/signup`, `/console/*` and every other client route return that `index.html`
 (`no-store`); `/assets/*` is immutable and a missing asset is a 404; `/healthz` returns `200 ok`;
-`/v1/*` is proxied to the gateway without added headers. The legacy `apps/web-console` source stays
-in the repository for one release, but no flag, environment variable or path serves it, and no
-`/legacy` path answers 200. Recovery is redeploying the prior chart and the image digest recorded in
+`/v1/*` is proxied to the gateway without added headers. The legacy console source has been
+removed from the repository, and no `/legacy` path answers 200. Recovery is redeploying the prior
+chart and the image digest recorded in
 `release-evidence/web-console-rollback.json` through the deterministic Helm adapter.
 
 `/next` and `/next/*` answer a permanent `301` to the same path without `/next`, with a relative
