@@ -4,3 +4,4 @@ export function assertNoSampleData(parity: {
   network?: { supplied?: string[] }
 }): Promise<void>
 export function assertResponsive(parity: Record<string, any>, width: number): Promise<void>
+export function assertRuntimeHealth(parity: Record<string, any>): Promise<void>

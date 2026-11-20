@@ -58,3 +58,19 @@ test('the exported assertResponsive helper fails when sample text shows only whi
   parity.page = transient
   await expect(checks.assertResponsive(parity, 375)).rejects.toThrow('sample-data:')
 })
+
+// assertRuntimeHealth ends in a synchronous matcher, so only an explicit check settles it: sample text that shows while its
+// browser-task drain runs and is gone again before teardown still fails the journey.
+test('the exported assertRuntimeHealth helper fails when sample text shows only while its drain runs', async () => {
+  release = trackParity(parity, true)
+  parity.faults = []
+  parity.page = { ...page, evaluate: async () => { rendered = true } }
+  await expect(checks.assertRuntimeHealth(parity)).rejects.toThrow('sample-data:')
+})
+
+test('the exported assertRuntimeHealth helper still resolves on a healthy page without sample text', async () => {
+  release = trackParity(parity, true)
+  parity.faults = []
+  parity.page = { ...page, evaluate: async () => {} }
+  await expect(checks.assertRuntimeHealth(parity)).resolves.toBeUndefined()
+})

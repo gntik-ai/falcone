@@ -1,4 +1,4 @@
-import { expect } from './settled-expect.mjs';
+import { expect, settle } from './settled-expect.mjs';
 import AxeBuilder from '@axe-core/playwright';
 import { existsSync } from 'node:fs';
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
@@ -140,12 +140,15 @@ export async function assertAccessibility(parity) {
   await awaitTransitions(parity.page);
   const result = await new AxeBuilder({ page: parity.page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
   expect(result.violations.filter((v) => ['serious', 'critical'].includes(v.impact)), 'accessibility: serious/critical axe violations').toEqual([]);
+  await settle();
 }
 export async function accessibility(parity, manifest) { await parity.open(manifest.route); await assertAccessibility(parity); await assertNoSampleData(parity); }
 export async function assertRuntimeHealth(parity) {
   // Drain browser tasks and pending event bindings before inspecting the monitor.
   await parity.page.evaluate(() => new Promise((done) => setTimeout(done, 0)));
   expect(parity.faults, `runtime-health: ${parity.faults.join('\n')}`).toEqual([]);
+  // The matcher above is synchronous, so the state the drain left behind is settled explicitly.
+  await settle();
 }
 export async function runtimeHealth(parity, manifest) { await parity.open(manifest.route); await assertRuntimeHealth(parity); await assertNoSampleData(parity); }
 export async function assertResponsive(parity, width) {
@@ -153,6 +156,7 @@ export async function assertResponsive(parity, width) {
   await expect(parity.page.getByRole('main'), `responsive: main at ${width}px`).toBeVisible();
   const sizes = await parity.page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
   expect(sizes.scrollWidth, `responsive: horizontal overflow at ${width}px`).toBeLessThanOrEqual(sizes.clientWidth);
+  await settle();
 }
 export async function responsive(parity, manifest) {
   await parity.open(manifest.route);
@@ -189,6 +193,7 @@ export async function assertLocale(parity) {
   });
   const bad = values.filter((text) => /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/.test(text) || (parity.locale === 'es' && forbidden.has(text)));
   expect(bad, `locale: unexpected copy ${bad.join(', ')}`).toEqual([]);
+  await settle();
 }
 export async function visualReview(parity, manifest, info, betweenPasses = async () => {}) {
   await parity.open(manifest.route);
