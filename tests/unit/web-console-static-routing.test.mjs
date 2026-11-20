@@ -34,7 +34,7 @@ async function fixture(t, { absentIndex = false, env = {} } = {}) {
     handler = callback;
     return { listen(_port, ready) { ready(); }, address() { return { port: 0 }; } };
   });
-  await import(`../../apps/web-console/static-server.mjs?test=${++instance}`);
+  await import(`../../apps/web-console-next/static-server.mjs?test=${++instance}`);
   return async (url, extra = {}) => {
     let response;
     let resolveEnd;

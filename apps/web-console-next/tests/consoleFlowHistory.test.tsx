@@ -1,3 +1,4 @@
+import frozenHistory from './frozen-legacy/flow-history.json'
 import { StrictMode, useState } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -224,19 +225,12 @@ test('CSP bootstrap fixtures accept only the on-load executions GET and reject a
 })
 
 test('Flow C: legacy and migrated clients emit identical queries for the same fixtures', async () => {
-  const legacy = await import('../../web-console/src/services/flowsMonitoringApi')
-  const cases = [
-    {}, { status: 'Failed' }, { flowVersion: '2' }, { triggerType: 'platform_event' },
-    { startedAfter: '2026-01-01T08:15', startedBefore: '2026-01-02T09:20' },
-    { status: 'Completed', flowVersion: '2', triggerType: 'webhook', startedAfter: '2026-01-01T08:15', startedBefore: '2026-01-02T09:20' },
-  ]
-  for (const filters of cases) for (const pageToken of [undefined, 'opaque+token/=']) {
-    setup({ [`GET ${path(filters, pageToken)}`]: firstPage })
-    const old = await legacy.listExecutions('synthetic-workspace', { flowId: 'f1', ...filters, pageToken })
-    const next = await listExecutions('synthetic-workspace', 'f1', { ...emptyFilters, ...filters }, pageToken)
-    expect(next).toEqual(old)
-    expect(calls()).toHaveLength(2)
-    expect(calls()[0]).toEqual(calls()[1])
+  expect(frozenHistory).toHaveLength(12)
+  for (const fixture of frozenHistory) {
+    setup({ [`GET ${fixture.request.url}`]: firstPage })
+    const next = await listExecutions('synthetic-workspace', 'f1', { ...emptyFilters, ...fixture.filters }, fixture.pageToken)
+    expect(next).toEqual(fixture.response)
+    expect(calls()).toEqual([{ url: fixture.request.url, method: fixture.request.method, body: undefined }])
     requests.verify()
   }
 })

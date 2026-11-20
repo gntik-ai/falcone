@@ -1,7 +1,7 @@
 import type { EndpointResponse, PageEndpoint, ParityManifest } from '../manifest'
 
 // Synthetic fixtures for /console/functions. Every request path and body mirrors the legacy page
-// (apps/web-console/src/pages/ConsoleFunctionsPage.tsx); the names follow the migration issue.
+// (legacy base 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFunctionsPage.tsx); the names follow the migration issue.
 const workspace = 'synthetic-workspace'
 const root = '/v1/functions'
 export const inventoryPath = `${root}/workspaces/${workspace}/inventory`

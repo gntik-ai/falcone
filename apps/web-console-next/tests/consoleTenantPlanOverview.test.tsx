@@ -5,7 +5,7 @@ import { buildConsoleRefreshSessionFixture } from '@in-falcone/console-api/fixtu
 import { readProtectedRouteIntent } from '@in-falcone/console-api/session'
 import PlanOverview from '../src/pages/consoleTenantPlanOverview'
 import { App } from '../src/App'
-import * as legacy from '../../web-console/src/services/planManagementApi'
+import frozenRequest from './frozen-legacy/own-plan-request.json'
 import { getEffectiveEntitlements } from '../src/pages/consoleTenantPlanOverview/api'
 import { ProtectedRoute } from '../src/shell/session'
 import { Shell } from '../src/shell/Shell'
@@ -136,11 +136,10 @@ test('the new and legacy clients send identical method, query, headers and paylo
   login(['tenant_owner'], ['synthetic-tenant'])
   requests = strictFetch({ [`GET ${myPlanUrl}`]: myPlanMixed })
   vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000001')
-  await legacy.getEffectiveEntitlements(undefined, { includeConsumption: true })
   await getEffectiveEntitlements()
-  expect(calls()).toHaveLength(2)
+  expect(calls()).toHaveLength(1)
   const normalize = ([url, init]: typeof requests.mock.mock.calls[number]) => ({ url, method: init?.method, body: init?.body, headers: [...new Headers(init?.headers).entries()] })
-  expect(normalize(calls()[1])).toEqual(normalize(calls()[0]))
+  expect(normalize(calls()[0])).toEqual(frozenRequest)
 })
 
 test('tenantless catalogue navigation focuses its destination heading', async () => {

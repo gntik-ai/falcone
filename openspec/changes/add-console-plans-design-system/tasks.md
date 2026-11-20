@@ -3,24 +3,24 @@
 - [x] T01: Confirm baseline issue signatures and scope.
   - Acceptance: `ConsolePlanCatalogPage.tsx` still uses a hand-rolled table, `ConsolePlanDetailPage.tsx`
     still hand-rolls tabs, and `WizardStepIndicator.tsx` styles completed/current steps identically.
-  - Actual paths reviewed: `apps/web-console/src/pages/ConsolePlanCatalogPage.tsx`,
-    `apps/web-console/src/pages/ConsolePlanDetailPage.tsx`,
-    `apps/web-console/src/components/console/wizards/WizardStepIndicator.tsx`.
+  - Actual paths reviewed: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanCatalogPage.tsx`,
+    `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanDetailPage.tsx`,
+    `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/WizardStepIndicator.tsx`.
 
 ## 2. Implement the Design-System Adoption
 
 - [x] T02: Migrate the plan catalog to the shared `Table` primitive.
   - Acceptance: `/console/plans` renders the catalog with `Table`, `TableHeader`, `TableBody`,
     `TableRow`, `TableHead`, and `TableCell`; row navigation and filter behavior are unchanged.
-  - Actual paths changed: `apps/web-console/src/pages/ConsolePlanCatalogPage.tsx`.
+  - Actual paths changed: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanCatalogPage.tsx`.
 - [x] T03: Migrate the plan-detail tab strip and panels to the shared `Tabs` primitive.
   - Acceptance: `/console/plans/:planId` renders `TabsList`, `TabsTrigger`, and `TabsContent`, and
     the active tab has the shared active state while inactive tabs are marked inactive.
-  - Actual paths changed: `apps/web-console/src/pages/ConsolePlanDetailPage.tsx`.
+  - Actual paths changed: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanDetailPage.tsx`.
 - [x] T04: Distinguish tenant-wizard progress states.
   - Acceptance: current, completed, and upcoming wizard steps render with separate states and only
     the current step exposes `aria-current="step"`.
-  - Actual paths changed: `apps/web-console/src/components/console/wizards/WizardStepIndicator.tsx`.
+  - Actual paths changed: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/WizardStepIndicator.tsx`.
 
 ## 3. Encode the Scenario in Tests
 
@@ -28,10 +28,10 @@
   - Acceptance: tests assert the plan catalog uses shared `Table` hooks and row affordance, plan
     detail uses shared `Tabs` active/inactive state, tenant wizard progress states are distinct, and
     plan status badges keep the theme-aware translucent tone idiom.
-  - Actual paths changed: `apps/web-console/src/pages/ConsolePlanCatalogPage.test.tsx`,
-    `apps/web-console/src/pages/ConsolePlanDetailPage.test.tsx`,
-    `apps/web-console/src/components/console/wizards/CreateTenantWizard.test.tsx`,
-    `apps/web-console/src/components/console/PlanStatusBadge.test.tsx`.
+  - Actual paths changed: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanCatalogPage.test.tsx`,
+    `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanDetailPage.test.tsx`,
+    `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/CreateTenantWizard.test.tsx`,
+    `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanStatusBadge.test.tsx`.
 
 ## 4. Documentation and OpenSpec
 

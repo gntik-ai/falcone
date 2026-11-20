@@ -1,23 +1,23 @@
 # Web console static asset delivery
 
 Falcone serves the built web-console SPA through the co-located release runtime under
-`apps/web-console`:
+`apps/web-console-next`:
 
-- `apps/web-console/Dockerfile` is the release Dockerfile for `in-falcone-web-console`.
-- `apps/web-console/static-server.mjs` is the restricted-profile Node server used by the release
+- `apps/web-console-next/Dockerfile` is the release Dockerfile for `in-falcone-web-console`.
+- `apps/web-console-next/static-server.mjs` is the restricted-profile Node server used by the release
   image and local compatibility images. It also proxies same-origin `/v1/*` requests to
   `GATEWAY_UPSTREAM` before the SPA fallback.
-- `apps/web-console/nginx.conf` and `deploy/kind/web-console/nginx.conf` are legacy compatibility
+- `apps/web-console-next/nginx.conf` and `deploy/kind/web-console/nginx.conf` are legacy compatibility
   configs only; they are not the release image runtime.
 
-## What the image serves (switch release)
+## What the image serves
 
 The image holds only the `apps/web-console-next` bundle, built at base `/` and copied to `/app/dist`.
 `GET /`, `/login`, `/signup`, `/console/*` and every other client route return that `index.html`
 (`no-store`); `/assets/*` is immutable and a missing asset is a 404; `/healthz` returns `200 ok`;
-`/v1/*` is proxied to the gateway without added headers. The legacy `apps/web-console` source stays
-in the repository for one release, but no flag, environment variable or path serves it, and no
-`/legacy` path answers 200. Recovery is redeploying the prior chart and the image digest recorded in
+`/v1/*` is proxied to the gateway without added headers. The legacy console source has been
+removed from the repository, and no `/legacy` path answers 200. Recovery is redeploying the prior
+chart and the image digest recorded in
 `release-evidence/web-console-rollback.json` through the deterministic Helm adapter.
 
 `/next` and `/next/*` answer a permanent `301` to the same path without `/next`, with a relative
@@ -82,7 +82,7 @@ server applies the headers directly and leaves proxied `/v1/` API response heade
 
 ## Icon asset policy
 
-The SVG-capable favicon declared by `apps/web-console/index.html` is part of the console boot path.
+The SVG-capable favicon declared by `apps/web-console-next/index.html` is part of the console boot path.
 It must remain a lightweight true vector SVG, with a target budget of roughly 10 KB or less. Do not
 embed raster icon artwork as `data:image/*;base64` inside `favicon.svg`; keep raster fallbacks such
 as `favicon.png` as separate small files.

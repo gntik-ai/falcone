@@ -6,7 +6,7 @@ OpenAPI, generated clients, auth claims, or realtime events.
 
 ## Modal dialogs
 
-`apps/web-console/src/components/ui/dialog.tsx` is the shared modal primitive for console dialogs
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/dialog.tsx` is the shared modal primitive for console dialogs
 and wizards. `DialogContent` renders the modal semantics by default:
 
 - `role="dialog"` unless a caller intentionally overrides it, for example `role="alertdialog"`

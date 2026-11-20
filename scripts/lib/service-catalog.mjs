@@ -46,7 +46,6 @@ export const REQUIRED_NON_RELEASE_CANDIDATES = [
 export const FORBIDDEN_OLD_ROOTS = [
   'deploy/kind/control-plane/',
   'deploy/kind/fn-runtime/',
-  'deploy/release/web-console.Dockerfile',
   'services/adapters/',
   'services/audit/',
   'services/audit-anomaly-handler/',
@@ -332,8 +331,9 @@ export function collectServiceCatalogViolations(catalog = readServiceCatalog(), 
       violations.push(`${entry.image} source must be under apps/<service>.`);
     }
 
-    if (service.source !== `apps/${service.id}`) {
-      violations.push(`${entry.image} source must equal apps/${service.id}.`);
+    const expectedSource = service.id === 'web-console' ? 'apps/web-console-next' : `apps/${service.id}`;
+    if (service.source !== expectedSource) {
+      violations.push(`${entry.image} source must equal ${expectedSource}.`);
     }
 
     if (!service.dockerfile || dockerfileParent(service.dockerfile) !== service.source) {

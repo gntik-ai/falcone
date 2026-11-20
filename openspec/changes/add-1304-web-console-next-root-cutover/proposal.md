@@ -4,7 +4,7 @@
 
 UI migration blueprint 57f536f4 (item `cutover:u5-cutover`) ends with the next console replacing the
 legacy one. Today the `in-falcone-web-console` image serves legacy at `/` and next under `/next`
-(`apps/web-console/static-server.mjs`, `apps/web-console/nginx.conf`). Issue #1304 is the switch
+(`apps/web-console-next/static-server.mjs`, `apps/web-console-next/nginx.conf`). Issue #1304 is the switch
 release, risk R3: every tenant's default console changes at once. Deleting the legacy source is a
 separate, later change set; the legacy source stays for one release and nothing serves it.
 
@@ -14,7 +14,7 @@ separate, later change set; the legacy source stays for one release and nothing 
   `/assets/*` is 404; `/legacy` is 404. `/next` and `/next/*` answer a relative `301` built by one
   function, `validateRedirectPath`, from the raw request target (suffix and query byte for byte,
   `/%6Eext` normalised); `//`, backslash and `..` forms answer 400.
-- `apps/web-console/nginx.conf` and `deploy/kind/web-console/nginx.conf` classify the raw
+- `apps/web-console-next/nginx.conf` and `deploy/kind/web-console/nginx.conf` classify the raw
   `$request_uri` in a `map`, answer from one named location with the security headers and
   `absolute_redirect off`, add no server-level header, and answer `location = /healthz` with
   `200 ok` before the SPA fallback.

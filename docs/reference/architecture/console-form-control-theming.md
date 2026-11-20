@@ -1,6 +1,6 @@
 # Console form controls — dark-theme legibility
 
-The web console renders in a permanent dark theme: `apps/web-console/src/styles/globals.css`
+The web console renders in a permanent dark theme: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/styles/globals.css`
 defines `--background: 222.2 84% 4.9%` (near-black) and `--foreground: 210 40% 98%`
 (near-white), and `body` applies `bg-background text-foreground`. This page documents the rule
 that keeps form controls (`<input>`, `<select>`, `<textarea>`) legible against that dark
@@ -19,9 +19,9 @@ white background — roughly **1.02:1** contrast, far below the WCAG 2.1 AA mini
 The value the user types is effectively invisible.
 
 This is exactly why the design-system primitives override the background. In
-`apps/web-console/src/components/ui/input.tsx` the `Input` class list includes
-`bg-background … text-foreground`; `apps/web-console/src/components/ui/select.tsx` (`Select`) and
-`apps/web-console/src/components/ui/textarea.tsx` (`Textarea`) include `bg-background`. On the
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/input.tsx` the `Input` class list includes
+`bg-background … text-foreground`; `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/select.tsx` (`Select`) and
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/textarea.tsx` (`Textarea`) include `bg-background`. On the
 dark background these primitives are legible.
 
 ## Rule: use the design-system primitives
@@ -48,7 +48,7 @@ and the full data-plane consistency guarantee.
 
 ## Safety net: the base-layer rule
 
-As defense-in-depth, `apps/web-console/src/styles/globals.css` also pins the theme colours on
+As defense-in-depth, `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/styles/globals.css` also pins the theme colours on
 native form elements inside `@layer base`:
 
 ```css

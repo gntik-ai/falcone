@@ -45,12 +45,11 @@ sent, the list states, axe, responsive, runtime health, the read-only capture an
 the whole file because the disclosure journeys show synthetic secrets; screenshots mask them, and variants are reset
 before every capture.
 
-Every owner cell compares both builds: `console-service-accounts-page.legacy.mjs` serves the legacy bundle (an existing
-`apps/web-console/dist`, or `LEGACY_CONSOLE_DIST`, or a one-off build) with the same session, clock, viewport and
-mocked backend, and the create, reveal, rotate, revoke and delete journeys must send the same requests, refetch the
-same number of times and disclose the same credential id and secret. The legacy page is Spanish only, so its controls
-are located with the Spanish copy in every cell. Write counts are per-scenario deltas because the harness keeps
-requests across `parity.open` calls.
+Every owner cell compares create, reveal, rotate, revoke and delete journeys with the frozen
+request/refetch/disclosure contracts in `tests/frozen-legacy/service-account-journeys.json`,
+transcribed from source base `69296937330b61be2bbf2c7267520196499fc038`. The same requests,
+refetch counts, credential ids and secrets are asserted without building the retired console.
+Write counts remain per-scenario deltas because the harness keeps requests across `parity.open` calls.
 
 Context switches (tenant and workspace) run with a confirmation, a disclosure and a failure open. The open modal makes
 the shell's workspace menu inert to pointer input, so for the two modal cases the spec replays the pointer events

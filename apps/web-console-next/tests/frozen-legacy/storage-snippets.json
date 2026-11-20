@@ -1,0 +1,44 @@
+[
+  {
+    "id": "storage-aws-cli",
+    "label": "AWS CLI — s3",
+    "code": "aws --endpoint-url <RESOURCE_HOST> s3 ls s3://media-assets --region eu-west-1",
+    "notes": [
+      "El punto de conexión puede seguir siendo interno; si no está publicado, usa el marcador temporal y la documentación del área de trabajo.",
+      "Faltan datos de punto de conexión o host en la vista actual; por eso se muestran marcadores temporales descriptivos."
+    ],
+    "hasPlaceholderSecrets": true,
+    "secretPlaceholderRef": "Sustituye los marcadores temporales por las claves de acceso del área de trabajo o credenciales temporales."
+  },
+  {
+    "id": "storage-node-sdk",
+    "label": "Node.js — @aws-sdk/client-s3",
+    "code": "import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3'\n\nconst client = new S3Client({\n  endpoint: '<RESOURCE_HOST>',\n  region: 'eu-west-1',\n  credentials: {\n    accessKeyId: '<AWS_ACCESS_KEY_ID>',\n    secretAccessKey: '<AWS_SECRET_ACCESS_KEY>'\n  },\n  forcePathStyle: true\n})\n\nconst result = await client.send(new ListObjectsV2Command({ Bucket: 'media-assets' }))\nconsole.log(result.Contents ?? [])",
+    "notes": [
+      "Faltan datos de punto de conexión o host en la vista actual; por eso se muestran marcadores temporales descriptivos."
+    ],
+    "hasPlaceholderSecrets": true,
+    "secretPlaceholderRef": "Sustituye los marcadores temporales por las claves de acceso del área de trabajo o credenciales temporales."
+  },
+  {
+    "id": "storage-python-boto3",
+    "label": "Python — boto3",
+    "code": "import boto3\n\ns3 = boto3.client(\n    's3',\n    endpoint_url='<RESOURCE_HOST>',\n    region_name='eu-west-1',\n    aws_access_key_id='<AWS_ACCESS_KEY_ID>',\n    aws_secret_access_key='<AWS_SECRET_ACCESS_KEY>'\n)\n\nresponse = s3.list_objects_v2(Bucket='media-assets')\nprint(response.get('Contents', []))",
+    "notes": [
+      "Faltan datos de punto de conexión o host en la vista actual; por eso se muestran marcadores temporales descriptivos."
+    ],
+    "hasPlaceholderSecrets": true,
+    "secretPlaceholderRef": "Sustituye los marcadores temporales por las claves de acceso del área de trabajo o credenciales temporales."
+  },
+  {
+    "id": "storage-curl-presigned",
+    "label": "cURL — presigned URL",
+    "code": "curl -X GET \"<RESOURCE_EXTRA_B>\"",
+    "notes": [
+      "Sustituye la URL firmada cuando la generes desde la superficie presigned del bucket.",
+      "Faltan datos de punto de conexión o host en la vista actual; por eso se muestran marcadores temporales descriptivos."
+    ],
+    "hasPlaceholderSecrets": false,
+    "secretPlaceholderRef": "Sustituye los marcadores temporales por las claves de acceso del área de trabajo o credenciales temporales."
+  }
+]

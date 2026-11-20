@@ -1,5 +1,5 @@
 // Page-local change-stream client for /console/realtime/changes.
-// Legacy used EventSource (apps/web-console/src/services/realtimeApi.ts). fetch plus a
+// Legacy used EventSource (legacy base 69296937330b61be2bbf2c7267520196499fc038:src/services/realtimeApi.ts). fetch plus a
 // text/event-stream reader keeps the same URL and the same reconnect behaviour while exposing
 // the HTTP status, which EventSource hides. The anon key in ?apikey= is the only credential:
 // this client never goes through the session transport, never sends Authorization and so a

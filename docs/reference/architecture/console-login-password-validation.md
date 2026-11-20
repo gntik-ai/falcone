@@ -1,9 +1,9 @@
 # Console login — password length validation
 
-The web console login page (`apps/web-console/src/pages/LoginPage.tsx`) authenticates an
+The web console login page (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/LoginPage.tsx`) authenticates an
 **existing** credential against the control plane via
 `createConsoleLoginSession` (`POST /v1/auth/login-sessions`,
-`apps/web-console/src/lib/console-auth.ts`). This page documents the one invariant that keeps
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-auth.ts`). This page documents the one invariant that keeps
 policy-valid accounts from being locked out of login by the browser.
 
 ## The login form imposes no client-side password length floor
@@ -33,6 +33,6 @@ platform password policy minimum (`/v1/auth/signups/policy` → `passwordPolicy.
 no client-side minimum on login is the safe default, since the backend / Keycloak policy stays
 authoritative and a policy-valid password can always be submitted.
 
-> Note: the **signup** form (`apps/web-console/src/pages/SignupPage.tsx`) is a separate surface
+> Note: the **signup** form (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/SignupPage.tsx`) is a separate surface
 > with its own password constraints; its length validation is tracked independently (#725) and is
 > not governed by this login invariant.

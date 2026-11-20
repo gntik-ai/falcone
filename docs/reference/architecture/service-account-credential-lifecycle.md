@@ -122,7 +122,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
 
 ## Console UX: credential-disclosure modal and status badge (#783)
 
-`apps/web-console/src/pages/ConsoleServiceAccountsPage.tsx` is the console surface for the
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleServiceAccountsPage.tsx` is the console surface for the
 endpoints above. Its "Revelar"/"Rotar" actions open `CredentialDisclosureDialog`, a true,
 action-anchored modal built on the shared `Dialog`/`DialogContent` primitive plus the
 `useModalFocusTrap` hook (see

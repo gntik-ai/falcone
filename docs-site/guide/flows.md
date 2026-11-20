@@ -82,7 +82,7 @@ credential — never from a client-supplied header.
 
 ## Designing on the canvas
 
-The console flow **designer** (`apps/web-console/src/pages/ConsoleFlowDesignerPage.tsx`,
+The console flow **designer** (`apps/web-console-next/src/pages/consoleFlowDesigner.tsx`,
 `components/flows/**`) is a node graph. Drag node types from the **palette** (populated from the
 `GET .../task-types` catalog), connect them, and fill each node's property panel. The designer
 distinguishes the seven node types — `sequence`, `parallel`, `task`, `branch`, `wait`,
@@ -106,7 +106,7 @@ disabled while the document is invalid.
 > that session. But the canvas works from the *structured* definition: the moment a flow
 > round-trips **YAML → canvas → YAML** (e.g. you switch to the designer and back), comments are
 > **discarded** and keys are re-emitted in a canonical, deterministic order with `canvasMetadata`
-> always last (`apps/web-console/src/lib/flows/yaml-serialiser.ts`). Keep anything you must
+> always last (`apps/web-console-next/src/pages/consoleFlowDesigner/yaml-serialiser.ts`). Keep anything you must
 > preserve inside fields (`description`, node `name`), not in `#` comments.
 
 ## The flow document

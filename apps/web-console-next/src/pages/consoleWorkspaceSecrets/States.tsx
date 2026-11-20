@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react'
+import type { ComponentProps, JSX } from 'react'
 import { Lock } from 'lucide-react'
 import { Button, EmptyState, Text } from '@gntik-ai/ui'
 import { ErrorPanel, NotFoundEmpty, TableSkeleton } from '@gntik-ai/blocks'

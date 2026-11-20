@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '1d5c93d275712d2650b9582b1d036e53ab7c1f83'
+  FALCONE_CHARTS_REF: '854a3cb7e8c44bdc5160bf2f542935f330d8dec3'
 
 jobs:
   quality:
@@ -522,7 +522,7 @@ jobs:
         run: pnpm --filter @in-falcone/web-console-next exec vite build
 
       - name: Build the console image without publishing
-        run: docker build -f apps/web-console/Dockerfile .
+        run: docker build -f apps/web-console-next/Dockerfile .
 
   cutover-gate:
     runs-on: ubuntu-24.04

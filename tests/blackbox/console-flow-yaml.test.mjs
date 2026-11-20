@@ -33,12 +33,12 @@ import { dirname, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../..');
-const WEB_CONSOLE = resolve(REPO_ROOT, 'apps/web-console');
+const WEB_CONSOLE = resolve(REPO_ROOT, 'apps/web-console-next');
 const FIXTURE_DIR = resolve(REPO_ROOT, 'packages/internal-contracts/src/fixtures/flows');
 
 // The serialiser deliberately uses no `@/` aliases or React imports so it loads under
 // plain node. Import it via a file URL to the real source.
-const serialiserUrl = pathToFileURL(resolve(WEB_CONSOLE, 'src/lib/flows/yaml-serialiser.ts')).href;
+const serialiserUrl = pathToFileURL(resolve(WEB_CONSOLE, 'src/pages/consoleFlowDesigner/yaml-serialiser.ts')).href;
 
 function readPackageJson() {
   return JSON.parse(readFileSync(resolve(WEB_CONSOLE, 'package.json'), 'utf8'));
@@ -54,9 +54,11 @@ function loadFixtures() {
 test('bbx-console-yml-001 monaco-editor, monaco-yaml and yaml are declared runtime deps', () => {
   const pkg = readPackageJson();
   const deps = pkg.dependencies ?? {};
-  for (const name of ['monaco-editor', 'monaco-yaml', 'yaml']) {
+  for (const name of ['monaco-editor', 'monaco-yaml']) {
     assert.ok(typeof deps[name] === 'string' && deps[name].length > 0, `${name} must be a declared dependency`);
   }
+  const root = JSON.parse(readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8'));
+  assert.ok(root.devDependencies.yaml, 'yaml is supplied by the workspace root');
 });
 
 // --- bbx-console-yml-002 -------------------------------------------------------------

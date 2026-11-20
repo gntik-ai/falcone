@@ -255,7 +255,7 @@ tag `4.33` in the chart but the OpenShift overlay pins a digest, so pin it.
 |---|---|---|---|---|
 | control-plane (API) | `in-falcone-control-plane:0.3.0` | `apps/control-plane/Dockerfile` | `node:22-alpine` | release workflow build; validates JWT and dispatches `/v1/*` to real action modules |
 | control-plane-executor | `in-falcone-control-plane-executor:0.3.0` | `apps/control-plane-executor/Dockerfile` | `node:22-alpine` | data-plane executor; built from repo root |
-| web-console | `in-falcone-web-console:0.3.0` | `apps/web-console/Dockerfile` | `node:22-alpine` | static Node server with zero filesystem writes; build SPA first |
+| web-console | `in-falcone-web-console:0.3.0` | `apps/web-console-next/Dockerfile` | `node:22-alpine` | static Node server with zero filesystem writes; build SPA first |
 | workflow-worker | `in-falcone-workflow-worker:0.3.0` | `apps/workflow-worker/Dockerfile` | `node:22-slim` (glibc - Temporal core-bridge) | core worker, built from repo root |
 | fn-runtime | `in-falcone-fn-runtime:0.3.0` | `apps/fn-runtime/Dockerfile` | `node:22-alpine` | Knative function runtime; referenced via `FN_RUNTIME_IMAGE` |
 | mcp-runtime | `in-falcone-mcp-runtime:0.3.0` | `apps/mcp-runtime/Dockerfile` | `node:22-alpine` | first-party MCP JSON-RPC runtime |

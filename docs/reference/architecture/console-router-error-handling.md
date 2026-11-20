@@ -1,7 +1,7 @@
 # Console router — lazy-route handling and the shell error boundary
 
 The web console is a single-page React Router app. Its route tree lives in
-`apps/web-console/src/router.tsx` (`appRoutes` + `createBrowserRouter`). This page documents two
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/router.tsx` (`appRoutes` + `createBrowserRouter`). This page documents two
 invariants that keep in-app navigation from crashing the whole console: **when a wired page may be
 lazily loaded**, and the **shell-level error boundary** contract.
 
@@ -39,7 +39,7 @@ to "fix" a suspended-input symptom — wrap it or change how it is entered inste
 
 The console content routes are nested under a **pathless layout route** (no `path`, no `element`,
 just `children`) that carries `errorElement: <RouteErrorBoundary />`
-(`apps/web-console/src/components/RouteErrorBoundary.tsx`). That pathless route sits **inside** the
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/RouteErrorBoundary.tsx`). That pathless route sits **inside** the
 `ConsoleShellLayout` route, so its element renders into the shell's content `<Outlet/>`.
 
 This placement is deliberate. If the `errorElement` were attached to the `ConsoleShellLayout` route

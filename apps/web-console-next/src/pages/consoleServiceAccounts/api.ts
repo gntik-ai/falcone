@@ -1,7 +1,7 @@
 import type { ApiError } from '@in-falcone/console-api/http'
 import { readConsoleShellSession, requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
-// The six legacy calls (apps/web-console/src/lib/console-service-accounts.ts) keep their method,
+// The six legacy calls (legacy base 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-service-accounts.ts) keep their method,
 // path and payload shape field for field; every request goes through the shared session client.
 export interface CredentialReference { credentialId: string; issuedAt: string | null; expiresAt: string | null; status: 'active' | 'rotated' | 'revoked' | null }
 export interface IssuedCredential { credentialId: string; secret: string; expiresAt: string | null }

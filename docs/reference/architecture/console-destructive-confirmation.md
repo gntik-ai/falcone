@@ -3,9 +3,9 @@
 Destructive console actions (delete a plan, delete a service account, revoke a credential,
 detach an identity provider, …) are confirmed through the shared
 `DestructiveConfirmationDialog`
-(`apps/web-console/src/components/console/DestructiveConfirmationDialog.tsx`). The contract between
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/DestructiveConfirmationDialog.tsx`). The contract between
 that dialog and its controller hook `useDestructiveOp`
-(`apps/web-console/src/components/console/hooks/useDestructiveOp.ts`) determines when "success"
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/hooks/useDestructiveOp.ts`) determines when "success"
 feedback is shown — and getting it wrong is security-relevant, because a credential **revoke** that
 falsely reports success can mislead an operator into thinking access was cut when it was not.
 
@@ -55,7 +55,7 @@ successfully; a failed op surfaces an error with no success feedback.
 `DestructiveConfirmationDialog` sits on the shared `ui/dialog.tsx` primitive, which only renders a
 backdrop overlay and click-outside-to-close — it provides none of the keyboard-accessibility
 semantics a modal needs. The dialog wires the shared
-`useModalFocusTrap` hook (`apps/web-console/src/components/console/hooks/useModalFocusTrap.ts`) onto
+`useModalFocusTrap` hook (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/hooks/useModalFocusTrap.ts`) onto
 its `role="alertdialog"` panel to add:
 
 - **Focus-on-open**: moves focus onto the first focusable descendant of the panel (the "type the

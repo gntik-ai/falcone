@@ -1,3 +1,4 @@
+import type { JSX } from 'react'
 import { Button, EmptyState, Text } from '@gntik-ai/ui'
 import { ErrorPanel, InlineCallout, NoAccessEmpty, NotFoundEmpty, TableSkeleton } from '@gntik-ai/blocks'
 import { focusRing, useCopy } from './copy'

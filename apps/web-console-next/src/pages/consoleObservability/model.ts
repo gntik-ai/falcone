@@ -19,7 +19,7 @@ export interface AuditRecord {
 }
 export interface Manifest { exportId: string; status?: string; itemCount: number; maskedItemCount?: number; items: unknown[]; message?: string }
 
-// Mirrors normalizeMetricsOverview in apps/web-console/src/lib/console-metrics.ts:127-182.
+// Mirrors normalizeMetricsOverview in legacy base 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-metrics.ts:127-182.
 export function normalizeMetrics(overview: OverviewResponse | null | undefined, usage: UsageResponse | null | undefined, series?: SeriesResponse | null): MetricsView {
   const lookup = new Map((usage?.dimensions ?? []).map((dimension) => [dimension.dimensionId ?? dimension.metricKey ?? '', dimension]))
   const dimensions = (overview?.dimensions ?? []).map((dimension): Dimension => {

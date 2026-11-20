@@ -5,7 +5,7 @@ Falcone stores **per-workspace function secrets** in the OpenBao KV v2 backend
 function deploy the control-plane reads it server-side and projects it into an owned Kubernetes
 Secret. The workload receives environment variables through `valueFrom.secretKeyRef`.
 This page documents the **Workspace Secrets** console screen (`/console/workspace-secrets`,
-`apps/web-console/src/pages/ConsoleWorkspaceSecretsPage.tsx`) and the runtime convergence that backs
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleWorkspaceSecretsPage.tsx`) and the runtime convergence that backs
 it, where a tenant could previously manage these secrets only over the HTTP API / CLI.
 
 The screen manages **only** `function_workspace_secret` resources for the **active workspace**. It is
@@ -20,7 +20,7 @@ Secret **values are write-only** — there is no read path on any layer:
   `DELETE` responses carry **only** the published `FunctionWorkspaceSecret` metadata; none contains
   the value. The value is resolvable **only** server-side at function deploy
   (`getValue`/`resolveEnv`), never through any secrets API response.
-- The `secretsApi` console client (`apps/web-console/src/services/secretsApi.ts`) exposes **no
+- The `secretsApi` console client (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/secretsApi.ts`) exposes **no
   value-returning method** — only list/metadata reads and create/replace/delete writes. Its read
   types carry no value field; only the write-request type carries `secretValue`.
 - The screen's value input is **masked**, is **never pre-populated** from any read (including the
@@ -91,7 +91,7 @@ cannot redirect the scope. A caller whose verified tenant does not own the works
 **`404 WORKSPACE_NOT_FOUND`** (no existence leak); the console renders this as a generic
 "not available" state that never reveals another scope's secret names or existence. Authorization is
 **server-authoritative** — the console adds only a coarse, fail-safe nav/route gate
-(`apps/web-console/src/lib/workspace-secrets-access.ts`: workspace membership / tenant-admin /
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/workspace-secrets-access.ts`: workspace membership / tenant-admin /
 platform role) and otherwise defers to the server `403`/`404`; it never client-trusts a mutation.
 
 ## Role authorization on writes

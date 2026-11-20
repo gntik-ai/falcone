@@ -10,7 +10,7 @@ authoritative decision.
 
 ## The single permission source
 
-`apps/web-console/src/lib/console-permissions.ts` exports `useConsolePermissions()` (and the pure
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-permissions.ts` exports `useConsolePermissions()` (and the pure
 `getConsolePermissions(roles)` for non-hook call sites). It reads `platformRoles` off the persisted
 console session (`ConsoleSessionPrincipal.platformRoles` — no new backend call) and mirrors
 `packages/internal-contracts/src/authorization-model.json`'s `permission_matrix.tenant` at the
@@ -53,11 +53,11 @@ write-capable role.
 
 ### Existing call sites now delegate to it
 
-- `apps/web-console/src/lib/console-wizards.ts::useWizardPermissionCheck` maps each
+- `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-wizards.ts::useWizardPermissionCheck` maps each
   `WizardPermission` (`create_tenant`, `create_workspace`, `manage_iam`, `invite_member`,
   `provision_database`, `publish_function`) onto a `PermissionAction` and delegates — see
   `docs/reference/architecture/console-wizard-permission-gates.md`.
-- `apps/web-console/src/lib/structural-write-access.ts::canPerformStructuralWrites` delegates to the
+- `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/structural-write-access.ts::canPerformStructuralWrites` delegates to the
   dedicated, exported `STRUCTURAL_WRITE_ADMIN_ROLES` set (not the broader
   `WORKSPACE_WRITE_CAPABLE_ROLES`) — a backend-parity set that mirrors
   `apps/control-plane-executor/src/runtime/auth-roles.mjs::WRITE_CAPABLE_ADMIN_ROLES` exactly, so it excludes
@@ -127,7 +127,7 @@ than a blanket change that risks hiding genuinely useful read surfaces.
 
 ## Graceful permission-denied state
 
-`apps/web-console/src/components/console/PermissionDeniedNotice.tsx` wraps the existing
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PermissionDeniedNotice.tsx` wraps the existing
 `ConsolePageState kind="blocked"` primitive (already `role="alert"`) with role-aware copy from
 `denyReason()`. It replaces raw backend `403` error text as a **defense-in-depth fallback** — reached
 only when the CTA above was somehow still enabled (e.g. a stale-session race after a mid-session role

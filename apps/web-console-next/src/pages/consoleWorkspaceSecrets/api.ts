@@ -1,5 +1,5 @@
 // Workspace function secrets client. Requests and bodies mirror the legacy
-// apps/web-console/src/services/secretsApi.ts:60-108 field for field; the only addition is the
+// legacy base 69296937330b61be2bbf2c7267520196499fc038:src/services/secretsApi.ts:60-108 field for field; the only addition is the
 // page[after] cursor the legacy page never sent (functions.openapi.json:136-158).
 // Secret VALUES are write-only: no method here reads one, and GET .../secrets/{name} is never called.
 import { requestConsoleSessionJson } from '@in-falcone/console-api/session'

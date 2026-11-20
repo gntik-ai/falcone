@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '1d5c93d275712d2650b9582b1d036e53ab7c1f83'
+  FALCONE_CHARTS_REF: '854a3cb7e8c44bdc5160bf2f542935f330d8dec3'
 
 jobs:
   plan-enforcement:
@@ -72,7 +72,7 @@ jobs:
           localhost:30500/in-falcone-control-plane:0.3.1|apps/control-plane/Dockerfile
           localhost:30500/in-falcone-control-plane-executor:0.9.3|apps/control-plane-executor/Dockerfile
           localhost:30500/in-falcone-workflow-worker:0.1.0|apps/workflow-worker/Dockerfile
-          localhost:30500/in-falcone-web-console:0.2.11|apps/web-console/Dockerfile
+          localhost:30500/in-falcone-web-console:0.2.11|apps/web-console-next/Dockerfile
           IMAGES
 
       - name: Generate ephemeral integration credentials

@@ -1,7 +1,7 @@
 # Console tenant/workspace context consistency
 
 The web console keeps the active context in `ConsoleContextProvider`
-(`apps/web-console/src/lib/console-context.tsx`). The active tenant drives the workspace list loaded
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-context.tsx`). The active tenant drives the workspace list loaded
 from `GET /v1/workspaces?filter[tenantId]=...`, and the active workspace is selected from that list.
 
 ## Tenant selection events

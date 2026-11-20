@@ -3,37 +3,37 @@
 - [x] 1.1 Add/update focused tests for
   `ConsoleTenantAllocationSummaryPage` so loading/error/empty states still render
   the page heading and wayfinding before the state card.
-  - Paths: `apps/web-console/src/pages/ConsoleTenantAllocationSummaryPage.test.tsx`.
+  - Paths: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantAllocationSummaryPage.test.tsx`.
 - [x] 1.2 Add/update focused tests for `ConsolePageState` icon support and the
   allocation empty state using that icon slot.
-  - Paths: `apps/web-console/src/components/console/ConsolePageState.test.tsx`,
-    `apps/web-console/src/pages/ConsoleTenantAllocationSummaryPage.test.tsx`.
+  - Paths: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsolePageState.test.tsx`,
+    `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantAllocationSummaryPage.test.tsx`.
 - [x] 1.3 Add/update focused tests for
   `WorkspaceAllocationSummaryTable` so allocation values carry units, workspace
   labels are human-readable where possible, and raw UUIDs are not primary copy.
   - Paths:
-    `apps/web-console/src/components/console/WorkspaceAllocationSummaryTable.test.tsx`.
+    `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/WorkspaceAllocationSummaryTable.test.tsx`.
 - [x] 1.4 Add/update focused tests for `ConsoleTenantPlanOverviewPage` so an
   over-limit tenant aggregate renders as destructive/alert styling, while the
   existing row-level breach behavior remains intact.
-  - Paths: `apps/web-console/src/pages/ConsoleTenantPlanOverviewPage.test.tsx`.
+  - Paths: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantPlanOverviewPage.test.tsx`.
 
 ## 2. Implement the frontend fix
 
 - [x] 2.1 `ConsolePageState`: add a backward-compatible optional icon slot.
-  - Paths: `apps/web-console/src/components/console/ConsolePageState.tsx`.
+  - Paths: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsolePageState.tsx`.
 - [x] 2.2 `ConsoleTenantAllocationSummaryPage`: render the header/wayfinding
   before every page state and pass icons to loading/error/empty states.
-  - Paths: `apps/web-console/src/pages/ConsoleTenantAllocationSummaryPage.tsx`.
+  - Paths: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantAllocationSummaryPage.tsx`.
 - [x] 2.3 `WorkspaceAllocationSummaryTable`: use the shared table primitive,
   format values with units, and render workspace labels instead of run-on raw
   identifier strings.
   - Paths:
-    `apps/web-console/src/components/console/WorkspaceAllocationSummaryTable.tsx`,
-    `apps/web-console/src/services/planManagementApi.ts`.
+    `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/WorkspaceAllocationSummaryTable.tsx`,
+    `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/planManagementApi.ts`.
 - [x] 2.4 `ConsoleTenantPlanOverviewPage`: change the over-limit aggregate banner
   from amber warning styling to destructive/alert styling.
-  - Paths: `apps/web-console/src/pages/ConsoleTenantPlanOverviewPage.tsx`.
+  - Paths: `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantPlanOverviewPage.tsx`.
 
 ## 3. Documentation and OpenSpec
 

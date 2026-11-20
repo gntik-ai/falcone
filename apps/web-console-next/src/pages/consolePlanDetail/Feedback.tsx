@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, type JSX } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Text } from '@gntik-ai/ui'

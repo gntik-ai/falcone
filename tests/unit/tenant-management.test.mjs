@@ -16,13 +16,6 @@ import {
   summarizeTenantManagementSurface,
   tenantLifecycleStateMachine
 } from '../../apps/control-plane-executor/src/tenant-management.mjs';
-import {
-  buildTenantActionChecklist,
-  buildTenantExportSummary,
-  buildTenantGovernanceCards,
-  buildTenantInventoryRows,
-  buildTenantPurgeModalDefaults
-} from '../../apps/web-console/src/actions/tenant-management.mjs';
 import { readDomainSeedFixtures } from '../../scripts/lib/domain-model.mjs';
 
 test('tenant helper modules expose governance dashboard, inventory, export, and purge semantics', () => {
@@ -105,41 +98,6 @@ test('tenant helper modules expose governance dashboard, inventory, export, and 
     actorUserId: 'usr_01betatenantadmin',
     approvalTicket: 'APR-42'
   });
-  const cards = buildTenantGovernanceCards({
-    tenant: activeTenant,
-    workspaces: growthProfile.workspaces,
-    externalApplications: growthProfile.externalApplications,
-    serviceAccounts: growthProfile.serviceAccounts,
-    managedResources: growthProfile.managedResources
-  });
-  const rows = buildTenantInventoryRows({
-    tenant: activeTenant,
-    workspaces: growthProfile.workspaces,
-    externalApplications: growthProfile.externalApplications,
-    serviceAccounts: growthProfile.serviceAccounts,
-    managedResources: growthProfile.managedResources
-  });
-  const exportSummary = buildTenantExportSummary({
-    tenant: activeTenant,
-    workspaces: growthProfile.workspaces,
-    externalApplications: growthProfile.externalApplications,
-    serviceAccounts: growthProfile.serviceAccounts,
-    managedResources: growthProfile.managedResources
-  });
-  const actionChecklist = buildTenantActionChecklist({
-    tenant: deletedTenant,
-    action: 'purge',
-    workspaces: growthProfile.workspaces,
-    managedResources: growthProfile.managedResources,
-    now: '2026-03-24T00:00:00Z',
-    hasElevatedAccess: true,
-    hasSecondConfirmation: true
-  });
-  const purgeModalDefaults = buildTenantPurgeModalDefaults({
-    tenant: deletedTenant,
-    actorUserId: 'usr_01betatenantadmin',
-    approvalTicket: 'APR-42'
-  });
 
   assert.deepEqual(tenantLifecycleStateMachine.states, ['pending_activation', 'active', 'suspended', 'deleted']);
   assert.equal(getTenantRoute('getTenantGovernanceDashboard').path, '/v1/tenants/{tenantId}/dashboard');
@@ -164,15 +122,6 @@ test('tenant helper modules expose governance dashboard, inventory, export, and 
   assert.deepEqual(purgeReady.requiredControls, ['elevated_access', 'dual_confirmation', 'retention_elapsed', 'export_checkpoint']);
   assert.equal(purgeDraft.approvalTicket, 'APR-42');
   assert.equal(controlPlanePurgeDraft.confirmationText.includes('PURGE ten_01growthbeta'), true);
-  assert.equal(cards.some((card) => card.id === 'tenant-lifecycle'), true);
-  assert.equal(
-    cards.find((card) => card.id === 'tenant-inventory')?.secondary,
-    `${inventory.workspaceCount} área(s) de trabajo, ${inventory.applicationCount} aplicación(es)`
-  );
-  assert.equal(rows.some((row) => row.workspaceId === 'wrk_01betaprod'), true);
-  assert.equal(exportSummary.exportId.startsWith('exp_'), true);
-  assert.equal(actionChecklist.allowed, true);
-  assert.equal(purgeModalDefaults.requiresElevatedAccess, true);
   assert.equal(previewTenantInventory({
     tenant: activeTenant,
     workspaces: growthProfile.workspaces,

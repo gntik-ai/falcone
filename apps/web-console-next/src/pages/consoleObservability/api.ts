@@ -1,7 +1,7 @@
 import type { ApiError, JsonValue } from '@in-falcone/console-api/http'
 import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
-// Same method, path, query and payload shape as apps/web-console/src/lib/console-metrics.ts:252-366.
+// Same method, path, query and payload shape as legacy base 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-metrics.ts:252-366.
 // GET /v1/metrics/tenants/{}/series is deliberately absent: the legacy page never sends it.
 export type MetricWindow = '24h' | '7d' | '30d'
 export const metricWindows: MetricWindow[] = ['24h', '7d', '30d']

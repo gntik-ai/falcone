@@ -11,12 +11,6 @@ import {
   summarizeObservabilityQuotaUsageView
 } from '../../apps/control-plane-executor/src/observability-admin.mjs';
 import {
-  buildQuotaUsageTableRows,
-  buildTenantProvisioningBanner,
-  buildTenantQuotaUsageCards,
-  buildWorkspaceQuotaUsageRows
-} from '../../apps/web-console/src/actions/observability-quota-usage.mjs';
-import {
   collectObservabilityQuotaUsageViewViolations,
   readObservabilityQuotaUsageView
 } from '../../scripts/lib/observability-quota-usage-view.mjs';
@@ -235,18 +229,12 @@ test('tenant quota usage overview aggregates provisioning detail and console hel
     requestedBy: 'usr_tenant_owner',
     generatedAt: '2026-03-28T18:10:00.000Z'
   });
-  const cards = buildTenantQuotaUsageCards(overview);
-  const banner = buildTenantProvisioningBanner(overview);
-  const rows = buildQuotaUsageTableRows(overview);
 
   assert.equal(overview.overallPosture, 'hard_limit_reached');
   assert.equal(overview.policiesConfigured, true);
   assert.equal(overview.provisioningState.state, 'degraded');
   assert.equal(provisioningView.degradedComponents.includes('functions'), true);
   assert.equal(auditRecord.permissionId, 'tenant.overview.read');
-  assert.equal(cards[0].emphasis, 'critical');
-  assert.equal(banner.emphasis, 'degraded');
-  assert.equal(rows.find((row) => row.dimensionId === 'storage_volume_bytes').blockingState, 'denied');
 });
 
 test('query overview helpers keep caller scope bounded', () => {
@@ -275,8 +263,5 @@ test('query overview helpers keep caller scope bounded', () => {
       }
     }
   );
-
-  const rows = buildWorkspaceQuotaUsageRows(workspaceOverview);
   assert.equal(workspaceOverview.queryScope, 'workspace');
-  assert.equal(rows.every((row) => row.workspaceId === 'wrk_123'), true);
 });

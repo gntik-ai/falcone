@@ -1,8 +1,8 @@
 # Console login — error classification
 
-The web console login page (`apps/web-console/src/pages/LoginPage.tsx`) submits credentials through
+The web console login page (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/LoginPage.tsx`) submits credentials through
 `createConsoleLoginSession` (`POST /v1/auth/login-sessions`,
-`apps/web-console/src/lib/console-auth.ts`). The endpoint returns the platform error envelope
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-auth.ts`). The endpoint returns the platform error envelope
 (`status`, `code`, `message`, optional details), and the public OpenAPI contract advertises the
 wrong-credentials case as HTTP `401` with the shared `ErrorResponse` schema. This document defines
 how the console maps that envelope into user-facing login feedback.

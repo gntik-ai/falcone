@@ -9,7 +9,7 @@ import { App } from '../src/App'
 import i18n from '../src/i18n'
 import es from '../src/locales/es/pages.console-tenant-plan-page.json'
 import en from '../src/locales/en/pages.console-tenant-plan-page.json'
-import * as legacy from '../../web-console/src/services/planManagementApi'
+import frozenRequests from './frozen-legacy/tenant-plan-requests.json'
 import { assignPlan, getEffectiveEntitlements, getPlanChangeHistory, getTenantPlan, listActivePlans } from '../src/pages/consoleTenantPlan/api'
 import {
   activePlans, activePlansWithoutTeam, assignedBody, entitlementsMixed, entitlementsNoLimits, freePlan, historyEntries, historyResponse, isTenantPlanQuery, proPlan, unassignedPlan,
@@ -461,8 +461,7 @@ test('requests match the legacy client method, path, query order and body field 
   const record = (response: unknown = {}) => async (_input: RequestInfo | URL, init?: RequestInit) => { seen.push({ method: init?.method ?? 'GET', url: String(_input), body: typeof init?.body === 'string' ? init.body : undefined }); return Response.json(response) }
   login()
   vi.stubGlobal('fetch', vi.fn(record({ items: [], plans: [] })))
-  await Promise.all([legacy.getTenantCurrentPlan('ten_alpha'), legacy.getEffectiveEntitlements('ten_alpha', { includeConsumption: true }), legacy.getPlanChangeHistory('ten_alpha'), legacy.listPlans({ status: 'active' }), legacy.assignPlan('ten_alpha', { planId: 'plan-team', assignedBy: 'console' })])
-  const old = [...seen]; seen.length = 0
+  const old = frozenRequests
   await Promise.all([getTenantPlan('ten_alpha'), getEffectiveEntitlements('ten_alpha'), getPlanChangeHistory('ten_alpha', 1), listActivePlans(), assignPlan('ten_alpha', 'plan-team')])
   const key = (entry: { method: string; url: string }) => `${entry.method} ${entry.url}`
   expect(seen.map(key).sort()).toEqual(old.map(key).sort())

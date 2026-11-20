@@ -7,7 +7,7 @@
 
 ## 2. Implement
 
-- [x] 2.1 `apps/web-console/src/pages/ConsoleMembersPage.tsx`: import and mount
+- [x] 2.1 `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMembersPage.tsx`: import and mount
   `InviteUserWizard` behind the existing `tenant.members.manage` gate.
 - [x] 2.2 Add an `Invitar usuario` CTA and keep `Crear usuario` as a secondary direct-create path.
 - [x] 2.3 Ensure opening one member-management action closes the other, so the page does not show a
@@ -20,12 +20,12 @@
 
 ## 3. Tests
 
-- [x] 3.1 `apps/web-console/src/pages/ConsoleMembersPage.test.tsx`: authorized roles
+- [x] 3.1 `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMembersPage.test.tsx`: authorized roles
   (`tenant_owner`, `tenant_admin`, `workspace_owner`, `workspace_admin`) see both member-management
   actions.
-- [x] 3.2 `apps/web-console/src/pages/ConsoleMembersPage.test.tsx`: read-only roles
+- [x] 3.2 `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMembersPage.test.tsx`: read-only roles
   (`tenant_viewer`, `tenant_developer`) see neither action and still see the read-only indicator.
-- [x] 3.3 `apps/web-console/src/pages/ConsoleMembersPage.test.tsx`: opening `Invitar usuario` from
+- [x] 3.3 `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMembersPage.test.tsx`: opening `Invitar usuario` from
   Members drives the real wizard to submit an invitation email payload without a password field.
 - [x] 3.4 `tests/unit/tenant-invitation-route.test.mjs`: the canonical invitation route resolves in
   seed/runtime route maps and persists masked/hash invitation records with tenant/workspace gating.

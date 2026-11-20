@@ -1,5 +1,5 @@
 // Functions administration client. Methods, paths, query strings and bodies mirror the legacy page
-// apps/web-console/src/pages/ConsoleFunctionsPage.tsx and services/functionsApi.ts field for field.
+// legacy base 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFunctionsPage.tsx and services/functionsApi.ts field for field.
 // Every request goes through the shared session client, which owns the single 401 refresh and replay.
 import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import type { ApiError, JsonValue } from '@in-falcone/console-api/http'

@@ -2,7 +2,7 @@ import { createRequestId, type ApiError, type JsonValue } from '@in-falcone/cons
 import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 
 // Every call keeps the method, path, query and payload shape of the legacy ConsoleAuthPage
-// (apps/web-console/src/pages/ConsoleAuthPage.tsx) and goes through the shared session client.
+// (legacy base 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleAuthPage.tsx) and goes through the shared session client.
 export type Protocol = 'openid-connect' | 'saml'
 export interface IamScope { scopeName: string; protocol: Protocol; isDefault: boolean; isOptional: boolean; includeInTokenScope: boolean; assignedClientIds?: string[] }
 export interface IamClient { clientId: string; protocol: Protocol; accessType: 'public' | 'confidential' | 'bearer_only'; enabled: boolean; state: string; redirectUris?: string[]; defaultScopes?: string[]; optionalScopes?: string[] }

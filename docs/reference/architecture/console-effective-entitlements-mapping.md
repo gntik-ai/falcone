@@ -39,7 +39,7 @@ The kind control-plane serves this verbatim — `apps/control-plane/b-handlers.m
 routes the request to `tenant-effective-entitlements-get.mjs`, which spreads `...profile`
 with no field renaming. The console requests the consumption-enriched form via
 `getEffectiveEntitlements(tenantId, { includeConsumption: true })`
-(`apps/web-console/src/services/planManagementApi.ts`), which appends `?include=consumption`
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/planManagementApi.ts`), which appends `?include=consumption`
 so `currentUsage` / `usageStatus` are populated.
 
 ## The field the console reads
@@ -49,7 +49,7 @@ under **`currentUsage`**. There is **no** `quotaDimensions` field and **no** `ob
 field on this response.
 
 The superadmin per-tenant plan page
-(`apps/web-console/src/pages/ConsoleTenantPlanPage.tsx`, route
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantPlanPage.tsx`, route
 `/console/tenants/{tenantId}/plan`, gated by `RequireSuperadminRoute`) maps
 `quantitativeLimits` into the `QuotaConsumptionTable`, using each entry's `currentUsage` for
 the consumption column. It reads the field defensively:
@@ -67,7 +67,7 @@ table rather than throwing — the page renders the assign/change-plan control e
 never crashes into the router error boundary.
 
 The tenant "My Plan" page
-(`apps/web-console/src/pages/ConsoleTenantPlanOverviewPage.tsx`, route `/console/my-plan` —
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantPlanOverviewPage.tsx`, route `/console/my-plan` —
 the default landing page for non-superadmin console principals) reads the same
 `quantitativeLimits` collection from the tenant-scoped
 `GET /v1/tenant/plan/effective-entitlements` call, with the same defensive guard:
@@ -85,7 +85,7 @@ endpoint (or the `EffectiveEntitlementProfile` model backing it) ever returns; t
 removed as part of fixing this page (issue #735).
 
 > Note: the shared TypeScript type `CurrentEffectiveEntitlementSummary`
-> (`apps/web-console/src/services/planManagementApi.ts`) still declares a legacy
+> (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/planManagementApi.ts`) still declares a legacy
 > `quotaDimensions` field alongside the correct `quantitativeLimits`. That legacy field does
 > not correspond to anything the API returns. As of issue #735, no page reads it anymore —
 > it is retained only because `PlanQuotaImpactTable.tsx` structurally types its `items`
@@ -133,7 +133,7 @@ The full sidebar role matrix, after #741:
 | Autenticación (`/console/auth`) | shown | **hidden** | **hidden** |
 
 `Gestión de organizaciones` is gated on the shared `hasPlatformInventoryAccess` predicate
-(`apps/web-console/src/lib/console-principal.ts`) — the same predicate that decides whether
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-principal.ts`) — the same predicate that decides whether
 `ConsoleTenantsPage.tsx` renders a real cross-tenant inventory or an honest blocked state (see
 `docs/reference/architecture/console-tenant-inventory.md`). `Acceso IAM`, `Planes`, and
 `Autenticación` are gated on `requiresSuperadminAccess`, matching their `RequireSuperadminRoute`

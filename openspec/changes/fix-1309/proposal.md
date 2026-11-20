@@ -4,7 +4,7 @@
 
 The `/next/` Vite build aborted at its 1536 MiB V8 heap cap in the legacy console
 image CI build on main. Both Vite RUN instructions in
-`apps/web-console/Dockerfile` use that cap. Raise both to 3072 MiB and preserve
+`apps/web-console-next/Dockerfile` use that cap. Raise both to 3072 MiB and preserve
 exactly three builder RUN layers: locked dependency installation, legacy build,
 and next build. No other Dockerfile instructions or runtime resources change.
 

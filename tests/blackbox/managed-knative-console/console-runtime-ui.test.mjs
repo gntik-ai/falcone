@@ -13,10 +13,12 @@ const repoRoot = resolve(capabilityDir, '../../..')
 
 test('bbx-933-console-01..11: managed Knative console public behavior', () => {
   const result = spawnSync('pnpm', [
-    '--filter', '@in-falcone/web-console',
+    '--filter', '@in-falcone/web-console-next',
     'exec', 'vitest', 'run',
-    '--config', resolve(capabilityDir, 'vitest.config.ts'),
-    '--typecheck'
+    'tests/managedRuntimeTransport.test.tsx',
+    'tests/consoleRuntime.test.tsx',
+    'tests/consoleFunctions.test.tsx',
+    'tests/consoleMcpServerDetail.test.tsx'
   ], {
     cwd: repoRoot,
     encoding: 'utf8',

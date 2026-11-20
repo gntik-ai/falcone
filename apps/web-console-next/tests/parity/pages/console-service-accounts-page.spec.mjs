@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import manifest, { accountPath, active, base, endpoints, issuancePath, issued, otherWorkspaceId, requestId, revocationPath, rotated, rotationPath, rotatedSecret, syntheticSecret, tenantBId, tenantBWorkspaceId, workspaceId } from './console-service-accounts-page.manifest.ts';
 import { seedHistoryPrincipal } from './console-flow-history-page.session.mjs';
-import { openLegacy } from './console-service-accounts-page.legacy.mjs';
 import { test, expect } from '../harness.mjs';
 import * as check from '../checks.mjs';
 import { consumeResourceDiagnostic } from '../resource-diagnostics.mjs';
+
+const frozenJourneys = JSON.parse(readFileSync(new URL('../../frozen-legacy/service-account-journeys.json', import.meta.url), 'utf8'));
 
 const bundles = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/pages.console-service-accounts-page.json`, import.meta.url), 'utf8'))]));
 const common = Object.fromEntries(['es', 'en'].map((locale) => [locale, JSON.parse(readFileSync(new URL(`../../../src/locales/${locale}/common.json`, import.meta.url), 'utf8'))]));
@@ -360,8 +361,7 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
         await expect.poll(() => pageWrites(p, since).length).toBe(1); await expect.poll(() => listReads(p, since).length).toBe(1); await settle(p);
         expect(pageWrites(p, since)).toHaveLength(1); expect(listReads(p, since)).toHaveLength(1);
       }
-      // Both builds, same fixtures, in every locale and width cell: requests, refetch counts and disclosure content match.
-      // The legacy page is Spanish only, so its controls are located with the Spanish copy.
+      // Compare requests, refetch counts and disclosure content with the frozen legacy contracts in every cell.
       await compareWithLegacy(p, info);
     });
 
@@ -570,52 +570,39 @@ for (const role of ['tenant_owner', 'tenant_viewer']) for (const locale of ['es'
   });
 }
 
-// Runs the same journeys against the legacy build and the Next build and compares what both send and show.
+// Exercise the same five journeys against independent literals frozen from the retired app.
 async function compareWithLegacy(p, info) {
-  const c = copy(p);
-  const viewport = p.page.viewportSize();
-  const run = async (mode) => {
-    // The legacy page has only Spanish copy; the Next page uses the cell's locale.
-    const k = mode === 'legacy' ? bundles.es : c;
-    const results = {};
-    for (const flow of ['create', 'reveal', 'rotate', 'revoke', 'delete']) {
-      const legacy = mode === 'legacy' ? await openLegacy({ browser: p.page.context().browser(), role: 'tenant_owner', locale: 'es', viewport, pageEndpoints: endpoints, route: manifest.route }) : null;
-      const page = legacy ? legacy.page : p.page;
-      const requests = legacy ? legacy.requests : p.network.requests;
-      if (!legacy) await p.open(manifest.route);
-      await expect(page.getByRole('table')).toBeVisible();
-      const since = requests.length;
-      const named = (kind) => page.getByRole('button', { name: fill(k.row[`${kind}Named`], { name: active.displayName }), exact: true });
-      const confirm = async (act, label) => {
-        const dialog = page.getByRole('alertdialog');
-        if (mode === 'next' || act === 'delete') await (mode === 'next' ? dialog.getByRole('textbox', { name: k.confirm.typedName, exact: true }) : dialog.getByPlaceholder(active.displayName)).fill(active.displayName);
-        await dialog.getByRole('button', { name: label, exact: true }).click();
-      };
-      let secret = null, credentialId = null;
-      if (flow === 'create') { await page.getByRole('textbox', { name: k.create.nameLabel, exact: true }).fill('Created service'); await page.getByRole('button', { name: k.create.submit, exact: true }).click(); }
-      else if (flow === 'reveal' || flow === 'rotate') {
-        await named(flow === 'reveal' ? 'reveal' : 'rotate').click();
-        if (flow === 'rotate' && mode === 'next') await confirm('rotate', k.confirm.rotate.action);
-        const dialog = page.getByRole('dialog', { name: flow === 'reveal' ? k.disclosure.revealTitle : k.disclosure.rotateTitle });
-        await expect(dialog).toBeVisible();
-        credentialId = (await dialog.locator('dd').first().textContent())?.trim();
-        if (mode === 'legacy') secret = (await dialog.locator('pre').textContent())?.trim();
-        else if (flow === 'reveal') { await dialog.getByRole('button', { name: k.disclosure.show, exact: true }).click(); secret = await dialog.getByRole('textbox', { name: k.disclosure.secretLabel, exact: true }).inputValue(); }
-        else secret = (await dialog.getByText(rotatedSecret, { exact: true }).textContent())?.trim();
-      } else if (flow === 'revoke') { await named('revoke').click(); await confirm('revoke', mode === 'legacy' ? 'Confirmar' : k.confirm.revoke.action); }
-      else { await named('delete').click(); await confirm('delete', k.confirm.delete.action); }
-      await page.waitForTimeout(500);
-      results[flow] = { requests: requests.slice(since).filter(({ path }) => path.includes('/service-accounts')).map(({ method, path, body }) => ({ method, path, body })), secret, credentialId };
-      if (legacy) { expect(legacy.faults).toEqual([]); await legacy.close(); }
-    }
-    return results;
-  };
-  const next = await run('next'), legacy = await run('legacy');
-  for (const flow of Object.keys(next)) {
-    // Successful requests, list refetch counts and the disclosed credential must match; the typed confirmation is the intended difference.
-    expect(next[flow].requests, `parity: ${flow} requests`).toEqual(legacy[flow].requests);
-    expect(next[flow].credentialId, `parity: ${flow} credential id`).toBe(legacy[flow].credentialId);
-    expect(next[flow].secret, `parity: ${flow} secret`).toBe(legacy[flow].secret);
+  const k = copy(p), results = {};
+  for (const flow of ['create', 'reveal', 'rotate', 'revoke', 'delete']) {
+    const page = p.page, requests = p.network.requests;
+    await p.open(manifest.route);
+    await expect(page.getByRole('table')).toBeVisible();
+    const since = requests.length;
+    const named = (kind) => page.getByRole('button', { name: fill(k.row[`${kind}Named`], { name: active.displayName }), exact: true });
+    const confirm = async (label) => {
+      const dialog = page.getByRole('alertdialog');
+      await dialog.getByRole('textbox', { name: k.confirm.typedName, exact: true }).fill(active.displayName);
+      await dialog.getByRole('button', { name: label, exact: true }).click();
+    };
+    let secret = null, credentialId = null;
+    if (flow === 'create') {
+      await page.getByRole('textbox', { name: k.create.nameLabel, exact: true }).fill('Created service');
+      await page.getByRole('button', { name: k.create.submit, exact: true }).click();
+    } else if (flow === 'reveal' || flow === 'rotate') {
+      await named(flow === 'reveal' ? 'reveal' : 'rotate').click();
+      if (flow === 'rotate') await confirm(k.confirm.rotate.action);
+      const dialog = page.getByRole('dialog', { name: flow === 'reveal' ? k.disclosure.revealTitle : k.disclosure.rotateTitle });
+      await expect(dialog).toBeVisible();
+      credentialId = (await dialog.locator('dd').first().textContent())?.trim();
+      if (flow === 'reveal') {
+        await dialog.getByRole('button', { name: k.disclosure.show, exact: true }).click();
+        secret = await dialog.getByRole('textbox', { name: k.disclosure.secretLabel, exact: true }).inputValue();
+      } else secret = (await dialog.getByText(rotatedSecret, { exact: true }).textContent())?.trim();
+    } else if (flow === 'revoke') { await named('revoke').click(); await confirm(k.confirm.revoke.action); }
+    else { await named('delete').click(); await confirm(k.confirm.delete.action); }
+    await page.waitForTimeout(500);
+    results[flow] = { requests: requests.slice(since).filter(({ path }) => path.includes('/service-accounts')).map(({ method, path, body }) => ({ method, path, body })), secret, credentialId };
+    expect(results[flow], `frozen legacy parity: ${flow}`).toEqual(frozenJourneys[flow]);
   }
-  await info.attach('legacy-parity-summary', { body: JSON.stringify(Object.fromEntries(Object.entries(next).map(([flow, value]) => [flow, value.requests.map(({ method, path }) => `${method} ${path}`)])), null, 2), contentType: 'application/json' });
+  await info.attach('legacy-parity-summary', { body: JSON.stringify(Object.fromEntries(Object.entries(results).map(([flow, value]) => [flow, value.requests.map(({ method, path }) => `${method} ${path}`)])), null, 2), contentType: 'application/json' });
 }

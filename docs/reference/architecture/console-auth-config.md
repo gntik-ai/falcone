@@ -8,8 +8,8 @@ identity providers) has always been fully manageable server-side via
 tenant owner had no way to change their own realm's login settings without raw API access (#782).
 
 This page documents the **Autenticación de la organización** console screen
-(`/console/auth-config`, `apps/web-console/src/pages/ConsoleAuthConfigPage.tsx`) and the client it is
-built on (`apps/web-console/src/services/authConfigApi.ts`).
+(`/console/auth-config`, `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleAuthConfigPage.tsx`) and the client it is
+built on (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/authConfigApi.ts`).
 
 The screen is distinct from the existing superadmin-only **Autenticación** screen (`/console/auth`,
 `ConsoleAuthPage.tsx`), which is a realm/IAM **inventory** view (users/roles/scopes/clients) plus
@@ -106,9 +106,9 @@ only `providerId` and `enabled`. Test-connection and a browser OAuth round-trip 
 `/v1/tenants/{tenantId}/auth-config` (and its `/identity-providers/{alias}` sub-resource) is a
 **kind-CP runtime-only route family** (`apps/control-plane/routes.mjs`) — it is **not** present
 in the public OpenAPI (`apps/control-plane-executor/openapi/control-plane.openapi.json`) or the generated
-console SDK (`apps/web-console/src/lib/console-openapi-sdk.ts`), the same pattern as the other
+console SDK (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-openapi-sdk.ts`), the same pattern as the other
 `/v1/tenants/*` runtime-only surfaces. There is therefore no OpenAPI/SDK contract artifact to update
-for this change; `apps/web-console/src/services/authConfigApi.ts` **is** the console-side contract for
+for this change; `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/authConfigApi.ts` **is** the console-side contract for
 this surface, built on `requestConsoleSessionJson` (inherits the session bearer, 401-refresh-retry,
 `X-API-Version`, and a fresh `Idempotency-Key` on every mutating call).
 

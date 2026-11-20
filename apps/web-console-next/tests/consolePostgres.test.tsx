@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { changeLocale } from '../src/i18n'
 import { previewDdl } from '../src/pages/consolePostgres/api'
-import { generateSnippets } from '../../web-console/src/lib/snippets/snippet-generator'
+import frozenSnippets from './frozen-legacy/postgres-snippets.json'
 import { postgresSnippets } from '../src/pages/consolePostgres/snippets'
 import { click, element, open, ready, selectSchema, selectTable, setup, settle, state, tab } from './consolePostgres-support'
 import { ddlPreviewFixture, fixtures, metricPaths, pageUrl, paths, tableFixture } from './parity/pages/console-postgres-page.manifest'
@@ -115,7 +115,7 @@ test('copy uses exact legacy snippet templates and announces feedback', async ()
   const clipboard = vi.fn(async () => {}); Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: clipboard } })
   server = setup(); open(); await ready(); click('app_db'); click('Copiar', within(screen.getAllByRole('article')[0]) as typeof screen)
   await waitFor(() => expect(clipboard).toHaveBeenCalledWith(postgresSnippets('app_db')[0].code)); expect(await screen.findAllByText('Fragmento copiado al portapapeles.').then((items) => items[0])).toBeVisible()
-  const legacy = generateSnippets('postgres-database', { tenantId: 't-1', tenantSlug: null, workspaceId: 'ws-1', workspaceSlug: null, resourceName: 'app_db', resourceHost: null, resourcePort: 5432, resourceExtraA: 'public', resourceExtraB: null, resourceState: 'active', externalAccessEnabled: true })
+  const legacy = frozenSnippets
   expect(postgresSnippets('app_db').map(({ code }) => code)).toEqual(legacy.map(({ code }) => code))
 })
 for (const engine of ['postgresql', 'mongodb'] as const) test(`wizard preserves untrimmed ${engine} name, configuration, success link and toast`, async () => {

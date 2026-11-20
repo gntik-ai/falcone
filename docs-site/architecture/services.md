@@ -78,11 +78,11 @@ Keeping plan-building separate from execution makes the data layer testable with
 
 ## Web Console
 
-**Chart alias:** `webConsole` · **Code:** `apps/web-console/` · **Image:** `in-falcone-web-console`
+**Chart alias:** `webConsole` · **Code:** `apps/web-console-next/` · **Image:** `in-falcone-web-console`
 
 A browser app for operators and developers. It authenticates against Keycloak (OIDC) and operates within a selected **tenant context**. The console surfaces the whole platform: tenants, workspace context, IAM (members, roles, service accounts & credentials), PostgreSQL and MongoDB browsers, object storage, the event bus, serverless functions, plans, quotas, observability and operations. (See the [tour](/guide/what-is-falcone#a-guided-tour-of-a-real-deployment).)
 
-The console talks to the same public API as any other client, so anything it does is reproducible over HTTP. The release Dockerfile at `apps/web-console/Dockerfile` serves the prebuilt Vite bundle with `apps/web-console/static-server.mjs`, a Node static server that runs as a numeric non-root user without filesystem writes. Anon-key embeds let you render read-only data in an external frontend.
+The console talks to the same public API as any other client, so anything it does is reproducible over HTTP. The release Dockerfile at `apps/web-console-next/Dockerfile` serves the prebuilt Vite bundle with `apps/web-console-next/static-server.mjs`, a Node static server that runs as a numeric non-root user without filesystem writes. Anon-key embeds let you render read-only data in an external frontend.
 
 ---
 
