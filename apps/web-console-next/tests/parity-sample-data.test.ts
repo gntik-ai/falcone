@@ -36,6 +36,21 @@ describe('assertNoSampleData', () => {
     await expect(assertNoSampleData(parity(html, ['{"items":[{"name":"other"}]}']))).rejects.toThrow(/billing-sync/)
   })
 
+  test('does not treat a longer supplied value as supplying a shorter sample string', async () => {
+    const html = '<main><table><tr><td>orders-api</td></tr></table></main>'
+    await expect(assertNoSampleData(parity(html, ['{"items":[{"name":"orders-api-v2"}]}']))).rejects.toThrow(/orders-api/)
+    await expect(assertNoSampleData(parity(html, ['orders-api-v2']))).rejects.toThrow(/orders-api/)
+    await expect(assertNoSampleData(parity(html, ['{"note":"see orders-api docs"}']))).rejects.toThrow(/orders-api/)
+  })
+
+  test('accepts a complete supplied value: a response scalar, a nested value or typed input', async () => {
+    const html = '<main><table><tr><td>orders-api</td></tr></table></main>'
+    await expect(assertNoSampleData(parity(html, ['{"items":[{"name":"orders-api","size":3}]}']))).resolves.toBeUndefined()
+    await expect(assertNoSampleData(parity(html, ['{"a":{"b":["x","orders-api"]}}']))).resolves.toBeUndefined()
+    await expect(assertNoSampleData(parity(html, ['orders-api']))).resolves.toBeUndefined()
+    await expect(assertNoSampleData(parity(html, ['  orders-api ']))).resolves.toBeUndefined()
+  })
+
   test('falls back to the body when the page has no main', async () => {
     await expect(assertNoSampleData(parity('<div>reports</div>'))).rejects.toThrow(/reports/)
   })

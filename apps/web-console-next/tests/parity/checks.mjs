@@ -44,6 +44,22 @@ async function loadSampleStrings() {
   }
   return sampleStrings;
 }
+// Only a complete supplied value exempts sample text: a response scalar (every string or number at any depth of a JSON
+// body), or a whole typed input. A longer value that merely contains the sample string (orders-api-v2) supplies nothing.
+const normalize = (text) => String(text).replace(/\s+/g, ' ').trim();
+function suppliedValues(entries) {
+  const values = new Set();
+  const collect = (node) => {
+    if (Array.isArray(node)) node.forEach(collect);
+    else if (node && typeof node === 'object') Object.values(node).forEach(collect);
+    else if (typeof node === 'string' || typeof node === 'number') values.add(normalize(node));
+  };
+  for (const entry of entries) {
+    values.add(normalize(entry));
+    try { collect(JSON.parse(entry)); } catch { /* typed input or a non-JSON body: the whole string counts */ }
+  }
+  return values;
+}
 export async function assertNoSampleData(parity) {
   const samples = await loadSampleStrings();
   let shown;
@@ -62,8 +78,8 @@ export async function assertNoSampleData(parity) {
     if (parity.page.isClosed() || /Execution context was destroyed|Target (?:page|context|closed)|has been closed|navigat/i.test(String(error))) return;
     throw error;
   }
-  const supplied = parity.network?.supplied ?? [];
-  const stray = shown.filter((text) => !supplied.some((data) => data.includes(text)));
+  const supplied = suppliedValues(parity.network?.supplied ?? []);
+  const stray = shown.filter((text) => !supplied.has(text));
   if (stray.length) throw new Error(`sample-data: the page shows kit sample text that no response or input supplied: ${stray.join(', ')}`);
 }
 export async function data(parity, manifest) {
