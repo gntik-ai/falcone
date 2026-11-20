@@ -32,8 +32,10 @@ explicit root test dependency instead of being reachable only through the remove
 coverage-v8 dependency. Its minimatch 9 / patched brace-expansion 2 assertions are unchanged.
 Hermes regenerated `pnpm-lock.yaml` in dependency-resolution commit `be31c4fa`; the legacy
 importer is absent and the root glob dependency is resolved. No lockfile was hand-edited.
-The sandbox offline frozen install is blocked by pnpm subprocess `EPERM`; CI must verify it
-with the repository-pinned pnpm 10.0.0 (the sandbox executable reports 9.12.3).
+The sandbox offline frozen install is blocked by pnpm subprocess `EPERM` and, after
+configuring the installed Node version and a writable PNPM_HOME, `EACCES` on the shared
+store metadata. CI must verify it with the repository-pinned pnpm 10.0.0 (the sandbox
+executable and installed modules report 9.12.3).
 
 | Deleted legacy test (relative path) | Next counterpart | Disposition |
 | --- | --- | --- |
@@ -276,8 +278,9 @@ legacy tree and its live consumers. The confirmed cause was serving configuratio
 consumers still rooted in the retired app. The server blob remains unchanged
 (`d1886d2da1088e0aec2367e523fed01e5428fdee`).
 
-After the regenerated lockfile was installed, `cd apps/web-console-next && node
-node_modules/typescript/bin/tsc --noEmit` failed with ten TS2503 diagnostics in eight files.
+After the regenerated lockfile was installed, `node
+apps/web-console-next/node_modules/typescript/bin/tsc --noEmit -p
+apps/web-console-next/tsconfig.json` failed with ten TS2503 diagnostics in eight files.
 Those annotations depended on the global JSX namespace from the removed app's React 18
 imports. Explicit type-only JSX imports from next's React 19 dependency make the same command
 pass without changing emitted code or page behavior.
@@ -299,13 +302,16 @@ These failures are reported as real failures for the control plane's base-commit
 are not assumed to be pre-existing just because their assertions are unchanged.
 
 Running the normal configured `pnpm test` from the next app directory avoids filtered-command
-workspace discovery's `spawnSync /usr/local/bin/node EPERM`. With two workers it also records
-an unchanged workspace-secret reload/focus test failure (the repository's 5000 ms test limit).
-The full suite is bounded independently of the focused migration checks; PR CI must complete
+workspace discovery's `spawnSync /usr/local/bin/node EPERM`. With two workers it records failures in three unchanged test cases: workspace-secret
+reload/focus, function-activation retry, and observability audit-date filters (each reaches
+the repository's 5000 ms test limit). The broad run was stopped after more than five minutes
+with these real failures recorded; it is not a completed full-suite run. PR CI must complete
 it and the base rerun must classify the unrelated assertions. No fixture-mode full Vitest run
 was used, and no test timeout was shortened.
 
-The unmodified offline frozen install command encounters pnpm subprocess `EPERM`. Catalogue
+The offline frozen install encounters pnpm subprocess `EPERM`; a retry with the installed
+Node version and writable PNPM_HOME reaches `EACCES` opening
+`/srv/engineering/cache/scan/toolchain/pnpm-store/v3/server/server.json`. Catalogue
 validation/repository layout/source-build validation encounter `spawnSync git EPERM`, even
 with the assigned repository configured as safe for that command. The static-server HTTP
 matrix encounters `listen EPERM`; its route-only and static configuration checks pass, but its
