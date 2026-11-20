@@ -384,3 +384,35 @@ and a browser-enabled base comparison is needed to classify the failure conclusi
 Investigating the paused-clock navigation is a follow-up outside this serving-config move
 unless that comparison implicates the move. No production behavior, pre-existing test,
 assertion, timeout, retry policy, shard count or CI gate is changed for this report.
+
+### Shard 14 revalidation
+
+The next supplied CI report identifies two accessibility failures in the same operations
+journey: `tenant_owner | es | 1280` and `tenant_owner | en | 768`. Both stop at the
+shared harness's busy-section assertion after the spec pauses the clock and navigates
+at `apps/web-console-next/tests/parity/pages/console-operations.spec.mjs:193`. The
+aggregate again reports `SHARDS_RESULT: failure`; the Node action deprecation is a warning.
+
+Fresh comparison against the same immutable base confirms that this spec, its manifest,
+the harness, settling logic, endpoint registry, shell fixtures, operations implementation,
+shell, router, parity checks/configuration, Vite configuration and app manifest are unchanged.
+The next lockfile importer is identical. Retained dependency snapshots keep the same
+dependency edges; seven snapshots only gain optional metadata after legacy removal.
+The moved static server still matches the SHA256 above, and the CSP fixture server still
+differs only in the path used to read it. No link to the serving-config move was established.
+
+The focused operations Vitest suite passes all 44 tests, and parity scanning and validation
+pass. These checks do not reproduce the reported paused-clock browser navigation or establish
+its cause. Chromium is unavailable; PR CI must rerun shard 14 and the aggregate, with a
+browser-enabled base comparison to classify the failure. No existing test or CI gate is
+changed, and no page behavior repair is inferred from these logs.
+
+Revalidation also passes the normal production build, shard 14 collection (154 tests),
+parity workflow/tool/sample-data tests, static routing including unsafe targets, Docker
+context, runtime-consumer retirement, release-images workflow, snippet CLI regression,
+structure validation with `FALCONE_CHARTS_DIR` set to the assigned deployment worktree,
+and gntik-ui pins. Snippet checks use the supported Python-unavailable fallback after the
+Python-enabled run stalled. The HTTP matrix remains unavailable (`listen EPERM`, nginx
+absent), and the source-build catalogue subprocess remains unavailable (`spawnSync git
+EPERM`, including with the worktree configured as safe). PR CI must run those checks and
+the Python-enabled lint. No dependency or lockfile update is needed for this follow-up.
