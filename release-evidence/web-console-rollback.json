@@ -13,6 +13,25 @@
   "verifiedAt": "2026-11-19",
   "rollback": "Redeploy the prior chart with webConsole.image pinned to the prior digest through the deterministic Helm adapter. The console-api session format is shared, so existing sessions stay valid.",
   "notes": [
-    "The switch-release digest does not exist until release-images builds the merged cutover commit. The operator records it here after publication, as part of the staging rollback rehearsal."
-  ]
+    "The switch-release digest above was read from the ghcr manifest and from the running pods' imageID on 2026-11-20, after release-images built the merged cutover commit."
+  ],
+  "switch": {
+    "tag": "sha-89ea156",
+    "digest": "sha256:1f06b00edb21af1775b29fe99d0e41f89ca625e4f83dea6a00312dbef73a6a62",
+    "reference": "ghcr.io/gntik-ai/in-falcone-web-console@sha256:1f06b00edb21af1775b29fe99d0e41f89ca625e4f83dea6a00312dbef73a6a62",
+    "manifest": "single-platform OCI manifest",
+    "commit": "89ea1565 (falcone#1664, the #1304 cutover)",
+    "serves": "apps/web-console-next at /; /next and /next/ redirect to /"
+  },
+  "rehearsal": {
+    "date": "2026-11-20",
+    "environment": "in-falcone-staging (Argo CD falcone-staging, chart falcone-charts 6f39ed25)",
+    "steps": [
+      "16:57:55Z: webConsole image set to the prior digest; the rollout completed with 2/2 ready",
+      "Probe through the service: / served the legacy console (title 'Consola In Falcone'), /next/ served web-console-next (200)",
+      "16:58:21Z: restored to the switch tag sha-89ea156; 2/2 ready on the switch digest; / served web-console-next and /next/ redirected (301) to /; Argo CD app Synced and Healthy"
+    ],
+    "chart": "falcone-charts#116 only adds a chart test, so the prior chart renders the same manifests apart from the image",
+    "sessions": "The console pods are stateless static servers; sessions live in the browser and console-api, so a console image change does not end them. No interactive login was replayed in this rehearsal."
+  }
 }
