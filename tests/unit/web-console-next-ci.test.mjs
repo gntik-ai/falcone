@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import test from 'node:test';
 import YAML from 'yaml';
 
-test('the next-console CI job checks the scaffold and legacy release commands without publication or credentials', () => {
+test('the next-console CI job checks the scaffold and release commands without publication or credentials', () => {
   const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
   const job = ci.jobs['web-console-next'];
   assert.ok(job, 'web-console-next must run in the existing PR workflow');
@@ -25,8 +25,9 @@ test('the next-console CI job checks the scaffold and legacy release commands wi
     'node scripts/validate-gntik-ui-pin.mjs',
     'docker build -f apps/web-console/Dockerfile .',
   ]) assert.ok(commands.includes(command), `Missing CI check: ${command}`);
-  assert.ok(commands.some((command) => command.includes('VITE_BASE_PATH=') && command.includes('/next/') && command.includes('web-console-next build')));
-  const build = job.steps.find((step) => step.name === 'Build the next console at both base paths');
+  assert.ok(commands.some((command) => command.includes('VITE_BASE_PATH="$base"') && command.includes('for base in /;') && command.includes('web-console-next build')));
+  assert.ok(!commands.some((command) => command.includes('/next/')), 'CI builds the next console at the root base only');
+  const build = job.steps.find((step) => step.name === 'Build the next console at the root base path');
   assert.match(build.run, /web-console-next test:i18n-chunks/);
   for (const command of ['check:i18n', 'lint:i18n', 'test:i18n']) {
     const step = job.steps.find((step) => step.run === `pnpm --filter @in-falcone/web-console-next ${command}`);
@@ -44,7 +45,7 @@ test('the next-console CI job checks the scaffold and legacy release commands wi
   assert.equal(ci.on.pull_request?.paths, undefined);
 });
 
-test('the next-console CSP step builds both bases and enforces the dist and Chromium checks', () => {
+test('the next-console CSP step builds the root base and enforces the dist and Chromium checks', () => {
   const job = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs['web-console-next'];
   const step = job.steps.find((step) => step.name === 'Validate next-console CSP and self-hosted assets');
   assert.ok(step, 'CSP validation must be an enforced CI step');
@@ -54,7 +55,7 @@ test('the next-console CSP step builds both bases and enforces the dist and Chro
   assert.equal(step.env, undefined);
   assert.match(step.run, /web-console-next exec playwright install --with-deps chromium/);
   assert.match(step.run, /node --test apps\/web-console-next\/tests\/validate-dist.test.mjs/);
-  assert.match(step.run, /for base in \/ \/next\//);
+  assert.match(step.run, /for base in \/; do/);
   assert.match(step.run, /CSP_TEST_HARNESS=true.*web-console-next build/);
   assert.match(step.run, /web-console-next validate:dist/);
   assert.match(step.run, /VITE_BASE_PATH="\$base".*web-console-next test:csp/);
@@ -67,7 +68,7 @@ test('the shell step enforces release exclusion, fixture build and browser tests
   assert.ok(shell, 'The shell browser spec must be an enforced step');
   assert.equal(shell.if, undefined);
   assert.equal(shell['continue-on-error'], undefined);
-  assert.match(shell.run, /SHELL_TEST_FIXTURES= VITE_BASE_PATH=\/next\/.*web-console-next build/);
+  assert.match(shell.run, /SHELL_TEST_FIXTURES= VITE_BASE_PATH=\/ .*web-console-next build/);
   assert.match(shell.run, /node --test tests\/shell-release.test.mjs/);
   assert.match(shell.run, /SHELL_TEST_FIXTURES=true.*web-console-next build/);
   assert.match(shell.run, /web-console-next exec playwright test --config tests\/shell\/playwright.config.mjs/);
@@ -341,4 +342,31 @@ test('merged blob reports certify groups split across workers and shards and pre
     assert.equal(JSON.parse(readFileSync(join(merged, reportPath), 'utf8')).result, undefined);
     assert.ok(readFileSync(join(merged, 'html/index.html'), 'utf8').includes('<html'));
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('CI byte-compares the kit sample strings with the pinned tarball and validates sample-data use in source', () => {
+  const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
+  const step = ci.jobs['web-console-next'].steps.find((item) => item.name === 'Check kit sample strings against the pinned kit tarball');
+  assert.ok(step, 'the extractor check must be an enforced step');
+  assert.equal(step.run, 'node apps/web-console-next/scripts/extract-kit-sample-strings.mjs --check');
+  assert.equal(step.if, undefined);
+  assert.equal(step['continue-on-error'], undefined);
+  const structure = ci.jobs['ui-parity-structure'].steps.find((item) => item.name === 'Check parity tools and workflow structure');
+  assert.match(structure.run, /pnpm --filter @in-falcone\/web-console-next parity:validate/);
+  assert.match(structure.run, /node --test tests\/unit\/parity-sample-data-validator.test.mjs/);
+  assert.match(readFileSync('apps/web-console-next/package.json', 'utf8'), /"parity:validate": "node tests\/parity\/validate.mjs"/);
+});
+
+test('the cutover gate job runs its tests and the gate with the workflow token and read-only permissions', () => {
+  const ci = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
+  const job = ci.jobs['cutover-gate'];
+  assert.ok(job, 'the cutover gate must run in the PR workflow');
+  assert.equal(job.if, undefined);
+  assert.deepEqual(job.permissions, { contents: 'read', issues: 'read', 'pull-requests': 'read' });
+  const commands = job.steps.filter((step) => step.run).map((step) => step.run);
+  assert.deepEqual(commands, ['node --test tests/unit/cutover-gate.test.mjs', 'node scripts/release/cutover-gate.mjs']);
+  const gate = job.steps.find((step) => step.run === 'node scripts/release/cutover-gate.mjs');
+  assert.equal(gate.env.GITHUB_TOKEN, '${{ secrets.GITHUB_TOKEN }}');
+  assert.equal(gate['continue-on-error'], undefined);
+  assert.equal(job['continue-on-error'], undefined);
 });

@@ -395,9 +395,10 @@ this control-plane serves. To make the shell usable end-to-end:
   other pre-existing pages (Postgres/Mongo/Kafka/Events/Functions-actions/…) target
   the repo's intended data-plane API and are NOT backed by this control-plane.
 
-  Build path: `npx vite build` in `apps/web-console` (esbuild transpile — the repo's
-  `tsc -b` baseline is already red on unrelated files), then build the release image
-  from `apps/web-console/Dockerfile` after `apps/web-console/dist` exists.
+  Build path: the release image is built from `apps/web-console/Dockerfile`, whose builder stage
+  runs `vite build` for `apps/web-console-next` at base `/` (the image serves only that bundle; the
+  legacy `apps/web-console` is no longer served). The kind compatibility image
+  `deploy/kind/web-console/Dockerfile` copies `apps/web-console-next/dist` once it exists.
 
 ### Honest gaps (domain B — still to build)
 - **Function execution** runs on the Knative data plane (each function is a ksvc;

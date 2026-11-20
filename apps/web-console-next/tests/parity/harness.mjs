@@ -1,12 +1,53 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect as baseExpect } from '@playwright/test';
 import { startServer } from '../csp/server.mjs';
 import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
 import { createEndpointRegistry } from './endpoint-registry.ts';
 import { consumeResourceDiagnostic } from './resource-diagnostics.mjs';
 import { catalogResponse, isPlansQuery } from './pages/console-plan-catalog-page.manifest.ts';
 import { sectionFailureEndpoints } from './pages/console-functions-page.manifest.ts';
+import { assertNoSampleData } from './checks.mjs';
 
-export { expect };
+const expect = baseExpect;
+// The parity fixture of the test that is running in this worker (tests run one at a time per worker).
+let current;
+// assertNoSampleData runs on every settled state: after open(), after every action and readiness assertion a journey runs
+// (the wrappers below), after every check in checks.mjs, and once more before teardown.
+const settle = async () => {
+  if (!current || current.settling) return;
+  current.settling = true;
+  try { await current.assertNoSampleData(); } finally { current.settling = false; }
+};
+const ACTIONS = ['click', 'dblclick', 'tap', 'fill', 'pressSequentially', 'press', 'check', 'uncheck', 'setChecked', 'selectOption', 'clear', 'dragTo'];
+function instrumentActions(page) {
+  const prototype = Object.getPrototypeOf(page.locator('html'));
+  if (prototype.parityInstrumented) return;
+  for (const name of ACTIONS) {
+    const original = prototype[name];
+    if (typeof original !== 'function') continue;
+    prototype[name] = async function (...args) {
+      const result = await original.apply(this, args);
+      if (current && ['fill', 'pressSequentially'].includes(name)) current.network.supplied.push(String(args[0]));
+      await settle();
+      return result;
+    };
+  }
+  prototype.parityInstrumented = true;
+}
+const wrapMatchers = (matchers) => new Proxy(matchers, {
+  get(target, property) {
+    const value = Reflect.get(target, property);
+    if (['not', 'resolves', 'rejects'].includes(property)) return wrapMatchers(value);
+    if (typeof value !== 'function') return value;
+    return (...args) => {
+      const result = value.apply(target, args);
+      return typeof result?.then === 'function' ? result.then(async (outcome) => { await settle(); return outcome; }) : result;
+    };
+  },
+});
+// Journeys import this expect: every awaited matcher (a readiness assertion) is followed by the sample-data check.
+// The harness itself uses the plain expect.
+const checkedExpect = new Proxy(baseExpect, { apply: (target, thisArg, args) => wrapMatchers(Reflect.apply(target, thisArg, args)) });
+export { checkedExpect as expect };
 export const test = base.extend({
   role: ['superadmin', { option: true }],
   preserveLocale: [false, { option: true }],
@@ -16,7 +57,7 @@ export const test = base.extend({
     try { await use(server); } finally { await server.close(); }
   }, { scope: 'worker' }],
   parity: [async ({ page, server, role, locale, pageEndpoints, preserveLocale }, use) => {
-    const requests = [], unmatched = [], faults = [], injectedFailures = [];
+    const requests = [], unmatched = [], faults = [], injectedFailures = [], supplied = [];
     const guardRequest = async (route) => {
       if (/apikey/i.test(route.request().url())) {
         unmatched.push('API key URL forbidden');
@@ -69,6 +110,7 @@ export const test = base.extend({
       let body;
       try { body = request.postDataJSON() ?? undefined; } catch { body = request.postData(); }
       requests.push({ method, path: path + url.search, body });
+      if (body !== undefined) supplied.push(typeof body === 'string' ? body : JSON.stringify(body));
       const name = registry.find(method, path, body);
       // Other page journeys can now navigate back to the migrated catalog.
       if (url.origin === server.origin && !name && isPlansQuery(method, url)) {
@@ -90,9 +132,12 @@ export const test = base.extend({
         injectedFailures.push({ url: request.url(), kind: response.network ? 'network' : String(response.status) });
       }
       if (response.network) await route.abort('failed');
-      else await route.fulfill({ status: response.status ?? 200, json: response.body });
+      else {
+        supplied.push(JSON.stringify(response.body ?? null));
+        await route.fulfill({ status: response.status ?? 200, json: response.body });
+      }
     });
-    const network = { requests, setVariants };
+    const network = { requests, setVariants, supplied };
     const parity = {
       page, locale, role, network, faults,
       async open(route, variants = {}) {
@@ -107,9 +152,13 @@ export const test = base.extend({
         // One retrying assertion, no separate existence check: the shell may re-render the region between a count() and a follow-up expect.
         await expect(context.and(page.locator('[aria-busy="true"]'))).toHaveCount(0);
         await page.evaluate(() => document.fonts.ready);
+        await settle();
       },
+      assertNoSampleData: () => assertNoSampleData(parity),
     };
-    try { await use(parity); }
-    finally { expect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]); }
+    instrumentActions(page);
+    current = parity;
+    try { await use(parity); await settle(); }
+    finally { current = undefined; expect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]); }
   }, { auto: true }],
 });

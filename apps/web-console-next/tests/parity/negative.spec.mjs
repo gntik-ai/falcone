@@ -75,6 +75,35 @@ for (const [name, text, attribute] of [
   await seedText(parity.page, text, attribute);
   await check.assertLocale(parity);
 });
+// Sample text that is absent at open() and appears afterwards, as a DataTable without rows would show it. The harness
+// must notice without any explicit assertion in the journey.
+test('sample-data appears only after open', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await seedText(parity.page, 'orders-api');
+  // No explicit assertion: the harness checks the settled state before teardown.
+});
+test('sample-data after a readiness assertion', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await seedText(parity.page, 'billing-sync-staging');
+  await expect(parity.page.locator('main')).toBeVisible();
+});
+test('sample-data after an action', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await parity.page.evaluate(() => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'synthetic-trigger';
+    trigger.onclick = () => { const cell = document.createElement('p'); cell.textContent = 'webhooks'; document.querySelector('main').append(cell); };
+    document.querySelector('main').append(trigger);
+  });
+  await parity.page.getByRole('button', { name: 'synthetic-trigger', exact: true }).click();
+});
+test('sample-data in a DataTable cell', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await parity.page.evaluate(() => {
+    document.querySelector('main').insertAdjacentHTML('beforeend', '<table><caption>synthetic</caption><tbody><tr><td>nightly-export</td></tr></tbody></table>');
+  });
+  await check.assertNoSampleData(parity);
+});
 test('kit-conformance raw colour', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'parity-colour-'));
   try {

@@ -1,0 +1,39 @@
+{
+  "description": "Strings the kit DataTable shows when rendered without rows. assertNoSampleData fails when a settled page shows one that no mocked response or user input supplied.",
+  "kit": {
+    "package": "@gntik-ai/blocks",
+    "version": "0.15.0",
+    "integrity": "sha512-AY23AKYRthtNZcX2uATu1sD1yQrMvUHWIn/+FvE/d0eKjRDQse9inb73D1KFZcX9tGm89Qecj7XgeWoZtysOAQ==",
+    "source": "package/src/tables/DataTable/fixtures.ts"
+  },
+  "strings": [
+    "ap-south-1",
+    "audit-log",
+    "audit-log-staging",
+    "auth-gateway",
+    "auth-gateway-staging",
+    "billing-sync",
+    "billing-sync-staging",
+    "checkout-web",
+    "checkout-web-staging",
+    "eu-central-1",
+    "eu-west-1",
+    "invoice-worker",
+    "invoice-worker-staging",
+    "media-resizer",
+    "media-resizer-staging",
+    "nightly-export",
+    "nightly-export-staging",
+    "notifications",
+    "notifications-staging",
+    "orders-api",
+    "orders-api-staging",
+    "reports",
+    "reports-staging",
+    "search-index",
+    "search-index-staging",
+    "us-east-1",
+    "webhooks",
+    "webhooks-staging"
+  ]
+}

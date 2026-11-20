@@ -138,7 +138,7 @@ for (const role of manifest.roles) for (const locale of ['es', 'en']) for (const
         if (['403', '404'].includes(state.variant)) {
           const back = surface(parity).getByRole('link', { name: copy(parity).context.back });
           await expect(back).toHaveAttribute('href', '/console');
-          // The root console belongs to the legacy app outside the /next server.
+          // The parity server has no console route at this path outside the fixture shell: stub the exit navigation.
           const legacy = (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><title>Console</title></head><body><main></main></body></html>' });
           await parity.page.route('**/console', legacy);
           const exitStart = parity.faults.length;
