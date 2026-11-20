@@ -116,6 +116,22 @@ test('sample-data after a mouse action', async ({ parity }) => {
   });
   await parity.page.mouse.click(20, 20);
 });
+// A transient state: focus shows sample text and Escape removes it before the journey ends. Only the check that follows
+// focus() itself can see it.
+test('sample-data after a focus action', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await parity.page.evaluate(() => {
+    const field = document.createElement('input');
+    field.setAttribute('aria-label', 'synthetic-field');
+    let cell;
+    field.addEventListener('focus', () => { cell = document.createElement('p'); cell.textContent = 'webhooks'; document.querySelector('main').append(cell); });
+    field.addEventListener('keydown', (event) => { if (event.key === 'Escape') cell?.remove(); });
+    document.querySelector('main').append(field);
+  });
+  const field = parity.page.getByLabel('synthetic-field', { exact: true });
+  await field.focus();
+  await field.press('Escape');
+});
 test('sample-data after an expect.poll readiness assertion', async ({ parity }) => {
   await parity.open(manifest.route);
   await seedText(parity.page, 'nightly-export');

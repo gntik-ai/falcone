@@ -33,6 +33,7 @@ const expected = new Map([
   ['sample-data after an action', /sample-data: .*webhooks/s],
   ['sample-data after a keyboard action', /sample-data: .*orders-api/s],
   ['sample-data after a mouse action', /sample-data: .*billing-sync-staging/s],
+  ['sample-data after a focus action', /sample-data: .*webhooks/s],
   ['sample-data after an expect.poll readiness assertion', /sample-data: .*nightly-export/s],
   ['sample-data in a DataTable cell', /sample-data: .*nightly-export/s],
   ['kit-conformance raw colour', /kit-conformance:.*semantic colour/s],

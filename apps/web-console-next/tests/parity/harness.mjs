@@ -20,8 +20,8 @@ const settle = async () => {
 // Every interface a journey can change the page through: locator and page actions, the keyboard, the mouse and the touchscreen.
 // `typed` is the argument index of text the journey itself supplies, which is exempt from the sample-data check.
 const INTERFACES = {
-  locator: { actions: { click: -1, dblclick: -1, tap: -1, fill: 0, pressSequentially: 0, press: -1, check: -1, uncheck: -1, setChecked: -1, selectOption: -1, clear: -1, dragTo: -1 } },
-  page: { actions: { click: -1, dblclick: -1, tap: -1, fill: 1, type: 1, press: -1, check: -1, uncheck: -1, setChecked: -1, selectOption: -1, dragAndDrop: -1 } },
+  locator: { actions: { click: -1, dblclick: -1, tap: -1, fill: 0, pressSequentially: 0, press: -1, check: -1, uncheck: -1, setChecked: -1, selectOption: -1, clear: -1, dragTo: -1, focus: -1, blur: -1, hover: -1, dispatchEvent: -1, scrollIntoViewIfNeeded: -1, setInputFiles: -1, selectText: -1 } },
+  page: { actions: { click: -1, dblclick: -1, tap: -1, fill: 1, type: 1, press: -1, check: -1, uncheck: -1, setChecked: -1, selectOption: -1, dragAndDrop: -1, focus: -1, hover: -1, dispatchEvent: -1, setInputFiles: -1 } },
   keyboard: { actions: { press: -1, down: -1, up: -1, type: 0, insertText: 0 } },
   mouse: { actions: { click: -1, dblclick: -1, down: -1, up: -1, move: -1, wheel: -1 } },
   touchscreen: { actions: { tap: -1 } },
