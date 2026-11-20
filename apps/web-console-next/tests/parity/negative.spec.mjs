@@ -97,6 +97,30 @@ test('sample-data after an action', async ({ parity }) => {
   });
   await parity.page.getByRole('button', { name: 'synthetic-trigger', exact: true }).click();
 });
+// The journeys also press keys, click by coordinates and poll: every one of those is an action or readiness assertion.
+test('sample-data after a keyboard action', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await parity.page.evaluate(() => {
+    document.addEventListener('keydown', () => { const cell = document.createElement('p'); cell.textContent = 'orders-api'; document.querySelector('main').append(cell); }, { once: true });
+  });
+  await parity.page.keyboard.press('Shift');
+});
+test('sample-data after a mouse action', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await parity.page.evaluate(() => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'synthetic-trigger';
+    trigger.style.cssText = 'position:fixed;left:10px;top:10px;width:80px;height:40px;z-index:99999';
+    trigger.onclick = () => { const cell = document.createElement('p'); cell.textContent = 'billing-sync-staging'; document.querySelector('main').append(cell); };
+    document.body.append(trigger);
+  });
+  await parity.page.mouse.click(20, 20);
+});
+test('sample-data after an expect.poll readiness assertion', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await seedText(parity.page, 'nightly-export');
+  await expect.poll(async () => parity.page.locator('main').count()).toBe(1);
+});
 test('sample-data in a DataTable cell', async ({ parity }) => {
   await parity.open(manifest.route);
   await parity.page.evaluate(() => {

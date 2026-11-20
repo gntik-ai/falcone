@@ -124,7 +124,8 @@ The kit `DataTable` renders built-in sample deployments when it gets no `rows`. 
 
 - Runtime: `assertNoSampleData` (checks.mjs) fails a journey when a settled page shows a string from
   `kit-sample-strings.json` that no mocked response or typed input supplied. The harness runs it after `open()`, after every
-  action (`click`, `fill`, `press`, ...) and every awaited `expect` matcher imported from `harness.mjs`, after each check in
+  action (locator and page actions, `keyboard`, `mouse` and `touchscreen` calls) and every awaited `expect` matcher, including
+  `expect.poll` and `expect.soft`, imported from `harness.mjs`, after each check in
   `checks.mjs`, and once before teardown. Regenerate the strings with
   `node scripts/extract-kit-sample-strings.mjs --write` (downloads the pinned `@gntik-ai/blocks` tarball, verifies the
   integrity recorded in `pnpm-lock.yaml`); `--check` fails unless the committed file is byte-identical.

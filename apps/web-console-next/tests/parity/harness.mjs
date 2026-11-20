@@ -17,21 +17,42 @@ const settle = async () => {
   current.settling = true;
   try { await current.assertNoSampleData(); } finally { current.settling = false; }
 };
-const ACTIONS = ['click', 'dblclick', 'tap', 'fill', 'pressSequentially', 'press', 'check', 'uncheck', 'setChecked', 'selectOption', 'clear', 'dragTo'];
+// Every interface a journey can change the page through: locator and page actions, the keyboard, the mouse and the touchscreen.
+// `typed` is the argument index of text the journey itself supplies, which is exempt from the sample-data check.
+const INTERFACES = {
+  locator: { actions: { click: -1, dblclick: -1, tap: -1, fill: 0, pressSequentially: 0, press: -1, check: -1, uncheck: -1, setChecked: -1, selectOption: -1, clear: -1, dragTo: -1 } },
+  page: { actions: { click: -1, dblclick: -1, tap: -1, fill: 1, type: 1, press: -1, check: -1, uncheck: -1, setChecked: -1, selectOption: -1, dragAndDrop: -1 } },
+  keyboard: { actions: { press: -1, down: -1, up: -1, type: 0, insertText: 0 } },
+  mouse: { actions: { click: -1, dblclick: -1, down: -1, up: -1, move: -1, wheel: -1 } },
+  touchscreen: { actions: { tap: -1 } },
+};
+// Wrapped actions call each other (keyboard.press runs down and up): only the outermost call settles.
+let actionDepth = 0;
 function instrumentActions(page) {
-  const prototype = Object.getPrototypeOf(page.locator('html'));
-  if (prototype.parityInstrumented) return;
-  for (const name of ACTIONS) {
-    const original = prototype[name];
-    if (typeof original !== 'function') continue;
-    prototype[name] = async function (...args) {
-      const result = await original.apply(this, args);
-      if (current && ['fill', 'pressSequentially'].includes(name)) current.network.supplied.push(String(args[0]));
-      await settle();
-      return result;
-    };
+  const targets = {
+    locator: Object.getPrototypeOf(page.locator('html')), page: Object.getPrototypeOf(page),
+    keyboard: Object.getPrototypeOf(page.keyboard), mouse: Object.getPrototypeOf(page.mouse), touchscreen: Object.getPrototypeOf(page.touchscreen),
+  };
+  for (const [kind, { actions }] of Object.entries(INTERFACES)) {
+    const prototype = targets[kind];
+    if (prototype.parityInstrumented) continue;
+    for (const [name, typed] of Object.entries(actions)) {
+      const original = prototype[name];
+      if (typeof original !== 'function') continue;
+      prototype[name] = async function (...args) {
+        actionDepth += 1;
+        try {
+          const result = await original.apply(this, args);
+          if (current && typed >= 0 && args[typed] !== undefined) current.network.supplied.push(String(args[typed]));
+          return result;
+        } finally {
+          actionDepth -= 1;
+          if (actionDepth === 0) await settle();
+        }
+      };
+    }
+    prototype.parityInstrumented = true;
   }
-  prototype.parityInstrumented = true;
 }
 const wrapMatchers = (matchers) => new Proxy(matchers, {
   get(target, property) {
@@ -46,7 +67,15 @@ const wrapMatchers = (matchers) => new Proxy(matchers, {
 });
 // Journeys import this expect: every awaited matcher (a readiness assertion) is followed by the sample-data check.
 // The harness itself uses the plain expect.
-const checkedExpect = new Proxy(baseExpect, { apply: (target, thisArg, args) => wrapMatchers(Reflect.apply(target, thisArg, args)) });
+// expect.poll and expect.soft return matchers too, and journeys use them as readiness assertions.
+const checkedExpect = new Proxy(baseExpect, {
+  apply: (target, thisArg, args) => wrapMatchers(Reflect.apply(target, thisArg, args)),
+  get(target, property) {
+    const value = Reflect.get(target, property);
+    if (['poll', 'soft'].includes(property) && typeof value === 'function') return (...args) => wrapMatchers(value.apply(target, args));
+    return value;
+  },
+});
 export { checkedExpect as expect };
 export const test = base.extend({
   role: ['superadmin', { option: true }],
