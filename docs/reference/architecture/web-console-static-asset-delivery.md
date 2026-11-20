@@ -10,6 +10,33 @@ Falcone serves the built web-console SPA through the co-located release runtime 
 - `apps/web-console/nginx.conf` and `deploy/kind/web-console/nginx.conf` are legacy compatibility
   configs only; they are not the release image runtime.
 
+## What the image serves (switch release)
+
+The image holds only the `apps/web-console-next` bundle, built at base `/` and copied to `/app/dist`.
+`GET /`, `/login`, `/signup`, `/console/*` and every other client route return that `index.html`
+(`no-store`); `/assets/*` is immutable and a missing asset is a 404; `/healthz` returns `200 ok`;
+`/v1/*` is proxied to the gateway without added headers. The legacy `apps/web-console` source stays
+in the repository for one release, but no flag, environment variable or path serves it, and no
+`/legacy` path answers 200. Recovery is redeploying the prior chart and the image digest recorded in
+`release-evidence/web-console-rollback.json` through the deterministic Helm adapter.
+
+`/next` and `/next/*` answer a permanent `301` to the same path without `/next`, with a relative
+`Location`:
+
+- the prefix is matched on the raw request target, and a percent-encoded unreserved prefix such as
+  `/%6Eext` is normalised to `/next` (RFC 3986 section 6.2.2.2);
+- the suffix and the query are copied byte for byte from the raw target: `%2F`, `%23`, `%3F` and
+  `%25` are never decoded or re-escaped (`/next/a%2Fb` redirects to `/a%2Fb`);
+- a target that could leave the origin or the path is answered `400`: a leading `//`, any backslash,
+  or a `..` segment, each also in percent-encoded form (`/next//evil.example`,
+  `/next/%2F%2Fevil.example`, `/next/../x`). `static-server.mjs` validates in one function
+  (`validateRedirectPath`); the nginx configs classify the raw `$request_uri` in a `map` and answer
+  from one named location that carries the security headers.
+
+The release gate `scripts/release/cutover-gate.mjs` (CI job `cutover-gate`) requires every blocking
+page and gap issue to be closed as completed by a merged pull request that references it, and the
+rollback evidence to record the prior tag and digest.
+
 ## Header policy
 
 The web console bundle is emitted with content-hashed files under `/assets/`. Those files are

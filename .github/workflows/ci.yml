@@ -14,7 +14,7 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10.0.0'
   # Publish this paired Keycloak public-path allowlist chart commit before source CI runs.
-  FALCONE_CHARTS_REF: '8a315b29c051b447a9c3eee799bcc7c409933d13'
+  FALCONE_CHARTS_REF: '1d5c93d275712d2650b9582b1d036e53ab7c1f83'
 
 jobs:
   quality:
@@ -412,11 +412,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The legacy console is no longer released or served, so its vitest suite no longer gates CI; the console tests are
+      # the web-console-next job's "Test the next console" step.
       - name: Console API unit tests (vitest)
         run: pnpm --filter @in-falcone/console-api test
-
-      - name: Web console unit tests (vitest)
-        run: pnpm --filter @in-falcone/web-console test
 
   web-console-next:
     runs-on: ubuntu-24.04
@@ -462,15 +461,20 @@ jobs:
       - name: Validate exact public UI pins
         run: node scripts/validate-gntik-ui-pin.mjs
 
+      # Downloads the pinned @gntik-ai/blocks tarball from public npm, verifies the integrity recorded in pnpm-lock.yaml
+      # and fails unless tests/parity/kit-sample-strings.json is byte-identical to what it extracts.
+      - name: Check kit sample strings against the pinned kit tarball
+        run: node apps/web-console-next/scripts/extract-kit-sample-strings.mjs --check
+
       - name: Test pin, colour and CI validation
         run: |
           node --test tests/unit/gntik-ui-pin.test.mjs
           node --test tests/unit/web-console-next-colours.test.mjs
           node --test tests/unit/web-console-next-ci.test.mjs
 
-      - name: Build the next console at both base paths
+      - name: Build the next console at the root base path
         run: |
-          for base in / /next/; do
+          for base in /; do
             VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
             pnpm --filter @in-falcone/web-console-next test:i18n-chunks
             BASE_PATH="$base" node --input-type=module <<'NODE'
@@ -487,7 +491,7 @@ jobs:
         run: |
           pnpm --filter @in-falcone/web-console-next exec playwright install --with-deps chromium
           node --test apps/web-console-next/tests/validate-dist.test.mjs
-          for base in / /next/; do
+          for base in /; do
             CSP_TEST_HARNESS=true VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
             pnpm --filter @in-falcone/web-console-next validate:dist
             VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next test:csp
@@ -495,10 +499,10 @@ jobs:
 
       - name: Test authenticated next-console shell
         run: |
-          SHELL_TEST_FIXTURES= VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next build
+          SHELL_TEST_FIXTURES= VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
           (cd apps/web-console-next && node --test tests/shell-release.test.mjs)
-          SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/next/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
-          VITE_BASE_PATH=/next/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
+          SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ VITE_APP_VERSION=1.2.3 VITE_APP_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 pnpm --filter @in-falcone/web-console-next build
+          VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next exec playwright test --config tests/shell/playwright.config.mjs
 
       - name: Upload shell Playwright report
         if: always()
@@ -511,17 +515,40 @@ jobs:
             apps/web-console-next/test-results/shell
           if-no-files-found: warn
 
-      - name: Build the legacy release SPA
-        run: pnpm --filter @in-falcone/web-console exec vite build
-
       - name: Build the next release SPA
         env:
-          VITE_BASE_PATH: /next/
+          VITE_BASE_PATH: /
           CSP_TEST_HARNESS: ''
         run: pnpm --filter @in-falcone/web-console-next exec vite build
 
-      - name: Build the legacy console image without publishing
+      - name: Build the console image without publishing
         run: docker build -f apps/web-console/Dockerfile .
+
+  cutover-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Test the cutover gate
+        run: node --test tests/unit/cutover-gate.test.mjs
+
+      # Fails closed: every blocking issue must be CLOSED as completed by a merged pull request that references it and
+      # was merged no later than the close. With GITHUB_TOKEN the evidence is re-checked against the GitHub API.
+      - name: Run the cutover gate on the cutover commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release/cutover-gate.mjs
 
   ui-parity-structure:
     runs-on: ubuntu-24.04
@@ -548,6 +575,7 @@ jobs:
         run: |
           node --test tests/unit/web-console-next-ci.test.mjs
           node --test tests/unit/parity-tools.test.mjs
+          node --test tests/unit/parity-sample-data-validator.test.mjs
           pnpm --filter @in-falcone/web-console-next parity:scan
           pnpm --filter @in-falcone/web-console-next parity:validate
 

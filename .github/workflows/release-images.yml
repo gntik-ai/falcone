@@ -165,17 +165,10 @@ jobs:
         if: matrix.build_spa == 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Build web-console SPA (vite)
-        if: matrix.build_spa == 'true'
-        env:
-          VITE_APP_VERSION: ${{ steps.meta.outputs.version }}
-          VITE_APP_COMMIT_SHA: ${{ github.sha }}
-        run: pnpm --filter @in-falcone/web-console exec vite build
-
       - name: Build web-console-next SPA (vite)
         if: matrix.build_spa == 'true'
         env:
-          VITE_BASE_PATH: /next/
+          VITE_BASE_PATH: /
           VITE_APP_VERSION: ${{ steps.meta.outputs.version }}
           VITE_APP_COMMIT_SHA: ${{ github.sha }}
           CSP_TEST_HARNESS: ''
@@ -348,7 +341,7 @@ jobs:
             exit 1
           fi
           expected_meta="<meta name=\"version\" content=\"${VERSION}\" />"
-          for bundle in dist dist-next; do
+          for bundle in dist; do
             if ! docker cp "$container:/app/$bundle/index.html" "$INDEX_HTML"; then
               echo "::error::could not read the published $bundle/index.html"
               exit 1
@@ -359,7 +352,7 @@ jobs:
               exit 1
             fi
           done
-          printf '\nVerified web-console and web-console-next HTML version: `%s`.\n' "$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          printf '\nVerified web-console-next HTML version: `%s`.\n' "$VERSION" >> "$GITHUB_STEP_SUMMARY"
 
   # Registry work is isolated: this queue never holds the GHCR build/push group.
   dockerhub-publish:

@@ -1,0 +1,18 @@
+{
+  "schema": "falcone.web-console-rollback/v1",
+  "image": "ghcr.io/gntik-ai/in-falcone-web-console",
+  "chartKey": "webConsole",
+  "prior": {
+    "tag": "sha-ca5183d",
+    "digest": "sha256:77e614f1a084b2ada754bccfab37c6018ffed5302078e87c89c055dd8c80dd5a",
+    "reference": "ghcr.io/gntik-ai/in-falcone-web-console@sha256:77e614f1a084b2ada754bccfab37c6018ffed5302078e87c89c055dd8c80dd5a",
+    "manifest": "single-platform OCI manifest",
+    "serves": "legacy apps/web-console at / and web-console-next under /next"
+  },
+  "source": "imageID of the running in-falcone-staging/falcone-web-console pods and the ghcr manifest",
+  "verifiedAt": "2026-11-19",
+  "rollback": "Redeploy the prior chart with webConsole.image pinned to the prior digest through the deterministic Helm adapter. The console-api session format is shared, so existing sessions stay valid.",
+  "notes": [
+    "The switch-release digest does not exist until release-images builds the merged cutover commit. The operator records it here after publication, as part of the staging rollback rehearsal."
+  ]
+}

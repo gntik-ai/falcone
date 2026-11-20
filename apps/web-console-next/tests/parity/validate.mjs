@@ -3,8 +3,17 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { checks } from './check-names.mjs';
+import { scanSource } from './sample-data-rule.mjs';
 
-const root = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), 'pages'));
+// validate.mjs [pagesDir] [--src <dir>]: checks the page manifests and, with the default pages directory or an explicit
+// --src, scans the application source for kit DataTables that would render sample data (parity/no-implicit-sample-data).
+const here = dirname(fileURLToPath(import.meta.url));
+const args = process.argv.slice(2);
+const srcFlag = args.indexOf('--src');
+const srcArgument = srcFlag === -1 ? undefined : args[srcFlag + 1];
+const positional = args.filter((arg, index) => !arg.startsWith('--') && (srcFlag === -1 || index !== srcFlag + 1));
+const root = resolve(positional[0] ?? join(here, 'pages'));
+const srcRoot = srcArgument ? resolve(srcArgument) : positional[0] ? undefined : resolve(here, '../../src');
 let failed = false;
 function fail(message) { console.error(message); failed = true; }
 function visitDirectory(dir) {
@@ -36,6 +45,19 @@ function visitDirectory(dir) {
   }
   return manifests;
 }
+function scanDirectory(dir) {
+  let files = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) { if (entry.name !== 'node_modules') files += scanDirectory(path); continue; }
+    if (!/\.(?:tsx?|jsx?|mjs|cjs)$/.test(entry.name) || entry.name.endsWith('.d.ts')) continue;
+    files++;
+    for (const hit of scanSource(path, readFileSync(path, 'utf8'))) fail(hit);
+  }
+  return files;
+}
 try { if (!visitDirectory(root)) fail(`${root}: no manifests`); }
+catch (error) { fail(error.message); }
+try { if (srcRoot && !scanDirectory(srcRoot)) fail(`${srcRoot}: no source files`); }
 catch (error) { fail(error.message); }
 process.exitCode = failed ? 1 : 0;

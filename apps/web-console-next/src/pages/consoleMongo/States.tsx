@@ -48,8 +48,8 @@ export function Table<T extends object>({ rows, columns, id, label, loadingLabel
   const shared = { rows, columns, getRowId: id, getRowLabel: id, caption: label, showCaption: false, paginated: false as const, selectionSummary: false, rowActions: undefined, toolbar: null, sort: null, defaultSort: null, manualSorting: true, loading: false, loadingRows: 0, emptyState: null, showDensityToggle: false, showColumnMenu: false, showViewSwitcher: false, views: [], defaultViews: [], hiddenColumns: [], resizable: false, virtualize: false, groupBy: undefined, showPinMenu: false, labels }
   return <div ref={box} className="min-w-0 max-w-full" onKeyDown={onKeyDown}>
     {selection
-      ? <DataTable {...shared} selectionMode="single" selectionName={selection.name} aria-label={label} selectedId={selection.selectedId} onSelectedIdChange={selection.choose} isRowDisabled={() => false} />
-      : <DataTable {...shared} selectable={false} selectionMode="none" selectedIds={[]} />}
+      ? <DataTable {...shared} rows={rows} selectionMode="single" selectionName={selection.name} aria-label={label} selectedId={selection.selectedId} onSelectedIdChange={selection.choose} isRowDisabled={() => false} />
+      : <DataTable {...shared} rows={rows} selectable={false} selectionMode="none" selectedIds={[]} />}
   </div>
 }
 

@@ -1,11 +1,13 @@
-import { expect } from '@playwright/test';
+import { expect, settle } from './settled-expect.mjs';
 import AxeBuilder from '@axe-core/playwright';
+import { existsSync } from 'node:fs';
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { runCli } from '../run-cli.mjs';
 
-const appRoot = fileURLToPath(new URL('../../', import.meta.url));
+// Under vitest/jsdom import.meta.url is not a file: URL, so the app root comes from the working directory (the package
+// directory under `pnpm --filter ... exec`, or the repository root).
+const appRoot = existsSync(resolve(process.cwd(), 'src/locales')) ? process.cwd() : resolve(process.cwd(), 'apps/web-console-next');
 const selector = (locator, locale) => typeof locator === 'string' ? locator : locator[locale];
 const locate = (parity, locator) => parity.page.locator(selector(locator, parity.locale));
 // The ConsoleShell sidebar (context region, account menu) is display:none below lg and lives in the navigation drawer
@@ -31,9 +33,59 @@ async function expectVisible(parity, entry, message) {
   await expect(entry.sidebar ? onScreen(parity, entry.locator) : locate(parity, entry.locator), message).toBeVisible();
   if (opened) await closeSidebar(parity);
 }
+// The strings the kit DataTable shows when rendered without rows, extracted from the pinned kit by
+// scripts/extract-kit-sample-strings.mjs. Text that a mocked response or the user supplied is data, not sample data.
+let sampleStrings;
+async function loadSampleStrings() {
+  if (!sampleStrings) {
+    const { strings } = JSON.parse(await readFile(resolve(appRoot, 'tests/parity/kit-sample-strings.json'), 'utf8'));
+    if (!Array.isArray(strings) || strings.length === 0) throw new Error('kit-sample-strings.json lists no strings');
+    sampleStrings = strings;
+  }
+  return sampleStrings;
+}
+// Only a complete supplied value exempts sample text: a response scalar (every string or number at any depth of a JSON
+// body), or a whole typed input. A longer value that merely contains the sample string (orders-api-v2) supplies nothing.
+const normalize = (text) => String(text).replace(/\s+/g, ' ').trim();
+function suppliedValues(entries) {
+  const values = new Set();
+  const collect = (node) => {
+    if (Array.isArray(node)) node.forEach(collect);
+    else if (node && typeof node === 'object') Object.values(node).forEach(collect);
+    else if (typeof node === 'string' || typeof node === 'number') values.add(normalize(node));
+  };
+  for (const entry of entries) {
+    values.add(normalize(entry));
+    try { collect(JSON.parse(entry)); } catch { /* typed input or a non-JSON body: the whole string counts */ }
+  }
+  return values;
+}
+export async function assertNoSampleData(parity) {
+  const samples = await loadSampleStrings();
+  let shown;
+  try {
+    shown = await parity.page.evaluate((wanted) => {
+      const sample = new Set(wanted), found = new Set();
+      const walker = document.createTreeWalker(document.querySelector('main') ?? document.body, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const text = node.textContent.replace(/\s+/g, ' ').trim();
+        if (sample.has(text) && node.parentElement?.checkVisibility?.({ visibilityProperty: true }) !== false) found.add(text);
+      }
+      return [...found];
+    }, samples);
+  } catch (error) {
+    // A page that is closing or navigating has no settled state to inspect.
+    if (parity.page.isClosed() || /Execution context was destroyed|Target (?:page|context|closed)|has been closed|navigat/i.test(String(error))) return;
+    throw error;
+  }
+  const supplied = suppliedValues(parity.network?.supplied ?? []);
+  const stray = shown.filter((text) => !supplied.has(text));
+  if (stray.length) throw new Error(`sample-data: the page shows kit sample text that no response or input supplied: ${stray.join(', ')}`);
+}
 export async function data(parity, manifest) {
   await parity.open(manifest.route);
   for (const field of manifest.data) await expectVisible(parity, field, `data: ${field.name}`);
+  await assertNoSampleData(parity);
 }
 export async function action(parity, manifest) {
   for (const item of manifest.actions) {
@@ -44,12 +96,14 @@ export async function action(parity, manifest) {
     await expect(locate(parity, item.outcome), `action: ${item.name} outcome`).toBeVisible();
     const sent = parity.network.requests.slice(start);
     expect(sent, `action: ${item.name} expected ${item.expected.method} ${item.expected.path}`).toContainEqual({ ...item.expected, body: item.expected.body });
+    await assertNoSampleData(parity);
   }
 }
 export async function errorEmpty(parity, manifest) {
   for (const state of manifest.states) {
     await parity.open(manifest.route, { [state.fixture]: state.variant });
     await expectVisible(parity, state, `error-empty: ${state.fixture} ${state.variant}`);
+    await assertNoSampleData(parity);
   }
 }
 // Dialogs fade in and out. axe reads computed colours, so a scan taken halfway through a transition
@@ -102,23 +156,27 @@ export async function assertAccessibility(parity) {
   await awaitTransitions(parity.page);
   const result = await new AxeBuilder({ page: parity.page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
   expect(result.violations.filter((v) => ['serious', 'critical'].includes(v.impact)), 'accessibility: serious/critical axe violations').toEqual([]);
+  await settle();
 }
-export async function accessibility(parity, manifest) { await parity.open(manifest.route); await assertAccessibility(parity); }
+export async function accessibility(parity, manifest) { await parity.open(manifest.route); await assertAccessibility(parity); await assertNoSampleData(parity); }
 export async function assertRuntimeHealth(parity) {
   // Drain browser tasks and pending event bindings before inspecting the monitor.
   await parity.page.evaluate(() => new Promise((done) => setTimeout(done, 0)));
   expect(parity.faults, `runtime-health: ${parity.faults.join('\n')}`).toEqual([]);
+  // The matcher above is synchronous, so the state the drain left behind is settled explicitly.
+  await settle();
 }
-export async function runtimeHealth(parity, manifest) { await parity.open(manifest.route); await assertRuntimeHealth(parity); }
+export async function runtimeHealth(parity, manifest) { await parity.open(manifest.route); await assertRuntimeHealth(parity); await assertNoSampleData(parity); }
 export async function assertResponsive(parity, width) {
   await parity.page.setViewportSize({ width, height: 900 });
   await expect(parity.page.getByRole('main'), `responsive: main at ${width}px`).toBeVisible();
   const sizes = await parity.page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
   expect(sizes.scrollWidth, `responsive: horizontal overflow at ${width}px`).toBeLessThanOrEqual(sizes.clientWidth);
+  await settle();
 }
 export async function responsive(parity, manifest) {
   await parity.open(manifest.route);
-  for (const width of [375, 768, 1280]) await assertResponsive(parity, width);
+  for (const width of [375, 768, 1280]) { await assertResponsive(parity, width); await assertNoSampleData(parity); }
 }
 const flatten = (object, prefix = '') => Object.entries(object).flatMap(([key, value]) => typeof value === 'string' ? [[prefix + key, value]] : flatten(value, `${prefix}${key}.`));
 const kitEnglish = ['Search...', 'Search…', 'No results found.', 'No results found', 'Loading...', 'Loading…', 'Toggle sidebar', 'Open menu', 'Close menu', 'Select an option', 'Select workspace', 'Previous page', 'Next page'];
@@ -151,6 +209,7 @@ export async function assertLocale(parity) {
   });
   const bad = values.filter((text) => /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/.test(text) || (parity.locale === 'es' && forbidden.has(text)));
   expect(bad, `locale: unexpected copy ${bad.join(', ')}`).toEqual([]);
+  await settle();
 }
 export async function visualReview(parity, manifest, info, betweenPasses = async () => {}) {
   await parity.open(manifest.route);
@@ -161,6 +220,7 @@ export async function visualReview(parity, manifest, info, betweenPasses = async
   await parity.open(manifest.route);
   await assertLocale(parity);
   await betweenPasses();
+  await assertNoSampleData(parity);
   await expect(parity.page).toHaveScreenshot('shell.png', { animations: 'disabled', caret: 'hide', scale: 'css', threshold: 0, maxDiffPixels: 0 });
 }
 export async function kitConformance(manifest) {

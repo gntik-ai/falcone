@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from './parity/settled-expect.mjs';
 // The account menu is the user menu of the ConsoleShell sidebar footer. Its accessible name comes from the kit
 // ("Account menu for <name>"), and below lg the footer lives in the navigation drawer.
 export async function openAccountMenu(page, locale) {

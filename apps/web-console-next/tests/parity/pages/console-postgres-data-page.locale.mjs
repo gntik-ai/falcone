@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from '../settled-expect.mjs';
 import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

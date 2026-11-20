@@ -1,11 +1,51 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base } from '@playwright/test';
 import { startServer } from '../csp/server.mjs';
 import { endpoints, responseFor, sessionFor } from './fixtures/shell.ts';
 import { createEndpointRegistry } from './endpoint-registry.ts';
 import { consumeResourceDiagnostic } from './resource-diagnostics.mjs';
 import { catalogResponse, isPlansQuery } from './pages/console-plan-catalog-page.manifest.ts';
 import { sectionFailureEndpoints } from './pages/console-functions-page.manifest.ts';
+import { assertNoSampleData } from './checks.mjs';
+import { expect, baseExpect, settle, trackParity, trackedParity } from './settled-expect.mjs';
 
+// Every interface a journey can change the page through: locator and page actions, the keyboard, the mouse and the touchscreen.
+// `typed` is the argument index of text the journey itself supplies, which is exempt from the sample-data check.
+const INTERFACES = {
+  locator: { actions: { click: -1, dblclick: -1, tap: -1, fill: 0, pressSequentially: 0, press: -1, check: -1, uncheck: -1, setChecked: -1, selectOption: -1, clear: -1, dragTo: -1, focus: -1, blur: -1, hover: -1, dispatchEvent: -1, scrollIntoViewIfNeeded: -1, setInputFiles: -1, selectText: -1 } },
+  page: { actions: { click: -1, dblclick: -1, tap: -1, fill: 1, type: 1, press: -1, check: -1, uncheck: -1, setChecked: -1, selectOption: -1, dragAndDrop: -1, focus: -1, hover: -1, dispatchEvent: -1, setInputFiles: -1 } },
+  keyboard: { actions: { press: -1, down: -1, up: -1, type: 0, insertText: 0 } },
+  mouse: { actions: { click: -1, dblclick: -1, down: -1, up: -1, move: -1, wheel: -1 } },
+  touchscreen: { actions: { tap: -1 } },
+};
+// Wrapped actions call each other (keyboard.press runs down and up): only the outermost call settles.
+let actionDepth = 0;
+function instrumentActions(page) {
+  const targets = {
+    locator: Object.getPrototypeOf(page.locator('html')), page: Object.getPrototypeOf(page),
+    keyboard: Object.getPrototypeOf(page.keyboard), mouse: Object.getPrototypeOf(page.mouse), touchscreen: Object.getPrototypeOf(page.touchscreen),
+  };
+  for (const [kind, { actions }] of Object.entries(INTERFACES)) {
+    const prototype = targets[kind];
+    if (prototype.parityInstrumented) continue;
+    for (const [name, typed] of Object.entries(actions)) {
+      const original = prototype[name];
+      if (typeof original !== 'function') continue;
+      prototype[name] = async function (...args) {
+        actionDepth += 1;
+        try {
+          const result = await original.apply(this, args);
+          if (typed >= 0 && trackedParity() && args[typed] !== undefined) trackedParity().network.supplied.push(String(args[typed]));
+          return result;
+        } finally {
+          actionDepth -= 1;
+          if (actionDepth === 0) await settle();
+        }
+      };
+    }
+    prototype.parityInstrumented = true;
+  }
+}
+// Journeys import this expect: it settles after every readiness assertion. The harness itself uses the plain one.
 export { expect };
 export const test = base.extend({
   role: ['superadmin', { option: true }],
@@ -16,7 +56,7 @@ export const test = base.extend({
     try { await use(server); } finally { await server.close(); }
   }, { scope: 'worker' }],
   parity: [async ({ page, server, role, locale, pageEndpoints, preserveLocale }, use) => {
-    const requests = [], unmatched = [], faults = [], injectedFailures = [];
+    const requests = [], unmatched = [], faults = [], injectedFailures = [], supplied = [];
     const guardRequest = async (route) => {
       if (/apikey/i.test(route.request().url())) {
         unmatched.push('API key URL forbidden');
@@ -69,6 +109,7 @@ export const test = base.extend({
       let body;
       try { body = request.postDataJSON() ?? undefined; } catch { body = request.postData(); }
       requests.push({ method, path: path + url.search, body });
+      if (body !== undefined) supplied.push(typeof body === 'string' ? body : JSON.stringify(body));
       const name = registry.find(method, path, body);
       // Other page journeys can now navigate back to the migrated catalog.
       if (url.origin === server.origin && !name && isPlansQuery(method, url)) {
@@ -90,26 +131,35 @@ export const test = base.extend({
         injectedFailures.push({ url: request.url(), kind: response.network ? 'network' : String(response.status) });
       }
       if (response.network) await route.abort('failed');
-      else await route.fulfill({ status: response.status ?? 200, json: response.body });
+      else {
+        supplied.push(JSON.stringify(response.body ?? null));
+        await route.fulfill({ status: response.status ?? 200, json: response.body });
+      }
     });
-    const network = { requests, setVariants };
+    const network = { requests, setVariants, supplied };
     const parity = {
       page, locale, role, network, faults,
       async open(route, variants = {}) {
         setVariants(variants);
         await page.goto(server.url(route.replace(/^\//, '')));
-        await expect(page.locator('main')).toBeVisible();
-        await expect(page.locator('main h1')).toBeVisible();
-        await expect(page.locator('main section[aria-busy="true"]')).toHaveCount(0);
+        await baseExpect(page.locator('main')).toBeVisible();
+        await baseExpect(page.locator('main h1')).toBeVisible();
+        await baseExpect(page.locator('main section[aria-busy="true"]')).toHaveCount(0);
         // The region sits in the ConsoleShell sidebar header, which is display:none below lg. A role query skips hidden elements,
         // so match the region by markup: at 375 px it must still gate the settle, not pass vacuously.
         const context = page.locator(`section[aria-label="${locale === 'es' ? 'Contexto activo' : 'Active context'}"]`);
         // One retrying assertion, no separate existence check: the shell may re-render the region between a count() and a follow-up expect.
-        await expect(context.and(page.locator('[aria-busy="true"]'))).toHaveCount(0);
+        await baseExpect(context.and(page.locator('[aria-busy="true"]'))).toHaveCount(0);
         await page.evaluate(() => document.fonts.ready);
+        await settle();
       },
+      assertNoSampleData: () => assertNoSampleData(parity),
     };
-    try { await use(parity); }
-    finally { expect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]); }
+    // Page doubles in unit tests have no locators or document: nothing to instrument or inspect there.
+    const live = typeof page.locator === 'function' && typeof page.evaluate === 'function';
+    if (live) instrumentActions(page);
+    const release = trackParity(parity, live);
+    try { await use(parity); await settle(); }
+    finally { release(); baseExpect(unmatched, `Unmatched requests:\n${unmatched.join('\n')}`).toEqual([]); }
   }, { auto: true }],
 });

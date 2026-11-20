@@ -77,3 +77,27 @@ for (const role of pageManifest.roles) {
     });
   });
 }
+
+// Sample strings that a mocked response supplied are data: the page may show them. Only unsupplied ones fail.
+test.describe('sample-data exemption', () => {
+  test.use({ pageEndpoints: { names: { method: 'GET', path: '/v1/synthetic-names', fixtures: { success: { status: 200, body: { label: 'orders-api' } } } } } });
+  test('text supplied by a mocked response is not sample data', async ({ parity }) => {
+    await parity.open('/console/overview');
+    await parity.page.evaluate(async () => {
+      const { label } = await (await fetch('/v1/synthetic-names')).json();
+      const node = document.createElement('p'); node.textContent = label; document.querySelector('main').append(node);
+    });
+    await expect(parity.page.getByText('orders-api', { exact: true })).toBeVisible();
+    await parity.assertNoSampleData();
+  });
+  test('text the journey typed is not sample data either', async ({ parity }) => {
+    await parity.open('/console/overview');
+    await parity.page.evaluate(() => {
+      const input = document.createElement('input'); input.setAttribute('aria-label', 'Synthetic name');
+      const echo = document.createElement('p'); input.oninput = () => { echo.textContent = input.value; };
+      document.querySelector('main').append(input, echo);
+    });
+    await parity.page.getByRole('textbox', { name: 'Synthetic name' }).fill('billing-sync');
+    await expect(parity.page.getByText('billing-sync', { exact: true })).toBeVisible();
+  });
+});

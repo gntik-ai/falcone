@@ -10,10 +10,8 @@ Run from the workspace root:
 ```sh
 pnpm --filter @in-falcone/web-console-next parity:scan
 pnpm --filter @in-falcone/web-console-next parity:validate
-for base in / /next/; do
-  SHELL_TEST_FIXTURES=true VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next build
-  VITE_BASE_PATH="$base" pnpm --filter @in-falcone/web-console-next test:parity
-done
+SHELL_TEST_FIXTURES=true VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next build
+VITE_BASE_PATH=/ pnpm --filter @in-falcone/web-console-next test:parity
 ```
 
 `test:parity` first runs the shell under three roles and two locales, then runs
@@ -119,3 +117,18 @@ page errors and unhandled rejections remain faults. The operation companion
 covers positive recovery and seeded console-error/rejection negatives at each
 viewport and locale. Its visual check attaches screenshots named with SHA256;
 these are review artifacts, not self-comparison or operator approval.
+
+## Kit sample data (G1/G2)
+
+The kit `DataTable` renders built-in sample deployments when it gets no `rows`. Two guards keep them out of the console:
+
+- Runtime: `assertNoSampleData` (checks.mjs) fails a journey when a settled page shows a string from
+  `kit-sample-strings.json` that no mocked response or typed input supplied. The harness runs it after `open()`, after every
+  action (locator and page actions, `keyboard`, `mouse` and `touchscreen` calls) and every awaited `expect` matcher, including
+  `expect.poll` and `expect.soft`, imported from `harness.mjs`, after each check in
+  `checks.mjs`, and once before teardown. Regenerate the strings with
+  `node scripts/extract-kit-sample-strings.mjs --write` (downloads the pinned `@gntik-ai/blocks` tarball, verifies the
+  integrity recorded in `pnpm-lock.yaml`); `--check` fails unless the committed file is byte-identical.
+- Static: `parity:validate` applies `parity/no-implicit-sample-data` to `src` (see `sample-data-rule.mjs`). A kit
+  `DataTable` passes only with a `rows` attribute after every spread, or with spreads of top-level `const` object
+  literals that have a literal `rows` key and are referenced nowhere else except as JSX spreads.

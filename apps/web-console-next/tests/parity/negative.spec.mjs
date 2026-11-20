@@ -2,6 +2,7 @@
 import { test, expect } from './harness.mjs';
 import manifest from './pages/overview.manifest.ts';
 import * as check from './checks.mjs';
+import { expect as helperExpect } from './settled-expect.mjs';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -74,6 +75,94 @@ for (const [name, text, attribute] of [
   await parity.open(manifest.route);
   await seedText(parity.page, text, attribute);
   await check.assertLocale(parity);
+});
+// Sample text that is absent at open() and appears afterwards, as a DataTable without rows would show it. The harness
+// must notice without any explicit assertion in the journey.
+test('sample-data appears only after open', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await seedText(parity.page, 'orders-api');
+  // No explicit assertion: the harness checks the settled state before teardown.
+});
+// The sample text in the cases below is on screen only for a moment: a timer removes it LIFETIME ms after it appears, and
+// the journey then waits for it to be gone. Teardown therefore sees a clean page, and only the check that runs right
+// after the assertion or action under test can see the text. A harness that does not instrument that step lets the case pass.
+const LIFETIME = 500;
+const showBriefly = (page, text) => page.evaluate(({ text, lifetime }) => {
+  const cell = document.createElement('p');
+  cell.textContent = text;
+  document.querySelector('main').append(cell);
+  setTimeout(() => cell.remove(), lifetime);
+}, { text, lifetime: LIFETIME });
+const gone = (page) => page.waitForTimeout(LIFETIME + 300);
+// A control that shows the sample text when the journey operates it, and removes it again after LIFETIME ms.
+const installTrigger = (page, text, { event, tag = 'button', style = '', parent = 'main' }) => page.evaluate(({ text, event, tag, style, parent, lifetime }) => {
+  const reveal = () => { const cell = document.createElement('p'); cell.textContent = text; document.querySelector('main').append(cell); setTimeout(() => cell.remove(), lifetime); };
+  if (event === 'keydown') { document.addEventListener('keydown', reveal, { once: true }); return; }
+  const trigger = document.createElement(tag);
+  trigger.textContent = 'synthetic-trigger';
+  trigger.style.cssText = style;
+  trigger.addEventListener(event, reveal, { once: true });
+  document.querySelector(parent).append(trigger);
+}, { text, event, tag, style, parent, lifetime: LIFETIME });
+test('sample-data after a readiness assertion', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await showBriefly(parity.page, 'billing-sync-staging');
+  await expect(parity.page.locator('main')).toContainText('billing-sync-staging');
+  await gone(parity.page);
+});
+// Journeys import the helpers' expect from settled-expect.mjs, the same guard.
+test('sample-data after a shared helper assertion', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await showBriefly(parity.page, 'webhooks');
+  await helperExpect(parity.page.locator('main')).toContainText('webhooks');
+  await gone(parity.page);
+});
+test('sample-data after an action', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await installTrigger(parity.page, 'webhooks', { event: 'click' });
+  await parity.page.getByRole('button', { name: 'synthetic-trigger', exact: true }).click();
+  await gone(parity.page);
+});
+// The journeys also press keys, click by coordinates and poll: every one of those is an action or readiness assertion.
+test('sample-data after a keyboard action', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await installTrigger(parity.page, 'orders-api', { event: 'keydown' });
+  await parity.page.keyboard.press('Shift');
+  await gone(parity.page);
+});
+test('sample-data after a mouse action', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await installTrigger(parity.page, 'billing-sync-staging', { event: 'click', style: 'position:fixed;left:10px;top:10px;width:80px;height:40px;z-index:99999', parent: 'body' });
+  await parity.page.mouse.click(20, 20);
+  await gone(parity.page);
+});
+// Focus shows sample text and Escape removes it before the journey ends. Only the check that follows focus() itself can see it.
+test('sample-data after a focus action', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await parity.page.evaluate(() => {
+    const field = document.createElement('input');
+    field.setAttribute('aria-label', 'synthetic-field');
+    let cell;
+    field.addEventListener('focus', () => { cell = document.createElement('p'); cell.textContent = 'webhooks'; document.querySelector('main').append(cell); });
+    field.addEventListener('keydown', (event) => { if (event.key === 'Escape') cell?.remove(); });
+    document.querySelector('main').append(field);
+  });
+  const field = parity.page.getByLabel('synthetic-field', { exact: true });
+  await field.focus();
+  await field.press('Escape');
+});
+test('sample-data after an expect.poll readiness assertion', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await showBriefly(parity.page, 'nightly-export');
+  await expect.poll(async () => parity.page.locator('main').innerText()).toContain('nightly-export');
+  await gone(parity.page);
+});
+test('sample-data in a DataTable cell', async ({ parity }) => {
+  await parity.open(manifest.route);
+  await parity.page.evaluate(() => {
+    document.querySelector('main').insertAdjacentHTML('beforeend', '<table><caption>synthetic</caption><tbody><tr><td>nightly-export</td></tr></tbody></table>');
+  });
+  await check.assertNoSampleData(parity);
 });
 test('kit-conformance raw colour', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'parity-colour-'));
