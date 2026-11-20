@@ -419,7 +419,7 @@ the Python-enabled lint. No dependency or lockfile update is needed for this fol
 
 ### Aggregate-only CI repair handoff
 
-The latest repair request supplies only the aggregate's `Every parity test must pass`
+An earlier repair request supplied only the aggregate's `Every parity test must pass`
 assertion: a merged result has status `failed` rather than `passed`. It supplies no
 test title, shard number, test error, trace or merged report. This is insufficient to
 identify the failed journey or to associate it with either earlier operations failure.
@@ -440,3 +440,29 @@ retained trace. Chromium is unavailable in this sandbox, and the request forbids
 access, so the maker cannot retrieve or recreate that missing browser evidence here.
 The reported parity failure remains unresolved; local structural and unit checks do
 not certify the browser suite or establish that the failure is pre-existing.
+
+### Shard 14 runtime-health report
+
+The current report supplies the missing failing journey: `console-operations |
+tenant_owner | en | 1280`, `runtime-health`, on shard 14. It stops at
+`apps/web-console-next/tests/parity/pages/console-operations.spec.mjs:218` on the
+second navigation, with the browser clock still paused. The shared harness observes
+one busy main section instead of zero. The aggregate's `Every parity test must pass`
+assertion reflects that failed result; the shard otherwise reports 153 passing tests.
+
+Comparison from assigned HEAD `a9cea70291b1c0f48fc316ab073685d101aebf3f` to the
+immutable base again shows no changes to the operations implementation, shell,
+router, journey, manifest, harness, settling logic, endpoint registry, shell fixtures,
+Playwright/Vite configuration or app manifest. The next lockfile importer is
+identical, and the moved server retains the SHA256 recorded above. No causal link
+to this ChangeSet is established. A paused-clock navigation stall is a hypothesis,
+not a reproduced diagnosis. Existing tests and CI gates remain unchanged.
+
+Current verification passes all 48 operations/navigation Vitest tests, shard 14
+collection (154 tests), parity validation/scanning, structure validation, gntik-ui pins,
+static routing including unsafe targets, Docker context, retirement checks,
+release-images workflow and snippet CLI regression. Snippet lint passes with the
+supported Python-unavailable fallback; Python syntax validation still needs CI.
+The HTTP matrix cannot run because socket binding returns `listen EPERM`; nginx
+is also absent. Chromium is unavailable; PR CI must rerun shard 14 and the aggregate,
+and compare the same journey on the immutable base before classifying its cause.
