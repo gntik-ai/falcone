@@ -9,7 +9,7 @@
  * playwright.config.ts points at the system Google Chrome via E2E_CHROME_BIN (same pattern as the
  * flows project).
  *
- * Selectors are taken from the console source (apps/web-console/src):
+ * Selectors are taken from the console source (apps/web-console-next/src):
  *   - login  : /login -> LoginPage.tsx — input[name="username"], input[name="password"], button[type=submit]
  *   - tenants: ConsoleTenantsPage.tsx — "Nuevo tenant" button; CreateTenantWizard.tsx steps
  *              Nombre / Plan / Región.

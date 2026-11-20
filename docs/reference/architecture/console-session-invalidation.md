@@ -1,8 +1,8 @@
 # Console session invalidation redirect
 
 The web console stores the active shell session in `window.sessionStorage` through
-`apps/web-console/src/lib/console-session.ts`. Protected console routes are guarded by
-`apps/web-console/src/components/auth/ProtectedRoute.tsx`.
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-session.ts`. Protected console routes are guarded by
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/auth/ProtectedRoute.tsx`.
 
 ## Expired or revoked active sessions
 

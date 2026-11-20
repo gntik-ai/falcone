@@ -1,7 +1,7 @@
 # Console wizard permission gates
 
 The web console uses `useWizardPermissionCheck`
-(`apps/web-console/src/lib/console-wizards.ts`) as a client-side affordance for create/provision
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-wizards.ts`) as a client-side affordance for create/provision
 wizards. This gate is not the source of truth for authorization; the control-plane API remains
 authoritative and can still accept or reject the submitted request.
 
@@ -22,7 +22,7 @@ wizard role gate must follow the server role policy above.
 ## Single permission source (issue #761)
 
 `useWizardPermissionCheck` no longer hand-rolls its own role sets. Each `WizardPermission` maps onto a
-`PermissionAction` from `apps/web-console/src/lib/console-permissions.ts` (`WIZARD_PERMISSION_ACTIONS`)
+`PermissionAction` from `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-permissions.ts` (`WIZARD_PERMISSION_ACTIONS`)
 and the hook delegates its `allowed`/`reason` computation there:
 
 | `WizardPermission` | `PermissionAction` |

@@ -1,0 +1,137 @@
+[
+  {
+    "url": "/v1/tenants/ten_alpha/plan",
+    "method": "GET",
+    "headers": [
+      [
+        "accept",
+        "application/json"
+      ],
+      [
+        "authorization",
+        "Bearer synthetic-access-token"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "x-api-version",
+        "2026-03-26"
+      ],
+      [
+        "x-correlation-id",
+        "corr_00000000-0000-4000-8000-000000000001"
+      ]
+    ]
+  },
+  {
+    "url": "/v1/tenants/ten_alpha/plan/effective-entitlements?include=consumption",
+    "method": "GET",
+    "headers": [
+      [
+        "accept",
+        "application/json"
+      ],
+      [
+        "authorization",
+        "Bearer synthetic-access-token"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "x-api-version",
+        "2026-03-26"
+      ],
+      [
+        "x-correlation-id",
+        "corr_00000000-0000-4000-8000-000000000001"
+      ]
+    ]
+  },
+  {
+    "url": "/v1/tenants/ten_alpha/plan/history-impact?page=1&pageSize=20",
+    "method": "GET",
+    "headers": [
+      [
+        "accept",
+        "application/json"
+      ],
+      [
+        "authorization",
+        "Bearer synthetic-access-token"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "x-api-version",
+        "2026-03-26"
+      ],
+      [
+        "x-correlation-id",
+        "corr_00000000-0000-4000-8000-000000000001"
+      ]
+    ]
+  },
+  {
+    "url": "/v1/plans?status=active&page=1&pageSize=20",
+    "method": "GET",
+    "headers": [
+      [
+        "accept",
+        "application/json"
+      ],
+      [
+        "authorization",
+        "Bearer synthetic-access-token"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "x-api-version",
+        "2026-03-26"
+      ],
+      [
+        "x-correlation-id",
+        "corr_00000000-0000-4000-8000-000000000001"
+      ]
+    ]
+  },
+  {
+    "url": "/v1/tenants/ten_alpha/plan",
+    "method": "POST",
+    "body": "{\"planId\":\"plan-team\",\"assignedBy\":\"console\"}",
+    "headers": [
+      [
+        "accept",
+        "application/json"
+      ],
+      [
+        "authorization",
+        "Bearer synthetic-access-token"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "idempotency-key",
+        "idem_00000000-0000-4000-8000-000000000001"
+      ],
+      [
+        "x-api-version",
+        "2026-03-26"
+      ],
+      [
+        "x-correlation-id",
+        "corr_00000000-0000-4000-8000-000000000001"
+      ]
+    ]
+  }
+]

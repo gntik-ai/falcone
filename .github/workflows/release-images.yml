@@ -14,7 +14,7 @@ name: release-images
 #                                       Keycloak JWT and dispatches /v1/* to the real action modules)
 #   in-falcone-control-plane-executor  apps/control-plane-executor/Dockerfile         (main.mjs: the data-plane
 #                                       executor that fronts the control-plane)
-#   in-falcone-web-console             apps/web-console/Dockerfile (static-server, numeric UID,
+#   in-falcone-web-console             apps/web-console-next/Dockerfile (static-server, numeric UID,
 #                                       zero-write — compatible with the restricted security profile)
 #   in-falcone-fn-runtime              apps/fn-runtime/Dockerfile     (nodejs function runtime)
 #   in-falcone-workflow-worker         apps/workflow-worker/Dockerfile   (Temporal DSL worker)
@@ -90,7 +90,7 @@ jobs:
           - image: in-falcone-control-plane-executor
             dockerfile: apps/control-plane-executor/Dockerfile
           - image: in-falcone-web-console
-            dockerfile: apps/web-console/Dockerfile
+            dockerfile: apps/web-console-next/Dockerfile
             build_spa: 'true'
           - image: in-falcone-fn-runtime
             dockerfile: apps/fn-runtime/Dockerfile
@@ -375,7 +375,7 @@ jobs:
           - image: in-falcone-control-plane-executor
             dockerfile: apps/control-plane-executor/Dockerfile
           - image: in-falcone-web-console
-            dockerfile: apps/web-console/Dockerfile
+            dockerfile: apps/web-console-next/Dockerfile
             build_spa: 'true'
           - image: in-falcone-fn-runtime
             dockerfile: apps/fn-runtime/Dockerfile

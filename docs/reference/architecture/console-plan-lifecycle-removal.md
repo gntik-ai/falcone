@@ -28,7 +28,7 @@ request is sent. On success, the console returns to `/console/plans`.
 ## API contract used by the console
 
 The console uses the authenticated plan-management client
-(`apps/web-console/src/services/planManagementApi.ts`) and these control-plane routes:
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/planManagementApi.ts`) and these control-plane routes:
 
 | Method | Path | Purpose |
 | --- | --- | --- |

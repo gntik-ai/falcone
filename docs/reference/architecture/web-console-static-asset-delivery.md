@@ -3,11 +3,11 @@
 Falcone serves the built web-console SPA through the co-located release runtime under
 `apps/web-console`:
 
-- `apps/web-console/Dockerfile` is the release Dockerfile for `in-falcone-web-console`.
-- `apps/web-console/static-server.mjs` is the restricted-profile Node server used by the release
+- `apps/web-console-next/Dockerfile` is the release Dockerfile for `in-falcone-web-console`.
+- `apps/web-console-next/static-server.mjs` is the restricted-profile Node server used by the release
   image and local compatibility images. It also proxies same-origin `/v1/*` requests to
   `GATEWAY_UPSTREAM` before the SPA fallback.
-- `apps/web-console/nginx.conf` and `deploy/kind/web-console/nginx.conf` are legacy compatibility
+- `apps/web-console-next/nginx.conf` and `deploy/kind/web-console/nginx.conf` are legacy compatibility
   configs only; they are not the release image runtime.
 
 ## What the image serves (switch release)
@@ -82,7 +82,7 @@ server applies the headers directly and leaves proxied `/v1/` API response heade
 
 ## Icon asset policy
 
-The SVG-capable favicon declared by `apps/web-console/index.html` is part of the console boot path.
+The SVG-capable favicon declared by `apps/web-console-next/index.html` is part of the console boot path.
 It must remain a lightweight true vector SVG, with a target budget of roughly 10 KB or less. Do not
 embed raster icon artwork as `data:image/*;base64` inside `favicon.svg`; keep raster fallbacks such
 as `favicon.png` as separate small files.

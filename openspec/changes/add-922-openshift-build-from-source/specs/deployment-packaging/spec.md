@@ -117,7 +117,7 @@ requiring a pre-generated host artifact, while preserving their numeric-non-root
 
 #### Scenario: Web console source build
 
-- **WHEN** OpenShift builds `apps/web-console/Dockerfile` from a clean monorepo checkout
+- **WHEN** OpenShift builds `apps/web-console-next/Dockerfile` from a clean monorepo checkout
 - **THEN** a locked pnpm builder stage produces `dist` and the final runtime stage contains the
   generated bundle without the builder dependencies
 

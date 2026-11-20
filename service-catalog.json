@@ -72,8 +72,8 @@
         "alias": "webConsole",
         "valueKey": "webConsole.image"
       },
-      "source": "apps/web-console",
-      "dockerfile": "apps/web-console/Dockerfile",
+      "source": "apps/web-console-next",
+      "dockerfile": "apps/web-console-next/Dockerfile",
       "baseImageArgs": [
         { "name": "NODE_BASE_IMAGE", "default": "node:22-alpine" }
       ],
@@ -81,9 +81,9 @@
         "packages/internal-contracts"
       ],
       "interServiceCalls": [
-        "serves the built SPA from apps/web-console/dist",
+        "serves the built SPA from apps/web-console-next/dist",
         "reverse-proxies same-origin /v1 requests to the APISIX gateway via GATEWAY_UPSTREAM",
-        "the SPA consumes the control-plane public API through apps/web-console/src/services"
+        "the SPA consumes the control-plane public API through apps/web-console-next/src/services"
       ]
     },
     {

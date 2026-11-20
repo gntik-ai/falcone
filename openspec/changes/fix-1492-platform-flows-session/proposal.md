@@ -40,7 +40,7 @@ All these existing web-console-next callers omit suppression and can invoke the 
 
 The indirect callers above use `packages/console-api/src/clients.ts`, whose requests also omit suppression. This inventory does not change any caller or shared client outside flows.
 
-`consoleFlowHistory/api.ts` already suppresses domain-401 invalidation. The legacy `apps/web-console/src/services/flowsApi.ts` uses the same executor URL and shared client, so the backend bug affects it too and this backend fix covers it. Legacy bootstrap never installs `setConsoleSessionRetryUnauthorizedHandler`; a repeated endpoint 401 rejects the request without that next-only session-ending hook. A failed refresh still invalidates the shared session. No legacy change is needed.
+`consoleFlowHistory/api.ts` already suppresses domain-401 invalidation. The legacy `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/flowsApi.ts` uses the same executor URL and shared client, so the backend bug affects it too and this backend fix covers it. Legacy bootstrap never installs `setConsoleSessionRetryUnauthorizedHandler`; a repeated endpoint 401 rejects the request without that next-only session-ending hook. A failed refresh still invalidates the shared session. No legacy change is needed.
 
 ## Limits and review
 

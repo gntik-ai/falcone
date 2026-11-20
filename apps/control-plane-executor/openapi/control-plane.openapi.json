@@ -60285,7 +60285,7 @@
         },
         "x-ui-inventory": {
           "index": null,
-          "source": "apps/web-console/src/services/authConfigApi.ts",
+          "source": "packages/console-api/src/auth-config.ts",
           "issue": 1095,
           "parity": "Provider actions remain pending UI parity checks until the published contract is adopted."
         }
@@ -60449,7 +60449,7 @@
         },
         "x-ui-inventory": {
           "index": null,
-          "source": "apps/web-console/src/services/authConfigApi.ts",
+          "source": "packages/console-api/src/auth-config.ts",
           "issue": 1095,
           "parity": "Provider actions remain pending UI parity checks until the published contract is adopted."
         }

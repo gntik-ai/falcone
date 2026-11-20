@@ -1,7 +1,7 @@
 # Console Operations Polling
 
 The web console reads async-operation data through `POST /v1/async-operation-query` from
-`apps/web-console/src/lib/console-operations.ts`.
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-operations.ts`.
 
 `useOperations`, `useOperationDetail`, `useOperationLogs`, and `useOperationResult` use the shared
 `useAsyncResource` helper. Resource execution is keyed by the semantic query dependency key plus an

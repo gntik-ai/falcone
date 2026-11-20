@@ -28,7 +28,7 @@ test('the amendment pins 43 console call sites, with 21 additions and 22 existin
   assert.equal(fixture.rows.filter(row => row.disposition === 'TO_PUBLISH').length, 21);
   assert.equal(fixture.rows.filter(row => row.disposition === 'ALREADY_PUBLISHED').length, 22);
   for (const row of fixture.rows) {
-    assert.match(row.console_file, /^apps\/web-console\/src\//);
+    assert.match(row.console_file, /^apps\/web-console-next\/src\//);
     assert.ok(existsSync(new URL(`../../${row.console_file}`, import.meta.url)), row.console_file);
   }
   for (const n of [2, 36]) assert.equal(fixture.rows[n - 1].method, 'GET');

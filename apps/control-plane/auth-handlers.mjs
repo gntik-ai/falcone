@@ -1,6 +1,6 @@
 // Domain B — console auth endpoints (login/refresh/logout/signup-policy).
 //
-// The SPA's LoginPage calls these (apps/web-console/src/lib/console-auth.ts);
+// The SPA's LoginPage calls these (packages/console-api/src/auth.ts);
 // We back them with Keycloak ROPC against the selected realm and public client, returning the ConsoleLoginSession
 // shape the SPA expects. Handler contract: async (ctx) => { statusCode, body }.
 import { randomUUID } from 'node:crypto';

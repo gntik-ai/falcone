@@ -49,15 +49,15 @@ test('the docker build context contains the next dist that both console images c
 test('the docker build context still excludes node_modules, other dist directories and the legacy bundle', () => {
   const patterns = loadPatterns();
   for (const path of [
-    'node_modules/x/index.js', 'apps/web-console-next/node_modules/react/index.js', 'apps/web-console/dist/index.html',
+    'node_modules/x/index.js', 'apps/web-console-next/node_modules/react/index.js', 'apps/retired-console/dist/index.html',
     'apps/control-plane/dist/main.js', '.git/HEAD', 'apps/web-console-next/test-results/a.json'
   ]) assert.equal(isIgnored(patterns, path), true, `${path} must stay out of the build context`);
-  assert.equal(isIgnored(patterns, 'apps/web-console/static-server.mjs'), false);
+  assert.equal(isIgnored(patterns, 'apps/web-console-next/static-server.mjs'), false);
 });
 
 test('every COPY source of the console Dockerfiles that is a build artifact is inside the build context', () => {
   const patterns = loadPatterns();
-  for (const dockerfile of ['deploy/kind/web-console/Dockerfile', 'apps/web-console/Dockerfile']) {
+  for (const dockerfile of ['deploy/kind/web-console/Dockerfile', 'apps/web-console-next/Dockerfile']) {
     const copies = readFileSync(resolve(repoRoot, dockerfile), 'utf8').split('\n')
       .filter((line) => /^COPY\s/.test(line) && !line.includes('--from='))
       .map((line) => line.split(/\s+/)[1]);
@@ -70,7 +70,7 @@ test('every COPY source of the console Dockerfiles that is a build artifact is i
 });
 
 test('the context model rejects the previous .dockerignore, which dropped the next dist', () => {
-  const previous = ['**/dist', '!apps/web-console/dist', '!apps/web-console/dist/**'].map(compilePattern);
+  const previous = ['**/dist', '!apps/retired-console/dist', '!apps/retired-console/dist/**'].map(compilePattern);
   assert.equal(isIgnored(previous, 'apps/web-console-next/dist/index.html'), true);
-  assert.equal(isIgnored(previous, 'apps/web-console/dist/index.html'), false);
+  assert.equal(isIgnored(previous, 'apps/retired-console/dist/index.html'), false);
 });

@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { changeLocale } from '../src/i18n'
 import { reconcileCreate } from '../src/pages/consoleStorage/api'
-import { generateSnippets } from '../../web-console/src/lib/snippets/snippet-generator'
+import frozenSnippets from './frozen-legacy/storage-snippets.json'
 import { storageSnippets } from '../src/pages/consoleStorage/snippets'
 import { click, create, element, fail, open, ready, remove, selectBucket, selectObject, set, setContext, setup, upload } from './consoleStorage-support'
 import { bucket, bucketsPath, createPath, deletePath, exportPath, metadataPath, mockBuckets, mockUsage, objectsPath, presignPath, uploadPath, usagePath } from './parity/pages/console-storage-page.manifest'
@@ -141,7 +141,7 @@ test('empty history, metadata and usage breakdown render explanatory states', as
 })
 
 test('all connection snippet bytes match the legacy generator including placeholder endpoints', () => {
-  const expected = generateSnippets('storage-bucket', { tenantId: bucket.tenantId, tenantSlug: null, workspaceId: bucket.workspaceId, workspaceSlug: null, resourceName: bucket.bucketName, resourceHost: null, resourcePort: null, resourceExtraA: bucket.region, resourceExtraB: null, resourceState: 'active', externalAccessEnabled: true })
+  const expected = frozenSnippets
   expect(storageSnippets(bucket).map((entry) => entry.code)).toEqual(expected.map((entry) => entry.code))
 })
 test('closing create no-access returns focus to New bucket and retains the name for reopening', async () => {

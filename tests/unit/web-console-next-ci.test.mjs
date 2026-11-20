@@ -23,7 +23,7 @@ test('the next-console CI job checks the scaffold and release commands without p
     'pnpm --filter @in-falcone/web-console-next lint:i18n',
     'pnpm --filter @in-falcone/web-console-next test:i18n',
     'node scripts/validate-gntik-ui-pin.mjs',
-    'docker build -f apps/web-console/Dockerfile .',
+    'docker build -f apps/web-console-next/Dockerfile .',
   ]) assert.ok(commands.includes(command), `Missing CI check: ${command}`);
   assert.ok(commands.some((command) => command.includes('VITE_BASE_PATH="$base"') && command.includes('for base in /;') && command.includes('web-console-next build')));
   assert.ok(!commands.some((command) => command.includes('/next/')), 'CI builds the next console at the root base only');

@@ -522,7 +522,7 @@ jobs:
         run: pnpm --filter @in-falcone/web-console-next exec vite build
 
       - name: Build the console image without publishing
-        run: docker build -f apps/web-console/Dockerfile .
+        run: docker build -f apps/web-console-next/Dockerfile .
 
   cutover-gate:
     runs-on: ubuntu-24.04

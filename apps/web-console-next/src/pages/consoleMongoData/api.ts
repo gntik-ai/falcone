@@ -1,5 +1,5 @@
 // Document client and anonymous-key client. Methods, paths, query strings and bodies mirror the legacy
-// apps/web-console/src/services/mongoApi.ts:18-206 and components/console/MongoDataEditor.tsx field for field.
+// legacy base 69296937330b61be2bbf2c7267520196499fc038:src/services/mongoApi.ts:18-206 and components/console/MongoDataEditor.tsx field for field.
 // The page never sends Mongo import, export or PUT replace, and never lists, revokes or rotates API keys.
 import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import { requestJson, type ApiError, type JsonValue } from '@in-falcone/console-api/http'
@@ -76,7 +76,7 @@ export function buildCurlSnippet(params: SnippetParams): string {
   return [`curl -H 'apikey: ${params.apiKey}' \\`, `  '${embedDocsUrl(params)}'`].join('\n')
 }
 
-// Pure helpers ported from apps/web-console/src/lib/editor-ux.ts.
+// Pure helpers ported from legacy base 69296937330b61be2bbf2c7267520196499fc038:src/lib/editor-ux.ts.
 export type ParseResult = { ok: true; value: MongoDocument } | { ok: false; error: 'jsonInvalid' | 'jsonObjectExpected' }
 export function parseJsonObject(text: string): ParseResult {
   let parsed: unknown

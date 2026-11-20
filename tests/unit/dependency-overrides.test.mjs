@@ -16,12 +16,10 @@ function resolveChain(from, chain) {
   return { require: requireFrom, packageJson: requireFrom(resolved) };
 }
 
-const webConsole = fileURLToPath(new URL('../../apps/web-console/package.json', import.meta.url));
+const workspaceManifest = fileURLToPath(new URL('../../package.json', import.meta.url));
 
 test('minimatch 9 (via glob 10) expands brace patterns with a patched brace-expansion 2.x', () => {
-  const { require: fromMinimatch, packageJson } = resolveChain(webConsole, [
-    '@vitest/coverage-v8',
-    'test-exclude',
+  const { require: fromMinimatch, packageJson } = resolveChain(workspaceManifest, [
     'glob',
     'minimatch',
   ]);

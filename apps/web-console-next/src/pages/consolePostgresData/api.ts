@@ -1,5 +1,5 @@
 // Row editor and API-key client. Methods, paths, query strings and bodies mirror the legacy
-// apps/web-console/src/services/postgresApi.ts:100-340 and components/console/PostgresDataEditor.tsx field for field.
+// legacy base 69296937330b61be2bbf2c7267520196499fc038:src/services/postgresApi.ts:100-340 and components/console/PostgresDataEditor.tsx field for field.
 import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import { requestJson, type ApiError, type JsonValue } from '@in-falcone/console-api/http'
 
@@ -107,7 +107,7 @@ export function buildCurlSnippet(params: SnippetParams): string {
   return [`curl -H 'apikey: ${params.apiKey}' \\`, `  '${embedRowsUrl(params)}'`].join('\n')
 }
 
-// Pure helpers ported from apps/web-console/src/lib/editor-ux.ts.
+// Pure helpers ported from legacy base 69296937330b61be2bbf2c7267520196499fc038:src/lib/editor-ux.ts.
 export const formatCell = (value: unknown): string => value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value)
 export function collectColumns(rows: Array<Record<string, unknown>>): string[] {
   const seen = new Set<string>()

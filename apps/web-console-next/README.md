@@ -52,7 +52,7 @@ tokens and imports no page components from those transitive packages.
 | @gntik-ai/tokens | 0.2.1 | sha512-Ys7tPnkMylielio3HIxQMTPp1tnmxnEqbp7JGnIaXdcdiAdZieudaLm2xnDCTZ+SWfq5AFTxmH0JQxIB+6CRSA== |
 | @gntik-ai/ui | 0.9.0 | sha512-GCwMcbKnB/dV9kk9DY7tJCP7OtryTFZrePVHKAcj6cVctni/XqmVmYNoeEPRoG2iskr84H0WAraD2hkPeDUUfQ== |
 
-CSP asset checks use the unchanged headers parsed from `../web-console/static-server.mjs`.
+CSP asset checks use the unchanged headers parsed from `./static-server.mjs`.
 The body font is Geist Sans; the test page's `code[data-testid="mono"]` uses Geist Mono.
 Run `pnpm test:dist` for the validator fixtures. To exercise Chromium locally:
 

@@ -64,11 +64,54 @@ for (const guide of guides) {
   }
 }
 
-const catalogSource = readFileSync(new URL('../apps/web-console/src/lib/snippets/snippet-catalog.ts', import.meta.url), 'utf8')
-for (const item of realtimeSnippetTemplates) {
-  if (!catalogSource.includes(item.id)) {
-    console.error(`Catalog missing snippet id ${item.id}`)
-    failed = true
+// Realtime snippets now live in the next console's locale catalogue.
+for (const locale of ['en', 'es']) {
+  const catalog = JSON.parse(readFileSync(new URL(`../apps/web-console-next/src/locales/${locale}/pages.console-realtime-page.json`, import.meta.url), 'utf8'))
+  for (const item of realtimeSnippetTemplates) {
+    if (!catalog.entries[item.id]) {
+      console.error(`Catalog missing snippet id ${item.id} in ${locale}`)
+      failed = true
+    }
+  }
+}
+
+// Per-page catalogues replaced the shared legacy catalogue. Read their literal
+// templates, so syntax and placeholder checks still cover the served snippets.
+const { createRequire } = await import('node:module')
+const requireNext = createRequire(new URL('../apps/web-console-next/package.json', import.meta.url))
+const ts = requireNext('typescript')
+for (const page of ['consoleFunctions', 'consolePostgres', 'consoleStorage']) {
+  const file = new URL(`../apps/web-console-next/src/pages/${page}/snippets.ts`, import.meta.url)
+  const source = ts.createSourceFile(file.pathname, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
+  let templates
+  for (const statement of source.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (declaration.name.getText(source) !== 'templates') continue
+      templates = ts.isAsExpression(declaration.initializer) ? declaration.initializer.expression : declaration.initializer
+    }
+  }
+  if (!templates || !ts.isArrayLiteralExpression(templates) || templates.elements.length < 3) throw new Error(`Missing templates in ${file.pathname}`)
+  for (const [index, entry] of templates.elements.entries()) {
+    let code, language
+    if (ts.isStringLiteral(entry)) {
+      code = entry.text
+      language = ['shell', 'javascript', 'python'][index] ?? 'shell'
+    } else {
+      const fields = Object.fromEntries(entry.properties.filter(ts.isPropertyAssignment).map((property) => [property.name.getText(source), property.initializer.text]))
+      code = fields.code
+      language = fields.language === 'js' ? 'javascript' : fields.language
+    }
+    if (typeof code !== 'string') throw new Error(`Missing template code in ${file.pathname}`)
+    code = code.replaceAll('{PORT}', '5432')
+    if (/Bearer [A-Za-z0-9_\-.]{20,}/.test(code) || /eyJ[A-Za-z0-9_\-]{20,}/.test(code)) throw new Error(`Embedded credential-like token in ${page}`)
+    if (language === 'javascript') new vm.Script(`(async () => {\n${toParsableJavascript(code)}\n})`)
+    if (language === 'python') {
+      const python = spawnSync('python3', ['-c', 'import ast,sys; ast.parse(sys.stdin.read())'], { input: code, encoding: 'utf8' })
+      if (python.error?.code === 'ENOENT') console.warn(`WARN python3 not available; skipping Python syntax validation for ${page}`)
+      else if (python.error) throw python.error
+      else if (python.status !== 0) throw new Error(`Python syntax error in ${page}: ${python.stderr}`)
+    }
   }
 }
 

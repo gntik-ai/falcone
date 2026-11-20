@@ -1,0 +1,28 @@
+[
+  {
+    "id": "postgres-uri",
+    "label": "URI PostgreSQL",
+    "code": "postgresql://<PG_USER>:<YOUR_SECRET>@<RESOURCE_HOST>:5432/app_db?sslmode=require",
+    "notes": [
+      "Si el punto de conexión aún no aparece en la consola, usa el marcador temporal y actualízalo cuando la dirección del servidor quede disponible."
+    ],
+    "hasPlaceholderSecrets": true,
+    "secretPlaceholderRef": "Usa la credencial del usuario de base de datos mostrada en la consola del área de trabajo."
+  },
+  {
+    "id": "postgres-node-pg",
+    "label": "Node.js — pg",
+    "code": "import { Client } from 'pg'\n\nconst client = new Client({\n  host: '<RESOURCE_HOST>',\n  port: 5432,\n  database: 'app_db',\n  user: '<PG_USER>',\n  password: '<YOUR_SECRET>',\n  ssl: true\n})\n\nawait client.connect()\nconst result = await client.query('select now()')\nconsole.log(result.rows[0])\nawait client.end()",
+    "notes": [],
+    "hasPlaceholderSecrets": true,
+    "secretPlaceholderRef": "Usa la credencial del usuario de base de datos mostrada en la consola del área de trabajo."
+  },
+  {
+    "id": "postgres-python-psycopg2",
+    "label": "Python — psycopg2",
+    "code": "import psycopg2\n\nconn = psycopg2.connect(\n    host='<RESOURCE_HOST>',\n    port=5432,\n    dbname='app_db',\n    user='<PG_USER>',\n    password='<YOUR_SECRET>',\n    sslmode='require'\n)\n\nwith conn.cursor() as cur:\n    cur.execute('select current_schema()')\n    print(cur.fetchone())\n\nconn.close()",
+    "notes": [],
+    "hasPlaceholderSecrets": true,
+    "secretPlaceholderRef": "Usa la credencial del usuario de base de datos mostrada en la consola del área de trabajo."
+  }
+]

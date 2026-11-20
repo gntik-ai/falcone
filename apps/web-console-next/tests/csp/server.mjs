@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const source = await readFile(new URL('../../../web-console/static-server.mjs', import.meta.url), 'utf8');
+const source = await readFile(new URL('../../static-server.mjs', import.meta.url), 'utf8');
 const policy = source.match(/const CONTENT_SECURITY_POLICY = (\[[\s\S]*?\])\.join\('; '\);/);
 if (!policy) throw new Error('Cannot parse legacy CONTENT_SECURITY_POLICY');
 const declarations = source.match(/const SECURITY_HEADERS = \{([\s\S]*?)\n\};/);

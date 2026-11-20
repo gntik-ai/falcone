@@ -3,7 +3,7 @@ import { publicKnativeStatus } from './knative-runtime.mjs';
 
 // Platform roles allowed to READ the runtime status route (GET /v1/platform/runtime/knative). This
 // set is the backend twin of the web console's platform-observer route guard
-// (apps/web-console/src/router.tsx `isPlatformObserverRole`): superadmin plus the three platform_*
+// (apps/web-console-next/src/shell/guards.tsx, observer guard): superadmin plus the three platform_*
 // roles. Authorization is by verified platform ROLE only — a token that merely asserts
 // actor_type=superadmin but carries none of these roles is NOT a runtime observer, so the backend
 // gate matches exactly what the console shows and no role-less principal can read operator status.

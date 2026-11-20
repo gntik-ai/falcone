@@ -1,6 +1,6 @@
 # Console design-system primitives — Card, Table, Tabs
 
-`apps/web-console/src/components/ui/` holds the console's shared, theme-correct building
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/` holds the console's shared, theme-correct building
 blocks. Prior to issue #757, this directory had `button.tsx`, `input.tsx`, `select.tsx`,
 `textarea.tsx`, `label.tsx`, `badge.tsx`, `dialog.tsx`, `checkbox.tsx`, `alert.tsx`, and
 `separator.tsx`, but **no `Card`, `Table`, or `Tabs` primitive** — every card panel and every
@@ -101,7 +101,7 @@ why, and treat that as a candidate follow-up.
 As of #757, every data-plane screen — the Postgres and Mongo inventory pages, their `/data`
 row/document editors, Storage, Flows, and Members — renders its buttons, inputs, selects,
 tables and card panels exclusively through the shared primitives in
-`apps/web-console/src/components/ui/`. There is no remaining hand-rolled `<table>`, no
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/`. There is no remaining hand-rolled `<table>`, no
 remaining hard-coded panel background, and no remaining native/unstyled `<button>`/`<input>`/
 `<select>`/`<textarea>` on those screens. `PostgresDataEditor.tsx` and `MongoDataEditor.tsx` in
 particular — which previously had **zero `className` usage** — now use `Button`, `Input`,
@@ -118,14 +118,14 @@ Issue #757 converged the data-plane surface onto the shared primitives; issue #7
 same token discipline to the rest of the authenticated console and closed two remaining theme
 bugs.
 
-**No hardcoded light-mode utilities.** Every panel/table/badge in `apps/web-console/src` renders
+**No hardcoded light-mode utilities.** Every panel/table/badge in `apps/web-console-next/src` renders
 on theme tokens — `bg-card`, `bg-muted`, `text-foreground`, `text-muted-foreground`,
 `border-border` — never a literal Tailwind color that only reads correctly against a white page
 (`bg-white`, `bg-slate-<n>`, `text-slate-<n>`). A worst-offender example fixed by #744:
 `ConsoleSecretRotationPage.tsx` previously rendered three solid `bg-white` panels directly on the
 dark theme. This is enforced by a repo-guard test,
-`apps/web-console/src/no-hardcoded-light-mode-colors.test.ts`, which scans the whole
-`apps/web-console/src` tree (excluding `*.test.tsx`/`*.stories.tsx`) for these patterns. It
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/no-hardcoded-light-mode-colors.test.ts`, which scans the whole
+`apps/web-console-next/src` tree (excluding `*.test.tsx`/`*.stories.tsx`) for these patterns. It
 carries a `SANCTIONED_EXCEPTIONS` list for the rare, reviewed case where a literal class is not a
 dark-theme regression (e.g. a vendored snippet whose color is not console UI) — kept **empty** as
 of #744.
@@ -190,7 +190,7 @@ primary button rendered an unbranded pale ice-blue (`--primary: 204 94% 94%`), t
 `ui-sans-serif, system-ui, …` stack), and `--destructive` — reused as inline error TEXT color on
 dozens of screens, not just the destructive button's surface — measured ~2:1 contrast as text, a
 WCAG AA failure (needs 4.5:1). All three are now fixed at the **token** level in
-`apps/web-console/src/styles/globals.css` (both the `:root` and `.dark` blocks, kept in sync per
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/styles/globals.css` (both the `:root` and `.dark` blocks, kept in sync per
 the #744 idiom, since the console renders dark-root with no `.dark` class ever applied to
 `<html>`), so every screen picks up the fix automatically — no component was hand-patched with a
 literal palette class, and the `no-hardcoded-light-mode-colors.test.ts` guard's exceptions list

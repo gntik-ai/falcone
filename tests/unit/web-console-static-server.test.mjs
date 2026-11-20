@@ -19,11 +19,11 @@ const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=()
 const staticServers = [
   {
     name: 'deploy kind static server',
-    script: 'apps/web-console/static-server.mjs'
+    script: 'apps/web-console-next/static-server.mjs'
   },
   {
     name: 'app static server',
-    script: 'apps/web-console/static-server.mjs'
+    script: 'apps/web-console-next/static-server.mjs'
   }
 ];
 
@@ -37,7 +37,7 @@ const SECURITY_HEADERS = {
 };
 const INDEX_HTML = '<!doctype html><main id="root">Next console</main>';
 const nginxConfigs = [
-  { name: 'production nginx.conf', path: 'apps/web-console/nginx.conf', proxiesV1: true },
+  { name: 'production nginx.conf', path: 'apps/web-console-next/nginx.conf', proxiesV1: true },
   { name: 'kind nginx.conf', path: 'deploy/kind/web-console/nginx.conf', proxiesV1: false }
 ];
 
@@ -205,7 +205,7 @@ test('serves the next index, redirects /next and answers /healthz (runtime)', as
   await t.test('static-server.mjs', async (t) => {
     const root = await createNextRoot(t);
     const upstreamPort = await startStub(t);
-    const { port } = await startStaticServer(t, 'apps/web-console/static-server.mjs', root, { GATEWAY_UPSTREAM: `127.0.0.1:${upstreamPort}` });
+    const { port } = await startStaticServer(t, 'apps/web-console-next/static-server.mjs', root, { GATEWAY_UPSTREAM: `127.0.0.1:${upstreamPort}` });
     await assertSharedBehaviour(port, 'static-server');
     await assertV1Proxy(port, 'static-server');
     // static-server.mjs also validates malformed escapes and traversal outside /next.
@@ -541,7 +541,7 @@ test('deploy kind static server keeps the same-origin /v1 proxy ahead of the SPA
 
   const upstreamAddress = upstream.address();
   const { root } = await createDistRoot(t);
-  const { port } = await startStaticServer(t, 'apps/web-console/static-server.mjs', root, {
+  const { port } = await startStaticServer(t, 'apps/web-console-next/static-server.mjs', root, {
     GATEWAY_UPSTREAM: `127.0.0.1:${upstreamAddress.port}`
   });
 
@@ -562,7 +562,7 @@ test('legacy nginx static-serving configs declare gzip, cache-control, and secur
   const configs = [
     {
       name: 'production web-console nginx',
-      path: 'apps/web-console/nginx.conf',
+      path: 'apps/web-console-next/nginx.conf',
       requiresHealthz: true
     },
     {

@@ -1,7 +1,7 @@
 # Console quota/metric breach visibility (`/console/quotas`, `/console/observability`)
 
-Issue #766: the Quotas (`apps/web-console/src/pages/ConsoleQuotasPage.tsx`) and Observability
-(`apps/web-console/src/pages/ConsoleObservabilityPage.tsx`) pages rendered an over-limit
+Issue #766: the Quotas (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleQuotasPage.tsx`) and Observability
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleObservabilityPage.tsx`) pages rendered an over-limit
 dimension in a way that was, in practice, indistinguishable from a healthy one. This page
 documents the breach-visibility contract those two pages (and the shared `ConsumptionBar`
 primitive) now follow, and the byte-humanization rule.
@@ -38,7 +38,7 @@ thresholds.
 
 ## The fix: `ConsumptionBar`'s over-limit treatment, reused everywhere
 
-`ConsumptionBar.tsx` (`apps/web-console/src/components/console/ConsumptionBar.tsx`) already
+`ConsumptionBar.tsx` (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsumptionBar.tsx`) already
 existed as an emerald→amber→red bar, but was only wired into `QuotaConsumptionTable.tsx` (the
 Plan/Workspace pages) — never the Quotas or Observability pages, and its own fill-width clamp
 (`Math.min((current / limit) * 100, 100)`) had the same "clamp hides breach" property as the
@@ -73,7 +73,7 @@ is unchanged.
 
 `formatBytes` existed twice, near-identically, in `ConsoleStoragePage.tsx` and
 `ConsoleMongoPage.tsx`. It is now a single implementation in
-`apps/web-console/src/lib/format.ts`, and both pages import it instead of shipping their own
+`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/format.ts`, and both pages import it instead of shipping their own
 copy (verified byte-identical against both pages' existing tests: `2.0 KB`, `4.0 KB`, `8.0 KB /
 16 KB`).
 

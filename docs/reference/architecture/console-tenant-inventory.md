@@ -1,6 +1,6 @@
 # Console tenant inventory (`/console/tenants`)
 
-Before this change, `/console/tenants` (`apps/web-console/src/pages/ConsoleTenantsPage.tsx`)
+Before this change, `/console/tenants` (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantsPage.tsx`)
 rendered only a header and a static "Inventario" card ("Desde esta superficie se inicia el
 alta guiada de nuevas organizaciones."). There was no list of tenants and no way to reach a
 specific tenant's plan/quotas/IAM surfaces without already knowing (and typing) its UUID in
@@ -11,7 +11,7 @@ the URL — the platform's primary object had no inventory in the console (issue
 `ConsoleTenantsPage` renders a real table (organization, slug, lifecycle state, action) for
 platform users, sourced from `useConsoleContext()`'s `tenants` collection — the same data the
 shell header's tenant selector already fetches via `GET /v1/tenants`
-(`apps/web-console/src/lib/console-context.tsx`). No duplicate fetch was introduced: the page
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-context.tsx`). No duplicate fetch was introduced: the page
 reuses the context's tenant list and its `reloadTenants()`/`tenantsLoading`/`tenantsError`
 state, so it stays in sync with the rest of the shell and follows the console's established
 loading/error/empty idioms (`ConsolePageState`, matching `ConsoleQuotasPage`).
@@ -91,7 +91,7 @@ including a bare `tenant_owner`/`tenant_admin` who, per the role-awareness secti
 sees anything but the "Inventario no disponible para tu rol" blocked state described above.
 
 The entry now carries `requiresPlatformInventoryAccess: true`, checked against the shared
-`hasPlatformInventoryAccess(roles)` predicate (`apps/web-console/src/lib/console-principal.ts`
+`hasPlatformInventoryAccess(roles)` predicate (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-principal.ts`
 — the same predicate `ConsoleTenantsPage.tsx` uses for `canViewInventory`, so the sidebar entry
 and the page's own role fork cannot drift apart): the entry is shown for `superadmin`,
 `platform_admin`, and `platform_operator` (who all reach a real inventory), and hidden for

@@ -1,0 +1,542 @@
+[
+  {
+    "filters": {},
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {},
+    "pageToken": "opaque+token/=",
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?page%5Bafter%5D=opaque%2Btoken%2F%3D",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {
+      "status": "Failed"
+    },
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?status=Failed",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {
+      "status": "Failed"
+    },
+    "pageToken": "opaque+token/=",
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?status=Failed&page%5Bafter%5D=opaque%2Btoken%2F%3D",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {
+      "flowVersion": "2"
+    },
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?query=flowVersion+%3D+%272%27",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {
+      "flowVersion": "2"
+    },
+    "pageToken": "opaque+token/=",
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?query=flowVersion+%3D+%272%27&page%5Bafter%5D=opaque%2Btoken%2F%3D",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {
+      "triggerType": "platform_event"
+    },
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?query=triggerType+%3D+%27platform_event%27",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {
+      "triggerType": "platform_event"
+    },
+    "pageToken": "opaque+token/=",
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?query=triggerType+%3D+%27platform_event%27&page%5Bafter%5D=opaque%2Btoken%2F%3D",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {
+      "startedAfter": "2026-01-01T08:15",
+      "startedBefore": "2026-01-02T09:20"
+    },
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?query=StartTime+%3E%3D+%272026-01-01T08%3A15%27+AND+StartTime+%3C%3D+%272026-01-02T09%3A20%27",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {
+      "startedAfter": "2026-01-01T08:15",
+      "startedBefore": "2026-01-02T09:20"
+    },
+    "pageToken": "opaque+token/=",
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?query=StartTime+%3E%3D+%272026-01-01T08%3A15%27+AND+StartTime+%3C%3D+%272026-01-02T09%3A20%27&page%5Bafter%5D=opaque%2Btoken%2F%3D",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {
+      "status": "Completed",
+      "flowVersion": "2",
+      "triggerType": "webhook",
+      "startedAfter": "2026-01-01T08:15",
+      "startedBefore": "2026-01-02T09:20"
+    },
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?status=Completed&query=flowVersion+%3D+%272%27+AND+triggerType+%3D+%27webhook%27+AND+StartTime+%3E%3D+%272026-01-01T08%3A15%27+AND+StartTime+%3C%3D+%272026-01-02T09%3A20%27",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  },
+  {
+    "filters": {
+      "status": "Completed",
+      "flowVersion": "2",
+      "triggerType": "webhook",
+      "startedAfter": "2026-01-01T08:15",
+      "startedBefore": "2026-01-02T09:20"
+    },
+    "pageToken": "opaque+token/=",
+    "request": {
+      "url": "/v1/flows/workspaces/synthetic-workspace/flows/f1/executions?status=Completed&query=flowVersion+%3D+%272%27+AND+triggerType+%3D+%27webhook%27+AND+StartTime+%3E%3D+%272026-01-01T08%3A15%27+AND+StartTime+%3C%3D+%272026-01-02T09%3A20%27&page%5Bafter%5D=opaque%2Btoken%2F%3D",
+      "method": "GET",
+      "headers": [
+        [
+          "accept",
+          "application/json"
+        ],
+        [
+          "authorization",
+          "Bearer synthetic-access-token"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "x-api-version",
+          "2026-03-26"
+        ],
+        [
+          "x-correlation-id",
+          "corr_00000000-0000-4000-8000-000000000001"
+        ]
+      ]
+    },
+    "response": {
+      "items": [
+        {
+          "executionId": "synthetic-tenant:synthetic-workspace:f1:run-aaaaaaaaaaaaaaaaaaaaaaaaa",
+          "workflowId": "synthetic-workflow",
+          "status": "Completed",
+          "triggerType": "manual",
+          "version": 1,
+          "startedAt": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "nextPageToken": "tok-2"
+    }
+  }
+]

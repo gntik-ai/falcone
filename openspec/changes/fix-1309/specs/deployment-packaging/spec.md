@@ -46,7 +46,7 @@ next Vite build. Both Vite RUN instructions SHALL use
 
 #### Scenario: Web console source build
 
-- **WHEN** OpenShift builds `apps/web-console/Dockerfile` from a clean monorepo checkout
+- **WHEN** OpenShift builds `apps/web-console-next/Dockerfile` from a clean monorepo checkout
 - **THEN** the locked pnpm builder produces both console bundles in separate 3072 MiB heap-capped RUN layers and copies them into the runtime without builder dependencies
 
 #### Scenario: Insufficient heap or combined layer regression

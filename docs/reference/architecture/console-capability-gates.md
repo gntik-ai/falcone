@@ -1,8 +1,8 @@
 # Console capability gates — catalog keys and the Flows exception
 
 The web console hides or dims plan-restricted features behind `CapabilityGate`
-(`apps/web-console/src/components/console/CapabilityGate.tsx`), which reads the per-tenant effective
-capabilities through `useCapabilityGate` (`apps/web-console/src/lib/hooks/use-capability-gate.ts`).
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/CapabilityGate.tsx`), which reads the per-tenant effective
+capabilities through `useCapabilityGate` (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/hooks/use-capability-gate.ts`).
 This page documents the **one invariant** that governs every gate and the **Flows exception**.
 
 ## The fail-closed invariant
@@ -37,10 +37,10 @@ provisioning-orchestrator migrations:
 | `104-plan-boolean-capabilities.sql` | `sql_admin_api`, `passthrough_admin`, `realtime`, `webhooks`, `public_functions`, `custom_domains`, `scheduled_functions` |
 | `114-backup-scope-deployment-profiles.sql` | `backup_scope_access` |
 
-The console mirrors this set in one place — `apps/web-console/src/lib/capabilities/catalog-keys.ts`
+The console mirrors this set in one place — `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/capabilities/catalog-keys.ts`
 (`BOOLEAN_CAPABILITY_KEYS` + the `BooleanCapabilityKey` union). The `CapabilityGate` `capability` prop
 and the `useCapabilityGate` key are typed to that union, so a phantom key fails to compile. An audit
-test (`apps/web-console/src/lib/capabilities/capability-gate-keys.test.ts`) additionally scans the
+test (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/capabilities/capability-gate-keys.test.ts`) additionally scans the
 source for every gate usage and fails if any key is outside the catalog — it catches phantom keys even
 when introduced through an `as`-cast.
 
@@ -55,8 +55,8 @@ catalog, and the flow control-plane API is open to every tenant regardless of pl
 `/v1/flows/...` entry in the gateway capability-gated route map
 (`deploy/gateway-config/routes/capability-gated-routes.yaml`) and no flows `planCapabilityAnyOf`
 block in `deploy/gateway-config/base/public-api-routing.yaml`. The four Flows pages
-(`apps/web-console/src/pages/ConsoleFlows*Page.tsx`) render their content directly. (#790)
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFlows*Page.tsx`) render their content directly. (#790)
 
-The Functions **publish wizard** (`apps/web-console/src/pages/ConsoleFunctionsPage.tsx`) is genuinely
+The Functions **publish wizard** (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFunctionsPage.tsx`) is genuinely
 plan-gated and keeps its gate, on the real catalog key `public_functions` (Public Serverless
 Functions).

@@ -7,7 +7,7 @@ import test from 'node:test';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const consoleRoot = path.join(repoRoot, 'apps/web-console');
+const consoleRoot = path.join(repoRoot, 'apps/web-console-next');
 const require = createRequire(path.join(consoleRoot, 'package.json'));
 const {build} = await import(pathToFileURL(require.resolve('vite')));
 
@@ -27,7 +27,7 @@ async function buildConsole(version, sha) {
       configFile: path.join(consoleRoot, 'vite.config.ts'),
       root: directory,
       logLevel: 'silent',
-      build: {write: false, minify: false},
+      build: {write: false, minify: false, rollupOptions: { input: path.join(directory, 'index.html') }},
     });
     const outputs = result.output;
     return {

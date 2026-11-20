@@ -2,7 +2,7 @@ import type { JsonValue } from './http'
 import { requestConsoleSessionJson } from './session'
 
 // Tenant realm auth-config client (#782, #950). The four routed calls of
-// apps/control-plane/routes.mjs, mirroring apps/web-console/src/services/authConfigApi.ts
+// apps/control-plane/routes.mjs, preserving the legacy authConfigApi contract at base 69296937.
 // method, path and payload shape. The path family is runtime-only: it is not in the published
 // OpenAPI, so these types are the console-side contract (gap-falcone-routed-unpublished).
 // It lives beside `clients` because the clients entry pins its exact export list.

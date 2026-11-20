@@ -21,7 +21,7 @@ test('repository layout catalog encodes the issue 900 release and non-release se
     REQUIRED_RELEASE_IMAGES.toSorted()
   );
   for (const service of releases) {
-    assert.equal(service.source, `apps/${service.id}`);
+    assert.equal(service.source, service.id === 'web-console' ? 'apps/web-console-next' : `apps/${service.id}`);
     assert.equal(service.dockerfile, `${service.source}/Dockerfile`);
     assert.equal(service.chart.alias.length > 0, true);
     assert.equal(service.chart.valueKey.length > 0, true);
@@ -42,11 +42,11 @@ test('repository layout catalog encodes the issue 900 release and non-release se
 test('catalog validation recognizes only the CI-declared SPA build artifact before release-image build', () => {
   const webConsoleRelease = {
     build_spa: 'true',
-    dockerfile: 'apps/web-console/Dockerfile'
+    dockerfile: 'apps/web-console-next/Dockerfile'
   };
 
-  assert.equal(isGeneratedBuildArtifact('apps/web-console/dist', '.', webConsoleRelease), true);
-  assert.equal(isGeneratedBuildArtifact('apps/web-console/src', '.', webConsoleRelease), false);
-  assert.equal(isGeneratedBuildArtifact('apps/web-console/dist', '.', { dockerfile: webConsoleRelease.dockerfile }), false);
-  assert.equal(isGeneratedBuildArtifact('apps/web-console/dist', 'apps/web-console', webConsoleRelease), false);
+  assert.equal(isGeneratedBuildArtifact('apps/web-console-next/dist', '.', webConsoleRelease), true);
+  assert.equal(isGeneratedBuildArtifact('apps/web-console-next/src', '.', webConsoleRelease), false);
+  assert.equal(isGeneratedBuildArtifact('apps/web-console-next/dist', '.', { dockerfile: webConsoleRelease.dockerfile }), false);
+  assert.equal(isGeneratedBuildArtifact('apps/web-console-next/dist', 'apps/web-console-next', webConsoleRelease), false);
 });

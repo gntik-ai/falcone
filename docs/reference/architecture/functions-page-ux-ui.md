@@ -12,7 +12,7 @@ Function authoring controls use shared UI primitives:
 - text and numeric fields use `Input`;
 - runtime and response mode use `Select`;
 - inline code and JSON payload editors use `Textarea`;
-- JSON payload parsing uses `parseJsonObject` from `apps/web-console/src/lib/editor-ux.ts`;
+- JSON payload parsing uses `parseJsonObject` from `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/editor-ux.ts`;
 - JSON defaults and displayed object payloads use `prettyJson` from the same helper.
 
 Code and JSON editors are always monospace, spellcheck-off, autocorrect-off, and sized as editing

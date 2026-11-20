@@ -1,6 +1,6 @@
 # Console quota-adjustment action (`/console/quotas`)
 
-The Quotas page (`apps/web-console/src/pages/ConsoleQuotasPage.tsx`) shows each quota
+The Quotas page (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleQuotasPage.tsx`) shows each quota
 dimension's hard limit, measured usage, and posture for the active tenant and (when one
 is selected) its active workspace. For superadmins, every dimension row has an "Ajustar
 cuota" action. This page documents what that action actually edits, and why (issue #750
@@ -31,7 +31,7 @@ tab uses (see
 [console-plan-limit-edit-feedback.md](./console-plan-limit-edit-feedback.md)).
 
 "Ajustar cuota" therefore opens `QuotaAdjustDialog`
-(`apps/web-console/src/components/console/QuotaAdjustDialog.tsx`), which:
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/QuotaAdjustDialog.tsx`), which:
 
 1. Resolves the active tenant's current plan (`planManagementApi.getTenantCurrentPlan`).
 2. Lets the operator enter a new value for that dimension (`-1` = sin límite) and calls

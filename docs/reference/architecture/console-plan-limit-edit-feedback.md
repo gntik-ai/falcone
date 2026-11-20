@@ -8,7 +8,7 @@ API as the source of truth: a typed value is only a saved limit after the operat
 ## Write flow
 
 The page uses the plan management API client
-(`apps/web-console/src/services/planManagementApi.ts`) against these existing routes:
+(`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/planManagementApi.ts`) against these existing routes:
 
 - `PUT /v1/plans/{planId}/limits/{dimensionKey}` with `{ value }`
 - `DELETE /v1/plans/{planId}/limits/{dimensionKey}`

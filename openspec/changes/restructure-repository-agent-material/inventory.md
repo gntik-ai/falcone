@@ -86,7 +86,7 @@ docs-site/.vitepress/config.mts:23 names a site logo but does not prove a root-f
 | --- | --- | --- | --- |
 | `.dockerignore` | product | 1 | no reader found |
 | `.env.example` | product | 1 | `.gitignore:8`, `delivery-adapter/GAP-001/FILE-SHA256SUMS:11`, `delivery-adapter/GAP-001/FILE-SHA256SUMS:23`, `delivery-adapter/GAP-001/FILE-SHA256SUMS:32` |
-| `.github` | product | 4 | `.github/workflows/deploy-docs.yml:8`, `apps/web-console/Dockerfile:4`, `delivery-adapter/GAP-001/FILE-SHA256SUMS:69`, `delivery-adapter/GAP-001/hermes-workflows-suite/adapters/common/lib.sh:187` |
+| `.github` | product | 4 | `.github/workflows/deploy-docs.yml:8`, `apps/web-console-next/Dockerfile:4`, `delivery-adapter/GAP-001/FILE-SHA256SUMS:69`, `delivery-adapter/GAP-001/hermes-workflows-suite/adapters/common/lib.sh:187` |
 | `.gitignore` | product | 1 | `docs/track-f/falcone-track-getting-started.md:38`, `falcone-loop-state/RUNLOG.md:331`, `spikes/add-flows-adr-temporal-spikes/.gitignore:2` |
 | `.markdownlint-cli2.jsonc` | product | 1 | `scripts/validate-structure.mjs:11` |
 | `CONTRIBUTING.md` | product | 1 | no reader found |
@@ -107,7 +107,7 @@ docs-site/.vitepress/config.mts:23 names a site logo but does not prove a root-f
 | `logo-original.png` | obsolete | 1 | no reader found |
 | `logo.svg` | product | 1 | `README.de.md:2`, `README.es.md:2`, `README.fr.md:2`, `README.md:2` |
 | `openspec` | agent-memory | 119 | `.gitignore:50`, `deploy/kind/README.md:101`, `docs-site/operations/webhook-signing-key-lifecycle.md:2848`, `docs/reference/architecture/console-design-system-primitives.md:96` |
-| `package.json` | product | 1 | `apps/control-plane-executor/Dockerfile:21`, `apps/control-plane-executor/Dockerfile:45`, `apps/control-plane/Dockerfile:20`, `apps/web-console/src/styles/brand-tokens.test.ts:169` |
+| `package.json` | product | 1 | `apps/control-plane-executor/Dockerfile:21`, `apps/control-plane-executor/Dockerfile:45`, `apps/control-plane/Dockerfile:20`, `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/styles/brand-tokens.test.ts:169` |
 | `packages` | product | 755 | `.github/workflows/ci.yml:226`, `.github/workflows/ci.yml:233`, `.github/workflows/release-images.yml:44`, `README.de.md:280` |
 | `pnpm-lock.yaml` | product | 1 | `tests/blackbox/source-build-root-context.test.mjs:111` |
 | `pnpm-workspace.yaml` | product | 1 | `scripts/validate-structure.mjs:8` |
@@ -137,7 +137,7 @@ identify experiments, plans and retained external-adapter evidence.
 | --- | --- | --- | --- |
 | `.dockerignore` | product | 1 | no reader found |
 | `.env.example` | product | 1 | `.gitignore:8`, `delivery-adapter/GAP-001/FILE-SHA256SUMS:11`, `delivery-adapter/GAP-001/FILE-SHA256SUMS:23`, `delivery-adapter/GAP-001/FILE-SHA256SUMS:32` |
-| `.github/workflows/**` | product | 4 | `.github/workflows/deploy-docs.yml:8`, `apps/web-console/Dockerfile:4`, `delivery-adapter/GAP-001/FILE-SHA256SUMS:69`, `docs-site/contributing/index.md:65` |
+| `.github/workflows/**` | product | 4 | `.github/workflows/deploy-docs.yml:8`, `apps/web-console-next/Dockerfile:4`, `delivery-adapter/GAP-001/FILE-SHA256SUMS:69`, `docs-site/contributing/index.md:65` |
 | `.gitignore` | product | 1 | `docs/track-f/falcone-track-getting-started.md:38`, `falcone-loop-state/RUNLOG.md:331`, `spikes/add-flows-adr-temporal-spikes/.gitignore:2` |
 | `.markdownlint-cli2.jsonc` | product | 1 | `scripts/validate-structure.mjs:11` |
 | `CONTRIBUTING.md` | product | 1 | no reader found |
@@ -153,7 +153,7 @@ identify experiments, plans and retained external-adapter evidence.
 | `apps/control-plane-executor/**` | product | 132 | `.github/workflows/ci.yml:219`, `.github/workflows/integration.yml:73`, `.github/workflows/release-images.yml:15`, `.github/workflows/release-images.yml:65` |
 | `apps/fn-runtime/**` | product | 3 | `.github/workflows/release-images.yml:19`, `.github/workflows/release-images.yml:70`, `apps/fn-runtime/Dockerfile:12`, `deploy/OPENSHIFT-HARBOR-REVIEW.md:139` |
 | `apps/mcp-runtime/**` | product | 2 | `.github/workflows/integration.yml:71`, `.github/workflows/release-images.yml:21`, `.github/workflows/release-images.yml:74`, `apps/mcp-runtime/Dockerfile:2` |
-| `apps/web-console/**` | product | 511 | `.dockerignore:20`, `.dockerignore:25`, `.dockerignore:26`, `.github/workflows/integration.yml:75` |
+| `apps/web-console-next/**` | product | 511 | `.dockerignore:20`, `.dockerignore:25`, `.dockerignore:26`, `.github/workflows/integration.yml:75` |
 | `apps/workflow-worker/**` | product | 31 | `.github/workflows/integration.yml:74`, `.github/workflows/release-images.yml:20`, `.github/workflows/release-images.yml:72`, `apps/control-plane-executor/Dockerfile:27` |
 | `delivery-adapter/GAP-001/**` | process | 13 | no reader found |
 | `deploy/OPENSHIFT-HARBOR-REVIEW.md` | product | 1 | `docs-site/operations/openshift-install.md:11`, `tests/blackbox/legacy-components-absent.test.mjs:124` |
@@ -173,7 +173,7 @@ identify experiments, plans and retained external-adapter evidence.
 | `docs-site/personas/**` | product | 3 | `falcone-loop-state/FINDINGS.md:899`, `tests/blackbox/all-core-install-readiness.test.mjs:819` |
 | `docs-site/public/**` | product | 34 | no reader found |
 | `docs/installation/**` | product | 4 | `README.md:191`, `falcone-loop-state/FINDINGS.md:85`, `openspec/changes/fix-972-function-sandbox-isolation/design.md:53`, `tests/blackbox/all-core-install-readiness.test.mjs:803` |
-| `docs/reference/**` | product | 65 | `apps/web-console/src/lib/structural-write-access.ts:5`, `apps/web-console/src/pages/ConsoleTenantPlanOverviewPage.tsx:60`, `deploy/kind/README.md:90`, `docs-site/architecture/adrs.md:11` |
+| `docs/reference/**` | product | 65 | `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/structural-write-access.ts:5`, `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantPlanOverviewPage.tsx:60`, `deploy/kind/README.md:90`, `docs-site/architecture/adrs.md:11` |
 | `docs/track-f/**` | process | 11 | `docs/track-f/falcone-track-getting-started.md:36`, `docs/track-f/falcone-track-getting-started.md:45`, `docs/track-f/falcone-track-getting-started.md:46`, `docs/track-f/falcone-track-getting-started.md:99` |
 | `falcone-loop-state/CAPABILITIES.md` | agent-memory | 1 | `docs/track-f/triage.md:334` |
 | `falcone-loop-state/COVERAGE.md` | agent-memory | 1 | `docs/track-f/triage.md:332` |
@@ -184,7 +184,7 @@ identify experiments, plans and retained external-adapter evidence.
 | `logo-original.png` | obsolete | 1 | no reader found |
 | `logo.svg` | product | 1 | `README.de.md:2`, `README.es.md:2`, `README.fr.md:2`, `README.md:2` |
 | `openspec/changes/**` | agent-memory | 119 | `deploy/kind/README.md:101`, `docs-site/operations/webhook-signing-key-lifecycle.md:2848`, `docs/reference/architecture/console-design-system-primitives.md:96`, `docs/reference/architecture/knative-runtime-status.md:38` |
-| `package.json` | product | 1 | `apps/control-plane-executor/Dockerfile:21`, `apps/control-plane-executor/Dockerfile:45`, `apps/control-plane/Dockerfile:20`, `apps/web-console/src/styles/brand-tokens.test.ts:169` |
+| `package.json` | product | 1 | `apps/control-plane-executor/Dockerfile:21`, `apps/control-plane-executor/Dockerfile:45`, `apps/control-plane/Dockerfile:20`, `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/styles/brand-tokens.test.ts:169` |
 | `packages/adapters/**` | product | 29 | `apps/control-plane-executor/Dockerfile:3`, `apps/control-plane-executor/Dockerfile:40`, `apps/control-plane-executor/src/console-backend-functions.mjs:6`, `apps/control-plane-executor/src/events-admin.mjs:13` |
 | `packages/audit/**` | product | 4 | `apps/control-plane-executor/Dockerfile:28`, `apps/control-plane-executor/Dockerfile:48`, `apps/control-plane-executor/src/runtime/flow-audit-relay.test.mjs:3`, `apps/control-plane-executor/src/runtime/flow-executor.mjs:48` |
 | `packages/audit-anomaly-handler/**` | product | 5 | `pnpm-lock.yaml:261`, `tests/blackbox/audit-anomaly-alerting.test.mjs:27`, `tests/blackbox/audit-anomaly-alerting.test.mjs:28`, `tests/blackbox/audit-anomaly-alerting.test.mjs:29` |
@@ -1026,517 +1026,517 @@ apps/fn-runtime/invocation-auth.mjs
 apps/fn-runtime/server.mjs
 apps/mcp-runtime/Dockerfile
 apps/mcp-runtime/server.mjs
-apps/web-console/Dockerfile
-apps/web-console/e2e/console-auth-flows.e2e.ts
-apps/web-console/e2e/console-context-auth-e2e.e2e.ts
-apps/web-console/e2e/console-service-e2e.e2e.ts
-apps/web-console/e2e/fixtures/context-auth-e2e.ts
-apps/web-console/e2e/fixtures/service-e2e.ts
-apps/web-console/e2e/workspace-docs.spec.ts
-apps/web-console/index.html
-apps/web-console/nginx.conf
-apps/web-console/package.json
-apps/web-console/playwright.config.ts
-apps/web-console/postcss.config.cjs
-apps/web-console/public/favicon.png
-apps/web-console/public/favicon.svg
-apps/web-console/public/img/icon-180.png
-apps/web-console/public/img/icon-192.png
-apps/web-console/public/img/logo-wide.png
-apps/web-console/src/__tests__/BackupScopeMatrix.test.tsx
-apps/web-console/src/__tests__/ConfigExportDomainSelector.test.tsx
-apps/web-console/src/__tests__/ConfigExportResultPanel.test.tsx
-apps/web-console/src/__tests__/ConsoleBackupScopePage.test.tsx
-apps/web-console/src/__tests__/ConsoleDocsPage.test.tsx
-apps/web-console/src/__tests__/ConsoleTenantConfigExportPage.test.tsx
-apps/web-console/src/__tests__/ConsoleTenantConfigPreflightPage.test.tsx
-apps/web-console/src/__tests__/ConsoleTenantConfigReprovisionPage.test.tsx
-apps/web-console/src/__tests__/FlowConnectionRules.test.ts
-apps/web-console/src/__tests__/FlowGraphModel.test.tsx
-apps/web-console/src/__tests__/FlowSemanticMarkers.test.ts
-apps/web-console/src/__tests__/FlowSemanticValidation.test.ts
-apps/web-console/src/__tests__/FlowViewSwitcher.test.tsx
-apps/web-console/src/__tests__/FlowViewSync.test.ts
-apps/web-console/src/__tests__/FlowYamlEditor.test.tsx
-apps/web-console/src/__tests__/FlowYamlRoundTrip.test.ts
-apps/web-console/src/__tests__/PostgresDataEditor.test.tsx
-apps/web-console/src/__tests__/WorkspaceDocNotes.test.tsx
-apps/web-console/src/__tests__/WorkspaceDocSections.test.tsx
-apps/web-console/src/__tests__/fixtures/backupScopeFixtures.ts
-apps/web-console/src/actions/observability-audit-correlation.mjs
-apps/web-console/src/actions/observability-audit-export.mjs
-apps/web-console/src/actions/observability-audit.mjs
-apps/web-console/src/actions/observability-quota-usage.mjs
-apps/web-console/src/actions/postgres-admin.mjs
-apps/web-console/src/actions/public-api-catalog.mjs
-apps/web-console/src/actions/secretRotationActions.ts
-apps/web-console/src/actions/tenant-management.mjs
-apps/web-console/src/actions/workspace-management.mjs
-apps/web-console/src/api/configExportApi.ts
-apps/web-console/src/api/configPreflightApi.ts
-apps/web-console/src/api/configReprovisionApi.ts
-apps/web-console/src/api/configSchemaApi.ts
-apps/web-console/src/components/ConfigArtifactValidator.tsx
-apps/web-console/src/components/ConfigExportDomainSelector.tsx
-apps/web-console/src/components/ConfigExportResultPanel.tsx
-apps/web-console/src/components/ConfigIdentifierMapEditor.test.tsx
-apps/web-console/src/components/ConfigIdentifierMapEditor.tsx
-apps/web-console/src/components/ConfigReprovisionResultPanel.tsx
-apps/web-console/src/components/PreflightConflictReport.tsx
-apps/web-console/src/components/PreflightRiskBadge.tsx
-apps/web-console/src/components/RouteErrorBoundary.test.tsx
-apps/web-console/src/components/RouteErrorBoundary.tsx
-apps/web-console/src/components/auth/ProtectedRoute.session-invalidation.test.tsx
-apps/web-console/src/components/auth/ProtectedRoute.test.tsx
-apps/web-console/src/components/auth/ProtectedRoute.tsx
-apps/web-console/src/components/backup/BackupNotAvailable.tsx
-apps/web-console/src/components/backup/BackupStatusBadge.tsx
-apps/web-console/src/components/backup/BackupStatusDetail.tsx
-apps/web-console/src/components/backup/BackupStatusTable.tsx
-apps/web-console/src/components/backup/BackupSummaryCard.tsx
-apps/web-console/src/components/backup/CriticalConfirmationPanel.tsx
-apps/web-console/src/components/backup/OperationHistoryPanel.tsx
-apps/web-console/src/components/backup/OperationStatusBadge.tsx
-apps/web-console/src/components/backup/PrecheckResultList.tsx
-apps/web-console/src/components/backup/RestoreConfirmationDialog.tsx
-apps/web-console/src/components/backup/RestoreSimulationDialog.tsx
-apps/web-console/src/components/backup/RestoreSimulationEvidence.tsx
-apps/web-console/src/components/backup/RiskLevelBadge.tsx
-apps/web-console/src/components/backup/SnapshotSelector.tsx
-apps/web-console/src/components/backup/TenantNameInput.tsx
-apps/web-console/src/components/backup/TriggerBackupButton.tsx
-apps/web-console/src/components/backup/__tests__/RestoreConfirmationDialog.test.tsx
-apps/web-console/src/components/backup/__tests__/RestoreSimulationDialog.test.tsx
-apps/web-console/src/components/backup/__tests__/TenantNameInput.test.tsx
-apps/web-console/src/components/console/ActiveOperationsIndicator.test.tsx
-apps/web-console/src/components/console/ActiveOperationsIndicator.tsx
-apps/web-console/src/components/console/BackupScopeLegend.test.tsx
-apps/web-console/src/components/console/BackupScopeLegend.tsx
-apps/web-console/src/components/console/BackupScopeMatrix.tsx
-apps/web-console/src/components/console/BackupScopeProfileSelector.tsx
-apps/web-console/src/components/console/CapabilityGate.test.tsx
-apps/web-console/src/components/console/CapabilityGate.tsx
-apps/web-console/src/components/console/CapabilityStatusGrid.test.tsx
-apps/web-console/src/components/console/CapabilityStatusGrid.tsx
-apps/web-console/src/components/console/ConnectionSnippets.test.tsx
-apps/web-console/src/components/console/ConnectionSnippets.tsx
-apps/web-console/src/components/console/ConsoleAuditCategoryBadge.tsx
-apps/web-console/src/components/console/ConsoleAuditRecordDetail.tsx
-apps/web-console/src/components/console/ConsoleAuditResultBadge.tsx
-apps/web-console/src/components/console/ConsoleCredentialStatusBadge.test.tsx
-apps/web-console/src/components/console/ConsoleCredentialStatusBadge.tsx
-apps/web-console/src/components/console/ConsoleInvitationList.test.tsx
-apps/web-console/src/components/console/ConsoleInvitationList.tsx
-apps/web-console/src/components/console/ConsoleMetricDimensionRow.test.tsx
-apps/web-console/src/components/console/ConsoleMetricDimensionRow.tsx
-apps/web-console/src/components/console/ConsolePageState.test.tsx
-apps/web-console/src/components/console/ConsolePageState.tsx
-apps/web-console/src/components/console/ConsoleQuotaPostureBadge.test.tsx
-apps/web-console/src/components/console/ConsoleQuotaPostureBadge.tsx
-apps/web-console/src/components/console/ConsoleTimeRangeSelector.test.tsx
-apps/web-console/src/components/console/ConsoleTimeRangeSelector.tsx
-apps/web-console/src/components/console/ConsumptionBar.test.tsx
-apps/web-console/src/components/console/ConsumptionBar.tsx
-apps/web-console/src/components/console/DestructiveConfirmationDialog.integration.test.tsx
-apps/web-console/src/components/console/DestructiveConfirmationDialog.test.tsx
-apps/web-console/src/components/console/DestructiveConfirmationDialog.tsx
-apps/web-console/src/components/console/EventsConsole.test.tsx
-apps/web-console/src/components/console/EventsConsole.tsx
-apps/web-console/src/components/console/FunctionsConsole.test.tsx
-apps/web-console/src/components/console/FunctionsConsole.tsx
-apps/web-console/src/components/console/InvitationProofView.tsx
-apps/web-console/src/components/console/MongoDataEditor.test.tsx
-apps/web-console/src/components/console/MongoDataEditor.tsx
-apps/web-console/src/components/console/OpenApiViewer.test.tsx
-apps/web-console/src/components/console/OpenApiViewer.tsx
-apps/web-console/src/components/console/OperationLogEntriesList.test.tsx
-apps/web-console/src/components/console/OperationLogEntriesList.tsx
-apps/web-console/src/components/console/OperationResultSummary.test.tsx
-apps/web-console/src/components/console/OperationResultSummary.tsx
-apps/web-console/src/components/console/OperationStatusBadge.test.tsx
-apps/web-console/src/components/console/OperationStatusBadge.tsx
-apps/web-console/src/components/console/OperationStatusBanner.test.tsx
-apps/web-console/src/components/console/OperationStatusBanner.tsx
-apps/web-console/src/components/console/OverrideIndicatorBadge.test.tsx
-apps/web-console/src/components/console/OverrideIndicatorBadge.tsx
-apps/web-console/src/components/console/PermissionDeniedNotice.test.tsx
-apps/web-console/src/components/console/PermissionDeniedNotice.tsx
-apps/web-console/src/components/console/PlanAssignmentDialog.test.tsx
-apps/web-console/src/components/console/PlanAssignmentDialog.tsx
-apps/web-console/src/components/console/PlanCapabilityBadge.test.tsx
-apps/web-console/src/components/console/PlanCapabilityBadge.tsx
-apps/web-console/src/components/console/PlanCapabilityImpactTable.tsx
-apps/web-console/src/components/console/PlanComparisonView.test.tsx
-apps/web-console/src/components/console/PlanComparisonView.tsx
-apps/web-console/src/components/console/PlanHistoryTable.test.tsx
-apps/web-console/src/components/console/PlanHistoryTable.tsx
-apps/web-console/src/components/console/PlanImpactHistoryTable.tsx
-apps/web-console/src/components/console/PlanImpactSummaryCard.tsx
-apps/web-console/src/components/console/PlanLimitsTable.test.tsx
-apps/web-console/src/components/console/PlanLimitsTable.tsx
-apps/web-console/src/components/console/PlanQuotaImpactTable.tsx
-apps/web-console/src/components/console/PlanStatusBadge.test.tsx
-apps/web-console/src/components/console/PlanStatusBadge.tsx
-apps/web-console/src/components/console/PostgresDataEditor.test.tsx
-apps/web-console/src/components/console/PostgresDataEditor.tsx
-apps/web-console/src/components/console/QuotaAdjustDialog.test.tsx
-apps/web-console/src/components/console/QuotaAdjustDialog.tsx
-apps/web-console/src/components/console/QuotaConsumptionTable.test.tsx
-apps/web-console/src/components/console/QuotaConsumptionTable.tsx
-apps/web-console/src/components/console/ReadOnlyActionBadge.test.tsx
-apps/web-console/src/components/console/ReadOnlyActionBadge.tsx
-apps/web-console/src/components/console/RealtimeConsole.test.tsx
-apps/web-console/src/components/console/RealtimeConsole.tsx
-apps/web-console/src/components/console/ScopeEnforcementDenialsTable.test.tsx
-apps/web-console/src/components/console/ScopeEnforcementDenialsTable.tsx
-apps/web-console/src/components/console/SdkDownloadPanel.test.tsx
-apps/web-console/src/components/console/SdkDownloadPanel.tsx
-apps/web-console/src/components/console/SpecDownloadButton.test.tsx
-apps/web-console/src/components/console/SpecDownloadButton.tsx
-apps/web-console/src/components/console/TenantSocialProviderDialog.tsx
-apps/web-console/src/components/console/WorkspaceAllocationSummaryTable.test.tsx
-apps/web-console/src/components/console/WorkspaceAllocationSummaryTable.tsx
-apps/web-console/src/components/console/WorkspaceDocAuthSection.tsx
-apps/web-console/src/components/console/WorkspaceDocNotes.tsx
-apps/web-console/src/components/console/WorkspaceDocSections.tsx
-apps/web-console/src/components/console/WorkspaceRequiredState.test.tsx
-apps/web-console/src/components/console/WorkspaceRequiredState.tsx
-apps/web-console/src/components/console/hooks/useDestructiveOp.test.ts
-apps/web-console/src/components/console/hooks/useDestructiveOp.ts
-apps/web-console/src/components/console/hooks/useModalFocusTrap.ts
-apps/web-console/src/components/console/mcp/McpServerConnectPanel.test.tsx
-apps/web-console/src/components/console/mcp/McpServerConnectPanel.tsx
-apps/web-console/src/components/console/mcp/McpServerPlayground.test.tsx
-apps/web-console/src/components/console/mcp/McpServerPlayground.tsx
-apps/web-console/src/components/console/snippets/RealtimeSnippetsPanel.test.tsx
-apps/web-console/src/components/console/snippets/RealtimeSnippetsPanel.tsx
-apps/web-console/src/components/console/wizards/CreateIamClientWizard.test.tsx
-apps/web-console/src/components/console/wizards/CreateIamClientWizard.tsx
-apps/web-console/src/components/console/wizards/CreateTenantWizard.test.tsx
-apps/web-console/src/components/console/wizards/CreateTenantWizard.tsx
-apps/web-console/src/components/console/wizards/CreateWorkspaceWizard.test.tsx
-apps/web-console/src/components/console/wizards/CreateWorkspaceWizard.tsx
-apps/web-console/src/components/console/wizards/InviteUserWizard.test.tsx
-apps/web-console/src/components/console/wizards/InviteUserWizard.tsx
-apps/web-console/src/components/console/wizards/ProvisionDatabaseWizard.test.tsx
-apps/web-console/src/components/console/wizards/ProvisionDatabaseWizard.tsx
-apps/web-console/src/components/console/wizards/PublishFunctionWizard.test.tsx
-apps/web-console/src/components/console/wizards/PublishFunctionWizard.tsx
-apps/web-console/src/components/console/wizards/WizardShell.test.tsx
-apps/web-console/src/components/console/wizards/WizardShell.tsx
-apps/web-console/src/components/console/wizards/WizardStepIndicator.tsx
-apps/web-console/src/components/console/wizards/WizardSummaryStep.tsx
-apps/web-console/src/components/flows/ConfirmActionDialog.tsx
-apps/web-console/src/components/flows/FlowPalette.test.tsx
-apps/web-console/src/components/flows/FlowPalette.tsx
-apps/web-console/src/components/flows/FlowProblemsPanel.test.tsx
-apps/web-console/src/components/flows/FlowProblemsPanel.tsx
-apps/web-console/src/components/flows/FlowRunTriggerButton.tsx
-apps/web-console/src/components/flows/FlowStatusBadge.test.tsx
-apps/web-console/src/components/flows/FlowStatusBadge.tsx
-apps/web-console/src/components/flows/FlowViewSwitcher.tsx
-apps/web-console/src/components/flows/FlowYamlEditor.tsx
-apps/web-console/src/components/flows/MonacoYamlSurface.tsx
-apps/web-console/src/components/flows/NodeStatusBadge.test.tsx
-apps/web-console/src/components/flows/NodeStatusBadge.tsx
-apps/web-console/src/components/flows/RunActionToolbar.test.tsx
-apps/web-console/src/components/flows/RunActionToolbar.tsx
-apps/web-console/src/components/flows/RunCanvas.tsx
-apps/web-console/src/components/flows/RunNodeDetailPanel.tsx
-apps/web-console/src/components/flows/connectionRules.ts
-apps/web-console/src/components/flows/flowGraphModel.ts
-apps/web-console/src/components/flows/nodes/ApprovalNode.tsx
-apps/web-console/src/components/flows/nodes/BranchNode.tsx
-apps/web-console/src/components/flows/nodes/FlowNodeBadges.test.tsx
-apps/web-console/src/components/flows/nodes/NodeShell.test.tsx
-apps/web-console/src/components/flows/nodes/NodeShell.tsx
-apps/web-console/src/components/flows/nodes/ParallelNode.tsx
-apps/web-console/src/components/flows/nodes/RunNode.tsx
-apps/web-console/src/components/flows/nodes/SequenceNode.tsx
-apps/web-console/src/components/flows/nodes/SubFlowNode.tsx
-apps/web-console/src/components/flows/nodes/TaskNode.tsx
-apps/web-console/src/components/flows/nodes/WaitNode.tsx
-apps/web-console/src/components/flows/nodes/nodeTypes.ts
-apps/web-console/src/components/flows/panels/ExpressionField.tsx
-apps/web-console/src/components/flows/panels/NodePropertyPanel.test.tsx
-apps/web-console/src/components/flows/panels/NodePropertyPanel.tsx
-apps/web-console/src/components/flows/panels/RetryPolicyEditor.tsx
-apps/web-console/src/components/flows/panels/TaskPropertyPanel.tsx
-apps/web-console/src/components/flows/semanticValidation.ts
-apps/web-console/src/components/ui/alert.tsx
-apps/web-console/src/components/ui/badge.tsx
-apps/web-console/src/components/ui/button.tsx
-apps/web-console/src/components/ui/card.test.tsx
-apps/web-console/src/components/ui/card.tsx
-apps/web-console/src/components/ui/checkbox.tsx
-apps/web-console/src/components/ui/dialog.test.tsx
-apps/web-console/src/components/ui/dialog.tsx
-apps/web-console/src/components/ui/input.tsx
-apps/web-console/src/components/ui/label.tsx
-apps/web-console/src/components/ui/select.tsx
-apps/web-console/src/components/ui/separator.tsx
-apps/web-console/src/components/ui/table.test.tsx
-apps/web-console/src/components/ui/table.tsx
-apps/web-console/src/components/ui/tabs.test.tsx
-apps/web-console/src/components/ui/tabs.tsx
-apps/web-console/src/components/ui/textarea.tsx
-apps/web-console/src/hooks/useAbortRestore.ts
-apps/web-console/src/hooks/useBackupStatus.ts
-apps/web-console/src/hooks/useConfirmRestore.ts
-apps/web-console/src/hooks/useDocumentTitle.test.ts
-apps/web-console/src/hooks/useDocumentTitle.ts
-apps/web-console/src/hooks/useOperationStatus.ts
-apps/web-console/src/hooks/useSnapshots.ts
-apps/web-console/src/hooks/useTriggerBackup.ts
-apps/web-console/src/hooks/useTriggerRestore.ts
-apps/web-console/src/layouts/AuthLayout.test.tsx
-apps/web-console/src/layouts/AuthLayout.tsx
-apps/web-console/src/layouts/ConsoleShellLayout.test.tsx
-apps/web-console/src/layouts/ConsoleShellLayout.tsx
-apps/web-console/src/lib/backupScopeApi.ts
-apps/web-console/src/lib/capabilities/capability-gate-keys.test.ts
-apps/web-console/src/lib/capabilities/catalog-keys.ts
-apps/web-console/src/lib/console-auth-surface.test.ts
-apps/web-console/src/lib/console-auth-surface.ts
-apps/web-console/src/lib/console-auth.test.ts
-apps/web-console/src/lib/console-auth.ts
-apps/web-console/src/lib/console-config.ts
-apps/web-console/src/lib/console-context.test.tsx
-apps/web-console/src/lib/console-context.tsx
-apps/web-console/src/lib/console-create-form-validation.ts
-apps/web-console/src/lib/console-errors.test.ts
-apps/web-console/src/lib/console-errors.ts
-apps/web-console/src/lib/console-metrics.test.ts
-apps/web-console/src/lib/console-metrics.ts
-apps/web-console/src/lib/console-openapi-sdk.ts
-apps/web-console/src/lib/console-operations.test.ts
-apps/web-console/src/lib/console-operations.ts
-apps/web-console/src/lib/console-permissions.test.ts
-apps/web-console/src/lib/console-permissions.ts
-apps/web-console/src/lib/console-principal.test.ts
-apps/web-console/src/lib/console-principal.ts
-apps/web-console/src/lib/console-quotas.test.ts
-apps/web-console/src/lib/console-quotas.ts
-apps/web-console/src/lib/console-scope-enforcement.ts
-apps/web-console/src/lib/console-service-accounts.test.ts
-apps/web-console/src/lib/console-service-accounts.ts
-apps/web-console/src/lib/console-session.test.ts
-apps/web-console/src/lib/console-session.ts
-apps/web-console/src/lib/console-wizards.ts
-apps/web-console/src/lib/console-workspace-docs.test.ts
-apps/web-console/src/lib/console-workspace-docs.ts
-apps/web-console/src/lib/destructive-ops.test.ts
-apps/web-console/src/lib/destructive-ops.ts
-apps/web-console/src/lib/editor-ux.test.ts
-apps/web-console/src/lib/editor-ux.ts
-apps/web-console/src/lib/flows/monaco-environment.ts
-apps/web-console/src/lib/flows/semantic-markers.ts
-apps/web-console/src/lib/flows/semantic-validation-core.ts
-apps/web-console/src/lib/flows/semantic-worker.ts
-apps/web-console/src/lib/flows/validation-errors.test.ts
-apps/web-console/src/lib/flows/validation-errors.ts
-apps/web-console/src/lib/flows/view-sync.ts
-apps/web-console/src/lib/flows/yaml-round-trip.ts
-apps/web-console/src/lib/flows/yaml-serialiser.ts
-apps/web-console/src/lib/format.test.ts
-apps/web-console/src/lib/format.ts
-apps/web-console/src/lib/hooks/use-capability-gate.test.ts
-apps/web-console/src/lib/hooks/use-capability-gate.ts
-apps/web-console/src/lib/hooks/use-flow-execution.test.tsx
-apps/web-console/src/lib/hooks/use-flow-execution.ts
-apps/web-console/src/lib/hooks/use-reconnect-state-sync.tenant-isolation.test.ts
-apps/web-console/src/lib/hooks/use-reconnect-state-sync.test.ts
-apps/web-console/src/lib/hooks/use-reconnect-state-sync.ts
-apps/web-console/src/lib/http.ts
-apps/web-console/src/lib/invitations.ts
-apps/web-console/src/lib/mcp/mcp-api.test.ts
-apps/web-console/src/lib/mcp/mcp-api.ts
-apps/web-console/src/lib/mcp/mcp-connect-snippets.test.ts
-apps/web-console/src/lib/mcp/mcp-connect-snippets.ts
-apps/web-console/src/lib/mcp/mcp-server-detail.test.ts
-apps/web-console/src/lib/mcp/mcp-server-detail.ts
-apps/web-console/src/lib/reconcile-operations.runtime.d.mts
-apps/web-console/src/lib/reconcile-operations.runtime.mjs
-apps/web-console/src/lib/reconcile-operations.ts
-apps/web-console/src/lib/snippets/snippet-catalog.test.ts
-apps/web-console/src/lib/snippets/snippet-catalog.ts
-apps/web-console/src/lib/snippets/snippet-generator.test.ts
-apps/web-console/src/lib/snippets/snippet-generator.ts
-apps/web-console/src/lib/snippets/snippet-types.ts
-apps/web-console/src/lib/structural-write-access.test.ts
-apps/web-console/src/lib/structural-write-access.ts
-apps/web-console/src/lib/utils.ts
-apps/web-console/src/lib/workspace-secrets-access.test.ts
-apps/web-console/src/lib/workspace-secrets-access.ts
-apps/web-console/src/main.tsx
-apps/web-console/src/no-hardcoded-light-mode-colors.test.ts
-apps/web-console/src/pages/ConsoleApiReferencePage.test.tsx
-apps/web-console/src/pages/ConsoleApiReferencePage.tsx
-apps/web-console/src/pages/ConsoleAuthConfigPage.test.tsx
-apps/web-console/src/pages/ConsoleAuthConfigPage.tsx
-apps/web-console/src/pages/ConsoleAuthPage.test.tsx
-apps/web-console/src/pages/ConsoleAuthPage.tsx
-apps/web-console/src/pages/ConsoleBackupScopePage.tsx
-apps/web-console/src/pages/ConsoleCapabilityCatalogPage.test.tsx
-apps/web-console/src/pages/ConsoleCapabilityCatalogPage.tsx
-apps/web-console/src/pages/ConsoleDocsPage.tsx
-apps/web-console/src/pages/ConsoleEventsDataPage.test.tsx
-apps/web-console/src/pages/ConsoleEventsDataPage.tsx
-apps/web-console/src/pages/ConsoleFlowDesignerPage.test.tsx
-apps/web-console/src/pages/ConsoleFlowDesignerPage.tsx
-apps/web-console/src/pages/ConsoleFlowHistoryPage.test.tsx
-apps/web-console/src/pages/ConsoleFlowHistoryPage.tsx
-apps/web-console/src/pages/ConsoleFlowRunPage.test.tsx
-apps/web-console/src/pages/ConsoleFlowRunPage.tsx
-apps/web-console/src/pages/ConsoleFlowsPage.test.tsx
-apps/web-console/src/pages/ConsoleFlowsPage.tsx
-apps/web-console/src/pages/ConsoleFunctionRegistryPage.test.tsx
-apps/web-console/src/pages/ConsoleFunctionRegistryPage.tsx
-apps/web-console/src/pages/ConsoleFunctionsDataPage.test.tsx
-apps/web-console/src/pages/ConsoleFunctionsDataPage.tsx
-apps/web-console/src/pages/ConsoleFunctionsPage.test.tsx
-apps/web-console/src/pages/ConsoleFunctionsPage.tsx
-apps/web-console/src/pages/ConsoleIamAccessPage.test.tsx
-apps/web-console/src/pages/ConsoleIamAccessPage.tsx
-apps/web-console/src/pages/ConsoleKafkaPage.test.tsx
-apps/web-console/src/pages/ConsoleKafkaPage.tsx
-apps/web-console/src/pages/ConsoleMcpServerDetailPage.test.tsx
-apps/web-console/src/pages/ConsoleMcpServerDetailPage.tsx
-apps/web-console/src/pages/ConsoleMembersPage.test.tsx
-apps/web-console/src/pages/ConsoleMembersPage.tsx
-apps/web-console/src/pages/ConsoleMongoDataPage.test.tsx
-apps/web-console/src/pages/ConsoleMongoDataPage.tsx
-apps/web-console/src/pages/ConsoleMongoPage.test.tsx
-apps/web-console/src/pages/ConsoleMongoPage.tsx
-apps/web-console/src/pages/ConsoleObservabilityPage.test.tsx
-apps/web-console/src/pages/ConsoleObservabilityPage.tsx
-apps/web-console/src/pages/ConsoleOperationDetailPage.test.tsx
-apps/web-console/src/pages/ConsoleOperationDetailPage.tsx
-apps/web-console/src/pages/ConsoleOperationsPage.test.tsx
-apps/web-console/src/pages/ConsoleOperationsPage.tsx
-apps/web-console/src/pages/ConsoleOverviewPage.test.tsx
-apps/web-console/src/pages/ConsoleOverviewPage.tsx
-apps/web-console/src/pages/ConsolePlanCatalogPage.test.tsx
-apps/web-console/src/pages/ConsolePlanCatalogPage.tsx
-apps/web-console/src/pages/ConsolePlanCreatePage.test.tsx
-apps/web-console/src/pages/ConsolePlanCreatePage.tsx
-apps/web-console/src/pages/ConsolePlanDetailPage.test.tsx
-apps/web-console/src/pages/ConsolePlanDetailPage.tsx
-apps/web-console/src/pages/ConsolePostgresDataPage.test.tsx
-apps/web-console/src/pages/ConsolePostgresDataPage.tsx
-apps/web-console/src/pages/ConsolePostgresPage.test.tsx
-apps/web-console/src/pages/ConsolePostgresPage.tsx
-apps/web-console/src/pages/ConsolePrivilegeDomainAuditPage.test.tsx
-apps/web-console/src/pages/ConsolePrivilegeDomainAuditPage.tsx
-apps/web-console/src/pages/ConsolePrivilegeDomainPage.test.tsx
-apps/web-console/src/pages/ConsolePrivilegeDomainPage.tsx
-apps/web-console/src/pages/ConsoleProfilePage.test.tsx
-apps/web-console/src/pages/ConsoleProfilePage.tsx
-apps/web-console/src/pages/ConsoleQuotasPage.test.tsx
-apps/web-console/src/pages/ConsoleQuotasPage.tsx
-apps/web-console/src/pages/ConsoleRealtimeChangesPage.test.tsx
-apps/web-console/src/pages/ConsoleRealtimeChangesPage.tsx
-apps/web-console/src/pages/ConsoleRealtimePage.test.tsx
-apps/web-console/src/pages/ConsoleRealtimePage.tsx
-apps/web-console/src/pages/ConsoleRuntimePage.test.tsx
-apps/web-console/src/pages/ConsoleRuntimePage.tsx
-apps/web-console/src/pages/ConsoleScopeEnforcementPage.test.tsx
-apps/web-console/src/pages/ConsoleScopeEnforcementPage.tsx
-apps/web-console/src/pages/ConsoleSecretRotationPage.test.tsx
-apps/web-console/src/pages/ConsoleSecretRotationPage.tsx
-apps/web-console/src/pages/ConsoleSecretsPage.test.tsx
-apps/web-console/src/pages/ConsoleSecretsPage.tsx
-apps/web-console/src/pages/ConsoleServiceAccountsPage.test.tsx
-apps/web-console/src/pages/ConsoleServiceAccountsPage.tsx
-apps/web-console/src/pages/ConsoleSettingsPage.test.tsx
-apps/web-console/src/pages/ConsoleSettingsPage.tsx
-apps/web-console/src/pages/ConsoleStoragePage.test.tsx
-apps/web-console/src/pages/ConsoleStoragePage.tsx
-apps/web-console/src/pages/ConsoleTenantAllocationSummaryPage.test.tsx
-apps/web-console/src/pages/ConsoleTenantAllocationSummaryPage.tsx
-apps/web-console/src/pages/ConsoleTenantConfigExportPage.tsx
-apps/web-console/src/pages/ConsoleTenantConfigPreflightPage.tsx
-apps/web-console/src/pages/ConsoleTenantConfigReprovisionPage.tsx
-apps/web-console/src/pages/ConsoleTenantPlanOverviewPage.test.tsx
-apps/web-console/src/pages/ConsoleTenantPlanOverviewPage.tsx
-apps/web-console/src/pages/ConsoleTenantPlanPage.test.tsx
-apps/web-console/src/pages/ConsoleTenantPlanPage.tsx
-apps/web-console/src/pages/ConsoleTenantsPage.test.tsx
-apps/web-console/src/pages/ConsoleTenantsPage.tsx
-apps/web-console/src/pages/ConsoleWorkspaceDashboardPage.test.tsx
-apps/web-console/src/pages/ConsoleWorkspaceDashboardPage.tsx
-apps/web-console/src/pages/ConsoleWorkspaceDatabasePage.test.tsx
-apps/web-console/src/pages/ConsoleWorkspaceDatabasePage.tsx
-apps/web-console/src/pages/ConsoleWorkspaceSecretsPage.test.tsx
-apps/web-console/src/pages/ConsoleWorkspaceSecretsPage.tsx
-apps/web-console/src/pages/ConsoleWorkspacesPage.test.tsx
-apps/web-console/src/pages/ConsoleWorkspacesPage.tsx
-apps/web-console/src/pages/InvitationAcceptancePage.test.tsx
-apps/web-console/src/pages/InvitationAcceptancePage.tsx
-apps/web-console/src/pages/LoginPage.test.tsx
-apps/web-console/src/pages/LoginPage.tsx
-apps/web-console/src/pages/NotFoundPage.test.tsx
-apps/web-console/src/pages/NotFoundPage.tsx
-apps/web-console/src/pages/PasswordRecoveryPage.test.tsx
-apps/web-console/src/pages/PasswordRecoveryPage.tsx
-apps/web-console/src/pages/PendingActivationPage.test.tsx
-apps/web-console/src/pages/PendingActivationPage.tsx
-apps/web-console/src/pages/SignupPage.test.tsx
-apps/web-console/src/pages/SignupPage.tsx
-apps/web-console/src/pages/WelcomePage.test.tsx
-apps/web-console/src/pages/WelcomePage.tsx
-apps/web-console/src/pages/admin/BackupStatusPage.tsx
-apps/web-console/src/pages/form-control-legibility.test.tsx
-apps/web-console/src/pages/tenant/BackupSummaryPage.tsx
-apps/web-console/src/router.auth-layout-wiring.test.tsx
-apps/web-console/src/router.lazy-route-guard.test.tsx
-apps/web-console/src/router.runtime.test.ts
-apps/web-console/src/router.test.tsx
-apps/web-console/src/router.tsx
-apps/web-console/src/services/authConfigApi.test.ts
-apps/web-console/src/services/authConfigApi.ts
-apps/web-console/src/services/backupOperationsApi.ts
-apps/web-console/src/services/backupStatusApi.ts
-apps/web-console/src/services/dataExportImportApi.ts
-apps/web-console/src/services/eventsApi.test.ts
-apps/web-console/src/services/eventsApi.ts
-apps/web-console/src/services/flowsApi.test.ts
-apps/web-console/src/services/flowsApi.ts
-apps/web-console/src/services/flowsMonitoringApi.test.ts
-apps/web-console/src/services/flowsMonitoringApi.ts
-apps/web-console/src/services/functionsApi.test.ts
-apps/web-console/src/services/functionsApi.ts
-apps/web-console/src/services/knativeRuntimeApi.ts
-apps/web-console/src/services/mongoApi.import.test.ts
-apps/web-console/src/services/mongoApi.test.ts
-apps/web-console/src/services/mongoApi.ts
-apps/web-console/src/services/planManagementApi.ts
-apps/web-console/src/services/postgresApi.test.ts
-apps/web-console/src/services/postgresApi.ts
-apps/web-console/src/services/privilege-domain-api.ts
-apps/web-console/src/services/realtimeApi.test.ts
-apps/web-console/src/services/realtimeApi.ts
-apps/web-console/src/services/secretsApi.test.ts
-apps/web-console/src/services/secretsApi.ts
-apps/web-console/src/services/taskTypeRegistryApi.ts
-apps/web-console/src/styles/brand-tokens.test.ts
-apps/web-console/src/styles/globals.css
-apps/web-console/src/styles/globals.test.ts
-apps/web-console/src/test/fixtures/permissions.ts
-apps/web-console/src/test/fixtures/quotas.ts
-apps/web-console/src/test/fixtures/resources.ts
-apps/web-console/src/test/fixtures/snippets.ts
-apps/web-console/src/test/fixtures/tenants.ts
-apps/web-console/src/test/setup.ts
-apps/web-console/src/types/flow-definition-validator.d.ts
-apps/web-console/src/types/flows.ts
-apps/web-console/src/vite-env.d.ts
-apps/web-console/static-server.mjs
-apps/web-console/tailwind.config.ts
-apps/web-console/tsconfig.app.json
-apps/web-console/tsconfig.json
-apps/web-console/tsconfig.node.json
-apps/web-console/vite.config.ts
+apps/web-console-next/Dockerfile
+apps/web-console-next/e2e/console-auth-flows.e2e.ts
+apps/web-console-next/e2e/console-context-auth-e2e.e2e.ts
+apps/web-console-next/e2e/console-service-e2e.e2e.ts
+apps/web-console-next/e2e/fixtures/context-auth-e2e.ts
+apps/web-console-next/e2e/fixtures/service-e2e.ts
+apps/web-console-next/e2e/workspace-docs.spec.ts
+apps/web-console-next/index.html
+apps/web-console-next/nginx.conf
+apps/web-console-next/package.json
+apps/web-console-next/playwright.config.ts
+apps/web-console-next/postcss.config.cjs
+apps/web-console-next/public/favicon.png
+apps/web-console-next/public/favicon.svg
+apps/web-console-next/public/img/icon-180.png
+apps/web-console-next/public/img/icon-192.png
+apps/web-console-next/public/img/logo-wide.png
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/BackupScopeMatrix.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/ConfigExportDomainSelector.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/ConfigExportResultPanel.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/ConsoleBackupScopePage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/ConsoleDocsPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/ConsoleTenantConfigExportPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/ConsoleTenantConfigPreflightPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/ConsoleTenantConfigReprovisionPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/FlowConnectionRules.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/FlowGraphModel.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/FlowSemanticMarkers.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/FlowSemanticValidation.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/FlowViewSwitcher.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/FlowViewSync.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/FlowYamlEditor.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/FlowYamlRoundTrip.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/PostgresDataEditor.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/WorkspaceDocNotes.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/WorkspaceDocSections.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/__tests__/fixtures/backupScopeFixtures.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/actions/observability-audit-correlation.mjs
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/actions/observability-audit-export.mjs
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/actions/observability-audit.mjs
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/actions/observability-quota-usage.mjs
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/actions/postgres-admin.mjs
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/actions/public-api-catalog.mjs
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/actions/secretRotationActions.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/actions/tenant-management.mjs
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/actions/workspace-management.mjs
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/api/configExportApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/api/configPreflightApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/api/configReprovisionApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/api/configSchemaApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ConfigArtifactValidator.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ConfigExportDomainSelector.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ConfigExportResultPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ConfigIdentifierMapEditor.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ConfigIdentifierMapEditor.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ConfigReprovisionResultPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/PreflightConflictReport.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/PreflightRiskBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/RouteErrorBoundary.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/RouteErrorBoundary.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/auth/ProtectedRoute.session-invalidation.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/auth/ProtectedRoute.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/auth/ProtectedRoute.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/BackupNotAvailable.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/BackupStatusBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/BackupStatusDetail.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/BackupStatusTable.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/BackupSummaryCard.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/CriticalConfirmationPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/OperationHistoryPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/OperationStatusBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/PrecheckResultList.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/RestoreConfirmationDialog.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/RestoreSimulationDialog.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/RestoreSimulationEvidence.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/RiskLevelBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/SnapshotSelector.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/TenantNameInput.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/TriggerBackupButton.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/__tests__/RestoreConfirmationDialog.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/__tests__/RestoreSimulationDialog.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/backup/__tests__/TenantNameInput.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ActiveOperationsIndicator.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ActiveOperationsIndicator.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/BackupScopeLegend.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/BackupScopeLegend.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/BackupScopeMatrix.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/BackupScopeProfileSelector.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/CapabilityGate.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/CapabilityGate.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/CapabilityStatusGrid.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/CapabilityStatusGrid.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConnectionSnippets.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConnectionSnippets.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleAuditCategoryBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleAuditRecordDetail.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleAuditResultBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleCredentialStatusBadge.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleCredentialStatusBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleInvitationList.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleInvitationList.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleMetricDimensionRow.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleMetricDimensionRow.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsolePageState.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsolePageState.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleQuotaPostureBadge.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleQuotaPostureBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleTimeRangeSelector.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsoleTimeRangeSelector.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsumptionBar.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ConsumptionBar.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/DestructiveConfirmationDialog.integration.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/DestructiveConfirmationDialog.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/DestructiveConfirmationDialog.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/EventsConsole.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/EventsConsole.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/FunctionsConsole.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/FunctionsConsole.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/InvitationProofView.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/MongoDataEditor.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/MongoDataEditor.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OpenApiViewer.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OpenApiViewer.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OperationLogEntriesList.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OperationLogEntriesList.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OperationResultSummary.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OperationResultSummary.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OperationStatusBadge.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OperationStatusBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OperationStatusBanner.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OperationStatusBanner.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OverrideIndicatorBadge.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/OverrideIndicatorBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PermissionDeniedNotice.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PermissionDeniedNotice.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanAssignmentDialog.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanAssignmentDialog.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanCapabilityBadge.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanCapabilityBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanCapabilityImpactTable.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanComparisonView.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanComparisonView.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanHistoryTable.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanHistoryTable.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanImpactHistoryTable.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanImpactSummaryCard.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanLimitsTable.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanLimitsTable.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanQuotaImpactTable.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanStatusBadge.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PlanStatusBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PostgresDataEditor.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/PostgresDataEditor.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/QuotaAdjustDialog.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/QuotaAdjustDialog.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/QuotaConsumptionTable.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/QuotaConsumptionTable.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ReadOnlyActionBadge.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ReadOnlyActionBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/RealtimeConsole.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/RealtimeConsole.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ScopeEnforcementDenialsTable.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/ScopeEnforcementDenialsTable.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/SdkDownloadPanel.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/SdkDownloadPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/SpecDownloadButton.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/SpecDownloadButton.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/TenantSocialProviderDialog.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/WorkspaceAllocationSummaryTable.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/WorkspaceAllocationSummaryTable.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/WorkspaceDocAuthSection.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/WorkspaceDocNotes.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/WorkspaceDocSections.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/WorkspaceRequiredState.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/WorkspaceRequiredState.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/hooks/useDestructiveOp.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/hooks/useDestructiveOp.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/hooks/useModalFocusTrap.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/mcp/McpServerConnectPanel.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/mcp/McpServerConnectPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/mcp/McpServerPlayground.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/mcp/McpServerPlayground.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/snippets/RealtimeSnippetsPanel.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/snippets/RealtimeSnippetsPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/CreateIamClientWizard.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/CreateIamClientWizard.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/CreateTenantWizard.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/CreateTenantWizard.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/CreateWorkspaceWizard.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/CreateWorkspaceWizard.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/InviteUserWizard.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/InviteUserWizard.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/ProvisionDatabaseWizard.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/ProvisionDatabaseWizard.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/PublishFunctionWizard.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/PublishFunctionWizard.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/WizardShell.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/WizardShell.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/WizardStepIndicator.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/console/wizards/WizardSummaryStep.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/ConfirmActionDialog.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/FlowPalette.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/FlowPalette.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/FlowProblemsPanel.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/FlowProblemsPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/FlowRunTriggerButton.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/FlowStatusBadge.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/FlowStatusBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/FlowViewSwitcher.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/FlowYamlEditor.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/MonacoYamlSurface.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/NodeStatusBadge.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/NodeStatusBadge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/RunActionToolbar.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/RunActionToolbar.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/RunCanvas.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/RunNodeDetailPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/connectionRules.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/flowGraphModel.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/ApprovalNode.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/BranchNode.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/FlowNodeBadges.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/NodeShell.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/NodeShell.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/ParallelNode.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/RunNode.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/SequenceNode.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/SubFlowNode.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/TaskNode.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/WaitNode.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/nodes/nodeTypes.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/panels/ExpressionField.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/panels/NodePropertyPanel.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/panels/NodePropertyPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/panels/RetryPolicyEditor.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/panels/TaskPropertyPanel.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/flows/semanticValidation.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/alert.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/badge.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/button.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/card.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/card.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/checkbox.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/dialog.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/dialog.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/input.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/label.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/select.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/separator.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/table.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/table.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/tabs.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/tabs.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/textarea.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/hooks/useAbortRestore.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/hooks/useBackupStatus.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/hooks/useConfirmRestore.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/hooks/useDocumentTitle.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/hooks/useDocumentTitle.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/hooks/useOperationStatus.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/hooks/useSnapshots.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/hooks/useTriggerBackup.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/hooks/useTriggerRestore.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/layouts/AuthLayout.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/layouts/AuthLayout.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/layouts/ConsoleShellLayout.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/layouts/ConsoleShellLayout.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/backupScopeApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/capabilities/capability-gate-keys.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/capabilities/catalog-keys.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-auth-surface.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-auth-surface.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-auth.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-auth.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-config.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-context.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-context.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-create-form-validation.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-errors.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-errors.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-metrics.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-metrics.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-openapi-sdk.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-operations.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-operations.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-permissions.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-permissions.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-principal.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-principal.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-quotas.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-quotas.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-scope-enforcement.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-service-accounts.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-service-accounts.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-session.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-session.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-wizards.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-workspace-docs.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-workspace-docs.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/destructive-ops.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/destructive-ops.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/editor-ux.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/editor-ux.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/flows/monaco-environment.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/flows/semantic-markers.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/flows/semantic-validation-core.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/flows/semantic-worker.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/flows/validation-errors.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/flows/validation-errors.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/flows/view-sync.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/flows/yaml-round-trip.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/flows/yaml-serialiser.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/format.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/format.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/hooks/use-capability-gate.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/hooks/use-capability-gate.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/hooks/use-flow-execution.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/hooks/use-flow-execution.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/hooks/use-reconnect-state-sync.tenant-isolation.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/hooks/use-reconnect-state-sync.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/hooks/use-reconnect-state-sync.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/http.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/invitations.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/mcp/mcp-api.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/mcp/mcp-api.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/mcp/mcp-connect-snippets.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/mcp/mcp-connect-snippets.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/mcp/mcp-server-detail.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/mcp/mcp-server-detail.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/reconcile-operations.runtime.d.mts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/reconcile-operations.runtime.mjs
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/reconcile-operations.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/snippets/snippet-catalog.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/snippets/snippet-catalog.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/snippets/snippet-generator.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/snippets/snippet-generator.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/snippets/snippet-types.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/structural-write-access.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/structural-write-access.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/utils.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/workspace-secrets-access.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/workspace-secrets-access.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/main.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/no-hardcoded-light-mode-colors.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleApiReferencePage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleApiReferencePage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleAuthConfigPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleAuthConfigPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleAuthPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleAuthPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleBackupScopePage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleCapabilityCatalogPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleCapabilityCatalogPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleDocsPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleEventsDataPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleEventsDataPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFlowDesignerPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFlowDesignerPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFlowHistoryPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFlowHistoryPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFlowRunPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFlowRunPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFlowsPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFlowsPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFunctionRegistryPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFunctionRegistryPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFunctionsDataPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFunctionsDataPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFunctionsPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleFunctionsPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleIamAccessPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleIamAccessPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleKafkaPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleKafkaPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMcpServerDetailPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMcpServerDetailPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMembersPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMembersPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMongoDataPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMongoDataPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMongoPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleMongoPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleObservabilityPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleObservabilityPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleOperationDetailPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleOperationDetailPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleOperationsPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleOperationsPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleOverviewPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleOverviewPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanCatalogPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanCatalogPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanCreatePage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanCreatePage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanDetailPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePlanDetailPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePostgresDataPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePostgresDataPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePostgresPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePostgresPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePrivilegeDomainAuditPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePrivilegeDomainAuditPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePrivilegeDomainPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsolePrivilegeDomainPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleProfilePage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleProfilePage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleQuotasPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleQuotasPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleRealtimeChangesPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleRealtimeChangesPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleRealtimePage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleRealtimePage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleRuntimePage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleRuntimePage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleScopeEnforcementPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleScopeEnforcementPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleSecretRotationPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleSecretRotationPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleSecretsPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleSecretsPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleServiceAccountsPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleServiceAccountsPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleSettingsPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleSettingsPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleStoragePage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleStoragePage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantAllocationSummaryPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantAllocationSummaryPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantConfigExportPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantConfigPreflightPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantConfigReprovisionPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantPlanOverviewPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantPlanOverviewPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantPlanPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantPlanPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantsPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleTenantsPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleWorkspaceDashboardPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleWorkspaceDashboardPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleWorkspaceDatabasePage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleWorkspaceDatabasePage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleWorkspaceSecretsPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleWorkspaceSecretsPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleWorkspacesPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/ConsoleWorkspacesPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/InvitationAcceptancePage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/InvitationAcceptancePage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/LoginPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/LoginPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/NotFoundPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/NotFoundPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/PasswordRecoveryPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/PasswordRecoveryPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/PendingActivationPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/PendingActivationPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/SignupPage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/SignupPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/WelcomePage.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/WelcomePage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/admin/BackupStatusPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/form-control-legibility.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/pages/tenant/BackupSummaryPage.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/router.auth-layout-wiring.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/router.lazy-route-guard.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/router.runtime.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/router.test.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/router.tsx
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/authConfigApi.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/authConfigApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/backupOperationsApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/backupStatusApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/dataExportImportApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/eventsApi.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/eventsApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/flowsApi.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/flowsApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/flowsMonitoringApi.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/flowsMonitoringApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/functionsApi.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/functionsApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/knativeRuntimeApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/mongoApi.import.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/mongoApi.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/mongoApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/planManagementApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/postgresApi.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/postgresApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/privilege-domain-api.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/realtimeApi.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/realtimeApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/secretsApi.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/secretsApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/services/taskTypeRegistryApi.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/styles/brand-tokens.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/styles/globals.css
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/styles/globals.test.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/test/fixtures/permissions.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/test/fixtures/quotas.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/test/fixtures/resources.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/test/fixtures/snippets.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/test/fixtures/tenants.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/test/setup.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/types/flow-definition-validator.d.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/types/flows.ts
+legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/vite-env.d.ts
+apps/web-console-next/static-server.mjs
+apps/web-console-next/tailwind.config.ts
+apps/web-console-next/tsconfig.app.json
+apps/web-console-next/tsconfig.json
+apps/web-console-next/tsconfig.node.json
+apps/web-console-next/vite.config.ts
 apps/workflow-worker/.gitignore
 apps/workflow-worker/Dockerfile
 apps/workflow-worker/README.md

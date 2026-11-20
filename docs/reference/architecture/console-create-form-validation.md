@@ -10,7 +10,7 @@ Guided console wizards validate required numeric limit fields on the step where 
 them. A limit field is valid only when its trimmed value is a base-10 integer string within the
 field's configured range.
 
-The shared parser in `apps/web-console/src/lib/console-create-form-validation.ts` rejects:
+The shared parser in `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-create-form-validation.ts` rejects:
 
 - an empty or whitespace-only value
 - non-integer text such as `abc`, `1.5`, or `1e3`

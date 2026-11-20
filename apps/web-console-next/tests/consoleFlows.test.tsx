@@ -1,3 +1,4 @@
+import frozenRequests from './frozen-legacy/flow-requests.json'
 import { StrictMode } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
@@ -164,15 +165,12 @@ test.each(['loading', 'error', 'picker', 'create', 'denied'])('workspace %s send
 })
 
 test('the extracted legacy client and migrated client send identical methods, encoded paths and bodies', async () => {
-  // Keep the legacy app’s path aliases outside this app’s TypeScript program.
-  const legacyPath = new URL('../../web-console/src/services/flowsApi.ts', import.meta.url).pathname
-  const legacy = await import(/* @vite-ignore */ legacyPath)
   const path = pathFor('ws/1'), trigger = `${path}/f%2F1/schedule/trigger`
   setup({ [`GET ${path}`]: flowRows, [`POST ${path}`]: { flowId: 'f1' }, [`POST ${trigger}`]: { status: 'triggered', scheduleId: 'schedule' } })
-  await legacy.listFlows('ws/1'); await listFlows('ws/1')
-  await legacy.createFlowDraft('ws/1', { name: 'Trimmed' }); await createFlowDraft('ws/1', 'Trimmed')
-  await legacy.triggerFlowSchedule('ws/1', 'f/1'); await triggerFlowSchedule('ws/1', 'f/1')
-  for (let index = 0; index < 6; index += 2) expect(calls()[index]).toEqual(calls()[index + 1])
+  await listFlows('ws/1')
+  await createFlowDraft('ws/1', 'Trimmed')
+  await triggerFlowSchedule('ws/1', 'f/1')
+  expect(calls()).toEqual(frozenRequests.map(({ url, method, body }) => ({ path: url, method, body: body ? JSON.parse(body) : undefined })))
 })
 
 test('missing names and statuses use legacy fallbacks while unknown statuses and invalid dates remain data', async () => {

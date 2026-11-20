@@ -207,7 +207,7 @@ this control-plane serves. To make the shell usable end-to-end:
   - **IAM Access** (`/console/iam-access`, superadmin) — pick a user in the active
     tenant realm; assign/remove roles and add/remove group membership.
 - The repo's **Plans** pages (`/console/plans`, `/plans/new`, `/plans/:id`,
-  `/console/my-plan`) are wired: `apps/web-console/src/services/planManagementApi.ts` used a bare `fetch`
+  `/console/my-plan`) are wired: `apps/web-console-next/src/pages/consoleTenantPlan/api.ts` used a bare `fetch`
   with NO bearer token (every call 401'd) — it now routes through
   `requestConsoleSessionJson` (auth + 401-refresh), and `listPlans` normalizes the
   control-plane's `{plans}` envelope to the SPA's `{items}`. These hit the REAL
@@ -388,16 +388,16 @@ this control-plane serves. To make the shell usable end-to-end:
   `/v1/tenants/{tenantId}/users` (creates the user in the tenant realm + assigns a
   role). Verified: create → 201 → new user appears with its role.
 
-  Sources: `apps/web-console/src/pages/Console{WorkspaceDatabase,FunctionRegistry,
-  IamAccess}Page.tsx` + `ConsoleMembersPage.tsx`. Verified by real headless-Chromium runs
+  Sources: `apps/web-console-next/src/pages/{consoleWorkspaceDatabase,consoleFunctionRegistry,
+  consoleIamAccess,consoleMembers}.tsx`. Verified by real headless-Chromium runs
   (`ui-verify-pages.mjs`, `ui-verify-members.mjs`):
   login → select tenant+workspace → each page renders live data. Note: the SPA's
   other pre-existing pages (Postgres/Mongo/Kafka/Events/Functions-actions/…) target
   the repo's intended data-plane API and are NOT backed by this control-plane.
 
-  Build path: the release image is built from `apps/web-console/Dockerfile`, whose builder stage
+  Build path: the release image is built from `apps/web-console-next/Dockerfile`, whose builder stage
   runs `vite build` for `apps/web-console-next` at base `/` (the image serves only that bundle; the
-  legacy `apps/web-console` is no longer served). The kind compatibility image
+  legacy console source has been removed). The kind compatibility image
   `deploy/kind/web-console/Dockerfile` copies `apps/web-console-next/dist` once it exists.
 
 ### Honest gaps (domain B — still to build)

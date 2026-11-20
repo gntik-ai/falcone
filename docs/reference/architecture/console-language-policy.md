@@ -25,7 +25,7 @@ For example, prefer `Cuentas de servicio` over `Service Accounts`, `Observabilid
 A failed request's raw transport/exception text (an HTTP `statusText`, a bare `HTTP_404` code, or
 the backend's own English `message` — e.g. `requires superadmin`, `No action mapped for GET
 /v1/...`) is not Spanish, and rendering it verbatim breaks this policy just as much as an
-untranslated label does. `apps/web-console/src/lib/console-errors.ts`'s
+untranslated label does. `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/console-errors.ts`'s
 `describeConsoleError(error, fallback)` is the single, shared, dependency-free helper for mapping
 a failed console request to page content:
 
@@ -57,7 +57,7 @@ Issue #803 is covered by focused tests in the shell, Observability page, and MCP
   while technical identifiers stay unchanged.
 - `flow-definition-validator.test.mjs` and `FlowSemanticValidation.test.ts` check that the shared
   `FLW-E` validator returns English messages and additive localization `params`.
-  The console-only `apps/web-console/src/lib/flows/validation-errors.ts` formatter produces Spanish
+  The console-only `legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/lib/flows/validation-errors.ts` formatter produces Spanish
   copy for the Problems panel, canvas tooltips, and YAML markers. Its tests, `FlowProblemsPanel.test.tsx`,
   and `FlowSemanticMarkers.test.ts` check that codes, node IDs, task types, cron strings, and durations
   stay unchanged, and missing params or unknown codes use Spanish fallbacks without raw server messages.

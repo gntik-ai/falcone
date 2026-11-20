@@ -11,11 +11,6 @@ import {
   summarizeWorkspaceManagementSurface,
   workspaceLifecycleStateMachine
 } from '../../apps/control-plane-executor/src/workspace-management.mjs';
-import {
-  buildWorkspaceCloneFormDefaults,
-  buildWorkspaceEndpointCards,
-  buildWorkspaceResourceSummary
-} from '../../apps/web-console/src/actions/workspace-management.mjs';
 import { readDomainSeedFixtures } from '../../scripts/lib/domain-model.mjs';
 
 test('workspace helper modules expose lifecycle, clone, inheritance, and API-surface primitives', () => {
@@ -48,12 +43,6 @@ test('workspace helper modules expose lifecycle, clone, inheritance, and API-sur
     iamRealm: stagingWorkspace.iamBoundary.realm,
     applications: stagingApplications
   });
-  const endpointCards = buildWorkspaceEndpointCards({ workspace: stagingWorkspace, applications: stagingApplications });
-  const cloneDefaults = buildWorkspaceCloneFormDefaults({
-    sourceWorkspace: stagingWorkspace,
-    targetWorkspace: { slug: 'beta-preview', displayName: 'Beta Preview' }
-  });
-  const resourceSummary = buildWorkspaceResourceSummary(stagingWorkspace);
 
   assert.deepEqual(workspaceLifecycleStateMachine.states, ['draft', 'provisioning', 'pending_activation', 'active', 'suspended', 'soft_deleted']);
   assert.equal(getWorkspaceRoute('cloneWorkspace').path, '/v1/workspaces/{workspaceId}/clone');
@@ -64,7 +53,4 @@ test('workspace helper modules expose lifecycle, clone, inheritance, and API-sur
   assert.equal(cloneDraft.clonePolicy.resetCredentialReferences, true);
   assert.equal(cloneDraft.resourceInheritance.sourceWorkspaceId, stagingWorkspace.workspaceId);
   assert.equal(controlPlaneSummary.routes.some((route) => route.operationId === 'getWorkspaceApiSurface'), true);
-  assert.equal(endpointCards.some((card) => card.audience === 'identity'), true);
-  assert.equal(cloneDefaults.entityType, 'workspace_clone');
-  assert.equal(resourceSummary.sharedResourceCount >= 1, true);
 });

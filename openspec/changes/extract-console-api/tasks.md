@@ -34,7 +34,7 @@
 - [ ] Run `pnpm install --frozen-lockfile` on a clean checkout.
 - [ ] Run `pnpm --filter @in-falcone/web-console exec vite build` with VITE_* sentinels and verify
   those sentinels are inlined in the bundle.
-- [ ] Run `docker build -f apps/web-console/Dockerfile .` in PR/release infrastructure.
+- [ ] Run `docker build -f apps/web-console-next/Dockerfile .` in PR/release infrastructure.
 
 The follow-up attempted package Vitest, app Vitest, frozen installation and Vite build. Each
 command stops at pnpm's Node version probe with `spawnSync /usr/local/bin/node EPERM` before

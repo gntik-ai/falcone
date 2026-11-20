@@ -2,7 +2,7 @@
 
 ### Requirement: Exact public kit pins
 
-The next console SHALL pin `@gntik-ai/ui`, `@gntik-ai/blocks` and `@gntik-ai/templates` to `0.12.0` and `@gntik-ai/tokens` to `0.4.0` in its manifest and lockfile importer. The update SHALL add no direct dependency and SHALL change no file under `apps/web-console/`.
+The next console SHALL pin `@gntik-ai/ui`, `@gntik-ai/blocks` and `@gntik-ai/templates` to `0.12.0` and `@gntik-ai/tokens` to `0.4.0` in its manifest and lockfile importer. The update SHALL add no direct dependency and SHALL change no file under `apps/web-console-next/`.
 
 #### Scenario: Current exact pins
 

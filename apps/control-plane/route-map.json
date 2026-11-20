@@ -758,7 +758,7 @@
     "deps": [],
     "auth": "",
     "subroutes": "",
-    "notes": "Console quota posture (ConsoleQuotasPage, wizards) + observability dashboards use the metrics family, which IS in the catalog. BUT apps/control-plane-executor/src/observability-admin.mjs + observability-audit-* are metadata/preview/normalization helpers with NO executable {statusCode,body} DB handler. apps/web-console/src/actions/observability-*.mjs are SPA-side transforms, not handlers. So metrics endpoints are GAPS unless a usage-snapshot reader is built. tenant-consumption-snapshot-get / quota-effective-limits-get from the plans family can back the posture.",
+    "notes": "Console quota posture (ConsoleQuotasPage, wizards) + observability dashboards use the metrics family, which IS in the catalog. BUT apps/control-plane-executor/src/observability-admin.mjs + observability-audit-* are metadata/preview/normalization helpers with NO executable {statusCode,body} DB handler. apps/web-console-next/src/pages/consoleObservability/model.ts are SPA-side transforms, not handlers. So metrics endpoints are GAPS unless a usage-snapshot reader is built. tenant-consumption-snapshot-get / quota-effective-limits-get from the plans family can back the posture.",
     "consoleUsed": false
   },
   {

@@ -1,5 +1,5 @@
 // Quick-deploy function client. Requests and bodies mirror the legacy
-// apps/web-console/src/services/functionsApi.ts:127-237 field for field.
+// legacy base 69296937330b61be2bbf2c7267520196499fc038:src/services/functionsApi.ts:127-237 field for field.
 import { requestConsoleSessionJson } from '@in-falcone/console-api/session'
 import type { JsonValue } from '@in-falcone/console-api/http'
 

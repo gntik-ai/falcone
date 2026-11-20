@@ -12,7 +12,7 @@ OpenAPI, generated clients, auth, or realtime contracts.
 
 ## What Changes
 
-- **Shared dialog primitive** (`apps/web-console/src/components/ui/dialog.tsx`):
+- **Shared dialog primitive** (`legacy source at 69296937330b61be2bbf2c7267520196499fc038:src/components/ui/dialog.tsx`):
   - Adds default modal semantics (`role="dialog"`, `aria-modal`) at `DialogContent`.
   - Coordinates `DialogTitle` / `DialogDescription` IDs with the content's accessible name and
     description.

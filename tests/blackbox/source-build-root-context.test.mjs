@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const fnDockerfilePath = path.join(repoRoot, 'apps/fn-runtime/Dockerfile');
-const webDockerfilePath = path.join(repoRoot, 'apps/web-console/Dockerfile');
+const webDockerfilePath = path.join(repoRoot, 'apps/web-console-next/Dockerfile');
 const fnDockerfile = fs.readFileSync(fnDockerfilePath, 'utf8');
 const webDockerfile = fs.readFileSync(webDockerfilePath, 'utf8');
 const filteredInstall = 'corepack enable && pnpm install --frozen-lockfile --filter @in-falcone/web-console-next... --filter @in-falcone/internal-contracts';
@@ -111,7 +111,7 @@ function validateWebBuilder(source) {
   assert.match(rootPackage.packageManager, /^pnpm@\d+\.\d+\.\d+$/);
   const lockfile = fs.readFileSync(path.join(repoRoot, 'pnpm-lock.yaml'), 'utf8');
   assert.match(lockfile, /^lockfileVersion:\s*['"]?9\.0['"]?/m);
-  assert.match(lockfile, /^\s{2}apps\/web-console:\s*$/m, 'root lockfile must contain the web-console workspace importer');
+  assert.doesNotMatch(lockfile, /^\s{2}apps\/web-console:\s*$/m, 'the retired console must have no workspace importer');
   assert.match(lockfile, /^\s{2}apps\/web-console-next:\s*$/m);
 
   const artifactCopy = oneInstruction(runtime, 'COPY', (entry) => entry.args.endsWith(' ./dist'));
@@ -141,8 +141,8 @@ function assertFinalRuntimeContract(runtime) {
   assert.equal(oneInstruction(runtime, 'EXPOSE').args, '3000');
   assert.equal(oneInstruction(runtime, 'CMD').args, '["node", "static-server.mjs"]');
   const serverCopy = oneInstruction(runtime, 'COPY', (entry) => entry.args.endsWith('./static-server.mjs'));
-  assert.equal(serverCopy.args, 'apps/web-console/static-server.mjs ./static-server.mjs');
-  assertRootContextFile('apps/web-console/static-server.mjs');
+  assert.equal(serverCopy.args, 'apps/web-console-next/static-server.mjs ./static-server.mjs');
+  assertRootContextFile('apps/web-console-next/static-server.mjs');
 }
 
 // bbx-922-001 | fn-openshift-build-from-source | #### Scenario: Function runtime builds from the clean checkout root

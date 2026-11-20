@@ -17,10 +17,10 @@ deploy/kind/tls
 *.tsbuildinfo
 **/*.log
 
-# Release image (apps/web-console/Dockerfile) and the kind image (deploy/kind/web-console/Dockerfile)
+# Release image (apps/web-console-next/Dockerfile) and the kind image (deploy/kind/web-console/Dockerfile)
 # copy the CI-built web-console-next SPA bundle, which lives under a dist/ dir excluded by **/dist
 # above. Re-include just that bundle (built by the release-images workflow's `vite build` step) so
 # the Node static-server image can serve it. Harmless for other builds: the dir only exists in the
-# web-console release job. The legacy apps/web-console/dist is not re-included: no image holds it.
+# web-console release job. Other dist directories remain excluded.
 !apps/web-console-next/dist
 !apps/web-console-next/dist/**

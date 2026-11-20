@@ -5200,7 +5200,7 @@
           "index": null,
           "issue": 1095,
           "parity": "Provider actions remain pending UI parity checks until the published contract is adopted.",
-          "source": "apps/web-console/src/services/authConfigApi.ts"
+          "source": "packages/console-api/src/auth-config.ts"
         },
         "x-visibility": "public"
       },
@@ -5381,7 +5381,7 @@
           "index": null,
           "issue": 1095,
           "parity": "Provider actions remain pending UI parity checks until the published contract is adopted.",
-          "source": "apps/web-console/src/services/authConfigApi.ts"
+          "source": "packages/console-api/src/auth-config.ts"
         },
         "x-visibility": "public"
       }

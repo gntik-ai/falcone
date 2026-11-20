@@ -1,0 +1,89 @@
+[
+  {
+    "url": "/v1/flows/workspaces/ws%2F1/flows",
+    "method": "GET",
+    "headers": [
+      [
+        "accept",
+        "application/json"
+      ],
+      [
+        "authorization",
+        "Bearer synthetic-access-token"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "x-api-version",
+        "2026-03-26"
+      ],
+      [
+        "x-correlation-id",
+        "corr_00000000-0000-4000-8000-000000000001"
+      ]
+    ]
+  },
+  {
+    "url": "/v1/flows/workspaces/ws%2F1/flows",
+    "method": "POST",
+    "body": "{\"name\":\"Trimmed\"}",
+    "headers": [
+      [
+        "accept",
+        "application/json"
+      ],
+      [
+        "authorization",
+        "Bearer synthetic-access-token"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "idempotency-key",
+        "idem_00000000-0000-4000-8000-000000000001"
+      ],
+      [
+        "x-api-version",
+        "2026-03-26"
+      ],
+      [
+        "x-correlation-id",
+        "corr_00000000-0000-4000-8000-000000000001"
+      ]
+    ]
+  },
+  {
+    "url": "/v1/flows/workspaces/ws%2F1/flows/f%2F1/schedule/trigger",
+    "method": "POST",
+    "headers": [
+      [
+        "accept",
+        "application/json"
+      ],
+      [
+        "authorization",
+        "Bearer synthetic-access-token"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "idempotency-key",
+        "idem_00000000-0000-4000-8000-000000000001"
+      ],
+      [
+        "x-api-version",
+        "2026-03-26"
+      ],
+      [
+        "x-correlation-id",
+        "corr_00000000-0000-4000-8000-000000000001"
+      ]
+    ]
+  }
+]
