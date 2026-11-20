@@ -357,3 +357,30 @@ and runtime-consumer retirement checks. Repository-layout validation is skipped 
 `spawnSync /usr/local/bin/node EPERM`; the installed pnpm is still 9.12.3 rather than the pinned
 10.0.0. Python-enabled lint, Docker builds and browser checks remain for PR CI. No dependencies,
 lockfiles, workflows, serving behavior or deployment files were changed by this follow-up.
+
+## Parity CI follow-up
+
+The supplied CI report records one failed test on shard 15: `console-operations |
+workspace_viewer | es | 768`, `runtime-health`. The shared harness at
+`apps/web-console-next/tests/parity/harness.mjs:147` still observed a busy main section
+when the journey navigated at `tests/parity/pages/console-operations.spec.mjs:226`.
+The journey had paused the browser clock, exercised reconnect and visibility events,
+then navigated to the all-completed fixture. The `ui-parity` aggregate failed because
+`SHARDS_RESULT` was `failure`; it does not identify a second defect. The action-runtime
+deprecation annotations are warnings, not the reported test failure.
+
+Comparison with immutable base `69296937330b61be2bbf2c7267520196499fc038` confirms that
+the operations spec and manifest, shared harness and settling logic, endpoint registry,
+shell fixtures, operations page and hooks, shell, router, parity configuration, Vite
+configuration and next app manifest are unchanged. The next app's lockfile importer is
+also identical. The parity HTTP fixture server's only change is the path used to read
+the moved static server's security constants. The moved file matches the base byte for
+byte (SHA256 `40f8f3c8202519441cde867d31d75ba35e2e27916981edc37fd8b37c2bd43b77`).
+
+These comparisons establish no change to the failing journey or the security policy it
+receives. They do not reproduce the browser failure on the base or establish its cause.
+Chromium is unavailable in the maker sandbox; PR CI must rerun shard 15 and the aggregate,
+and a browser-enabled base comparison is needed to classify the failure conclusively.
+Investigating the paused-clock navigation is a follow-up outside this serving-config move
+unless that comparison implicates the move. No production behavior, pre-existing test,
+assertion, timeout, retry policy, shard count or CI gate is changed for this report.
